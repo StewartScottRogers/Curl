@@ -4,8 +4,8 @@ using Curl.Cookies;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Networking;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 

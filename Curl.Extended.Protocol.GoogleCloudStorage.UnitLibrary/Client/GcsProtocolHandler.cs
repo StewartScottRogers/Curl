@@ -73,7 +73,7 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
         context.Progress.ReportTransferStarted();
         return context.Upload switch
         {
-            null when namesPrefix => operations.ListAsync(objectName, context.Output),
+            null when namesPrefix => operations.ListAsync(objectName, GcsEndpoint.QueryOf(context.Url.Query), context.Output),
             null => operations.DownloadAsync(objectName, context.Output),
             _ when namesPrefix => throw new GcsTransferException(CurlExitCode.UrlMalformat, "A Cloud Storage upload needs an object name in the URL"),
             { } upload => operations.UploadAsync(objectName, upload),

@@ -363,7 +363,7 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// answered with the Type 3, and LOGIN finishes only once its password prompt is answered, so a tagged <c>OK</c>
     /// before that is a refusal (RFC 4422 section 3.6, BL-5013, BL-5398).
     /// </summary>
-    private bool HasFinished(string mechanism) => (mechanism != "NTLM" && mechanism != "LOGIN") || challengesHanded > 0;
+    private bool HasFinished(string mechanism) => challengesHanded >= (mechanism == "DIGEST-MD5" ? 2 : mechanism == "NTLM" || mechanism == "LOGIN" ? 1 : 0);
 
     /// <summary>Reads the next tagged response or <c>+</c> continuation, skipping untagged lines.</summary>
     /// <exception cref="ImapResponseMissingException">The server closed before a response was complete.</exception>

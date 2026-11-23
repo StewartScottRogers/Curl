@@ -14,6 +14,8 @@ internal sealed partial class ServerCertificateVerification
 {
     private const string CrlDistributionPointsOid = "2.5.29.31";
 
+    private const string FreshestCrlOid = "2.5.29.46";
+
     private static readonly Asn1Tag ContextTag0 = new(TagClass.ContextSpecific, 0);
 
     private static readonly Asn1Tag ContextTag6 = new(TagClass.ContextSpecific, 6);
@@ -49,10 +51,12 @@ internal sealed partial class ServerCertificateVerification
     /// </summary>
     /// <param name="diagnosticLog">The connect target's diagnostic log.</param>
     /// <param name="limit">Cancelled when the connect's limit passes.</param>
+    /// <param name="isProxy">Whether the handshake is with an HTTPS proxy (BL-5828).</param>
     /// <returns>A verification for one handshake.</returns>
-    internal ServerCertificateVerification ForHandshake(IDiagnosticLog diagnosticLog, CancellationToken limit) =>
+    internal ServerCertificateVerification ForHandshake(IDiagnosticLog diagnosticLog, CancellationToken limit, bool isProxy = false) =>
         new(options, matchesSchannelBuild, timeProvider)
         {
+            IsProxy = isProxy,
             FetchRevocationList = FetchRevocationList,
             RevocationFetchBudget = RevocationFetchBudget,
             RevocationDiagnosticLog = diagnosticLog,
@@ -62,6 +66,13 @@ internal sealed partial class ServerCertificateVerification
             ReadEnvironmentVariable = ReadEnvironmentVariable,
             DefaultCaBundleCandidates = DefaultCaBundleCandidates,
         };
+
+    /// <summary>
+    /// Returns a verification with this one's settings and seams for a handshake with an HTTPS
+    /// proxy, whose <see cref="IsProxy" /> is set (BL-5828).
+    /// </summary>
+    /// <returns>A verification for the proxy's handshake.</returns>
+    internal ServerCertificateVerification ForProxy() => ForHandshake(RevocationDiagnosticLog, RevocationLimit, isProxy: true);
 
     private readonly ConditionalWeakTable<X509Chain, BelowAnchorRevocationAnswer> _belowAnchorAnswers = new();
 
@@ -105,10 +116,38 @@ internal sealed partial class ServerCertificateVerification
 
     private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var lists = CrlDistributionPointUris(certificate).Select(uri => UsableRevocationList(uri, certificate, issuer, budget)).OfType<CertificateRevocationList>().ToArray();
-        return lists.Length == 0
+        var outcomes = CrlDistributionPointUris(certificate)
+            .Select(uri => UsableRevocationList(uri, certificate, issuer, budget))
+            .OfType<CertificateRevocationList>()
+            .Select(list => list.Revokes(certificate) ? BelowAnchorRevocation.Revoked : DeltaRevocationOf(list, certificate, issuer, budget))
+            .ToArray();
+        return outcomes.Contains(BelowAnchorRevocation.Revoked)
+            ? BelowAnchorRevocation.Revoked
+            : outcomes.Contains(BelowAnchorRevocation.Clean) ? BelowAnchorRevocation.Clean : BelowAnchorRevocation.Unresolved;
+    }
+
+    // The delta lists a base list or the certificate points to through freshestCRL (RFC 5280, 5.2.6): each
+    // pointer needs a usable delta list, and a pointer with none (unfetchable, unusable, or not http) leaves the status unknown.
+    private BelowAnchorRevocation DeltaRevocationOf(CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    {
+        var pointers = new[] { baseList.FreshestCrlValue, certificate.Extensions[FreshestCrlOid]?.RawData }.OfType<byte[]>();
+        var outcomes = pointers.Select(pointer => DeltaRevocationOf(pointer, baseList, certificate, issuer, budget)).ToArray();
+        return outcomes.Contains(BelowAnchorRevocation.Revoked)
+            ? BelowAnchorRevocation.Revoked
+            : outcomes.Contains(BelowAnchorRevocation.Unresolved) ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
+    }
+
+    private BelowAnchorRevocation DeltaRevocationOf(byte[] pointer, CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    {
+        var deltas = DistributionPointUris(pointer)
+            .Select(uri => TryFetchRevocationList(uri, budget))
+            .Select(der => der is null ? null : DecodeOrNothing(der))
+            .OfType<CertificateRevocationList>()
+            .Where(delta => delta.CoversCertificatesIssuedFor(certificate) && delta.IsSignedBy(issuer) && delta.NextUpdate >= timeProvider.GetUtcNow() && delta.IsDeltaOf(baseList, certificate))
+            .ToArray();
+        return deltas.Length == 0
             ? BelowAnchorRevocation.Unresolved
-            : lists.Any(list => list.Revokes(certificate)) ? BelowAnchorRevocation.Revoked : BelowAnchorRevocation.Clean;
+            : deltas.Any(delta => delta.Revokes(certificate)) ? BelowAnchorRevocation.Revoked : BelowAnchorRevocation.Clean;
     }
 
     // A list is usable when it decodes, is the issuer's, is signed by the issuer and names a next update not yet passed (one naming none fails closed).
@@ -165,15 +204,16 @@ internal sealed partial class ServerCertificateVerification
     // for a certificate without the extension or with one that does not parse.
     internal static IReadOnlyList<Uri> CrlDistributionPointUris(X509Certificate2 certificate)
     {
-        if (certificate.Extensions[CrlDistributionPointsOid] is not { } extension)
-        {
-            return [];
-        }
+        return certificate.Extensions[CrlDistributionPointsOid] is { } extension ? DistributionPointUris(extension.RawData) : [];
+    }
 
+    // The http addresses of a CRLDistributionPoints value, as in a cRLDistributionPoints or freshestCRL extension.
+    private static IReadOnlyList<Uri> DistributionPointUris(byte[] value)
+    {
         var uris = new List<Uri>();
         try
         {
-            var points = new AsnReader(extension.RawData, AsnEncodingRules.DER).ReadSequence();
+            var points = new AsnReader(value, AsnEncodingRules.DER).ReadSequence();
             while (points.HasData)
             {
                 AddUrisOfPoint(points.ReadSequence(), uris);

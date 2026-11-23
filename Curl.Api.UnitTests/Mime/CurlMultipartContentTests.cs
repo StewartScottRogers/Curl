@@ -83,6 +83,18 @@ public sealed class CurlMultipartContentTests
     }
 
     [TestMethod]
+    public async Task SendAsync_BytesPartWithNoContentType_LeavesTheTypeToTheEngine()
+    {
+        FakeMimePartBuilder plain = await SendOnePartAsync(CurlMimePart.Bytes("report", new byte[] { 1 }));
+        FakeMimePartBuilder named = await SendOnePartAsync(CurlMimePart.Bytes("report", new byte[] { 1 }) with { FileName = "report.bin" });
+
+        Assert.IsNull(plain.Type);
+        Assert.IsNull(plain.FileName);
+        Assert.IsNull(named.Type);
+        Assert.AreEqual("report.bin", named.FileName);
+    }
+
+    [TestMethod]
     public async Task SendAsync_FilePart_SetsTheFileDataAndLeavesItsFileName()
     {
         FakeMimePartBuilder part = await SendOnePartAsync(CurlMimePart.File("upload", "dir/report.txt"));

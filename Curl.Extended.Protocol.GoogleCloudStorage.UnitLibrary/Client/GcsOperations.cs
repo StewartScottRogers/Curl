@@ -26,13 +26,14 @@ internal sealed class GcsOperations(GcsClient client, string bucket, Cancellatio
     /// <param name="prefix">The prefix the names start with, empty for the whole bucket.</param>
     /// <param name="output">Where the lines go.</param>
     /// <returns>The number of bytes written.</returns>
-    internal async Task<long> ListAsync(string prefix, Stream output)
+    /// <param name="urlQuery">The URL's query parameters: a <c>prefix</c> narrows the list further, a <c>delimiter</c> replaces <c>/</c>, any other parameter is passed on.</param>
+    internal async Task<long> ListAsync(string prefix, IReadOnlyList<KeyValuePair<string, string>> urlQuery, Stream output)
     {
         long written = 0;
         string? continuationToken = null;
         do
         {
-            GcsObjectListing listing = await client.ExchangeAsync("GET", GcsEndpoint.PathOf(bucket, string.Empty), ListQuery(prefix, continuationToken), null, ReadListingAsync);
+            GcsObjectListing listing = await client.ExchangeAsync("GET", GcsEndpoint.PathOf(bucket, string.Empty), ListQuery(prefix, urlQuery, continuationToken), null, ReadListingAsync);
             byte[] lines = Encoding.UTF8.GetBytes(string.Concat(listing.CommonPrefixes.Concat(listing.Objects.Select(listed => listed.Key)).Select(name => name + "\n")));
             await output.WriteAsync(lines, cancellationToken);
             written += lines.Length;
@@ -54,10 +55,20 @@ internal sealed class GcsOperations(GcsClient client, string bucket, Cancellatio
         return await client.ExchangeAsync("PUT", GcsEndpoint.PathOf(bucket, objectName), [], body, _ => Task.FromResult((long)body.Length));
     }
 
-    private static KeyValuePair<string, string>[] ListQuery(string prefix, string? continuationToken) =>
-        continuationToken is null
-            ? [new("list-type", "2"), new("delimiter", "/"), new("prefix", prefix)]
-            : [new("list-type", "2"), new("delimiter", "/"), new("prefix", prefix), new("continuation-token", continuationToken)];
+    private static List<KeyValuePair<string, string>> ListQuery(string prefix, IReadOnlyList<KeyValuePair<string, string>> urlQuery, string? continuationToken)
+    {
+        string[] owned = ["list-type", "continuation-token", "prefix", "delimiter"];
+        List<KeyValuePair<string, string>> query = [new("list-type", "2")];
+        query.Add(urlQuery.FirstOrDefault(parameter => parameter.Key == "delimiter") is { Key: not null } delimiter ? delimiter : new("delimiter", "/"));
+        query.Add(new("prefix", prefix + urlQuery.FirstOrDefault(parameter => parameter.Key == "prefix").Value));
+        query.AddRange(urlQuery.Where(parameter => !owned.Contains(parameter.Key)));
+        if (continuationToken is not null)
+        {
+            query.Add(new("continuation-token", continuationToken));
+        }
+
+        return query;
+    }
 
     private async Task<long> CopyAsync(Stream source, Stream output)
     {

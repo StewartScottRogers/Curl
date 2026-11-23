@@ -29,4 +29,11 @@ public sealed record ConnectTimings(
     long Started,
     long? NameResolved,
     long? Connected,
-    long? TlsHandshakeCompleted);
+    long? TlsHandshakeCompleted)
+{
+    /// <summary>
+    /// The <see cref="Exception.Data" /> key under which a connector carries the timings it had taken on the
+    /// <see cref="OperationCanceledException" /> a cancellation made it throw, so a caller that ended the connect itself still reports them (STD-145).
+    /// </summary>
+    public const string CarriedOnCancellationKey = "Curl.ConnectTimings";
+}

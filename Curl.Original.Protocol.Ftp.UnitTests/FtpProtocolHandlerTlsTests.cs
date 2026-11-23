@@ -490,6 +490,58 @@ public sealed class FtpProtocolHandlerTlsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ActiveProtPServerAlreadyConnected_StartsTheDataHandshakeBeforeTheTransferReply()
+    {
+        await RunActiveHandshakeBeforeReplyAsync(hasConnectionWaiting: true);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ActiveProtP_StartsTheDataHandshakeBeforeTheTransferReply()
+    {
+        await RunActiveHandshakeBeforeReplyAsync(hasConnectionWaiting: false);
+    }
+
+    private static async Task RunActiveHandshakeBeforeReplyAsync(bool hasConnectionWaiting)
+    {
+        // STD-175: a server may finish its data handshake before it sends 150, so the client
+        // must accept and start its handshake while the reply is still awaited.
+        using var cancel = new CancellationTokenSource();
+        var accepted = new ScriptedConnection();
+        var pending = new ScriptedPendingConnection(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 56703), ConnectResult.Connected(accepted)) { HasConnectionWaiting = hasConnectionWaiting };
+        var controlLocal = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 55129);
+        var securedControl = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            LoggedIn + Protected + Pwd + "200 EPRT command successful\r\n200 Type set\r\n213 5\r\n"))
+        {
+            LocalEndPoint = controlLocal,
+            HangsWhenExhausted = true,
+        };
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(securedControl), ConnectResult.Connected(Scripted("hello")));
+        int handshakesWhenReplyAwaited = -1;
+        securedControl.OnReadHangs = () =>
+        {
+            handshakesWhenReplyAwaited = tls.Handshakes.Count;
+            cancel.Cancel();
+        };
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + AuthAccepted))
+        {
+            LocalEndPoint = controlLocal,
+        };
+        var connector = new QueuedConnector(ConnectResult.Connected(control));
+        TransferContext context = MutableContext.Build(
+            new TransferContext { Url = CurlUrl.Parse("ftp://127.0.0.1:18437/a.txt"), Output = new MemoryStream(), CancellationToken = cancel.Token },
+            m =>
+            {
+                m.SslLevel = TransportSecurityLevel.Required;
+                m.FtpPort = "-";
+            });
+
+        await new FtpProtocolHandler(connector, new QueuedListener(ListenResult.Listening(pending)), tls).ExecuteAsync(context);
+
+        Assert.AreEqual(2, handshakesWhenReplyAwaited);
+        Assert.AreSame(accepted, tls.Handshakes[1].Plaintext);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UploadAndDataHandshakeFails_EndsWithItsExitCode()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

@@ -242,6 +242,14 @@ CurlResponse response = await client.SendAsync(request, cancellationToken);
 await response.Body.CopyToAsync(Stream.Null, cancellationToken);
 ```
 
+## See what the server said
+
+Set `CurlRequest.Debug` (`CURLOPT_DEBUGFUNCTION`) to take the trace `curl -v` writes: the callback gets each
+piece with its `CurlInfoType` (`Text`, `HeaderIn`, `HeaderOut`, `DataIn`, `DataOut`), and setting it makes the
+request verbose. With `MailRecipientAllowFails`, each server reply to a `RCPT TO` is a `HeaderIn` piece, `550 ...`
+for a refused recipient and `250 ...` for an accepted one, which the response's 250 status does not show. The
+pieces are exactly the bytes `curl -v` prints, so whatever `-v` hides never reaches the callback (ADR-1341).
+
 ## Use a WebSocket
 
 `CurlClient.ConnectWebSocketAsync` connects (`CurlWebSocketOptions` turns off the automatic pong

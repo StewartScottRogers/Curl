@@ -62,23 +62,42 @@ public sealed class SocketIoSessionTests
     }
 
     [TestMethod]
-    public async Task RunAsync_EmitEchoedWhileServerStaysOpen_ReturnsAtTheFirstEventWithoutWaitingForATimeout()
+    public async Task RunAsync_EmitEchoedWhileServerStaysOpen_ReturnsOnceTheServerIsQuietWithoutWaitingForATimeout()
     {
         ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "42[\"hello\"]", "42[\"later\"]");
         connection.WaitsAtEnd = true;
         MemoryStream output = new();
 
-        TransferResult result = await new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), new ZeroRandomSource()).ExecuteAsync(
+        ManualClock clock = new();
+        ValueTask<TransferResult> run = new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), new ZeroRandomSource()).ExecuteAsync(
             new TransferContext
             {
                 Url = CurlUrl.Parse("socketio://h/"),
                 Output = output,
-                TimeProvider = new ManualClock(),
+                TimeProvider = clock,
                 PostData = System.Text.Encoding.UTF8.GetBytes("""["hello"]"""),
             });
 
+        clock.Advance(TimeSpan.FromMilliseconds(999));
+        Assert.IsFalse(run.IsCompleted, "The client waits a second for a further event.");
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        TransferResult result = await run;
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual("[\"hello\"]\n", System.Text.Encoding.UTF8.GetString(output.ToArray()));
+        Assert.AreEqual("[\"hello\"]\n[\"later\"]\n", System.Text.Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EmitThenSeveralEventsThenDisconnect_WritesEveryEvent()
+    {
+        ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "42[\"reply\",\"ok\"]", "42[\"reply2\",\"ok2\"]", "41");
+        MemoryStream output = new();
+
+        TransferResult result = await new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), new ZeroRandomSource()).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("socketio://h/"), Output = output, TimeProvider = new ManualClock(), PostData = System.Text.Encoding.UTF8.GetBytes("""["ping",1]""") });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("[\"reply\",\"ok\"]\n[\"reply2\",\"ok2\"]\n", System.Text.Encoding.UTF8.GetString(output.ToArray()));
     }
 
     [TestMethod]

@@ -38,6 +38,14 @@ public sealed class McpServerProcessStarter : IMcpServerProcessStarter
             RedirectStandardError = false,
             StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
         };
+        if (McpBatchArgumentRefusal.IsBatchFile(command))
+        {
+            // cmd.exe splits an unquoted argument at = , and ;, so every argument of a batch server is double-quoted
+            // (the refusal has already kept " and % out of them).
+            startInfo.Arguments = string.Join(' ', arguments.Select(argument => "\"" + argument + "\""));
+            return startInfo;
+        }
+
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);

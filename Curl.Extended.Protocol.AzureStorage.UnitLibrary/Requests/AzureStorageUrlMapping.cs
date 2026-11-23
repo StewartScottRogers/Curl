@@ -38,7 +38,13 @@ public static class AzureStorageUrlMapping
 
     private static bool IsPathStyleHost(Uri url) =>
         url.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6
-        || string.Equals(url.Host, "localhost", StringComparison.OrdinalIgnoreCase);
+        || string.Equals(url.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || IsNumericIpv4Spelling(url.Host);
+
+    // Hex (0x7f000001) and all-digit (2130706433) hosts are IPv4 spellings the port's URL parser reads as 127.0.0.1 (EXT-105); never account names.
+    private static bool IsNumericIpv4Spelling(string host) =>
+        host.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+        || (host.Length > 0 && host.All(character => char.IsAsciiDigit(character) || character == '.'));
 
     private static AzureStorageEndpoint MapDfs(Uri url)
     {

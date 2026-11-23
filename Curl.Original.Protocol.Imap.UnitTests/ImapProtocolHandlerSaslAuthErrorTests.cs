@@ -63,6 +63,22 @@ public sealed class ImapProtocolHandlerSaslAuthErrorTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_OkAfterTheFirstDigestMd5ChallengeOnly_FailsWithLoginDeniedSendingNothingMore()
+    {
+        // BL-5810 STD-166: DIGEST-MD5 finishes only after the rspauth continuation is answered.
+        var sasl = new RankedSaslAuthenticator(("DIGEST-MD5", null, [Encoding.Latin1.GetBytes("R1")]));
+
+        ImapRun run = await ImapRun.ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse(Url + "INBOX/;UID=1"), Output = Stream.Null, Credentials = new NetworkCredential("user", "secret") },
+            new ScriptedConnection(Encoding.Latin1.GetBytes(
+                "* OK ready\r\n* CAPABILITY IMAP4rev1 AUTH=DIGEST-MD5\r\nA001 OK done\r\n+ " + NoNonceChallenge + "\r\nA002 OK auth\r\n")),
+            sasl);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        Assert.IsFalse(run.Sent.Contains("SELECT", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_CompleteNtlmExchange_LogsIn()
     {
         var sasl = new RankedSaslAuthenticator(("NTLM", Encoding.Latin1.GetBytes("T1"), [Encoding.Latin1.GetBytes("T3")]));

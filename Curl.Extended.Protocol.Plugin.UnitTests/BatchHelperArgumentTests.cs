@@ -43,4 +43,20 @@ public sealed class BatchHelperArgumentTests
         SystemHelperProcessStarter.RefuseUnsafeBatchArgument("/bin/curl-proto-demo.exe", "demo://host/a&b\"%");
         SystemHelperProcessStarter.RefuseUnsafeBatchArgument("/bin/curl-proto-demo", "demo://host/a&b");
     }
-}
+
+    [TestMethod]
+    public void BuildStartInfo_BatchHelper_QuotesTheUrlSoCmdDoesNotSplitIt()
+    {
+        var info = SystemHelperProcessStarter.BuildStartInfo("curl-proto-zzq.cmd", "zzq://h/a,b;c?a=b");
+
+        Assert.AreEqual("\"zzq://h/a,b;c?a=b\"", info.Arguments);
+        Assert.IsEmpty(info.ArgumentList);
+    }
+
+    [TestMethod]
+    public void BuildStartInfo_NonBatchHelper_PassesTheUrlAsOneArgument()
+    {
+        var info = SystemHelperProcessStarter.BuildStartInfo("curl-proto-zzq", "zzq://h/x?a=b");
+
+        CollectionAssert.AreEqual(new[] { "zzq://h/x?a=b" }, info.ArgumentList.ToArray());
+    }}

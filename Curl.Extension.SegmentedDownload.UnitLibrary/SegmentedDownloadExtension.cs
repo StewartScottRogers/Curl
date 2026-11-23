@@ -21,6 +21,10 @@ public static class SegmentedDownloadExtension
         ExtensionOptionArgument.Value,
         "Download an HTTP GET as <n> byte ranges fetched in parallel (1 to 64)");
 
+    // --content-digest checks Repr-Digest only against a whole representation, never a 206 (ADR-1094), so a split transfer would go
+    // unchecked; with it given the transfer is not split and runs as curl runs it (EXT-106). Matched by name: extensions never reference each other.
+    private static readonly ExtensionOption ContentDigestOption = new("content-digest", ExtensionOptionArgument.None, string.Empty);
+
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "segments",
@@ -33,7 +37,7 @@ public static class SegmentedDownloadExtension
     /// <param name="values">The option group's extension options.</param>
     /// <returns>
     /// The hook splitting into the given number of segments, a hook that refuses the transfer when the number is not
-    /// a whole number from 1 to <see cref="MaximumSegments" />, or <see langword="null" /> when <c>--segments</c> was not given.
+    /// a whole number from 1 to <see cref="MaximumSegments" />, or <see langword="null" /> when <c>--segments</c> was not given or <c>--content-digest</c> was (the digest is checked against one whole response, EXT-106).
     /// </returns>
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
@@ -42,7 +46,7 @@ public static class SegmentedDownloadExtension
         {
             null => null,
             var text when int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var count) && count is >= 1 and <= MaximumSegments
-                => new SegmentedDownloadTransferHook(count),
+                => values.IsGiven(ContentDigestOption) ? null : new SegmentedDownloadTransferHook(count),
             _ => new InvalidSegmentCountTransferHook(),
         };
     }

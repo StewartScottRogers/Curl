@@ -118,13 +118,25 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     private string? FindDefaultCaBundleFile() =>
         matchesSchannelBuild || options.HasCaCertificates || options.Insecure
             ? null
-            : NonEmptyCurlCaBundle() ?? BuiltInBundleForAnEmptiedSystemStore();
+            : IsProxy ? BuiltInBundleForAProxy() : NonEmptyCurlCaBundle() ?? BuiltInBundleForAnEmptiedSystemStore();
+
+    /// <summary>
+    /// Whether the handshake is with an HTTPS proxy. The OpenSSL build then verifies the proxy
+    /// against its built-in bundle, never the file <c>CURL_CA_BUNDLE</c> or <c>SSL_CERT_FILE</c>
+    /// names, which is for the target (BL-5828); <c>SSL_CERT_DIR</c> still reaches it.
+    /// </summary>
+    internal bool IsProxy { get; init; }
+
+    private string? BuiltInBundleForAProxy() =>
+        string.IsNullOrEmpty(ReadEnvironmentVariable("SSL_CERT_DIR")) ? FirstExistingBuiltInBundle() : null;
 
     private string? NonEmptyCurlCaBundle() =>
         ReadEnvironmentVariable("CURL_CA_BUNDLE") is { Length: > 0 } bundle ? bundle : null;
 
     private string? BuiltInBundleForAnEmptiedSystemStore() =>
-        EmptiesSystemStore() ? DefaultCaBundleCandidates.FirstOrDefault(File.Exists) : null;
+        EmptiesSystemStore() ? FirstExistingBuiltInBundle() : null;
+
+    private string? FirstExistingBuiltInBundle() => DefaultCaBundleCandidates.FirstOrDefault(File.Exists);
 
     private bool EmptiesSystemStore() =>
         ReadEnvironmentVariable("SSL_CERT_FILE") is "" || ReadEnvironmentVariable("SSL_CERT_DIR") is "";
@@ -302,7 +314,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         ReadOnlyMemory<byte>[] peerCertificates,
         byte[]? stapledResponse = null)
     {
-        if (RelyingOnAnIntermediateTheServerDidNotSend(chain, peerCertificates))
+        if (RelyingOnAnUnsentIntermediate(chain, anchorsBesideSystemStore, peerCertificates))
         {
             return (
                 new PeerVerification(false, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally, peerCertificates),
@@ -342,6 +354,25 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             && chain is not null
             && peerCertificates.Length > 0
             && chain.ChainElements.Skip(1).Take(Math.Max(0, AnchorIndexOf(chain) - 1)).Any(element => !WasSent(element.Certificate, peerCertificates));
+    }
+
+    private bool RelyingOnAnUnsentIntermediate(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates) =>
+        RelyingOnAnIntermediateTheServerDidNotSend(chain, peerCertificates)
+        || AnchoredChainRelyingOnAnIntermediateTheServerDidNotSend(chain, anchors, peerCertificates);
+
+    // The same test for the chain rebuilt against the --capath roots, which the system store's
+    // intermediates reach too when the SslStream chain does not end at an anchor (BL-5827).
+    private bool AnchoredChainRelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates)
+    {
+        if (matchesSchannelBuild || options.Insecure || peerCertificates.Length == 0)
+        {
+            return false;
+        }
+
+        using var rebuilt = RebuildAgainstAnchors(chain, anchors, requireServerAuthentication: true, out _);
+        return rebuilt is not null
+            && EndsAtAnchor(rebuilt, anchors)
+            && rebuilt.ChainElements.Skip(1).Take(Math.Max(0, rebuilt.ChainElements.Count - 2)).Any(element => !WasSent(element.Certificate, peerCertificates));
     }
 
     private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates) =>

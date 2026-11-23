@@ -1743,6 +1743,11 @@ internal sealed class FtpSession(
 
         ConnectResult accepted = await pendingConnection.AcceptAsync(context.CancellationToken).ConfigureAwait(false);
         acceptedEarly = accepted.Connection;
+        if (protectData && acceptedEarly is not null)
+        {
+            dataHandshake = StartDataHandshake(acceptedEarly);
+        }
+
         return acceptedEarly is null
             ? TransferResult.Failure(accepted.ExitCode, accepted.ErrorMessage!, bytesTransferred)
             : null;
@@ -2051,7 +2056,7 @@ internal sealed class FtpSession(
             return null;
         }
 
-        Task<ConnectResult> handshake = dataHandshake ?? StartDataHandshake(dataConnection!);
+        Task<ConnectResult> handshake = dataHandshake!;
         dataHandshake = null;
         ConnectResult secured = await handshake.ConfigureAwait(false);
         dataConnection = secured.Connection;
@@ -3172,6 +3177,43 @@ internal sealed class FtpSession(
         await SendAsync(command).ConfigureAwait(false);
         trace.Sent(command);
         trace.AwaitingReply();
+        return await ExchangeAcceptingEarlyAsync().ConfigureAwait(false);
+    }
+
+    private async ValueTask<FtpReply> ExchangeAcceptingEarlyAsync()
+    {
+        using var stopAccepting = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+        Task acceptingEarly = AcceptAndStartDataHandshakeAsync(pendingConnection!, stopAccepting.Token);
+        Task<FtpReply> exchange = ExchangeWhileAcceptingAsync().AsTask();
+        await ((Task)exchange).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await stopAccepting.CancelAsync().ConfigureAwait(false);
+        await acceptingEarly.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        return await exchange.ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Accepts the server's data connection while the transfer command's reply is awaited and
+    /// starts the TLS handshake over it at once, as curl does, so a server that finishes its
+    /// handshake before it sends <c>150</c> is served (STD-175). A failed or cancelled accept
+    /// is left to <see cref="AcceptDataConnectionAsync" />.
+    /// </summary>
+    private async Task AcceptAndStartDataHandshakeAsync(IPendingConnection pending, CancellationToken cancellationToken)
+    {
+        if (!protectData)
+        {
+            return;
+        }
+
+        ConnectResult accepted = await pending.AcceptAsync(cancellationToken).ConfigureAwait(false);
+        if (accepted.Connection is { } connection)
+        {
+            acceptedEarly = connection;
+            dataHandshake = StartDataHandshake(connection);
+        }
+    }
+
+    private async ValueTask<FtpReply> ExchangeWhileAcceptingAsync()
+    {
         Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
         TimeSpan acceptLeft = context.FtpAcceptTimeout - context.TimeProvider.GetElapsedTime(listenedAt);
         bool acceptFirst = acceptLeft <= context.FtpServerResponseTimeout;

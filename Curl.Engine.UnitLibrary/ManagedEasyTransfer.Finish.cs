@@ -15,9 +15,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 

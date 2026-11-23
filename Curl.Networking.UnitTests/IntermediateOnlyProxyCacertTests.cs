@@ -3,6 +3,7 @@ using System.Net.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
+using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
@@ -217,6 +218,136 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.AreEqual(fetched.Count, fetched.Distinct().Count());
     }
 
+    private const string DeltaAddress = "http://127.0.0.1:1/delta.crl";
+
+    private const string FreshestCrlOid = "2.5.29.46";
+
+    private static byte[] Number(byte value) => [0x02, 0x01, value];
+
+    private static byte[] FreshestExtension(string address) =>
+        TestRevocationList.Extension(FreshestCrlOid, false, CertificateRevocationListBuilder.BuildCrlDistributionPointExtension([address]).RawData);
+
+    private static byte[] BaseListNumbered(Pki pki, byte number, params byte[][] more) =>
+        TestRevocationList.Write(
+            pki.Intermediate,
+            nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
+            extensions: [TestRevocationList.Extension("2.5.29.20", false, Number(number)), .. more]);
+
+    private static byte[] Delta(Pki pki, byte baseNumber, bool revoked, bool deltaIndicator = true) =>
+        TestRevocationList.Write(
+            pki.Intermediate,
+            nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
+            revokedSerialNumbers: revoked ? [pki.LeafSerial] : null,
+            extensions: deltaIndicator ? [TestRevocationList.Extension("2.5.29.27", true, Number(baseNumber))] : []);
+
+    private (CurlExitCode ExitCode, string Message)? VerifyWithDelta(Pki pki, byte[] baseList, byte[]? delta) =>
+        VerifyStubbedWith(
+            pki,
+            (uri, _) => uri.AbsolutePath == "/delta.crl" ? delta ?? throw new IOException("the server answered 404") : baseList,
+            NoDiagnosticLog.Instance,
+            TimeSpan.FromSeconds(5));
+
+    [TestMethod]
+    public void VerifyPeer_BaseListPointsToADeltaListRevokingTheLeaf_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyWithDelta(pki, BaseListNumbered(pki, 5, FreshestExtension(DeltaAddress)), Delta(pki, 5, revoked: true));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_CertificatePointsToADeltaListRevokingTheLeaf_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false, freshestCrlAddress: DeltaAddress);
+
+        var failure = VerifyWithDelta(pki, BaseListNumbered(pki, 5), Delta(pki, 4, revoked: true));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_DeltaListIsValidAndEmpty_Accepts()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyWithDelta(pki, BaseListNumbered(pki, 5, FreshestExtension(DeltaAddress)), Delta(pki, 5, revoked: false));
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_DeltaListCannotBeFetched_IsExit60AndNotRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyWithDelta(pki, BaseListNumbered(pki, 5, FreshestExtension(DeltaAddress)), null);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreNotEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_FreshestCrlNamesNoHttpAddress_IsExit60()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyWithDelta(pki, BaseListNumbered(pki, 5, FreshestExtension("ldap://127.0.0.1/delta")), Delta(pki, 5, revoked: false));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_DeltaListNewerThanTheBaseList_IsExit60()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyWithDelta(pki, BaseListNumbered(pki, 5, FreshestExtension(DeltaAddress)), Delta(pki, 6, revoked: false));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_BaseListWithoutANumberAndADelta_IsExit60()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var baseList = TestRevocationList.Write(pki.Intermediate, nextUpdate: DateTimeOffset.UtcNow.AddDays(3), extensions: [FreshestExtension(DeltaAddress)]);
+
+        var failure = VerifyWithDelta(pki, baseList, Delta(pki, 5, revoked: false));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_FreshestCrlAnswersWithAListThatIsNotADelta_IsExit60()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyWithDelta(pki, BaseListNumbered(pki, 5, FreshestExtension(DeltaAddress)), Delta(pki, 5, revoked: false, deltaIndicator: false));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_DeltaListThatIsExpiredOrNotTheIssuersOrSignedByAnother_IsExit60()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        using var other = new Pki(revokeLeaf: false);
+        var baseList = BaseListNumbered(pki, 5, FreshestExtension(DeltaAddress));
+        var extensions = new[] { TestRevocationList.Extension("2.5.29.27", true, Number(5)) };
+        var expired = TestRevocationList.Write(pki.Intermediate, thisUpdate: DateTimeOffset.UtcNow.AddDays(-3), nextUpdate: DateTimeOffset.UtcNow.AddDays(-1), extensions: extensions);
+        var otherIssuer = TestRevocationList.Write(pki.Intermediate, new X500DistinguishedName("CN=Somebody Else"), nextUpdate: DateTimeOffset.UtcNow.AddDays(3), extensions: extensions);
+        var otherSigner = TestRevocationList.Write(other.Intermediate, pki.Intermediate.SubjectName, nextUpdate: DateTimeOffset.UtcNow.AddDays(3), extensions: extensions);
+
+        var undated = TestRevocationList.Write(pki.Intermediate, extensions: extensions);
+
+        foreach (var delta in new[] { expired, otherIssuer, otherSigner, undated })
+        {
+            Assert.AreEqual(CurlExitCode.PeerFailedVerification, VerifyWithDelta(pki, baseList, delta)?.ExitCode);
+        }
+    }
+
     [TestMethod]
     public void VerifyPeer_StalledFetch_EndsWithinTheBudgetAsUnfetchable()
     {
@@ -366,13 +497,13 @@ public sealed class IntermediateOnlyProxyCacertTests
 
         private readonly RSA _intermediateKey;
 
-        public Pki(bool revokeLeaf, bool withDistributionPoint = true)
+        public Pki(bool revokeLeaf, bool withDistributionPoint = true, string? freshestCrlAddress = null)
         {
             _root = CreateAuthority("CN=Proxy Root", null, out _);
             using var intermediate = CreateAuthority("CN=Proxy Intermediate", _root, out _intermediateKey);
             Intermediate = intermediate.CopyWithPrivateKey(_intermediateKey);
             LeafSerial = [0x42, 0x17];
-            Leaf = CreateLeaf(Intermediate, LeafSerial, withDistributionPoint);
+            Leaf = CreateLeaf(Intermediate, LeafSerial, withDistributionPoint, freshestCrlAddress);
             CrlBytes = BuildCrlOfIssuer(revokeLeaf ? [LeafSerial] : [], DateTimeOffset.UtcNow.AddDays(3));
         }
 
@@ -447,7 +578,7 @@ public sealed class IntermediateOnlyProxyCacertTests
             return request.Create(issuer, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(20), [1, 2, 3]);
         }
 
-        private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, byte[] serial, bool withDistributionPoint)
+        private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, byte[] serial, bool withDistributionPoint, string? freshestCrlAddress)
         {
             using var key = RSA.Create(2048);
             var request = new CertificateRequest($"CN={Host}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -459,6 +590,11 @@ public sealed class IntermediateOnlyProxyCacertTests
             if (withDistributionPoint)
             {
                 request.CertificateExtensions.Add(CertificateRevocationListBuilder.BuildCrlDistributionPointExtension([UnreachableCrlAddress]));
+            }
+
+            if (freshestCrlAddress is not null)
+            {
+                request.CertificateExtensions.Add(new X509Extension(new Oid(FreshestCrlOid), CertificateRevocationListBuilder.BuildCrlDistributionPointExtension([freshestCrlAddress]).RawData, false));
             }
 
             return request.Create(issuer, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(10), serial);

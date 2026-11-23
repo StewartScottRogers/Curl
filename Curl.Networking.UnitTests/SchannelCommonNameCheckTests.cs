@@ -118,6 +118,41 @@ public sealed class SchannelCommonNameCheckTests
     }
 
     [TestMethod]
+    [DataRow("localhost.", "localhost", true)]
+    [DataRow("localhost.", "localhost.", true)]
+    [DataRow("localhost", "localhost.", true)]
+    [DataRow("other.example.", "localhost", false)]
+    [DataRow("localhost.", "127.0.0.1", false)]
+    public void DnsAlternativeNameMatches_WithATrailingDotOnEitherSide_FollowsCurlsHostCheck(string name, string host, bool expected)
+    {
+        using var certificate = CreateCertificate("CN=other", names => names.AddDnsName(name));
+
+        Diagnostics.Arrange("alternative name, host", $"{name}, {host}");
+
+        var matches = SchannelCommonNameCheck.DnsAlternativeNameMatches(certificate, host);
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", expected, matches);
+
+        Assert.AreEqual(expected, matches);
+    }
+
+    [TestMethod]
+    public void DnsAlternativeNameMatches_WithoutAlternativeNames_IsFalse()
+    {
+        using var certificate = CreateCertificate("CN=localhost", addNames: null);
+
+        Diagnostics.Arrange("subject, alternative names, host", "CN=localhost, none, localhost");
+
+        var matches = SchannelCommonNameCheck.DnsAlternativeNameMatches(certificate, "localhost");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", false, matches);
+
+        Assert.IsFalse(matches);
+    }
+
+    [TestMethod]
     public void CommonNameMatches_WithADnsAlternativeName_IsFalse()
     {
         using var certificate = CreateCertificate("CN=localhost", names => names.AddDnsName("other.example"));

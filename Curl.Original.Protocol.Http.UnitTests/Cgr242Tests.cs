@@ -58,3 +58,34 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsEmpty(progress.Reports);
     }
 }
+
+/// <summary>STD-145: a connect that failed after the TCP connect, or timed out after the name resolved, counts one connection.</summary>
+public sealed partial class HttpProtocolHandlerTests
+{
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectFailedAfterTheTcpConnect_CountsOneConnection()
+    {
+        ConnectResult failure = ConnectResult.Failed(CurlExitCode.PeerFailedVerification, "certificate refused", new ConnectTimings(1, 2, 3, null));
+        TransferResult result = await Handler(new QueueConnector(failure)).ExecuteAsync(ProgressContext("http://example.com/", new RecordingTransferProgress(), new HttpRequestOptions()));
+
+        Assert.AreEqual(1, result.Report!.ConnectionCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectTimedOutAfterTheNameResolved_CountsOneConnection()
+    {
+        ConnectResult failure = ConnectResult.Failed(CurlExitCode.OperationTimedOut, "timed out", new ConnectTimings(1, 2, null, null));
+        TransferResult result = await Handler(new QueueConnector(failure)).ExecuteAsync(ProgressContext("http://example.com/", new RecordingTransferProgress(), new HttpRequestOptions()));
+
+        Assert.AreEqual(1, result.Report!.ConnectionCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectRefusedAfterTheNameResolved_CountsNoConnection()
+    {
+        ConnectResult failure = ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused", new ConnectTimings(1, 2, null, null));
+        TransferResult result = await Handler(new QueueConnector(failure)).ExecuteAsync(ProgressContext("http://example.com/", new RecordingTransferProgress(), new HttpRequestOptions()));
+
+        Assert.AreEqual(0, result.Report!.ConnectionCount);
+    }
+}

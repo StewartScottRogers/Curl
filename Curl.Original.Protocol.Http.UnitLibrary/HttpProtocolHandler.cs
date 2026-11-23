@@ -1157,8 +1157,16 @@ public sealed class HttpProtocolHandler(
             ResponseHeadersStored = connect.ConnectReplyHeadersStored,
             RefusedConnectHeaderCount = connect.ConnectReplyHeadersStored,
             Timings = new TransferTimings(plan.Started, connect.Timings, failed, failed, failed, failed),
+            ConnectionCount = ReachedAPeer(connect) ? 1 : 0,
         };
     }
+
+    /// <summary>
+    /// Whether a failed connect had made a connection curl counts in <c>%{num_connects}</c>: the TCP connect completed before a
+    /// TLS or tunnel step failed, or the attempt timed out after the name resolved (STD-145).
+    /// </summary>
+    private static bool ReachedAPeer(ConnectResult connect) =>
+        connect.Timings is { } timings && (timings.Connected is not null || connect.ExitCode == CurlExitCode.OperationTimedOut && timings.NameResolved is not null);
 
     /// <summary>
     /// Sends <paramref name="plan" /> on <paramref name="connection" />, then each retry that

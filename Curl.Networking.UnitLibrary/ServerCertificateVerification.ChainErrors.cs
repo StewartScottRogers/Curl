@@ -98,8 +98,17 @@ internal sealed partial class ServerCertificateVerification
     // With --cacert the Schannel build names a broken name constraint (BL-5375) or a revoked certificate below the anchor (BL-5384).
     private (CurlExitCode ExitCode, string Message)? CaCertificateFileChainFailure(SslPolicyErrors errors, X509Chain? chain) =>
         ConstraintViolationOf(errors, chain) is var violation and not 0
-            ? (CurlExitCode.PeerFailedVerification, $"schannel: error 0x{violation:x8}")
+            ? (CurlExitCode.PeerFailedVerification,
+                RevocationStatusIsUnknownAndChecked(chain)
+                    ? TlsFailureMessages.SchannelRevocationStatusUnknown
+                    : $"schannel: error 0x{violation:x8}")
             : BelowNonSelfSignedAnchorFailure(chain);
+
+    // Schannel names an unknown revocation status before a broken name constraint (BL-5809).
+    private bool RevocationStatusIsUnknownAndChecked(X509Chain? chain) =>
+        !options.SkipRevocationCheck
+        && !options.RevocationCheckBestEffort
+        && ReadChainStatus(chain).Any(status => (status.Status & UnavailableRevocationFlags) != 0);
 
     // A chain error with a name constraint of a CA in the chain broken by the server certificate
     // is named by Schannel's trust error (BL-5375); 0 for any other failure.

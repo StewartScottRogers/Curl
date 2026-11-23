@@ -150,6 +150,19 @@ internal sealed class CertificateRevocationList
         return false;
     }
 
+    /// <summary>Gets the value of the list's <c>freshestCRL</c> extension (where its delta lists are), or <see langword="null" /> when it has none.</summary>
+    public byte[]? FreshestCrlValue => _scope.FreshestCrlValue;
+
+    /// <summary>
+    /// Returns whether this list is a delta list that updates <paramref name="baseList" /> and answers
+    /// for <paramref name="certificate" />: its <c>deltaCRLIndicator</c> is not past the base list's <c>cRLNumber</c>.
+    /// </summary>
+    /// <param name="baseList">The base list the delta updates.</param>
+    /// <param name="certificate">The certificate whose revocation is checked.</param>
+    /// <returns><see langword="true" /> when this list can be applied to the base list.</returns>
+    public bool IsDeltaOf(CertificateRevocationList baseList, X509Certificate2 certificate) =>
+        _scope.CoversAsDelta(certificate, baseList._scope.Number);
+
     /// <summary>Returns whether the list revokes <paramref name="certificate" />, by its serial number.</summary>
     /// <param name="certificate">The certificate checked.</param>
     /// <returns><see langword="true" /> when its serial number is listed.</returns>

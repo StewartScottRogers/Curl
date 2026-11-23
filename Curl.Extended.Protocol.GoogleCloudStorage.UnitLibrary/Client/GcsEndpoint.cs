@@ -38,6 +38,20 @@ internal sealed record GcsEndpoint(string Host, int Port, bool UseTls)
             : null;
     }
 
+    /// <summary>Splits a <c>gs://</c> URL's query string into its parameters, percent-decoded (a <c>+</c> is a space); a parameter with no <c>=</c> has an empty value.</summary>
+    /// <param name="query">The query string without its <c>?</c>, or <see langword="null"/> when the URL has none.</param>
+    /// <returns>The parameters in the order the URL gives them.</returns>
+    internal static List<KeyValuePair<string, string>> QueryOf(string? query) =>
+        [.. (query ?? string.Empty).Split('&', StringSplitOptions.RemoveEmptyEntries).Select(parameter =>
+        {
+            int equals = parameter.IndexOf('=', StringComparison.Ordinal);
+            return equals < 0
+                ? new KeyValuePair<string, string>(Decode(parameter), string.Empty)
+                : new KeyValuePair<string, string>(Decode(parameter[..equals]), Decode(parameter[(equals + 1)..]));
+        })];
+
+    private static string Decode(string text) => Uri.UnescapeDataString(text.Replace('+', ' '));
+
     /// <summary>Gives the path, before percent-encoding, of <paramref name="objectName"/> in <paramref name="bucket"/>; an empty name gives the bucket itself.</summary>
     /// <param name="bucket">The bucket.</param>
     /// <param name="objectName">The object name, or empty for the bucket.</param>

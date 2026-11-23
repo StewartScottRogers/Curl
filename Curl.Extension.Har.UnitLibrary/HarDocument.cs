@@ -18,8 +18,6 @@ internal static class HarDocument
 
     private static readonly HashSet<string> UrlHeaderNames = new(["Location", "Content-Location", "Referer"], StringComparer.OrdinalIgnoreCase);
 
-    private static readonly HashSet<string> UrlListHeaderNames = new(["Link", "Refresh"], StringComparer.OrdinalIgnoreCase);
-
     /// <summary>Writes the archive of <paramref name="exchanges" />, in the order given, as indented UTF-8 JSON.</summary>
     /// <param name="exchanges">The transfers, one entry each.</param>
     /// <returns>The archive's bytes.</returns>
@@ -187,8 +185,7 @@ internal static class HarDocument
 
     private static KeyValuePair<string, string> RedactedHeader(KeyValuePair<string, string> header) =>
         UrlHeaderNames.Contains(header.Key) ? new(header.Key, HarTransferHook.Redacted(header.Value))
-        : UrlListHeaderNames.Contains(header.Key) ? new(header.Key, RedactedInEachUrl(header.Value))
-        : header;
+        : new(header.Key, RedactedInEachUrl(header.Value));
 
     /// <summary>Puts <see cref="HarTransferHook.RedactedUserInfo" /> in place of the user information of every absolute URL in <paramref name="value" />, a <c>Link</c> or <c>Refresh</c> value.</summary>
     private static string RedactedInEachUrl(string value)

@@ -38,13 +38,13 @@ public sealed class MultipartFormBodyBuilderTraceSizeTests
 
     private async Task<MultipartFormBuildResult> BuildAsync(IReadOnlyDictionary<string, long>? sizes)
     {
-        MultipartFormBodyBuilder builder = new(new FormFileSystem().WithFile("f.txt", "ab"), Encoding.UTF8, () => "B", standardInput: null)
-        {
-            FileSizesBeforeTrace = sizes,
-        };
+        MultipartFormBodyBuilder builder = new(new FormFileSystem().WithFile("f.txt", "ab"), Encoding.UTF8, () => "B", standardInput: null);
 
         return await builder.BuildAsync(
             [new MultipartFormPart("f", MultipartFormPartKind.FileUpload, "f.txt", null, null, [], NoParts)],
-            TestContext.CancellationToken);
+            MultipartNameEscaping.Percent,
+            null,
+            TestContext.CancellationToken,
+            sizes);
     }
 }

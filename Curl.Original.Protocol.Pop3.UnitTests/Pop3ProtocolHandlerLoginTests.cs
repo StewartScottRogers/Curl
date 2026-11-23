@@ -479,6 +479,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
     [TestMethod]
     [DataRow("LOGIN", "u", "AUTH LOGIN dQ==\r\n", DisplayName = "BL-5477 STD-156: LOGIN --sasl-ir, +OK before the password prompt")]
     [DataRow("CRAM-MD5", null, "AUTH CRAM-MD5\r\n", DisplayName = "BL-5477 STD-156: CRAM-MD5 --sasl-ir, +OK before the challenge")]
+    [DataRow("DIGEST-MD5", null, "AUTH DIGEST-MD5\r\n", DisplayName = "BL-5810 STD-166: DIGEST-MD5 --sasl-ir, +OK before the challenge")]
     public async Task ExecuteAsync_SaslIrOkBeforeFirstChallenge_Exit67LoginDenied(string mechanism, string? initialResponse, string authLine)
     {
         var sasl = new RankedSaslAuthenticator((mechanism, initialResponse is null ? null : Encoding.ASCII.GetBytes(initialResponse), [Encoding.ASCII.GetBytes("p")]));

@@ -62,7 +62,8 @@ internal sealed partial class ServerCertificateVerification
 
     private static SslPolicyErrors WithoutNameMismatchTheCommonNameAnswers(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
         errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
-        && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
+        && (SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
+            || SchannelCommonNameCheck.DnsAlternativeNameMatches(chain.ChainElements[0].Certificate, targetHost))
             ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
             : errors;
 

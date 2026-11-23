@@ -1379,6 +1379,9 @@ Each option and the specific reason it lost.
 | [1335](ADR-1335-a-curl-api-header-with-an-empty-value-removes-it-and-empty-headers-sends-it-empty.md) | A Curl.Api header with an empty value removes it; EmptyHeaders sends one empty (BL-5747) | Accepted | 2026-11-22 |
 | [1336](ADR-1336-a-curl-api-body-to-an-extension-scheme-reaches-the-handler-as-curl-d-data.md) | A Curl.Api body to an extension scheme reaches the handler as -d data (BL-5758) | Accepted | 2026-11-22 |
 | [1337](ADR-1337-a-curl-api-stream-body-to-an-extension-scheme-is-read-up-front-as-curl-d-data.md) | A Curl.Api stream body to an extension scheme is read up front as -d data (BL-5754) | Accepted | 2026-11-22 |
-| [1338](ADR-1338-a-socketio-emit-ends-at-the-first-event-the-server-sends-back.md) | A socketio emit ends at the first event the server sends back (BL-5763) | Accepted | 2026-11-22 |
+| [1338](ADR-1338-a-socketio-emit-ends-at-the-first-event-the-server-sends-back.md) | A socketio emit ends at the first event the server sends back (BL-5763); amended: every event until disconnect or one quiet second (BL-5835) | Accepted | 2026-11-22 |
 | [1339](ADR-1339-an-extension-url-post-whose-read-callback-aborts-pauses-or-lies-fails-the-transfer.md) | An extension URL post whose read callback aborts, pauses or lies fails the transfer (BL-5764) | Accepted | 2026-11-22 |
 | [1340](ADR-1340-socketio-sends-oauth2-bearer-as-the-connect-packet-token.md) | The socketio client sends --oauth2-bearer as the CONNECT packet's token (BL-5781) | Accepted | 2026-11-22 |
+| [1341](ADR-1341-curl-api-takes-the-verbose-trace-through-a-per-request-debug-callback.md) | Curl.Api takes the verbose trace through a per-request debug callback (BL-5797) | Accepted | 2026-11-22 |
+| [1342](ADR-1342-the-openssl-build-verifies-an-https-proxy-against-its-built-in-bundle.md) | The OpenSSL build verifies an HTTPS proxy against its built-in bundle (BL-5828) | Accepted | 2026-11-23 |
+| [1343](ADR-1343-openldap-sasl-bind-failures-exit-67-login-denied-or-authentication-cancelled.md) | OpenLDAP SASL bind failures exit 67 Login denied or Authentication cancelled (BL-5819) | Accepted | 2026-11-23 |

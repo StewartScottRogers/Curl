@@ -16,7 +16,7 @@ internal static class MailRequestOptionsMapping
     /// <summary>The schemes whose transfers carry <see cref="MailRequestOptions" />, matched without case.</summary>
     private static readonly HashSet<string> MailSchemes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "smtp", "smtps", "pop3", "pop3s", "imap", "imaps",
+        "smtp", "smtps", "pop3", "pop3s", "imap", "imaps", "ldap", "ldaps",
     };
 
     /// <summary>

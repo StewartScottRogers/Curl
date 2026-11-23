@@ -14,4 +14,13 @@ public sealed class McpServerProcessStarterStartInfoTests
         Assert.IsFalse(startInfo.RedirectStandardError);
         CollectionAssert.AreEqual(new[] { "--a", "b c" }, startInfo.ArgumentList.ToArray());
     }
+
+    [TestMethod]
+    public void BuildStartInfo_BatchServer_QuotesEveryArgument()
+    {
+        var startInfo = McpServerProcessStarter.BuildStartInfo("mcpsrv.cmd", ["a=b", "a,b;c"]);
+
+        Assert.AreEqual("\"a=b\" \"a,b;c\"", startInfo.Arguments);
+        Assert.IsEmpty(startInfo.ArgumentList);
+    }
 }

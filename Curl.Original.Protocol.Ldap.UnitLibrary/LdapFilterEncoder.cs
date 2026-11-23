@@ -285,9 +285,11 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         _ => EncodeEqualityOrSubstrings(left, value),
     };
 
+    /// <summary>Encodes a <c>~=</c>, <c>&gt;=</c> or <c>&lt;=</c> match; WinLDAP refuses an empty value, <c>libldap</c> sends it (STD-170).</summary>
     private byte[]? EncodeAssertion(Asn1Tag tag, string attribute, string value)
     {
-        byte[]? assertion = IsAttribute(attribute) ? DecodeValue(value) : null;
+        bool valueAllowed = value.Length > 0 || !isWinLdap;
+        byte[]? assertion = valueAllowed && IsAttribute(attribute) ? DecodeValue(value) : null;
         return assertion is null ? null : writer.Constructed(tag, OctetString(attribute), LdapBerWriter.OctetString(Asn1Tag.PrimitiveOctetString, assertion));
     }
 

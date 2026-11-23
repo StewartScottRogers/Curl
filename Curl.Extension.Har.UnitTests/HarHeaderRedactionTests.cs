@@ -68,8 +68,8 @@ public sealed class HarHeaderRedactionTests
         var entry = EntryOf("http://example.com/", ("Location", "http://example.com/plain"), ("X-Link", "http://a:b@h/"));
 
         Assert.AreEqual("http://example.com/plain", ValueOf(entry.GetProperty("response").GetProperty("headers"), "Location"));
-        Assert.AreEqual("http://a:b@h/", ValueOf(entry.GetProperty("response").GetProperty("headers"), "X-Link"));
-        Assert.AreEqual("http://a:b@h/", ValueOf(entry.GetProperty("request").GetProperty("headers"), "X-Other"));
+        Assert.AreEqual("http://REDACTED:REDACTED@h/", ValueOf(entry.GetProperty("response").GetProperty("headers"), "X-Link"));
+        Assert.AreEqual("http://REDACTED:REDACTED@h/", ValueOf(entry.GetProperty("request").GetProperty("headers"), "X-Other"));
         Assert.AreEqual("http://u:URLSECRET@example.com/r".Replace("u:URLSECRET", "REDACTED:REDACTED"), entry.GetProperty("request").GetProperty("url").GetString());
         Assert.AreEqual("http://REDACTED:REDACTED@example.com/new", entry.GetProperty("response").GetProperty("redirectURL").GetString());
     }

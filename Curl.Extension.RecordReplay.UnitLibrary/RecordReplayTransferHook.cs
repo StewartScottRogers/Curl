@@ -32,11 +32,11 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
         return at < 0 ? url : url[..authorityStart] + RedactedUserInfo + url[(authorityStart + at)..];
     }
 
-    private static readonly Regex UrlFieldLine = new(@"^(?:Location|Content-Location|Link|Refresh):[^\r\n]*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant);
+    private static readonly Regex UrlFieldLine = new(@"^[^\r\n:]+:[^\r\n]*", RegexOptions.Multiline | RegexOptions.CultureInvariant);
 
     private static readonly Regex UserInfo = new(@"(?<=//)[^/?#\s<>""]*@", RegexOptions.CultureInvariant);
 
-    /// <summary>Puts <see cref="RedactedUserInfo" /> in place of the user information of every URL in the <c>Location</c>, <c>Content-Location</c>, <c>Link</c> and <c>Refresh</c> lines of <paramref name="head" />.</summary>
+    /// <summary>Puts <see cref="RedactedUserInfo" /> in place of the user information of every URL in every header line of <paramref name="head" />.</summary>
     /// <param name="head">The head bytes as received.</param>
     /// <returns>The head with no credentials in those lines; a head with none is returned unchanged.</returns>
     internal static byte[] RedactedHead(byte[] head)
