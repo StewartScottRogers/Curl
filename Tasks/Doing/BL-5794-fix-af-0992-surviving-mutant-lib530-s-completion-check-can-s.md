@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs line 209`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs line 209`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The mutant was equivalent: CheckForCompletion's `success` was read only when a message had come, so its initial value never mattered. Made it unkillable by construction: CheckForCompletion now returns `bool?` (null = no message), with no separate `completed` flag. Mutating the initial `null` to `false` fails several Lib530Tests (e.g. TestOneAsync_NoSocketToWaitOn_MaxFdZero, TestOneAsync_SelectFails_SelectCode, RunAsync_FiveRuns_OnlyTheFailingCallbacksAbortAndTheProgramSucceeds); reverted, all 1242 pass. Measure-CodeQuality for the library: 100/100, 0 failing. Fast tests green.
 
 ## Log
 
