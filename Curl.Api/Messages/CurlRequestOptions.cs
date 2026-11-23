@@ -30,8 +30,12 @@ internal static class CurlRequestOptions
             Http = options.Http with { HttpHeaders = HeaderLines(request), Post = post },
             Callbacks = options.Callbacks with { Header = header, Write = write },
         };
-        return ApplyBody(applied, BodyToApply(request, post, upload), upload, engine, owned);
+        return ApplyBody(ApplyDebug(applied, request.Debug), BodyToApply(request, post, upload), upload, engine, owned);
     }
+
+    /// <summary><paramref name="options"/> with the request's debug callback set and verbose on (ADR-1341), or unchanged for a request with none.</summary>
+    private static EasyOptions ApplyDebug(EasyOptions options, DebugCallback? debug) =>
+        debug is null ? options : options with { Callbacks = options.Callbacks with { Debug = debug }, Behaviour = options.Behaviour with { Verbose = true } };
 
     /// <summary>Whether a <c>PUT</c> body is sent as an upload, as <c>curl -T</c> does (ADR-1331): any body but a multipart one.</summary>
     private static bool IsHttpPutUpload(CurlRequest request) =>

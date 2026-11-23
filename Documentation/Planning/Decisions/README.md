@@ -1382,3 +1382,4 @@ Each option and the specific reason it lost.
 | [1338](ADR-1338-a-socketio-emit-ends-at-the-first-event-the-server-sends-back.md) | A socketio emit ends at the first event the server sends back (BL-5763) | Accepted | 2026-11-22 |
 | [1339](ADR-1339-an-extension-url-post-whose-read-callback-aborts-pauses-or-lies-fails-the-transfer.md) | An extension URL post whose read callback aborts, pauses or lies fails the transfer (BL-5764) | Accepted | 2026-11-22 |
 | [1340](ADR-1340-socketio-sends-oauth2-bearer-as-the-connect-packet-token.md) | The socketio client sends --oauth2-bearer as the CONNECT packet's token (BL-5781) | Accepted | 2026-11-22 |
+| [1341](ADR-1341-curl-api-takes-the-verbose-trace-through-a-per-request-debug-callback.md) | Curl.Api takes the verbose trace through a per-request debug callback (BL-5797) | Accepted | 2026-11-22 |

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api.UnitLibrary/Options/Protocols/EasySmtpOptions.cs, Curl.Api/Messages]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5797 — Expose each SMTP RCPT reply to a Curl.Api caller when MailRecipientAllowFails lets a recipient fail
 
@@ -24,14 +24,18 @@ Repro: `surl --mail-domain example.com --mailbox ann@example.com:pw smtp://127.0
 
 ## Acceptance criteria
 
-- [ ] An ADR records the choice and why.
-- [ ] Against an SMTP test server that refuses one of two recipients, a `Curl.Api` caller with `MailRecipientAllowFails` observes the 550 reply for that recipient and the 250 for the other through the chosen API, pinned by a test.
-- [ ] Nothing a curl `-v` would hide (credentials, `Authorization`) reaches the caller through it, pinned by a test; the README documents it.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An ADR records the choice and why.
+- [x] Against an SMTP test server that refuses one of two recipients, a `Curl.Api` caller with `MailRecipientAllowFails` observes the 550 reply for that recipient and the 250 for the other through the chosen API, pinned by a test.
+- [x] Nothing a curl `-v` would hide (credentials, `Authorization`) reaches the caller through it, pinned by a test; the README documents it.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- ADR-1341 chose the general `CurlRequest.Debug` callback (sets verbose; same event stream as `curl -v`, so nothing -v hides reaches it; no second redaction). README section "See what the server said".
+- The 550/250 and secrets criteria are pinned at the Curl.Api seam with the scripted engine (`CurlRequestDebugTests`): the engine already emits SMTP RCPT replies as HeaderIn (`SmtpControlChannel`). No real-SMTP end-to-end test: the Curl.Api tests send nothing over a network and the task's `touches` has no integration project.
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T2157, finding 3.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 77b5bb79 ad55a03b 16f1db5b 3d836d5e.
+- 2026-11-22: Doing -> Done. CurlRequest.Debug exposes the curl -v trace (incl. each RCPT reply) to Curl.Api callers; ADR-1341
