@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Console.UnitTests/FormFileSizedBeforeTraceTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5800 — Hand form-file trace sizes only to the first sending build under -Z
 
@@ -44,3 +44,4 @@ Suggested fix (from BL-5795's own context): stop sharing mutable state on the bu
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 4f547ad5 3cd9a84e c458d85a e0a08499 4717605e.
+- 2026-11-22: Doing -> Done. Pre-trace form-file sizes go to exactly one sending build under -Z, passed as a BuildAsync argument
