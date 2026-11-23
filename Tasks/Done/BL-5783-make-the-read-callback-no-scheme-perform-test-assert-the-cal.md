@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5783 — Make the read-callback no-scheme perform test assert the callback is read exactly once
 
@@ -26,9 +26,9 @@ Found by the shift-end review of 2026-11-22 (ADR-0710; code-reviewer).
 
 ## Acceptance criteria
 
-- [ ] The test asserts an exact callback count (or an exact count of data-returning reads) that a read-up-front-and-again regression would fail, or its name no longer says "once".
-- [ ] The task's Log records the exact count the test now pins and why that is the number curl's read pattern gives.
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] The test asserts an exact callback count (or an exact count of data-returning reads) that a read-up-front-and-again regression would fail, or its name no longer says "once".
+- [x] The task's Log records the exact count the test now pins and why that is the number curl's read pattern gives.
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
 
@@ -36,3 +36,5 @@ Found by the shift-end review of 2026-11-22 (ADR-0710; code-reviewer).
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 638a1d3c 1b7de58a e4d345af.
+- 2026-11-22: The test now counts reads that return data and pins exactly 1: the reader is given the 5-byte body, so curl's pattern is one data read while sending; a read-up-front-then-again regression would take the body in the first read and send nothing (or read twice), failing the body or count check. Build clean; fast test for it green.
+- 2026-11-22: Doing -> Done. Test pins exactly one data-returning read

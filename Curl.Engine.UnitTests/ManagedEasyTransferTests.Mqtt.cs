@@ -243,20 +243,20 @@ public sealed partial class ManagedEasyTransferTests
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes("HTTP/1.1 100 Continue\r\n\r\n"), Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")]);
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
-        int calls = 0;
+        int dataReads = 0;
         Curl.Api.Callbacks.ReadCallback inner = ReaderOf("hello");
         easy.Options = new EasyOptions
         {
             Network = new EasyNetworkOptions { Url = "localhost:8080/x" },
             Http = new EasyHttpOptions { Post = true, PostFieldSize = 5 },
-            Callbacks = new Curl.Api.Callbacks.EasyCallbackOptions { Read = buffer => { calls++; return inner(buffer); } },
+            Callbacks = new Curl.Api.Callbacks.EasyCallbackOptions { Read = buffer => { long count = inner(buffer); if (count > 0) { dataReads++; } return count; } },
         };
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual(CurlCode.Ok, code);
         StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n\r\nhello");
-        Assert.IsTrue(calls >= 1);
+        Assert.AreEqual(1, dataReads);
     }
 
     [TestMethod]
