@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpTransferDeadline.cs, Curl.Networking.UnitTests/TcpConnectorTests.FailureTimings.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5814 — Fix fitness finding STD-145: after a TLS verification failure, or a SOCKS handshake that times out, %{num_connects} is 0 and (for SOCKS) %{time_namelookup} is 0 (STILL OPEN, partly fixed)
 
@@ -56,3 +56,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: a6f195da 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. SOCKS handshake timeouts and post-connect failures keep namelookup and count one connection
