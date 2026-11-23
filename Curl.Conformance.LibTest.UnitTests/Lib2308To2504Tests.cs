@@ -223,6 +223,7 @@ public sealed class Lib2308To2504Tests
 
         Assert.AreEqual(0, result.ExitCode, run.Error.ToString());
         Assert.AreEqual(HttpVersion.Http11, engine.Multi.Added!.Options.Http.HttpVersion);
+        Assert.IsEmpty(engine.Multi.OptionsWritten, "HTTP/1 runs must not enable multiplexing.");
     }
 
     [TestMethod]
@@ -240,6 +241,8 @@ public sealed class Lib2308To2504Tests
 
         Assert.AreEqual(0, result.ExitCode, run.Error.ToString());
         Assert.IsTrue(engine.Multi.Added!.Options.Http.PipeWait);
+        Assert.HasCount(1, engine.Multi.OptionsWritten, "only the multiplexed run sets the multi option.");
+        Assert.AreEqual(Lib2405.PipeMultiplex, (long)engine.Multi.Options.Pipelining);
     }
 
     [TestMethod]

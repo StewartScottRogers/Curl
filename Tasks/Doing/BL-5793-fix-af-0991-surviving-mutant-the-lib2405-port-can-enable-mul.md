@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib2405Run.cs line 134`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib2405Run.cs line 134`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `Lib2405_Case2405_HoldsTwoDescriptorsOverHttp1`, which now asserts the HTTP/1 run writes no multi option; `Lib2405_Case2407_RunsHttp2ThenMultiplexed` asserts exactly one write, pipelining multiplex. Mutant applied by hand: 1 failure; reverted: 1242 pass. No production change.
 
 ## Log
 
