@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/RevocationListScope.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5801 — Fix fitness finding STD-158: Windows: delta CRLs (FreshestCRL) are ignored below an intermediate-only --cacert / --proxy-cacert anchor, so a certificate revoked in the delta CRL is accepted
 
@@ -43,13 +43,16 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 
 ## Acceptance criteria
 
-- [ ] step 4 for `v_freshest` exits 60 with `has been revoked`; the 404 variant exits 60 with `the revocation status is unknown`; a leaf whose delta is valid and empty still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 4 for `v_freshest` exits 60 with `has been revoked`; the 404 variant exits 60 with `the revocation status is unknown`; a leaf whose delta is valid and empty still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Delta CRLs are now read below an intermediate-only anchor: the base list's freshestCRL and the leaf's freshestCRL are fetched, checked like the base (issuer, signature, nextUpdate, deltaCRLIndicator <= base cRLNumber), and a missing, unusable or non-http delta leaves the status unknown (exit 60). The ldap:// variant is therefore unknown, as in curl. Unit tests: IntermediateOnlyProxyCacertTests. Quality run for Curl.Networking.UnitLibrary: 100/100, no failing member. No ADR needed (a fix to match curl).
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 6ccddf78 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. Delta CRLs are fetched and applied below an intermediate-only anchor; quality gate clean
