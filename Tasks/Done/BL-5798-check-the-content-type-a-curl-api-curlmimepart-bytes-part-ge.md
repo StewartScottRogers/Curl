@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Mime/CurlMimePart.cs, Curl.Api/Mime/CurlMultipartContent.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5798 — Check the Content-Type a Curl.Api CurlMimePart.Bytes part gets with no ContentType, against libcurl's curl_mime_data and curl -F @file
 
@@ -24,13 +24,23 @@ Repro: `CurlMimePart.Bytes("report", bytes)` with no `ContentType`, sent over SM
 
 ## Acceptance criteria
 
-- [ ] The Notes record libcurl 8.22.0's `Content-Type` for each of the six cases above (data/data-with-filename/file, over HTTP and SMTP).
-- [ ] `CurlMimePart.Bytes` gives the same for each, pinned by tests of the request bytes; its doc comment says which header a part gets.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes record libcurl 8.22.0's `Content-Type` for each of the six cases above (data/data-with-filename/file, over HTTP and SMTP).
+- [x] `CurlMimePart.Bytes` gives the same for each, pinned by tests of the request bytes; its doc comment says which header a part gets.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+- libcurl 8.22.0 (Schannel, Windows), measured with Record-CurlExchange.ps1 (HTTP) and a loopback SMTP script (`--mail-rcpt`, `-F`): part Content-Type for
+  - HTTP data part, no file name (`-F report=abc`): none.
+  - HTTP data part with file name: `r.bin` none, `r.txt` `text/plain`.
+  - HTTP file part (`-F report=@f`): `report.bin` `application/octet-stream`, `report.txt` `text/plain`.
+  - SMTP data part, no file name: none (`Content-Disposition: attachment; name="report"`).
+  - SMTP data part with file name: none for `r.bin` and for `r.txt` (a default text/plain is unlabelled in mail).
+  - SMTP file part: `report.bin` `application/octet-stream` plus `Content-Transfer-Encoding: 8bit`; `report.txt` none.
+- Curl 's engine (`MultipartPartHeaders`) already gives byte-identical results for all ten runs (checked against the built curl.exe), so `CurlMimePart.Bytes` already matches libcurl; the cookbook's expectation came from `-F @file` being a file part. No behaviour change.
+- Done: doc comment on `Bytes` says which header a part gets; `SendAsync_BytesPartWithNoContentType_LeavesTheTypeToTheEngine` pins that Curl.Api sets no type (and passes the file name) so the engine's guess applies. Curl.Api.UnitTests cannot use a real engine (CLAUDE.md of Curl.Api), so the request bytes themselves are pinned by the engine's own MultipartPartHeaders tests. Only a doc comment changed in production code, so no quality run.
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T2157, finding 4.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 56cdac44 a11660a4 3d836d5e.
+- 2026-11-22: Doing -> Done. Engine already matches libcurl; documented and pinned Curl.Api pass-through
