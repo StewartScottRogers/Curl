@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Plugin.UnitLibrary/SystemHelperProcessStarter.cs, Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpServerProcessStarter.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5841 — Fix fitness finding EXT-113: a .cmd/.bat plugin helper or mcp+stdio server gets the URL or its arguments split at =, , and ;
 
@@ -38,9 +38,9 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] `curl -sS -m 5 "zzq://h/x?a=b"` makes args.log show `1=["zzq://h/x?a=b"]` (or the URL unsplit) and `2=[]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS -m 5 "zzq://h/x?a=b"` makes args.log show `1=["zzq://h/x?a=b"]` (or the URL unsplit) and `2=[]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -48,3 +48,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 19d5c9fa 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. batch plugin helpers and mcp+stdio servers get double-quoted arguments, so cmd.exe no longer splits at = , ;

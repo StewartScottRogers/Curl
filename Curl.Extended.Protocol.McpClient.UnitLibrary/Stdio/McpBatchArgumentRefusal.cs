@@ -18,7 +18,8 @@ internal static class McpBatchArgumentRefusal
         }
     }
 
-    private static bool IsBatchFile(string program)
+    /// <summary>True when <paramref name="program"/> names a <c>.cmd</c> or <c>.bat</c> file.</summary>
+    public static bool IsBatchFile(string program)
     {
         var end = program.Length;
         while (end > 0 && IsTrailingNoise(program[end - 1]))

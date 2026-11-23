@@ -13,13 +13,7 @@ public sealed class SystemHelperProcessStarter : IHelperProcessStarter
     public IHelperProcess Start(string program, string url)
     {
         RefuseUnsafeBatchArgument(program, url);
-        ProcessStartInfo info = new(program)
-        {
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-        };
-        info.ArgumentList.Add(url);
+        ProcessStartInfo info = BuildStartInfo(program, url);
         try
         {
             return new SystemHelperProcess(Process.Start(info)!);
@@ -28,6 +22,30 @@ public sealed class SystemHelperProcessStarter : IHelperProcessStarter
         {
             throw new IOException(failure.Message, failure);
         }
+    }
+
+    /// <summary>
+    /// Builds the start info. A <c>.cmd</c> or <c>.bat</c> helper gets the URL double-quoted, because cmd.exe splits an
+    /// unquoted argument at <c>=</c>, <c>,</c> and <c>;</c> (the refusal has already kept <c>"</c> and <c>%</c> out of it).
+    /// </summary>
+    internal static ProcessStartInfo BuildStartInfo(string program, string url)
+    {
+        ProcessStartInfo info = new(program)
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+        };
+        if (IsBatchFile(program))
+        {
+            info.Arguments = "\"" + url + "\"";
+        }
+        else
+        {
+            info.ArgumentList.Add(url);
+        }
+
+        return info;
     }
 
     /// <summary>
