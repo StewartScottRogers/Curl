@@ -213,7 +213,7 @@ internal static class CertificateNameConstraints
         : UriMatches(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name));
 
     // A directoryName constraint matches a name that begins with the same relative names.
-    private static bool DirectoryNameMatches(byte[] constraint, byte[] name)
+    internal static bool DirectoryNameMatches(byte[] constraint, byte[] name)
     {
         var constraintNames = new AsnReader(constraint, AsnEncodingRules.DER).ReadSequence();
         var nameNames = new AsnReader(name, AsnEncodingRules.DER).ReadSequence();

@@ -322,8 +322,16 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.IsNull(Verify(Constraints(excludedName: DirectoryName("O=Evil")), Host, true, subject: "OU=Evil"));
 
     [TestMethod]
-    public void VerifyPeer_ExcludedDirectoryNameWithANonStringValue_DoesNotMatchAStringSubject() =>
-        Assert.IsNull(Verify(Constraints(excludedName: DirectoryName(RelativeName(writer => writer.WriteInteger(7)))), Host, true, subject: "O=Evil"));
+    public void DirectoryNameMatches_ConstraintWithANonStringValue_DoesNotMatchAStringSubject()
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteEncodedValue(RelativeName(attribute => attribute.WriteInteger(7)));
+        }
+
+        Assert.IsFalse(CertificateNameConstraints.DirectoryNameMatches(writer.Encode(), new X500DistinguishedName("O=Evil").RawData));
+    }
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building itself rejects a directoryName whose attribute value is context-specific (BL-5845).
