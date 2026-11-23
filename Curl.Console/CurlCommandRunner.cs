@@ -2337,7 +2337,7 @@ internal sealed class CurlCommandRunner(
 
         _ = TryResolveTransferUrl(options, transfer.Url, transfer.UploadFile, out string transferUrl);
         string scheme = transferUrl[..Math.Max(transferUrl.IndexOf(':', StringComparison.Ordinal), 0)];
-        MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, scheme, MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)).ConfigureAwait(false);
+        MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, scheme, MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme), isSendingBuild: false).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
             return form.Failure;
@@ -4697,8 +4697,9 @@ internal sealed class CurlCommandRunner(
     /// <param name="mimePost">The <c>-F</c> parts, as <see cref="EasyOptionsFromCommandLine.HttpOf" /> maps them.</param>
     /// <param name="scheme">The transfer URL's scheme, which picks the names' escaping.</param>
     /// <param name="mimeMessage">Whether the parts are a mail message rather than a form.</param>
+    /// <param name="isSendingBuild">Whether the body is the one sent, which uses up the sizes taken before the trace file opened.</param>
     /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
-    private async ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage)
+    private async ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage, bool isSendingBuild = true)
     {
         try
         {
@@ -4716,8 +4717,12 @@ internal sealed class CurlCommandRunner(
         }
         finally
         {
-            // The sizes taken before the trace file opened belong to the run's first form only (BL-5784).
-            formBodyBuilder.FileSizesBeforeTrace = null;
+            // The sizes taken before the trace file opened belong to the run's first sending form only
+            // (BL-5784); the build that only checks the form under -Z leaves them for it (BL-5795).
+            if (isSendingBuild)
+            {
+                formBodyBuilder.FileSizesBeforeTrace = null;
+            }
         }
     }
 
