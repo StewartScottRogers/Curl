@@ -38,11 +38,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] step 3 shows `prefix=d%2F` on the request line and prints only `d/b.txt`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 3 shows `prefix=d%2F` on the request line and prints only `d/b.txt`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- gs:// list now honours the URL query like s3: `prefix` extends the path prefix, `delimiter` replaces `/`, other parameters pass on (`GcsEndpoint.QueryOf`, `GcsOperations.ListQuery`). Platform-neutral tests; quality run for the library: 0 failing members. Platform-neutral so CI on Linux and macOS is met.
 
 ## Log
 
