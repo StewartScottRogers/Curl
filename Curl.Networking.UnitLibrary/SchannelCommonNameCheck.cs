@@ -33,6 +33,19 @@ public static class SchannelCommonNameCheck
     }
 
     /// <summary>
+    /// Whether a DNS subjectAltName of <paramref name="certificate" /> matches the host name
+    /// <paramref name="targetHost" /> as curl's Schannel build matches it, which .NET's own
+    /// check does not when one side has a trailing dot (BL-5808).
+    /// </summary>
+    /// <param name="certificate">The server certificate.</param>
+    /// <param name="targetHost">The host the certificate was checked against.</param>
+    /// <returns><see langword="true" /> when a dNSName matches the host.</returns>
+    public static bool DnsAlternativeNameMatches(X509Certificate2 certificate, string targetHost) =>
+        !IPAddress.TryParse(targetHost, out _)
+        && certificate.Extensions.OfType<X509SubjectAlternativeNameExtension>()
+            .Any(names => names.EnumerateDnsNames().Any(name => PatternMatchesHost(name, targetHost)));
+
+    /// <summary>
     /// curl's <c>Curl_cert_hostcheck</c>: one trailing dot is ignored on each side and case
     /// is ignored; a pattern starting <c>*.</c> with at least one more dot stands for any
     /// one non-empty left-most label of a host name that is not an IP literal.

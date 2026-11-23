@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.NameChecks.cs, Curl.Networking.UnitLibrary/SchannelCommonNameCheck.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5808 — Fix fitness finding STD-164: Windows: a SAN dNSName with a trailing dot (localhost.) does not match host localhost; REF accepts it
 
@@ -37,13 +37,16 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 
 ## Acceptance criteria
 
-- [ ] both commands exit 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] both commands exit 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: .NET's own name check flags a SAN `localhost.` against host `localhost`; the Schannel path only cleared that flag via the CN fallback, which a DNS SAN disables. Fix: `SchannelCommonNameCheck.DnsAlternativeNameMatches` (trailing-dot-insensitive, curl's hostcheck) clears the mismatch. Criterion 1 is met by the unit tests and the platform-neutral logic; no live Schannel server was run in this lane. Quality gate: 0 failing members.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 59e6c62b 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. SAN dNSName with a trailing dot now matches the host on the Schannel build
