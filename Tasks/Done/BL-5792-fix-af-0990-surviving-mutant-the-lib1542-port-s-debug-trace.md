@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib1542.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5792 — Fix AF-0990: Surviving mutant: the lib1542 port's debug trace can stamp each line with the time (traceTime false -> true)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1542.cs line 49`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1542.cs line 49`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `Lib1542_TraceLinesCarryNoTimePrefix` (Lib1535To1550Tests.cs): with `traceTime: true` it fails, with `false` it passes. Test-only change; library untouched, so no quality run. All 1243 fast tests of Curl.Conformance.LibTest.UnitTests pass.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 793bf909 9742157d.
+- 2026-11-22: Doing -> Done. Lib1542_TraceLinesCarryNoTimePrefix kills the traceTime mutant

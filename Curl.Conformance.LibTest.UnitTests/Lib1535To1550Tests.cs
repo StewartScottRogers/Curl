@@ -350,6 +350,24 @@ public sealed class Lib1535To1550Tests
     }
 
     [TestMethod]
+    public async Task Lib1542_TraceLinesCarryNoTimePrefix()
+    {
+        var engine = new FakeCurlEngine
+        {
+            Performing = o =>
+            {
+                _ = o.Callbacks.Debug!(CurlInfoType.DataOut, "ok"u8);
+                return CurlCode.RecvError;
+            },
+        };
+        var run = new PortRun(engine, 1542, "http://x/1542");
+
+        _ = await new Lib1542(new ManualTimeProvider(DateTimeOffset.UnixEpoch)).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.StartsWith("=> Send data, 2 bytes (0x2)\n", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib1542_TracesDataWithoutTheHexColumn()
     {
         var engine = new FakeCurlEngine
