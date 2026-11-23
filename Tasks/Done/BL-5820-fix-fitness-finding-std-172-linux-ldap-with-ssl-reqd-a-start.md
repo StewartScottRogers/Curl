@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapStartTls.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5820 — Fix fitness finding STD-172: Linux ldap:// with --ssl-reqd: a StartTLS certificate failure exits 60; curl exits 64
 
@@ -47,3 +47,4 @@ LdapStartTls maps PeerFailedVerification (60) from the StartTLS handshake to Use
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 1eed013a 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. StartTLS cert failure now exits 64; unit test added
