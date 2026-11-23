@@ -34,3 +34,4 @@ Repro: `surl --mail-domain example.com --mailbox ann@example.com:pw smtp://127.0
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T2157, finding 3.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 77b5bb79 ad55a03b 16f1db5b 3d836d5e.
