@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5803 — Fix fitness finding STD-160: Windows: an excluded directoryName name constraint is bypassed when the leaf's subject uses a different string type or letter case
 
@@ -53,3 +53,4 @@ DirectoryNameMatches now compares attribute type plus a normalised value (string
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: eb4646c5 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. Fixed
