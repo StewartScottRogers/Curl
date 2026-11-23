@@ -46,3 +46,4 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
+- 2026-11-23: Backlog -> Doing. Criteria at claim: 48e998ef 69116afe 3d836d5e.
