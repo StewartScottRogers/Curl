@@ -50,7 +50,7 @@ internal static class LdapOpenLdapSaslBind
     private static ValueTask<TransferResult?> SaslBindFailedAsync(LdapExchange exchange, LdapBindReply reply, CancellationToken cancellationToken) =>
         reply.Status == LdapBindReplyStatus.Closed
             ? LdapBind.OpenLdapBindFailedAsync(exchange, reply, cancellationToken)
-            : reply.Status == LdapBindReplyStatus.Answered && reply.ResultCode == WinLdapResultText.LocalError
+            : reply.ResultCode == WinLdapResultText.LocalError
                 ? LdapBind.UnbindAndFailAsync(exchange, TransferResult.Failure(CurlExitCode.LoginDenied, "Authentication cancelled"), cancellationToken)
                 : LdapBind.OpenLdapLoginDeniedAsync(exchange, cancellationToken);
 
