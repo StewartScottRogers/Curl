@@ -2314,8 +2314,25 @@ internal sealed class CurlCommandRunner(
         }
 
         return string.Equals(name, known, StringComparison.OrdinalIgnoreCase)
-            ? null
+            ? BadTelnetOptionValueFailure(known, option[(separator + 1)..])
             : TransferResult.Failure(CurlExitCode.UnknownOption, "An unknown option was passed in to libcurl");
+    }
+
+    /// <summary>
+    /// Finds the exit 43 curl's <c>check_telnet_options</c> gives a known option whose value cannot be held: a
+    /// <c>NEW_ENV</c> without a comma, a <c>TTYPE</c> of 32 or more characters or an <c>XDISPLOC</c> of 128 or more
+    /// (STD-074, BL-5811).
+    /// </summary>
+    private static TransferResult? BadTelnetOptionValueFailure(string known, string value)
+    {
+        bool bad = known switch
+        {
+            "NEW_ENV" => !value.Contains(',', StringComparison.Ordinal),
+            "TTYPE" => value.Length >= 32,
+            "XDISPLOC" => value.Length >= 128,
+            _ => false,
+        };
+        return bad ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, "A libcurl function was given a bad argument") : null;
     }
 
     private static bool ReadsStandardInput(EasyMimeBody mimePost) =>

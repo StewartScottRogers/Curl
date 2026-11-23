@@ -94,11 +94,14 @@ public sealed class CurlCommandRunnerFatalErrorTests
     [TestMethod]
     [DataRow("rtsp://h.test/m", "Session: 1", 43, "(43) Session ID cannot be set as a custom header.")]
     [DataRow("telnet://h.test", "x", 48, "(48) An unknown option was passed in to libcurl")]
+    [DataRow("telnet://h.test", "NEW_ENV=nocomma", 43, "(43) A libcurl function was given a bad argument")]
+    [DataRow("telnet://h.test", "TTYPE=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 43, "(43) A libcurl function was given a bad argument")]
+    [DataRow("telnet://h.test", "XDISPLOC=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 43, "(43) A libcurl function was given a bad argument")]
     public async Task RunAsync_FatalSetupFailureUnderParallel_StartsNothingAndAbortsTheOthers(string url, string marker, int code, string line)
     {
         RecordingProtocolHandler http = Handler(CurlExitCode.Ok);
         RecordingProtocolHandler other = new(new Uri(url).Scheme, _ => ValueTask.FromResult(TransferResult.Success(0)));
-        string[] first = marker == "x" ? [url, "-t", "BOGUS=1"] : [url, "-H", marker];
+        string[] first = marker == "x" ? [url, "-t", "BOGUS=1"] : url.StartsWith("telnet", StringComparison.Ordinal) ? [url, "-t", marker] : [url, "-H", marker];
 
         int exitCode = await new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([http, other])),
@@ -131,7 +134,7 @@ public sealed class CurlCommandRunnerFatalErrorTests
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: true)
-            .RunAsync(["-sS", "-Z", "rtsp://h.test/m", "-H", "Foo: 1", "-H", "Session", "--next", "telnet://h.test", "-t", "ttype=x", "-t", "noequals", "-t", "WS=é"]);
+            .RunAsync(["-sS", "-Z", "rtsp://h.test/m", "-H", "Foo: 1", "-H", "Session", "--next", "telnet://h.test", "-t", "ttype=x", "-t", "noequals", "-t", "WS=é", "-t", "BINARY=1", "-t", "TTYPE=vt100", "-t", "XDISPLOC=h:0", "-t", "NEW_ENV=A,b"]);
 
         Assert.AreEqual(0, exitCode);
         Assert.HasCount(1, rtsp.Contexts);

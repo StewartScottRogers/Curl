@@ -39,11 +39,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] commands 1 and 2 each print `[43]` `[42]` and the (42) line, exit 43, and no `hello`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] commands 1 and 2 each print `[43]` `[42]` and the (42) line, exit 43, and no `hello`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Setup now returns exit 43 for NEW_ENV without a comma, TTYPE of 32+ chars and XDISPLOC of 128+ chars (curl buffer sizes; the 200-char repro is over both). Limits chosen from curl's buffer sizes, not re-measured. Pinned in CurlCommandRunnerFatalErrorTests. Quality run clean.
 
 ## Log
 
