@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.Scheme.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5815 — Fix fitness finding STD-167: %{scheme} is empty when an HTTP/0.9 reply is rejected (exit 1)
 
@@ -35,13 +35,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the command prints `[http|1|0|1]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints `[http|1|0|1]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: RequestSchemeOf no longer returns null for the "Received HTTP/0.9 when not allowed" UnsupportedProtocol exit (same exclusion as CurlCommandRunner). Test: Engine.UnitTests/Std167Tests.cs (new file, beside touches). Engine UnitTests 3185 pass; quality run 0 failing. Repro command not run against a live server; the unit test pins the scheme the runner prints.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: d9dd65df 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. %{scheme} prints http when an HTTP/0.9 reply is rejected

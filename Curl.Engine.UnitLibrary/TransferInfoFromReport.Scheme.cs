@@ -53,7 +53,9 @@ internal static partial class TransferInfoFromReport
         }
 
         // A followed redirect moves the handle's scheme to its target's, even when that hop then fails (CGR-194).
-        return result.ExitCode != CurlExitCode.UnsupportedProtocol ? SchemeOf(result.Report?.EffectiveUrl ?? requestUrl) : null;
+        // A rejected HTTP/0.9 reply also exits UnsupportedProtocol, but the handle connected over its URL's scheme (STD-167).
+        bool schemeUnsupported = result.ExitCode == CurlExitCode.UnsupportedProtocol && result.ErrorMessage != "Received HTTP/0.9 when not allowed";
+        return !schemeUnsupported ? SchemeOf(result.Report?.EffectiveUrl ?? requestUrl) : null;
     }
 
     /// <summary>
