@@ -40,3 +40,4 @@ Suggested fix (from BL-5795's own context): stop sharing mutable state on the bu
 ## Log
 
 - 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 4f547ad5 3cd9a84e c458d85a e0a08499 4717605e.
