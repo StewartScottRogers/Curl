@@ -35,6 +35,14 @@ public sealed class SegmentedDownloadExtensionTests
     }
 
     [TestMethod]
+    public void HookFor_WithContentDigest_GivesNoneSoTheDigestIsCheckedAgainstTheWholeResponse()
+    {
+        ExtensionOptionValues values = new(new Dictionary<string, string> { [SegmentedDownloadExtension.Option.Name] = "4", ["content-digest"] = string.Empty });
+
+        Assert.IsNull(SegmentedDownloadExtension.HookFor(values));
+    }
+
+    [TestMethod]
     public void HookFor_TheOptionNotGiven_GivesNone()
     {
         Assert.IsNull(SegmentedDownloadExtension.HookFor(ExtensionOptionValues.None));

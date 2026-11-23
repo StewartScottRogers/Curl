@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.SegmentedDownload.UnitLibrary/SegmentableRequest.cs, Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadTransferHook.cs]
+touches: [Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadExtension.cs, Curl.Extension.SegmentedDownload.UnitTests/SegmentedDownloadExtensionTests.cs, Curl.Extension.SegmentedDownload.UnitLibrary/SegmentableRequest.cs, Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadTransferHook.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5834 — Fix fitness finding EXT-106: --content-digest checks nothing when combined with --segments
 
@@ -39,13 +39,16 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] step 2 exits 56 with the same message as step 1.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 2 exits 56 with the same message as step 1.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision (by Claude, delegated): with `--content-digest` given, `--segments` activates no hook, so the transfer runs whole and the content-digest hook checks Repr-Digest against the full representation (exit 56, same message). The joined result carries the first 206 report, for which Repr-Digest is never checked (ADR-1094), so not splitting is the simplest correct fix. Fixed in SegmentedDownloadExtension.HookFor; tests and CodeQuality (0 failing) pass.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: a38e0826 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. --segments is not applied when --content-digest is given, so the digest is checked against the whole response
