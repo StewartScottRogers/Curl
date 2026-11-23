@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/MailRequestOptionsMapping.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5805 — Fix fitness finding STD-117: Linux LDAP ignores --login-options AUTH=... and --anyauth and sends the password in a cleartext simple bind (STILL OPEN, partly fixed)
 
@@ -54,3 +54,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 8e9040af 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. OpenLDAP binds honour AUTH= login options and --anyauth (SASL, no cleartext password)
