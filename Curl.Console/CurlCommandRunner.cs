@@ -479,6 +479,8 @@ internal sealed class CurlCommandRunner(
     private readonly TransferContextFactory transferContextFactory = new(standardInput, timeProvider, CredentialEncoding.ForPlatform(runsOnWindows));
 
     /// <summary>Builds each transfer's <c>-F</c> body; reads <c>@-</c> and <c>&lt;-</c> parts from standard input.</summary>
+    private IReadOnlyDictionary<string, long>? formFileSizesBeforeTrace;
+
     private readonly MultipartFormBodyBuilder formBodyBuilder = formBodyBuilder
         ?? new MultipartFormBodyBuilder(
             new PhysicalFileSystem(),
@@ -1891,7 +1893,7 @@ internal sealed class CurlCommandRunner(
             }
         }
 
-        formBodyBuilder.FileSizesBeforeTrace = sizes;
+        formFileSizesBeforeTrace = sizes;
     }
 
     private static IEnumerable<MultipartFormPart> FormFileParts(IEnumerable<MultipartFormPart> parts) =>
@@ -4701,29 +4703,22 @@ internal sealed class CurlCommandRunner(
     /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
     private async ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage, bool isSendingBuild = true)
     {
-        try
-        {
-            return mimeMessage
+        // The sizes taken before the trace file opened belong to exactly one sending build, the first to ask
+        // (BL-5784, BL-5800); the build that only checks the form under -Z takes none (BL-5795).
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace = isSendingBuild ? Interlocked.Exchange(ref formFileSizesBeforeTrace, null) : null;
+        return mimeMessage
                 ? await formBodyBuilder.BuildMailMessageAsync(
                     MultipartFormPartMapping.FromMimeBody(mimePost),
                     MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
                     options.Headers,
-                    CancellationToken.None).ConfigureAwait(false)
+                    CancellationToken.None,
+                    fileSizesBeforeTrace).ConfigureAwait(false)
                 : await formBodyBuilder.BuildAsync(
                     MultipartFormPartMapping.FromMimeBody(mimePost),
                     MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
                     MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
-                    CancellationToken.None).ConfigureAwait(false);
-        }
-        finally
-        {
-            // The sizes taken before the trace file opened belong to the run's first sending form only
-            // (BL-5784); the build that only checks the form under -Z leaves them for it (BL-5795).
-            if (isSendingBuild)
-            {
-                formBodyBuilder.FileSizesBeforeTrace = null;
-            }
-        }
+                    CancellationToken.None,
+                    fileSizesBeforeTrace).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -29,13 +29,16 @@ Suggested fix (from BL-5795's own context): stop sharing mutable state on the bu
 
 ## Acceptance criteria
 
-- [ ] `MultipartFormBodyBuilder` no longer holds the pre-trace sizes as a settable property; the build that uses them receives them as an argument.
-- [ ] Under `-Z`, exactly one sending form build per run receives the pre-trace sizes, taken atomically, and the check build in `FormSetupFailureAsync` receives none.
-- [ ] A test in `Curl.Console.UnitTests` runs `-Z -F f=@f.txt --trace-ascii f.txt` with two URLs and asserts the same per-transfer outcome on every run (a handler that holds the first build until the second has read its sizes shows the race is gone).
-- [ ] `RunAsync_ParallelTraceTruncatesTheFormFile_EndsWithExit26` and the other `FormFileSizedBeforeTraceTests` and `MultipartFormBodyBuilderTraceSizeTests` still pass.
-- [ ] `Curl.Console` and `Curl.Core.UnitLibrary` keep 100% line and branch coverage.
+- [x] `MultipartFormBodyBuilder` no longer holds the pre-trace sizes as a settable property; the build that uses them receives them as an argument.
+- [x] Under `-Z`, exactly one sending form build per run receives the pre-trace sizes, taken atomically, and the check build in `FormSetupFailureAsync` receives none.
+- [x] A test in `Curl.Console.UnitTests` runs `-Z -F f=@f.txt --trace-ascii f.txt` with two URLs and asserts the same per-transfer outcome on every run (a handler that holds the first build until the second has read its sizes shows the race is gone).
+- [x] `RunAsync_ParallelTraceTruncatesTheFormFile_EndsWithExit26` and the other `FormFileSizedBeforeTraceTests` and `MultipartFormBodyBuilderTraceSizeTests` still pass.
+- [x] `Curl.Console` and `Curl.Core.UnitLibrary` keep 100% line and branch coverage.
 
 ## Notes
+
+- The sizes now live in a runner field (`formFileSizesBeforeTrace`); `BuildFormAsync` takes them with `Interlocked.Exchange` for a sending build only, so exactly one sending build gets them and the `FormSetupFailureAsync` check build and any `--next` carry-over get none. `MultipartFormBodyBuilder` takes them as an optional `fileSizesBeforeTrace` argument of `BuildAsync` and `BuildMailMessageAsync`; the settable property is gone.
+- New test uses `--parallel-immediate` so both URLs start together (without it the second waits for the first). Measure-CodeQuality for Curl.Core.UnitLibrary and Curl.Console: 0 failing members. Fast tests green. The Linux and macOS criterion is met by keeping the change platform-neutral.
 
 ## Log
 

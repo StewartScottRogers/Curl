@@ -91,12 +91,6 @@ public sealed class MultipartFormBodyBuilder(
     /// </summary>
     public bool SevenBitRefusalWaitsForSend { get; init; }
 
-    /// <summary>
-    /// Gets or sets the sizes form files had before the run's trace file opened, by path: a file now smaller
-    /// than its entry is declared at the entry's size, so the send reads it short and fails with exit 26, as
-    /// curl 8.22.0 sizes a part before its first trace event truncates a file the trace names (AF-0982).
-    /// </summary>
-    public IReadOnlyDictionary<string, long>? FileSizesBeforeTrace { get; set; }
 
     /// <summary>
     /// Gets a value indicating whether a file part whose file does not open fails when the send reaches it, with
@@ -189,20 +183,22 @@ public sealed class MultipartFormBodyBuilder(
     /// <c>-H "Content-Type:"</c>; <see langword="null" /> when no <c>-H</c> header names it.
     /// </param>
     /// <param name="cancellationToken">Cancels the file opens.</param>
+    /// <param name="fileSizesBeforeTrace">The sizes form files had before the run's trace file opened, by path: a file now smaller than its entry is declared at the entry's size, so the send reads it short and fails with exit 26, as curl 8.22.0 sizes a part before its first trace event truncates a file the trace names (AF-0982); <see langword="null" /> for none.</param>
     /// <returns>The body or the failure, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, CancellationToken)" /> gives them.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="parts" /> is <see langword="null" />.</exception>
     public async ValueTask<MultipartFormBuildResult> BuildAsync(
         IReadOnlyList<MultipartFormPart> parts,
         MultipartNameEscaping nameEscaping,
         string? requestContentType,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace = null)
     {
         ArgumentNullException.ThrowIfNull(parts);
 
         string? disposition = requestContentType is null || MultipartPartHeaders.IsContentType(requestContentType, "multipart/form-data")
             ? FormDataDisposition
             : null;
-        return await BuildBodyAsync(parts, "multipart/form-data", null, disposition, nameEscaping, false, cancellationToken)
+        return await BuildBodyAsync(parts, "multipart/form-data", null, disposition, nameEscaping, false, fileSizesBeforeTrace, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -220,6 +216,7 @@ public sealed class MultipartFormBodyBuilder(
     /// <param name="nameEscaping">How names and file names are escaped in <c>Content-Disposition</c>.</param>
     /// <param name="messageHeaders">The <c>-H</c> headers, each sent as given, after <c>Mime-Version</c>.</param>
     /// <param name="cancellationToken">Cancels the file opens.</param>
+    /// <param name="fileSizesBeforeTrace">The sizes form files had before the run's trace file opened, by path, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, MultipartNameEscaping, string?, CancellationToken, IReadOnlyDictionary{string, long}?)" /> takes them; <see langword="null" /> for none.</param>
     /// <returns>
     /// The message, its headers included, with the outermost multipart's content type; or the
     /// failure, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, CancellationToken)" /> gives it.
@@ -229,11 +226,12 @@ public sealed class MultipartFormBodyBuilder(
         IReadOnlyList<MultipartFormPart> parts,
         MultipartNameEscaping nameEscaping,
         IReadOnlyList<string> messageHeaders,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace = null)
     {
         ArgumentNullException.ThrowIfNull(parts);
         ArgumentNullException.ThrowIfNull(messageHeaders);
-        return BuildBodyAsync(parts, "multipart/mixed", messageHeaders, null, nameEscaping, true, cancellationToken);
+        return BuildBodyAsync(parts, "multipart/mixed", messageHeaders, null, nameEscaping, true, fileSizesBeforeTrace, cancellationToken);
     }
 
     /// <summary>
@@ -247,6 +245,7 @@ public sealed class MultipartFormBodyBuilder(
         string? disposition,
         MultipartNameEscaping nameEscaping,
         bool forMail,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace,
         CancellationToken cancellationToken)
     {
         using MultipartBodySegments segments = new(textEncoding);
@@ -258,7 +257,7 @@ public sealed class MultipartFormBodyBuilder(
                 + string.Concat(messageHeaders.Select(header => header + "\r\n")) + "\r\n");
         }
 
-        TransferResult? failure = await AddPartsAsync(segments, parts, boundary, disposition, nameEscaping, forMail, cancellationToken)
+        TransferResult? failure = await AddPartsAsync(segments, parts, boundary, disposition, nameEscaping, forMail, fileSizesBeforeTrace, cancellationToken)
             .ConfigureAwait(false);
         if (failure is not null)
         {
@@ -284,6 +283,7 @@ public sealed class MultipartFormBodyBuilder(
         string? disposition,
         MultipartNameEscaping nameEscaping,
         bool forMail,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace,
         CancellationToken cancellationToken)
     {
         string lineBefore = string.Empty;
@@ -291,7 +291,7 @@ public sealed class MultipartFormBodyBuilder(
         {
             segments.AddText($"{lineBefore}--{boundary}\r\n");
             TransferResult? failure = RefuseLineBreakInName(part, nameEscaping, forMail)
-                ?? await AddPartAsync(segments, part, disposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+                ?? await AddPartAsync(segments, part, disposition, nameEscaping, forMail, fileSizesBeforeTrace, cancellationToken).ConfigureAwait(false);
             if (failure is not null)
             {
                 return failure;
@@ -310,12 +310,13 @@ public sealed class MultipartFormBodyBuilder(
         string? disposition,
         MultipartNameEscaping nameEscaping,
         bool forMail,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace,
         CancellationToken cancellationToken)
     {
         if (part.Kind == MultipartFormPartKind.Multipart)
         {
             // An encoder libcurl does not have is ignored here, as it always was for a nested multipart.
-            return await AddMultipartPartAsync(segments, part, disposition, nameEscaping, forMail, part.Encoder is null ? null : MultipartPartEncoder.Find(part.Encoder), cancellationToken).ConfigureAwait(false);
+            return await AddMultipartPartAsync(segments, part, disposition, nameEscaping, forMail, part.Encoder is null ? null : MultipartPartEncoder.Find(part.Encoder), fileSizesBeforeTrace, cancellationToken).ConfigureAwait(false);
         }
 
         if (!TryFindEncoder(part.Encoder, out MultipartPartEncoder? encoder))
@@ -329,7 +330,7 @@ public sealed class MultipartFormBodyBuilder(
             return null;
         }
 
-        return await AddFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
+        return await AddFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, fileSizesBeforeTrace, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -344,6 +345,7 @@ public sealed class MultipartFormBodyBuilder(
         MultipartNameEscaping nameEscaping,
         bool forMail,
         MultipartPartEncoder? encoder,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace,
         CancellationToken cancellationToken)
     {
         string boundary = createBoundary();
@@ -351,10 +353,10 @@ public sealed class MultipartFormBodyBuilder(
         string? partsDisposition = MultipartPartHeaders.IsContentType(contentType, "multipart/form-data") ? FormDataDisposition : null;
         if (encoder is null || encoder.PassesDataThrough)
         {
-            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, fileSizesBeforeTrace, cancellationToken).ConfigureAwait(false);
         }
 
-        return await AddEncodedPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
+        return await AddEncodedPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, encoder, fileSizesBeforeTrace, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Adds the nested multipart block of <paramref name="parts" />, built whole and encoded as it is sent.</summary>
@@ -366,10 +368,11 @@ public sealed class MultipartFormBodyBuilder(
         MultipartNameEscaping nameEscaping,
         bool forMail,
         MultipartPartEncoder encoder,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace,
         CancellationToken cancellationToken)
     {
         MultipartBodySegments nested = new(textEncoding);
-        TransferResult? failure = await AddPartsAsync(nested, parts, boundary, disposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+        TransferResult? failure = await AddPartsAsync(nested, parts, boundary, disposition, nameEscaping, forMail, fileSizesBeforeTrace, cancellationToken).ConfigureAwait(false);
         if (failure is not null)
         {
             nested.Dispose();
@@ -413,13 +416,14 @@ public sealed class MultipartFormBodyBuilder(
         MultipartNameEscaping nameEscaping,
         bool forMail,
         MultipartPartEncoder? encoder,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace,
         CancellationToken cancellationToken) =>
         part.ReadsStandardInput && standardInput is not null
             ? AddStandardInputPartAsync(segments, part, disposition, nameEscaping, forMail, encoder, standardInput, cancellationToken)
-            : AddOpenedFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken);
+            : AddOpenedFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, fileSizesBeforeTrace, cancellationToken);
 
-    private long SizeBeforeTrace(string path, long openedLength) =>
-        FileSizesBeforeTrace is not null && FileSizesBeforeTrace.TryGetValue(path, out long sized) && sized > openedLength
+    private static long SizeBeforeTrace(IReadOnlyDictionary<string, long>? fileSizesBeforeTrace, string path, long openedLength) =>
+        fileSizesBeforeTrace is not null && fileSizesBeforeTrace.TryGetValue(path, out long sized) && sized > openedLength
             ? sized
             : openedLength;
 
@@ -430,6 +434,7 @@ public sealed class MultipartFormBodyBuilder(
         MultipartNameEscaping nameEscaping,
         bool forMail,
         MultipartPartEncoder? encoder,
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace,
         CancellationToken cancellationToken)
     {
         FileOpenResult opened = await fileSystem.OpenForReadAsync(part.Content, cancellationToken).ConfigureAwait(false);
@@ -441,7 +446,7 @@ public sealed class MultipartFormBodyBuilder(
 
         Stream content = opened.Content!;
         segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
-        long? length = content.CanSeek ? seekableFileLength(part.Content, SizeBeforeTrace(part.Content, opened.Length)) : unseekableFileLength(part.Content);
+        long? length = content.CanSeek ? seekableFileLength(part.Content, SizeBeforeTrace(fileSizesBeforeTrace, part.Content, opened.Length)) : unseekableFileLength(part.Content);
         return await AddFileDataAsync(segments, content, length, encoder, forMail, cancellationToken)
             .ConfigureAwait(false);
     }

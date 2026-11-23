@@ -98,6 +98,47 @@ public sealed class FormFileSizedBeforeTraceTests
         Assert.AreEqual(26, exitCode);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ParallelTraceTruncatesTheFormFileForTwoUrls_ExactlyOneBuildDeclaresTheEarlierSize()
+    {
+        InMemoryFileSystem files = new();
+        files.ExistingContent["f.txt"] = "file body\n"u8.ToArray();
+        List<long> lengths = [];
+        TaskCompletionSource bothArrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        RecordingProtocolHandler http = new("http", async context =>
+        {
+            lock (lengths)
+            {
+                lengths.Add((context.Http?.Body as StreamBody)?.Length ?? -1);
+                if (lengths.Count == 2)
+                {
+                    bothArrived.SetResult();
+                }
+            }
+
+            await bothArrived.Task;
+            return TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } };
+        });
+        TruncatingFileSystem truncating = new(files);
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                truncating,
+                files,
+                new MemoryStream(),
+                new MemoryStream(),
+                new MemoryStream(),
+                runsOnWindows: false,
+                outputPaths: files,
+                formBodyBuilder: new MultipartFormBodyBuilder(truncating, Encoding.UTF8, () => "B", standardInput: null))
+            .RunAsync(["-Z", "--parallel-immediate", "-F", "f=@f.txt", "--trace-ascii", "f.txt", "http://127.0.0.1:22000/a", "http://127.0.0.1:22000/b"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(2, lengths);
+        Assert.AreEqual(1, lengths.Count(length => length == lengths.Max()));
+        Assert.AreNotEqual(lengths[0], lengths[1]);
+    }
+
     private static async Task<long> BodyLengthAsync(string? traceOption, string? traceFile)
     {
         InMemoryFileSystem files = new();
