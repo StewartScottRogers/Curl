@@ -10,7 +10,7 @@ public static class SocketIoExtension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "socketio",
-        "Connects to Socket.IO v5 servers over WebSocket: joins the URL path's namespace, emits the -d JSON array [\"event\", args...] as an event and writes each event received as one JSON array per line until the server disconnects. -u sends the user and password as the Authorization header of the handshake and as the namespace CONNECT packet's auth payload {\"username\":..,\"password\":..}.",
+        "Connects to Socket.IO v5 servers over WebSocket: joins the URL path's namespace, emits the -d JSON array [\"event\", args...] as an event and writes each event received as one JSON array per line until the server disconnects. -u sends the user and password as the Authorization header of the handshake and as the namespace CONNECT packet's auth payload {\"username\":..,\"password\":..}. --oauth2-bearer sends the token as the handshake's Authorization: Bearer header and as the auth payload {\"token\":..} instead (it wins over -u).",
         ["socketio", "socketios"],
         [],
         new Uri("https://socket.io/docs/v4/socket-io-protocol/"));

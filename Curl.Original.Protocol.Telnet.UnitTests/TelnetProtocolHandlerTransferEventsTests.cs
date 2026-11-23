@@ -125,6 +125,16 @@ public sealed class TelnetProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ServerSubnegotiatesFirstUnnamedOption_ReportsItByNumberAsUnknown()
+    {
+        // Option 40 is the first past the 40-entry name table; naming it must not index the table.
+        Session session = await RunAsync([], null, Hex("FF FA 28 01 FF F0"), Latin1("hi\r\n"));
+
+        Assert.IsTrue(session.Transcript.Contains("* 40 (unknown)"), string.Join("|", session.Transcript));
+        Assert.IsTrue(session.Transcript.Contains("<= hi\r\n"), string.Join("|", session.Transcript));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UserAndEnvironmentVariables_ReportsTheEnvironmentByteByByte()
     {
         // Measured with -u bob:x -t NEW_ENV=AB,CD -t NEW_ENV=E; the TTYPE IS at the end,

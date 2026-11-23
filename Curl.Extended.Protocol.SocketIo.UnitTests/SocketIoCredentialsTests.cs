@@ -33,6 +33,27 @@ public sealed class SocketIoCredentialsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_WithABearerToken_SendsItAsTheTokenAuthPayloadInsteadOfCredentials()
+    {
+        ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "41");
+        CapturingLog log = new();
+
+        TransferResult result = await new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), new ZeroRandomSource())
+            .ExecuteAsync(new TransferContext
+            {
+                Url = CurlUrl.Parse("socketio://example.com/"),
+                Output = new MemoryStream(),
+                Credentials = new NetworkCredential("user", "pw"),
+                Http = new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = "ab\"c" },
+                DiagnosticLog = log,
+            });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "1:40{\"token\":\"ab\\u0022c\"}" }, connection.SentFrames());
+        Assert.DoesNotContain("ab\"c", string.Join("\n", log.Messages));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_WithoutCredentials_SendsABareConnectPacket()
     {
         ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "41");

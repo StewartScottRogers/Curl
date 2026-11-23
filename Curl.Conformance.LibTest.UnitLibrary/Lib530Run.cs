@@ -186,8 +186,8 @@ public sealed class Lib530Run(LibTestContext context, TimeProvider timeProvider,
 
     private async ValueTask RunUntilCompleteAsync(LibTestSteps steps, CurlMulti multi, CancellationToken cancellationToken)
     {
-        bool success;
-        while (!CheckForCompletion(multi, out success))
+        bool? success;
+        while ((success = CheckForCompletion(multi)) is null)
         {
             if (!await TurnAsync(steps, multi, cancellationToken).ConfigureAwait(false))
             {
@@ -195,21 +195,19 @@ public sealed class Lib530Run(LibTestContext context, TimeProvider timeProvider,
             }
         }
 
-        if (!success)
+        if (!success.Value)
         {
             WriteMessage("Error getting file.");
             steps.Result = LibTestErrorCodes.MajorBad;
         }
     }
 
-    // t530_checkForCompletion: whether a message came, and whether the last one was a successful done.
-    private bool CheckForCompletion(CurlMulti multi, out bool success)
+    // t530_checkForCompletion: null when no message came, else whether the last one was a successful done.
+    private bool? CheckForCompletion(CurlMulti multi)
     {
-        bool completed = false;
-        success = false;
+        bool? success = null;
         while (multi.InfoRead(out _) is { } message)
         {
-            completed = true;
             success = message.Type == CurlMultiMessageType.Done && message.Result == CurlCode.Ok;
             if (message.Type != CurlMultiMessageType.Done)
             {
@@ -217,7 +215,7 @@ public sealed class Lib530Run(LibTestContext context, TimeProvider timeProvider,
             }
         }
 
-        return completed;
+        return success;
     }
 
     // One turn of the loop: select_test over the sets, socket_action on each ready socket, then on the timer

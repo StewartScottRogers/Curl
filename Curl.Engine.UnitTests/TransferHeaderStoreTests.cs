@@ -116,6 +116,21 @@ public sealed class TransferHeaderStoreTests
     }
 
     [TestMethod]
+    public void RecordLine_InformationalHeadThenFinalHeadAfterAFinalHead_KeepsBothInTheSecondRequest()
+    {
+        TransferHeaderStore store = StoreOf(
+            "HTTP/1.1 302 Found", "Location: /b", string.Empty,
+            "HTTP/1.1 100 Continue", string.Empty,
+            "HTTP/1.1 200 OK", "Server: second", string.Empty);
+
+        CurlHeaderCode code = store.Find("Server", 0, CurlHeaderOrigin.Header, 1, out CurlHeader? server);
+
+        Assert.AreEqual(CurlHeaderCode.Ok, code);
+        Assert.AreEqual("second", server?.Value);
+        Assert.AreEqual(CurlHeaderCode.NoRequest, store.Find("Server", 0, CurlHeaderOrigin.Header, 2, out _));
+    }
+
+    [TestMethod]
     public void RecordLine_InformationalConnectAndTrailers_GiveEachItsOrigin()
     {
         TransferHeaderStore store = new();

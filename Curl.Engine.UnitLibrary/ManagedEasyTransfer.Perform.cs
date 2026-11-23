@@ -243,7 +243,7 @@ internal sealed partial class ManagedEasyTransfer
         EngineTransferSettings settings;
         try
         {
-            settings = ToolSettings ?? TransferSettingsOf(options, scheme => createDispatcher(options, PerformShared, null, null, rtspSession, WebSocketConnection.PerformConnection).Serves(scheme));
+            settings = ToolSettings ?? TransferSettingsOf(options, scheme => createDispatcher(options, PerformShared.WithoutFtpPwdStop(), null, null, rtspSession, WebSocketConnection.PerformConnection).Serves(scheme));
         }
         catch (ExtensionPostReadFailedException exception)
         {
