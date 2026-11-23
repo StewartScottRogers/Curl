@@ -1,5 +1,5 @@
 ---
-id: BL-5781
+id: BL-5784
 title: Clear the pre-trace -F file sizes after the first transfer so a later transfer declares a shrunk file at its new size
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-22
 completed:
 ---
-# BL-5781 — Clear the pre-trace -F file sizes after the first transfer so a later transfer declares a shrunk file at its new size
+# BL-5784 — Clear the pre-trace -F file sizes after the first transfer so a later transfer declares a shrunk file at its new size
 
 ## Goal
 
