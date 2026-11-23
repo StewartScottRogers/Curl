@@ -33,3 +33,4 @@ Repro: `CurlMimePart.Bytes("report", bytes)` with no `ContentType`, sent over SM
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T2157, finding 4.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 56cdac44 a11660a4 3d836d5e.
