@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferHeaderStore.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5790 — Fix AF-0988: Surviving mutant: the header store can count every later line as a new request once a final head ended (finalHeadEnded = false -> true)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferHeaderStore.cs line 235`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferHeaderStore.cs line 235`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `TransferHeaderStoreTests.RecordLine_InformationalHeadThenFinalHeadAfterAFinalHead_KeepsBothInTheSecondRequest` (a 100 head and the final head after a finished request must share request 1; with the mutant the 100 head bumps the count and the 200 bumps it again). Mutant applied by hand: that test failed; reverted: Curl.Engine.UnitTests 3180 passed. No production change, so no quality run.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 327bc833 9742157d.
+- 2026-11-22: Doing -> Done. A header-store test with a 1xx head after a finished request now fails the finalHeadEnded mutant
