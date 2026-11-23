@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WebSocketExtendedConnect.UnitTests/Http2/Http2WebSocketTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5786 — Fix AF-0984: ReceiveAsync_MaskedServerFrame_FailsWithTheViolation checks only that the message is non-empty, not that it names the violation
 
@@ -52,3 +52,4 @@ Test now pins "masked input frame" (the WsFrameDecoder violation text) with Stri
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. Test pins the masked input frame violation text.
