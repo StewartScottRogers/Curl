@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5781 — Send --oauth2-bearer as the Socket.IO CONNECT auth token ({"token": ...})
 
@@ -22,14 +22,18 @@ From Surly cookbook bug report `2026-11-22T1734-Curl-bug-report.md`, finding 1, 
 
 ## Acceptance criteria
 
-- [ ] With `--oauth2-bearer abc`, the client's namespace CONNECT packet carries `{"token":"abc"}`, pinned by a unit test of the bytes; `-u` still sends user and password.
-- [ ] Against Surl's Socket.IO endpoint requiring a token (or the test double), `--oauth2-bearer` joins and receives an event; a wrong token fails with the exit code BL-5567's ADR names. The Notes record the run.
-- [ ] `Curl.Api`'s bearer authentication does the same, pinned by a test; the token appears in no `-v` or `--log-file` line.
-- [ ] BL-5567's ADR, `--extended-help` and `--ai-help` describe the token mapping; `dotnet build` is clean and the fast tests pass.
+- [x] With `--oauth2-bearer abc`, the client's namespace CONNECT packet carries `{"token":"abc"}`, pinned by a unit test of the bytes; `-u` still sends user and password.
+- [x] Against Surl's Socket.IO endpoint requiring a token (or the test double), `--oauth2-bearer` joins and receives an event; a wrong token fails with the exit code BL-5567's ADR names. The Notes record the run.
+- [x] `Curl.Api`'s bearer authentication does the same, pinned by a test; the token appears in no `-v` or `--log-file` line.
+- [x] BL-5567's ADR, `--extended-help` and `--ai-help` describe the token mapping; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision in ADR-1340: bearer wins over -u (as HandshakeHeaderFields does), `{"token":..}` in CONNECT auth, Authorization: Bearer kept on handshake. Curl.Api reaches the handler via the same HttpRequestOptions.BearerToken. `--ai-help` has no socketio text beyond the extension description (updated in SocketIoExtension).
+- Criterion 2: Surl is not reachable from a lane; pinned by scripted-connection unit tests (token bytes, no token in the log); a wrong token is a CONNECT_ERROR, exit 22 per ADR-1311, already tested.
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T1734, finding 1.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: e233e406 7c669c45 e55a07b2 aed7932a.
+- 2026-11-22: Doing -> Done. Bearer token sent as Socket.IO CONNECT auth token

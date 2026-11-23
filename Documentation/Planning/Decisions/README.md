@@ -1381,3 +1381,4 @@ Each option and the specific reason it lost.
 | [1337](ADR-1337-a-curl-api-stream-body-to-an-extension-scheme-is-read-up-front-as-curl-d-data.md) | A Curl.Api stream body to an extension scheme is read up front as -d data (BL-5754) | Accepted | 2026-11-22 |
 | [1338](ADR-1338-a-socketio-emit-ends-at-the-first-event-the-server-sends-back.md) | A socketio emit ends at the first event the server sends back (BL-5763) | Accepted | 2026-11-22 |
 | [1339](ADR-1339-an-extension-url-post-whose-read-callback-aborts-pauses-or-lies-fails-the-transfer.md) | An extension URL post whose read callback aborts, pauses or lies fails the transfer (BL-5764) | Accepted | 2026-11-22 |
+| [1340](ADR-1340-socketio-sends-oauth2-bearer-as-the-connect-packet-token.md) | The socketio client sends --oauth2-bearer as the CONNECT packet's token (BL-5781) | Accepted | 2026-11-22 |

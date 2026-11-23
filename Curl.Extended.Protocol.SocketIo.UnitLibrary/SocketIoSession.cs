@@ -20,7 +20,8 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <param name="timeProvider">The transfer's clock, which times the heartbeat.</param>
 /// <param name="progress">Told the bytes written so far after each event, so a <c>-m</c> timeout and <c>%{size_download}</c> count them.</param>
 /// <param name="credentials">The <c>-u</c> user and password sent as the namespace CONNECT packet's <c>auth</c> payload (ADR-1311), or <see langword="null" /> to send none.</param>
-internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider, ITransferProgress progress, NetworkCredential? credentials = null)
+/// <param name="bearerToken">The <c>--oauth2-bearer</c> token sent as the CONNECT packet's <c>auth</c> payload <c>{"token":..}</c> in place of <paramref name="credentials"/> (ADR-1340), or <see langword="null" />.</param>
+internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider, ITransferProgress progress, NetworkCredential? credentials = null, string? bearerToken = null)
 {
     private const char EngineIoOpen = '0';
 
@@ -68,10 +69,11 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         ReadHandshake(handshake, long.MaxValue, root =>
             root.TryGetProperty("maxPayload", out JsonElement maxPayload) && maxPayload.TryGetInt64(out long bytes) && bytes >= 0 ? bytes : long.MaxValue);
 
-    /// <summary>Gives the CONNECT packet's <c>auth</c> payload: <c>{"username":..,"password":..}</c>, or nothing without credentials (ADR-1311).</summary>
-    internal static string AuthPayloadOf(NetworkCredential? credentials)
+    /// <summary>Gives the CONNECT packet's <c>auth</c> payload: <c>{"token":..}</c> for a bearer token (it wins over <c>-u</c>, as on HTTP; ADR-1340), else <c>{"username":..,"password":..}</c> (ADR-1311), or nothing without either.</summary>
+    internal static string AuthPayloadOf(NetworkCredential? credentials, string? bearerToken = null)
     {
-        if (credentials is null)
+        bool hasToken = !string.IsNullOrEmpty(bearerToken);
+        if (!hasToken && credentials is null)
         {
             return string.Empty;
         }
@@ -80,8 +82,16 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
-            writer.WriteString("username", credentials.UserName);
-            writer.WriteString("password", credentials.Password);
+            if (hasToken)
+            {
+                writer.WriteString("token", bearerToken);
+            }
+            else
+            {
+                writer.WriteString("username", credentials!.UserName);
+                writer.WriteString("password", credentials.Password);
+            }
+
             writer.WriteEndObject();
         }
 
@@ -150,7 +160,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         heartbeatTimeout = HeartbeatTimeoutOf(handshake);
         maxPayload = MaxPayloadOf(handshake);
         heartbeat.CancelAfter(heartbeatTimeout);
-        return SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Connect, namespaceName, null, AuthPayloadOf(credentials)), cancellationToken);
+        return SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Connect, namespaceName, null, AuthPayloadOf(credentials, bearerToken)), cancellationToken);
     }
 
     private ValueTask PingedAsync(string payload, CancellationToken cancellationToken)
