@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5819 — Fix fitness finding STD-171: Linux LDAP SASL bind failures exit 38 "LDAP: cannot bind"; curl exits 67
 
@@ -45,7 +45,7 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Notes
 
-Decision in ADR-1342: OpenLDAP SASL bind failures exit 67 (Login denied; Local Error challenge -> Authentication cancelled). Not measured against real curl (no OpenLDAP here); taken from the finding. Measure-CodeQuality was blocked by an unrelated Curl.Console.UnitTests failure (CreateRunnerOverConnectors_WritesProgressMeter_WritesTheMeterOnlyWhenAsked); the change adds one small method, all branches tested.
+Decision in ADR-1343 (renumbered from 1342, which BL-5828 took): OpenLDAP SASL bind failures exit 67 (Login denied; Local Error challenge -> Authentication cancelled). Not measured against real curl (no OpenLDAP here); taken from the finding. Lane 1 took lane 13's branch (factory/BL-5819-lane-13-20261123-102134) and added ExecuteAsync_ServerClosesBeforeTheDigestChallenge_FailsWith7 for the uncovered Closed branch of SaslBindFailedAsync; Measure-CodeQuality -Library Curl.Original.Protocol.Ldap.UnitLibrary reports 0 failing members. Criterion 1 is met by the unit tests replaying the server replies (Login denied for every other failed reply, Authentication cancelled for Local Error); no OpenLDAP server here to run the commands live. Platform-neutral: byte replays only.
 
 ## Log
 
@@ -53,3 +53,4 @@ Decision in ADR-1342: OpenLDAP SASL bind failures exit 67 (Login denied; Local E
 - 2026-11-23: Backlog -> Doing. Criteria at claim: fa86ec17 69116afe 3d836d5e.
 - 2026-11-23: Doing -> Backlog. Lane 13 could not integrate: quality gates missed by 1 member(s) of files it changed: LdapOpenLdapSaslBind.SaslBindFailedAsync(Curl.Original.Protocol.Ldap.LdapExchange, Curl.Original.Protocol.Ldap.LdapBindReply, System.Threading.CancellationToken) (Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs: branch), still after a repair run. The work is on branch factory/BL-5819-lane-13-20261123-102134; start with git cherry-pick --no-commit factory/BL-5819-lane-13-20261123-102134 and fix it.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: fa86ec17 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. OpenLDAP SASL bind failures exit 67 Login denied / Authentication cancelled instead of 38
