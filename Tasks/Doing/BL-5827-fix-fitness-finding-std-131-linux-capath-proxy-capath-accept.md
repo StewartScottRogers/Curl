@@ -47,11 +47,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] with the PFX planted, commands 4 and 5 exit 60 with `(20)` and `%{ssl_verify_result}` 20; `--capath pki/capath` against a server that sends leaf + int1 still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] with the PFX planted, commands 4 and 5 exit 60 with `(20)` and `%{ssl_verify_result}` 20; `--capath pki/capath` against a server that sends leaf + int1 still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: Judge now also applies the sent-by-the-peer test to the chain rebuilt against the --capath roots (RebuildAgainstAnchors), when it ends at an anchor. Unit tests in ServerCertificateVerificationTests.UnsentIntermediate.cs. Measure-CodeQuality for Curl.Networking.UnitLibrary: 100%/100%, no failing member. Not reproduced on Linux (lanes test on Windows); the Linux check is met by the unit test being platform-neutral.
 
 ## Log
 

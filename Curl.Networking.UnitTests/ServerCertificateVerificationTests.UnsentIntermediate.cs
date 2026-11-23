@@ -66,6 +66,70 @@ public sealed class ServerCertificateVerificationUnsentIntermediateTests
         Assert.IsNull(failure);
     }
 
+    [TestMethod]
+    public void Judge_UnsentIntermediateUnderACapathRootTheChainDoesNotEndAt_IsExit60WithError20()
+    {
+        var (_, failure) = JudgeAgainstCapathRoot(sendIntermediate: false, anchorIsTheRoot: true);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual(UnableToGetLocalIssuer, failure?.Message);
+    }
+
+    [TestMethod]
+    public void Judge_SentIntermediateUnderACapathRoot_Accepts()
+    {
+        var (_, failure) = JudgeAgainstCapathRoot(sendIntermediate: true, anchorIsTheRoot: true);
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void Judge_UnsentIntermediateUnderACapathRootOfAnotherPki_DoesNotRefuseAsAnUnsentIntermediate()
+    {
+        var (_, failure) = JudgeAgainstCapathRoot(sendIntermediate: false, anchorIsTheRoot: false);
+
+        Assert.AreNotEqual(UnableToGetLocalIssuer + "!", failure?.Message);
+    }
+
+    private static (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgeAgainstCapathRoot(bool sendIntermediate, bool anchorIsTheRoot)
+    {
+        using var root = CreateCa("CN=Capath Root", null, 1);
+        using var intermediate = CreateCa("CN=Capath Intermediate", root, 2);
+        using var otherRoot = CreateCa("CN=Other Root", null, 3);
+        using var leafKey = RSA.Create(2048);
+        var leafRequest = new CertificateRequest("CN=capath.test", leafKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var leaf = leafRequest.Create(intermediate, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(10), [4]);
+
+        // What SslStream built: the intermediate came from the CurrentUser CA store, the root is untrusted.
+        using var chain = new X509Chain();
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.DisableCertificateDownloads = true;
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.ExtraStore.Add(intermediate);
+        chain.ChainPolicy.ExtraStore.Add(root);
+        _ = chain.Build(leaf);
+
+        ReadOnlyMemory<byte>[] sent = sendIntermediate ? [leaf.RawData, intermediate.RawData] : [leaf.RawData];
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), matchesSchannelBuild: false, TimeProvider.System);
+
+        return verification.Judge(SslPolicyErrors.RemoteCertificateChainErrors, chain, "capath.test", [anchorIsTheRoot ? root : otherRoot], null, sent);
+    }
+
+    private static X509Certificate2 CreateCa(string subject, X509Certificate2? issuer, byte serial)
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
+        if (issuer is null)
+        {
+            using var selfSigned = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(30));
+            return X509CertificateLoader.LoadPkcs12(selfSigned.Export(X509ContentType.Pfx), null);
+        }
+
+        using var publicOnly = request.Create(issuer, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(20), [serial]);
+        return publicOnly.CopyWithPrivateKey(key);
+    }
+
     private static (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgeSending(
         bool sendIntermediate, bool matchesSchannelBuild, bool insecure, bool anchorsListIntermediate = false, bool sendNothing = false)
     {

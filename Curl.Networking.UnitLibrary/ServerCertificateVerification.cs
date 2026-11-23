@@ -302,7 +302,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         ReadOnlyMemory<byte>[] peerCertificates,
         byte[]? stapledResponse = null)
     {
-        if (RelyingOnAnIntermediateTheServerDidNotSend(chain, peerCertificates))
+        if (RelyingOnAnUnsentIntermediate(chain, anchorsBesideSystemStore, peerCertificates))
         {
             return (
                 new PeerVerification(false, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally, peerCertificates),
@@ -342,6 +342,25 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             && chain is not null
             && peerCertificates.Length > 0
             && chain.ChainElements.Skip(1).Take(Math.Max(0, AnchorIndexOf(chain) - 1)).Any(element => !WasSent(element.Certificate, peerCertificates));
+    }
+
+    private bool RelyingOnAnUnsentIntermediate(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates) =>
+        RelyingOnAnIntermediateTheServerDidNotSend(chain, peerCertificates)
+        || AnchoredChainRelyingOnAnIntermediateTheServerDidNotSend(chain, anchors, peerCertificates);
+
+    // The same test for the chain rebuilt against the --capath roots, which the system store's
+    // intermediates reach too when the SslStream chain does not end at an anchor (BL-5827).
+    private bool AnchoredChainRelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates)
+    {
+        if (matchesSchannelBuild || options.Insecure || peerCertificates.Length == 0)
+        {
+            return false;
+        }
+
+        using var rebuilt = RebuildAgainstAnchors(chain, anchors, requireServerAuthentication: true, out _);
+        return rebuilt is not null
+            && EndsAtAnchor(rebuilt, anchors)
+            && rebuilt.ChainElements.Skip(1).Take(Math.Max(0, rebuilt.ChainElements.Count - 2)).Any(element => !WasSent(element.Certificate, peerCertificates));
     }
 
     private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates) =>
