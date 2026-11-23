@@ -70,20 +70,20 @@ public sealed class LdapOpenLdapSaslBindTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ServerOffersOnlyAuthConf_SendsNoAnswerAndFailsWith38()
+    public async Task ExecuteAsync_ServerOffersOnlyAuthConf_SendsNoAnswerAndFailsWith67AuthenticationCancelled()
     {
         (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, Challenge(2, "nonce=\"abc\",qop=\"auth-conf\",cipher=\"rc4\""));
 
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP: cannot bind"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Authentication cancelled"), result);
         Assert.IsFalse(sent.AsSpan().IndexOf("response="u8) >= 0);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_DigestChallengeWithoutANonce_SendsNoAnswerAndFailsWith38()
+    public async Task ExecuteAsync_DigestChallengeWithoutANonce_SendsNoAnswerAndFailsWith67AuthenticationCancelled()
     {
         (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, Challenge(2, "realm=\"x\",qop=\"auth\""));
 
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP: cannot bind"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Authentication cancelled"), result);
         Assert.IsFalse(sent.AsSpan().IndexOf("response="u8) >= 0);
     }
 
@@ -106,6 +106,14 @@ public sealed class LdapOpenLdapSaslBindTests
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
         Assert.IsFalse(sent.AsSpan().IndexOf("secret"u8) >= 0);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestBindSucceedsWithoutAChallenge_FailsWith67LoginDenied()
+    {
+        (TransferResult result, _) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, "30 0c 02 01 02 61 07 0a 01 00 04 00 04 00");
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
     }
 
     [TestMethod]

@@ -42,8 +42,17 @@ internal static class LdapOpenLdapSaslBind
         }
 
         LdapBindReply reply = await LdapAuthenticatedBind.DigestAsync(exchange, credentials, host, cancellationToken, acceptsQopAuth: true).ConfigureAwait(false);
-        return reply.IsSuccess ? null : await LdapBind.OpenLdapBindFailedAsync(exchange, reply, cancellationToken).ConfigureAwait(false);
+        return reply.IsSuccess ? null : await SaslBindFailedAsync(exchange, reply, cancellationToken).ConfigureAwait(false);
     }
+
+    // The OpenLDAP SASL bind (ADR-1342): a server that closed is exit 7; a challenge the client cannot answer (Local Error, as under a
+    // server minssf) is exit 67 "Authentication cancelled"; every other failed reply is exit 67 "Login denied", never exit 38.
+    private static ValueTask<TransferResult?> SaslBindFailedAsync(LdapExchange exchange, LdapBindReply reply, CancellationToken cancellationToken) =>
+        reply.Status == LdapBindReplyStatus.Closed
+            ? LdapBind.OpenLdapBindFailedAsync(exchange, reply, cancellationToken)
+            : reply.Status == LdapBindReplyStatus.Answered && reply.ResultCode == WinLdapResultText.LocalError
+                ? LdapBind.UnbindAndFailAsync(exchange, TransferResult.Failure(CurlExitCode.LoginDenied, "Authentication cancelled"), cancellationToken)
+                : LdapBind.OpenLdapLoginDeniedAsync(exchange, cancellationToken);
 
     private static IEnumerable<string> SplitOptions(string? loginOptions) =>
         (loginOptions ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

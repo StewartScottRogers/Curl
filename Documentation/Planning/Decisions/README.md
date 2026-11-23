@@ -1383,3 +1383,4 @@ Each option and the specific reason it lost.
 | [1339](ADR-1339-an-extension-url-post-whose-read-callback-aborts-pauses-or-lies-fails-the-transfer.md) | An extension URL post whose read callback aborts, pauses or lies fails the transfer (BL-5764) | Accepted | 2026-11-22 |
 | [1340](ADR-1340-socketio-sends-oauth2-bearer-as-the-connect-packet-token.md) | The socketio client sends --oauth2-bearer as the CONNECT packet's token (BL-5781) | Accepted | 2026-11-22 |
 | [1341](ADR-1341-curl-api-takes-the-verbose-trace-through-a-per-request-debug-callback.md) | Curl.Api takes the verbose trace through a per-request debug callback (BL-5797) | Accepted | 2026-11-22 |
+| [1342](ADR-1342-openldap-sasl-bind-failures-exit-67-login-denied-or-authentication-cancelled.md) | OpenLDAP SASL bind failures exit 67 Login denied or Authentication cancelled (BL-5819) | Accepted | 2026-11-23 |

@@ -39,11 +39,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] command 1 exits 67 `curl: (67) Login denied`; command 4 exits 67 `curl: (67) Authentication cancelled`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] command 1 exits 67 `curl: (67) Login denied`; command 4 exits 67 `curl: (67) Authentication cancelled`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision in ADR-1342: OpenLDAP SASL bind failures exit 67 (Login denied; Local Error challenge -> Authentication cancelled). Not measured against real curl (no OpenLDAP here); taken from the finding. Measure-CodeQuality was blocked by an unrelated Curl.Console.UnitTests failure (CreateRunnerOverConnectors_WritesProgressMeter_WritesTheMeterOnlyWhenAsked); the change adds one small method, all branches tested.
 
 ## Log
 
