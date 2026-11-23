@@ -3,8 +3,8 @@ id: AF-0983
 title: ManagedEasyTransfer.PostDataOf's summary says only an mqtt or mqtts URL reads the post data; it also gives it to every extension URL, read-callback posts included
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs:PostDataOf:false-doc-comment
 reproduction: none
 task: BL-5780
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1817.md
 ---
 # AF-0983 - ManagedEasyTransfer.PostDataOf's summary says only an mqtt or mqtts URL reads the post data; it also gives it to every extension URL, read-callback posts included
 
@@ -44,6 +44,9 @@ ManagedEasyTransfer.Context.cs:265:        if (!(IsMqttUrl(options) || IsExtensi
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1817.md | reproduces: no | Ran the reproduction. The pattern 'only an <c>mqtt</c> or <c>mqtts</c> URL reads it' no longer matches. The other two alternatives match code lines only: 262 (PostDataOf => ... : ReadCallbackPostDataOf(options, isServedScheme)) and 270 (if (!(IsMqttUrl(options) || IsExtensionUrl(options)))). The PostDataOf summary (lines 250-256) now reads 'The post data an MQTT or extension URL's handler reads ... or, with no fields, a CURLOPT_READFUNCTION post read up front ... every extension URL, a scheme curl itself does not serve, is given it too'. That covers extension URLs and read-callback posts, which matches the code.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces.

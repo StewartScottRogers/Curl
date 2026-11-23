@@ -3,8 +3,8 @@ id: AF-0977
 title: Surviving mutant: an amqp:// URL with explicit port 0 can be dialled on the default port 5672 (>= -> >)
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ProtocolHandler.cs:TargetOf-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ProtocolHandler.cs:41:>=
 task: BL-5774
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: mechanical
+closed-by: 2026-11-22_1817.md
 ---
 # AF-0977 - Surviving mutant: an amqp:// URL with explicit port 0 can be dialled on the default port 5672 (>= -> >)
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1817.md | reproduces: no | Ran the -Site command: killed at line 41 ('url.Port >= 0' -> 'url.Port > 0' in TargetOf). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
