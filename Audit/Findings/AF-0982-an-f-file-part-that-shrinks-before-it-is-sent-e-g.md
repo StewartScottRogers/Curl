@@ -3,8 +3,8 @@ id: AF-0982
 title: An -F file part that shrinks before it is sent (e.g. --trace-ascii into the same file) exits 0 where curl fails with exit 26
 auditor: conformance
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces.
 key: conformance:-F:form-file-shorter-than-sized:exit-code
 reproduction: none
 task: BL-5779
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1817.md
 ---
 # AF-0982 - An -F file part that shrinks before it is sent (e.g. --trace-ascii into the same file) exits 0 where curl fails with exit 26
 
@@ -42,6 +42,9 @@ Set-Location $env:TEMP; 'file body' | Set-Content -NoNewline f.txt; Add-Content 
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1817.md | reproduces: no | The given command names a binary from audit 20261122-135121 that no longer exists, and its URL is port 1. Against port 1 both curl 8.22.0 (Schannel, Git ucrt64) and this tree's Release curl.exe exit 7 ('Failed to connect'), because the connection is refused before the form part is read, so that form cannot tell. Reran the case against a live loopback server with Record-CurlExchange.ps1 (-sS -o NUL -F f=@f.txt --trace-ascii f.txt http://127.0.0.1:47911/, f.txt = 'file body\n'): curl exit 26 'curl: (26) client mime read EOF fail, only 192/202 of needed bytes read'; Curl exit 26 with the same stderr and the same 385 request bytes. No longer reproduces.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces.

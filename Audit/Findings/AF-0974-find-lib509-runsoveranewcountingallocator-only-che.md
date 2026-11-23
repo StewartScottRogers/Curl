@@ -3,8 +3,8 @@ id: AF-0974
 title: Find_Lib509_RunsOverANewCountingAllocator only checks that the exit code is not -1, never that a counting allocator was used
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib510To519Tests.cs:Find_Lib509_RunsOverANewCountingAllocator:name-lies
 reproduction: none
 task: BL-5771
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1817.md
 ---
 # AF-0974 - Find_Lib509_RunsOverANewCountingAllocator only checks that the exit code is not -1, never that a counting allocator was used
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib510To519Tests.cs -Patt
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1817.md | reproduces: no | Ran the Select-String reproduction. Find_Lib509_RunsOverANewCountingAllocator now asserts Assert.AreEqual(0, result.ExitCode), Assert.AreEqual("Callbacks were invoked!\n", run.OutputText) (lib509's line when the counting allocator's callbacks ran) and an empty standard error. It no longer only checks for an exit code other than -1.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces.

@@ -46,6 +46,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Origi
 - 2026-11-21 | 2026-11-21_1740.md | not re-audited | Ran the -Site command: outcome site-missing. MqttPackets.cs:93 is now 'if (IsOverPublishLimit(remainingLength))'; the comparison moved out of BuildPublish. Not re-audited.
 - 2026-11-22 | 2026-11-22_0210.md | not re-audited | Ran the -Site command: outcome site-missing. BuildPublish line 93 now calls IsOverPublishLimit(remainingLength), and the '>' moved to line 107 ('remainingLength > MaximumPublishRemainingLength'). Not re-audited. Separately I ran -Site Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs:107:> -Member IsOverPublishLimit: outcome killed.
 - 2026-11-22 | 2026-11-22_1351.md | not re-audited | Ran the -Site command. Outcome site-missing: BuildPublish now calls IsOverPublishLimit(remainingLength), and the '>' comparison moved to that member (MqttPackets.cs:107). Not re-audited.
+- 2026-11-22 | 2026-11-22_1817.md | reproduces: yes | Ran the -Site command: site-missing at line 93, because BuildPublish now calls IsOverPublishLimit(remainingLength). Re-ran at the moved site (MqttPackets.cs:102:> -Member IsOverPublishLimit): 'remainingLength > MaximumRemainingLength' -> '>= MaximumRemainingLength' survived, so a publish of exactly the limit can still be refused with exit 100.
 
 ## Log
 
