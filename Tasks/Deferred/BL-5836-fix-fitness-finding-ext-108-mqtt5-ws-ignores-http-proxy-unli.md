@@ -46,3 +46,4 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
+- 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
