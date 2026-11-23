@@ -3,8 +3,8 @@ id: AF-0971
 title: ADR-1325 says CurlFtpOptions.ResumeFrom and ListOnly sit with FTP, not on every protocol; the code applies them to every protocol
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1325-curl-api-ftp-resume-offset-and-names-only-listing-live-on-curlftpoptions.md:CurlFtpOptions.ResumeFrom:stale-adr
 reproduction: none
 task: BL-5742
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0971 - ADR-1325 says CurlFtpOptions.ResumeFrom and ListOnly sit with FTP, not on every protocol; the code applies them to every protocol
 
@@ -42,6 +42,9 @@ Select-String -Path Documentation/Planning/Decisions/ADR-1325-*.md,Curl.Api/Opti
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | Ran the reproduction: no 'not on every' match in ADR-1325. Its Decision now says the two members 'are transfer-wide ... apply to every protocol'. The only match is CurlFtpOptions.cs:97 'it applies to every protocol', which agrees with the code (ApplyTo writes the shared EasyTransferOptions).
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.

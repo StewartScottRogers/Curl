@@ -3,8 +3,8 @@ id: AF-0970
 title: BrainpoolEcdsa.Verify compares the recomputed r with the signature's r using SequenceEqual, unlike DsaSignature, Ed25519 and Ed448
 auditor: security
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.
 key: security:Curl.Cryptography.UnitLibrary/BrainpoolEcdsa.cs:Verify:non-constant-time-compare
 reproduction: none
 task: BL-5741
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0970 - BrainpoolEcdsa.Verify compares the recomputed r with the signature's r using SequenceEqual, unlike DsaSignature, Ed25519 and Ed448
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Cryptography.UnitLibrary/BrainpoolEcdsa.cs -Pattern "Se
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | Select-String on Curl.Cryptography.UnitLibrary/BrainpoolEcdsa.cs for SequenceEqual|FixedTimeEquals finds only line 186: return finite && CryptographicOperations.FixedTimeEquals(MemoryMarshal.AsBytes(w), MemoryMarshal.AsBytes(r)). No SequenceEqual.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.

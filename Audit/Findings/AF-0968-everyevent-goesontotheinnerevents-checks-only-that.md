@@ -3,8 +3,8 @@ id: AF-0968
 title: EveryEvent_GoesOnToTheInnerEvents checks only that 13 calls arrived, not that each event reached its own method
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/EngineConnectionIdTransferEventsTests.cs:EveryEvent_GoesOnToTheInnerEvents:weak-assertion
 reproduction: none
 task: BL-5739
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0968 - EveryEvent_GoesOnToTheInnerEvents checks only that 13 calls arrived, not that each event reached its own method
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Engine.UnitTests/EngineConnectionIdTransferEventsTests.
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | Ran the Select-String: no match for 'Assert.AreEqual(13, inner.Count)' or '=> Count++'. The test now records each call (RecordingEvents.Calls) and asserts each event reached its own method: Assert.HasCount(13, inner.Calls); Assert.AreSame(opened, inner.Calls[0]); Assert.AreSame(reused, inner.Calls[1]); CollectionAssert.AreEqual(expectedRest, ...); Assert.AreSame(handshake, inner.Calls[5]).
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.

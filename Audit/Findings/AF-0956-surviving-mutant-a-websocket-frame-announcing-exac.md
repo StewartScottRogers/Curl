@@ -3,8 +3,8 @@ id: AF-0956
 title: Surviving mutant: a WebSocket frame announcing exactly 2^63-1 bytes can be refused as longer than 63 bits
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:PayloadLength-gt:surviving-mutant
 reproduction: mutation Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:261:>
 task: BL-5732
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: mechanical
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0956 - Surviving mutant: a WebSocket frame announcing exactly 2^63-1 bytes can be refused as longer than 63 bits
 
@@ -43,7 +43,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.WebSo
 ## Re-audits
 
 - 2026-11-22 | 2026-11-22_0210.md | reproduces: yes | Ran the -Site command: resolvedLine 261, outcome survived. Line 261 is still 'if (length > long.MaxValue)' in PayloadLength.
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | Ran the -Site command: 'if (length > long.MaxValue)' -> '>=' was killed. Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

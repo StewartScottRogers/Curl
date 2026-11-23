@@ -44,6 +44,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 - 2026-11-21 | 2026-11-21_1740.md | not re-audited | Ran the -Site command: outcome site-missing. OpenSslCipherString.cs:195 is now inside ReadSelection, and ApplyNextRule has no '<' site left. Not re-audited.
 - 2026-11-22 | 2026-11-22_0210.md | not re-audited | Ran the -Site command: outcome site-missing. ApplyNextRule (OpenSslCipherString.cs:159) has no '<' site any more; it starts with 'if (IsSeparator(ch)) { _position++; return true; }'. Not re-audited.
+- 2026-11-22 | 2026-11-22_1351.md | not re-audited | Ran the -Site command (3 ECH tests that already fail left out). Outcome site-missing: ApplyNextRule was restructured and holds no '<' site near line 195. Not re-audited.
 
 ## Log
 

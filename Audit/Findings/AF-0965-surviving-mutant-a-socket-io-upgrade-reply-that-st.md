@@ -3,8 +3,8 @@ id: AF-0965
 title: Surviving mutant: a Socket.IO upgrade reply that starts with an empty line can be read on instead of failing with exit 8 (IndexOf(HeadEnd) < 0 -> <= 0)
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs:ReadReplyAsync-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs:64:<
 task: BL-5736
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: mechanical
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0965 - Surviving mutant: a Socket.IO upgrade reply that starts with an empty line can be read on instead of failing with exit 8 (IndexOf(HeadEnd) < 0 -> <= 0)
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | Ran the -Site command: 'IndexOf(HeadEnd)) < 0' -> '<= 0' at SocketIoUpgrade.cs:64 was killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

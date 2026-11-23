@@ -3,8 +3,8 @@ id: AF-0959
 title: README.md tells readers to run the MCP server with 'dnx Curl.Mcp', but the package ID is Surly.Curl.Mcp
 auditor: truthfulness
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.
 key: truthfulness:README.md:Curl.Mcp-dnx-command:false-statement
 reproduction: none
 task: BL-5728
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0959 - README.md tells readers to run the MCP server with 'dnx Curl.Mcp', but the package ID is Surly.Curl.Mcp
 
@@ -43,7 +43,9 @@ Select-String -Path README.md,Curl.Mcp/README.md,Curl.Mcp/Curl.Mcp.csproj -Patte
 ## Re-audits
 
 - 2026-11-22 | 2026-11-22_0210.md | reproduces: no | Ran Select-String -Path README.md,Curl.Mcp/README.md,Curl.Mcp/Curl.Mcp.csproj -Pattern 'dnx (Surly\.)?Curl\.Mcp|<PackageId>'. README.md:133 now says 'Run it with `dnx Surly.Curl.Mcp`'; Curl.Mcp/README.md:3 and :17 say 'dnx Surly.Curl.Mcp'; Curl.Mcp.csproj:29 has <PackageId>Surly.Curl.Mcp</PackageId>. No 'dnx Curl.Mcp' remains; the documented command matches the package ID.
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | Ran the reproduction: README.md:133 and Curl.Mcp/README.md:3,17 now say 'dnx Surly.Curl.Mcp', and Curl.Mcp.csproj:29 has <PackageId>Surly.Curl.Mcp</PackageId>. No bare 'dnx Curl.Mcp' remains.
 
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.

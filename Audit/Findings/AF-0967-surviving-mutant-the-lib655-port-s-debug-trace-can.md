@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: survived at resolved line 46. As with AF-0952, the line reads traceTime: true, noHex: true, and the tool flipped the first 'true' (traceTime). No test pins lib655's trace format. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-11-22: filed proposed.
