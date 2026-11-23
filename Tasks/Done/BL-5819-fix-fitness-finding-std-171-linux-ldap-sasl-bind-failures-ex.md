@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5819 — Fix fitness finding STD-171: Linux LDAP SASL bind failures exit 38 "LDAP: cannot bind"; curl exits 67
 
@@ -51,3 +51,4 @@ Decision in ADR-1342: OpenLDAP SASL bind failures exit 67 (Login denied; Local E
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: fa86ec17 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. OpenLDAP SASL bind failures now exit 67 Login denied / Authentication cancelled
