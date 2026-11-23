@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5811 — Fix fitness finding STD-074: -Z does not abort the other transfers when a TELNET -t option fails at setup with exit 43 (STILL OPEN, partly fixed)
 
@@ -51,3 +51,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: f6f9f61b 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. -Z now ends the run with 43/42 for NEW_ENV without comma and over-long TTYPE/XDISPLOC; tests added
