@@ -41,11 +41,13 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] step 2 logs `Host: 0x7f000001` or `Host: 127.0.0.1` (or exits 3) and never `.dfs.core.windows.net`; `abfss://fs@acct/x` still maps to `acct.dfs.core.windows.net`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 2 logs `Host: 0x7f000001` or `Host: 127.0.0.1` (or exits 3) and never `.dfs.core.windows.net`; `abfss://fs@acct/x` still maps to `acct.dfs.core.windows.net`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- IsPathStyleHost now also treats hex (0x...) and all-digit/dot hosts as emulator hosts, used as given (no Azure suffix). Tests added in AzureStorageUrlMappingTests; quality gate clean. CI platform-neutral.
 
 ## Log
 
