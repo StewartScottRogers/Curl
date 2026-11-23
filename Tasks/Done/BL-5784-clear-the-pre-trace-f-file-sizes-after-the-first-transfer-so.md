@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Console.UnitTests/FormFileSizedBeforeTraceTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5784 — Clear the pre-trace -F file sizes after the first transfer so a later transfer declares a shrunk file at its new size
 
@@ -27,14 +27,17 @@ Found by the shift-end review of 2026-11-22 (ADR-0710; silent-failure-hunter, ty
 
 ## Acceptance criteria
 
-- [ ] After the run's first transfer has built its form, no later transfer of the same command line declares a form file at a size recorded before the trace file opened.
-- [ ] A unit test in `Curl.Console.UnitTests` runs two transfers under `--trace` where the first shrinks a file the second sends with `-F`, and asserts the second declares the file's new length and exits 0.
-- [ ] `RunAsync_TraceFileIsTheFormFile_DeclaresTheSizeTheFileHadBeforeTheTrace` still passes.
-- [ ] `dotnet build` is clean and the fast tests are green; the touched libraries keep 100% line and branch coverage.
+- [x] After the run's first transfer has built its form, no later transfer of the same command line declares a form file at a size recorded before the trace file opened.
+- [x] A unit test in `Curl.Console.UnitTests` runs two transfers under `--trace` where the first shrinks a file the second sends with `-F`, and asserts the second declares the file's new length and exits 0.
+- [x] `RunAsync_TraceFileIsTheFormFile_DeclaresTheSizeTheFileHadBeforeTheTrace` still passes.
+- [x] `dotnet build` is clean and the fast tests are green; the touched libraries keep 100% line and branch coverage.
 
 ## Notes
+
+- BuildFormAsync clears FileSizesBeforeTrace in a finally after the first form build, so later transfers size files as they are. New test RunAsync_TraceTruncatesTheFormFileForASecondTransfer_SecondDeclaresTheNewLength. Console quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b9f4bda4 c06a16e8 872c54fe 708e5fec.
+- 2026-11-22: Doing -> Done. Pre-trace -F file sizes now apply only to the first form build; later transfers size the file as it is

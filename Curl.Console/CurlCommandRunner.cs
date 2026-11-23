@@ -4698,18 +4698,28 @@ internal sealed class CurlCommandRunner(
     /// <param name="scheme">The transfer URL's scheme, which picks the names' escaping.</param>
     /// <param name="mimeMessage">Whether the parts are a mail message rather than a form.</param>
     /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
-    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage) =>
-        mimeMessage
-            ? formBodyBuilder.BuildMailMessageAsync(
-                MultipartFormPartMapping.FromMimeBody(mimePost),
-                MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
-                options.Headers,
-                CancellationToken.None)
-            : formBodyBuilder.BuildAsync(
-                MultipartFormPartMapping.FromMimeBody(mimePost),
-                MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
-                MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
-                CancellationToken.None);
+    private async ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage)
+    {
+        try
+        {
+            return mimeMessage
+                ? await formBodyBuilder.BuildMailMessageAsync(
+                    MultipartFormPartMapping.FromMimeBody(mimePost),
+                    MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
+                    options.Headers,
+                    CancellationToken.None).ConfigureAwait(false)
+                : await formBodyBuilder.BuildAsync(
+                    MultipartFormPartMapping.FromMimeBody(mimePost),
+                    MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
+                    MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
+                    CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
+        {
+            // The sizes taken before the trace file opened belong to the run's first form only (BL-5784).
+            formBodyBuilder.FileSizesBeforeTrace = null;
+        }
+    }
 
     /// <summary>
     /// Turns a <c>-F</c> form whose file cannot be opened into <see cref="CannotOpenUploadFileFailure" />, which ends
