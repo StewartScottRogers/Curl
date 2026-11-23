@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5794 — Fix AF-0992: Surviving mutant: lib530's completion check can start out as success (success = false -> true), hiding 'Error getting file.'
 
@@ -43,3 +43,4 @@ The mutant was equivalent: CheckForCompletion's `success` was read only when a m
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 02a45221 9742157d.
+- 2026-11-22: Doing -> Done. Completion check returns bool? so the equivalent mutant cannot exist; killed by Lib530Tests
