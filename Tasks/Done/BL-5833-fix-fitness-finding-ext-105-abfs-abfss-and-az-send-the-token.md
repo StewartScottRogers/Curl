@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Requests/AzureStorageUrlMapping.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5833 — Fix fitness finding EXT-105: abfs, abfss and az send the token to the public cloud host 0x7f000001....core.windows.net / 2130706433...., although the port reads those hosts as 127.0.0.1 for HTTP
 
@@ -53,3 +53,4 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: ca07b771 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. Hex and decimal IPv4 hosts are used as given; unit tests added
