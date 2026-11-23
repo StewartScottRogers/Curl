@@ -33,3 +33,4 @@ Repro: `surl --allow-anonymous --directory site --fault "delay;stage=command;com
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T2157, finding 1 and 2.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 1f7a7531 a360bf8b 3d836d5e.
