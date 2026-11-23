@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs, Curl.Networking.UnitTests/RebuiltChainVerifyReasonTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5791 — Fix AF-0989: Surviving mutant: the --capath reason chain can be rebuilt without requiring the server-auth purpose (true -> false)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs line 207`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs line 207`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by new test `RebuiltChainVerifyReasonTests.Judge_CaDirectoryAnchorAndExpiredClientAuthenticationLeaf_ReportsVerifyResultOfTheChainRequiringServerPurpose` (expired leaf with client-auth EKU: 26 with the purpose required, 10 with the mutant). Verified by hand: mutant fails it, reverted passes all 4408 fast tests of Curl.Networking.UnitTests. Test file added to touches (tests only, no production change).
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 4efe49ba 9742157d.
+- 2026-11-22: Doing -> Done. Test pins the --capath reason chain's server-auth purpose requirement; mutant now fails it

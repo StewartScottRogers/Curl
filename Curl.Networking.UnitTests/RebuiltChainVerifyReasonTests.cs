@@ -90,6 +90,18 @@ public sealed class RebuiltChainVerifyReasonTests
     }
 
     [TestMethod]
+    public void Judge_CaDirectoryAnchorAndExpiredClientAuthenticationLeaf_ReportsVerifyResultOfTheChainRequiringServerPurpose()
+    {
+        using var root = CreateRoot();
+        using var leaf = CreateLeaf(root, ClientAuthentication, expired: true);
+
+        var (observed, failure) = JudgeWithDirectory(root, leaf);
+
+        Assert.AreEqual("SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)", failure?.Message);
+        Assert.AreEqual(26L, observed.VerifyResult);
+    }
+
+    [TestMethod]
     public void Judge_CaDirectoryAnchorUnrelatedToTheLeaf_DoesNotReportExpired()
     {
         using var root = CreateRoot();
