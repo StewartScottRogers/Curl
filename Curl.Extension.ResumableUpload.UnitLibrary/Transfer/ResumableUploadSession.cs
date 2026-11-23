@@ -11,6 +11,7 @@ namespace Curl.Extension.ResumableUpload.Transfer;
 /// <param name="context">The transfer: its proxy, <c>-H</c> lines and cancellation.</param>
 internal sealed class ResumableUploadSession(IConnector connector, ITransferContext context) : IAsyncDisposable
 {
+    private Uri? origin;
     private ConnectTarget? target;
     private IConnection? connection;
     private ResumableUploadHttpClientConnection? client;
@@ -28,7 +29,7 @@ internal sealed class ResumableUploadSession(IConnector connector, ITransferCont
     {
         var http = await ConnectAsync(uri);
         var request = new ResumableUploadHttpRequest(
-            method, uri.PathAndQuery, ResumableUploadRequestHeaders.For(uri, headers, context), body, body is null ? 0 : body.Length - offset, offset);
+            method, uri.PathAndQuery, ResumableUploadRequestHeaders.For(uri, origin ??= uri, headers, context), body, body is null ? 0 : body.Length - offset, offset);
         body?.Position = offset;
         ResumableUploadTransferException failure;
         try

@@ -181,6 +181,25 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_LocationOnAnotherOrigin_DropsCredentialHeadersButKeepsOthers()
+    {
+        var options = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+        var creation = new RecordedConnection("HTTP/1.1 201 Created\r\nLocation: http://other.example.net/u/1\r\nContent-Length: 0\r\n\r\n");
+        var append = new RecordedConnection(IetfAppended);
+        var connector = new ScriptedConnector(ConnectResult.Connected(options), ConnectResult.Connected(creation), ConnectResult.Connected(append));
+        var context = Context(
+            "https://up.example.com/files",
+            http: new HttpRequestOptions { Headers = ["Authorization: Bearer t", "cookie: a=b", "Proxy-Authorization: Basic x", "X-Api-Key: k"] });
+
+        await new ResumableUploadTransferHook().ExecuteAsync(context, Services(connector), NeverSent);
+
+        StringAssert.Contains(creation.Written, "Authorization: Bearer t");
+        StringAssert.Contains(append.Written, "X-Api-Key: k");
+        Assert.DoesNotContain("Authorization", append.Written);
+        Assert.DoesNotContain("ookie", append.Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ClosedConnectionOrLocationOnAnotherHost_ConnectsAgainToTheRightTarget()
     {
         var options = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");

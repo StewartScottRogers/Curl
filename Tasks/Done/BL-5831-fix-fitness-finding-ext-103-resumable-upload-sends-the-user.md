@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadRequestHeaders.cs, Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadFlow.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5831 — Fix fitness finding EXT-103: --resumable-upload sends the user's -H headers, including Authorization and Cookie, to a cross-origin upload Location, even from https to http
 
@@ -41,13 +41,16 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] after step 2, `grep -ci "^Authorization" h2.log` prints 0 (or the command exits non-zero naming the cross-origin upload URL). With `?loc=/files/1` (same origin) the header is still sent on PATCH.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] after step 2, `grep -ci "^Authorization" h2.log` prints 0 (or the command exits non-zero naming the cross-origin upload URL). With `?loc=/files/1` (same origin) the header is still sent on PATCH.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: ResumableUploadSession remembers the first request URL as the origin; ResumableUploadRequestHeaders.For drops -H Authorization, Cookie and Proxy-Authorization when the request differs in scheme, host or port (curl -L behaviour). ResumableUploadSession.cs was added beyond touches (no other Doing task named it). Quality run clean.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: eb6ceef7 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. Cross-origin upload Location no longer gets -H Authorization, Cookie or Proxy-Authorization
