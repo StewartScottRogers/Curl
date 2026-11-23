@@ -1,4 +1,5 @@
 using System.Formats.Asn1;
+using System.Numerics;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Curl.Networking;
@@ -32,6 +33,18 @@ internal sealed class RevocationListScope
     private List<string>? _distributionPointAddresses;
     private bool _onlyContainsUserCerts;
     private bool _onlyContainsCaCerts;
+
+    /// <summary>Gets whether the list is a delta list (RFC 5280, 5.2.4): never the whole answer on its own.</summary>
+    public bool IsDelta { get; private set; }
+
+    /// <summary>Gets the list's <c>cRLNumber</c>, or <see langword="null" /> when it has none.</summary>
+    public BigInteger? Number { get; private set; }
+
+    /// <summary>Gets the <c>BaseCRLNumber</c> of a delta list, or <see langword="null" /> for a list that is not one.</summary>
+    public BigInteger? BaseNumber { get; private set; }
+
+    /// <summary>Gets the value of the list's <c>freshestCRL</c> extension, or <see langword="null" /> when it has none.</summary>
+    public byte[]? FreshestCrlValue { get; private set; }
 
     /// <summary>Gets or sets whether the list can answer for no certificate at all.</summary>
     public bool Unusable { get; set; }
@@ -100,13 +113,23 @@ internal sealed class RevocationListScope
     /// <returns><see langword="true" /> when the scope covers it.</returns>
     public bool Covers(X509Certificate2 certificate, Uri distributionPoint)
     {
-        if (Unusable)
-        {
-            return false;
-        }
+        return !Unusable && !IsDelta && AdmitsKindOf(certificate) && NamesAddress(distributionPoint);
+    }
 
+    /// <summary>
+    /// Returns whether the list is a delta list that updates a base list numbered
+    /// <paramref name="baseListNumber" /> and answers for <paramref name="certificate" />'s kind (RFC 5280, 5.2.4).
+    /// </summary>
+    /// <param name="certificate">The certificate checked.</param>
+    /// <param name="baseListNumber">The <c>cRLNumber</c> of the base list, or <see langword="null" /> when it has none.</param>
+    /// <returns><see langword="true" /> when the delta list is usable with that base list.</returns>
+    public bool CoversAsDelta(X509Certificate2 certificate, BigInteger? baseListNumber) =>
+        !Unusable && IsDelta && baseListNumber >= BaseNumber && AdmitsKindOf(certificate);
+
+    private bool AdmitsKindOf(X509Certificate2 certificate)
+    {
         var isCa = certificate.Extensions.OfType<X509BasicConstraintsExtension>().Any(constraints => constraints.CertificateAuthority);
-        return (!_onlyContainsUserCerts || !isCa) && (!_onlyContainsCaCerts || isCa) && NamesAddress(distributionPoint);
+        return (!_onlyContainsUserCerts || !isCa) && (!_onlyContainsCaCerts || isCa);
     }
 
     private bool NamesAddress(Uri distributionPoint) =>
@@ -123,11 +146,20 @@ internal sealed class RevocationListScope
             case IssuingDistributionPoint:
                 ReadIssuingDistributionPoint(value);
                 break;
-            case AuthorityKeyIdentifier or CrlNumber or IssuerAlternativeName or FreshestCrl or AuthorityInformationAccess:
+            case CrlNumber:
+                Number = new AsnReader(value, AsnEncodingRules.DER).ReadInteger();
+                break;
+            case DeltaCrlIndicator:
+                IsDelta = true;
+                BaseNumber = new AsnReader(value, AsnEncodingRules.DER).ReadInteger();
+                break;
+            case FreshestCrl:
+                FreshestCrlValue = value;
+                break;
+            case AuthorityKeyIdentifier or IssuerAlternativeName or AuthorityInformationAccess:
                 break;
             default:
-                // A delta list is never the whole answer, critical or not.
-                Unusable |= critical || oid == DeltaCrlIndicator;
+                Unusable |= critical;
                 break;
         }
     }
