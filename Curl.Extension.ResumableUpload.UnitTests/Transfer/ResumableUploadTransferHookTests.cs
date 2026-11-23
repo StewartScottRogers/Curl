@@ -20,7 +20,7 @@ public sealed class ResumableUploadTransferHookTests
     private const string PlainOptions = "HTTP/1.1 200 OK\r\nAllow: GET, PUT\r\nContent-Length: 0\r\n\r\n";
     private const string IetfCreated = "HTTP/1.1 201 Created\r\nLocation: /uploads/7\r\nContent-Length: 0\r\n\r\n";
     private const string IetfAppended = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndone";
-    private const string Host = "Host: up.example.com\r\n";
+    private const string Host = "Host: up.example.com\r\nUser-Agent: curl/8.22.0\r\n";
 
     [TestMethod]
     public async Task ExecuteAsync_WithoutUpload_CallsNextUnchanged()
@@ -181,6 +181,65 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_UserAgentRefererCredentialsAndCookies_AreSentOnEveryRequest()
+    {
+        var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        var context = Context("http://up.example.com/files", http: new HttpRequestOptions { UserAgent = "X/1", Referer = "http://r/", CookieStrings = "c=v" }, credentials: new System.Net.NetworkCredential("tu", "TUSPASS"));
+
+        await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+
+        StringAssert.Contains(connection.Written, "User-Agent: X/1\r\n");
+        StringAssert.Contains(connection.Written, "Referer: http://r/\r\n");
+        StringAssert.Contains(connection.Written, "Authorization: Basic dHU6VFVTUEFTUw==\r\n");
+        StringAssert.Contains(connection.Written, "Cookie: c=v\r\n");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenWithoutUserAgent_SendsBearerAndDefaultAgent()
+    {
+        var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        var context = Context("http://up.example.com/files", http: new HttpRequestOptions { BearerToken = "T" });
+
+        await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+
+        StringAssert.Contains(connection.Written, "Authorization: Bearer T\r\n");
+        StringAssert.Contains(connection.Written, "User-Agent: curl/8.22.0\r\n");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LocationOnAnotherOrigin_KeepsUserAgentAndRefererButDropsAuthorizationAndCookie()
+    {
+        var options = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+        var creation = new RecordedConnection("HTTP/1.1 201 Created\r\nLocation: http://other.example.net/u/1\r\nContent-Length: 0\r\n\r\n");
+        var append = new RecordedConnection(IetfAppended);
+        var connector = new ScriptedConnector(ConnectResult.Connected(options), ConnectResult.Connected(creation), ConnectResult.Connected(append));
+        var http = new HttpRequestOptions { BearerToken = "T", UserAgent = "X/1", Referer = "http://r/", CookieStrings = "c=v" };
+
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", http: http, credentials: new System.Net.NetworkCredential("tu", "p")), Services(connector), NeverSent);
+
+        StringAssert.Contains(creation.Written, "Authorization: Bearer T\r\n");
+        StringAssert.Contains(append.Written, "User-Agent: X/1\r\n");
+        StringAssert.Contains(append.Written, "Referer: http://r/\r\n");
+        Assert.DoesNotContain("Authorization", append.Written);
+        Assert.DoesNotContain("Cookie", append.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HeaderLinesNameUserAgentAndEmptyOptions_HeaderWinsAndEmptyOnesAreNotSent()
+    {
+        var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        var http = new HttpRequestOptions { Headers = ["User-Agent: H/2"], UserAgent = "X/1", Referer = "", CookieStrings = "" };
+
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", http: http, credentials: new System.Net.NetworkCredential()), Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+
+        StringAssert.Contains(connection.Written, "User-Agent: H/2\r\n");
+        Assert.DoesNotContain("X/1", connection.Written);
+        Assert.DoesNotContain("Referer", connection.Written);
+        Assert.DoesNotContain("Cookie", connection.Written);
+        Assert.DoesNotContain("Authorization", connection.Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_LocationOnAnotherOrigin_DropsCredentialHeadersButKeepsOthers()
     {
         var options = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
@@ -334,12 +393,13 @@ public sealed class ResumableUploadTransferHookTests
     private static TransferHookServices Services(IConnector connector) => new(connector, new UnusedListener());
 
     private static TransferContext Context(
-        string url, Stream? upload = null, HttpRequestOptions? http = null, Stream? headerOutput = null, Stream? dumpHeaderOutput = null) => new()
+        string url, Stream? upload = null, HttpRequestOptions? http = null, Stream? headerOutput = null, Stream? dumpHeaderOutput = null, System.Net.NetworkCredential? credentials = null) => new()
         {
             Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
             Upload = upload ?? new MemoryStream(Encoding.ASCII.GetBytes("hello")),
             Http = http,
+            Credentials = credentials,
             HeaderOutput = headerOutput,
             DumpHeaderOutput = dumpHeaderOutput,
         };

@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.ResumableUpload.Transfer;
 
-/// <summary>Builds a resumable upload request's header fields: <c>Host</c>, the flow's own, then <c>-H</c>'s.</summary>
+/// <summary>Builds a resumable upload request's header fields: <c>Host</c>, the flow's own, <c>-H</c>'s, then <c>User-Agent</c>, <c>Referer</c>, <c>Authorization</c> and <c>Cookie</c> from <c>-A</c>, <c>-e</c>, <c>-u</c>, <c>--oauth2-bearer</c> and <c>-b</c>.</summary>
 internal static class ResumableUploadRequestHeaders
 {
     /// <summary>Gives the header fields of a request to <paramref name="uri" />.</summary>
@@ -23,7 +23,53 @@ internal static class ResumableUploadRequestHeaders
             }
         }
 
+        List<KeyValuePair<string, string>> transfer = [];
+        AddTransferFields(transfer, headers, context, crossOrigin);
+        headers.InsertRange(1, transfer);
         return headers;
+    }
+
+    private static void AddTransferFields(List<KeyValuePair<string, string>> headers, List<KeyValuePair<string, string>> already, ITransferContext context, bool crossOrigin)
+    {
+        AddUnlessSet(headers, already, "User-Agent", context.Http?.UserAgent ?? "curl/8.22.0");
+        AddUnlessSetWhenNotEmpty(headers, already, "Referer", context.Http?.Referer);
+        if (!crossOrigin)
+        {
+            AddAuthorizationAndCookie(headers, already, context);
+        }
+    }
+
+    private static void AddAuthorizationAndCookie(List<KeyValuePair<string, string>> headers, List<KeyValuePair<string, string>> already, ITransferContext context)
+    {
+        AddUnlessSetWhenNotEmpty(headers, already, "Authorization", AuthorizationOf(context));
+        AddUnlessSetWhenNotEmpty(headers, already, "Cookie", context.Http?.CookieStrings);
+    }
+
+    private static string? AuthorizationOf(ITransferContext context)
+    {
+        if (context.Http?.BearerToken is { } token)
+        {
+            return "Bearer " + token;
+        }
+
+        return context.Credentials is { UserName.Length: > 0 } credentials
+            ? "Basic " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(credentials.UserName + ":" + credentials.Password))
+            : null;
+    }
+
+    private static void AddUnlessSetWhenNotEmpty(List<KeyValuePair<string, string>> headers, List<KeyValuePair<string, string>> already, string name, string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            AddUnlessSet(headers, already, name, value);
+        }
+    }
+    private static void AddUnlessSet(List<KeyValuePair<string, string>> headers, List<KeyValuePair<string, string>> already, string name, string value)
+    {
+        if (!IsSet(already, name))
+        {
+            headers.Add(new(name, value));
+        }
     }
 
     private static bool IsSent(List<KeyValuePair<string, string>> headers, string name, bool crossOrigin) =>

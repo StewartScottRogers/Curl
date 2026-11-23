@@ -37,11 +37,13 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] the `-u` command logs `Authorization: Basic dHU6VFVTUEFTUw==` on every request to 127.0.0.1:27020, and `-A X/1` logs `User-Agent: X/1`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the `-u` command logs `Authorization: Basic dHU6VFVTUEFTUw==` on every request to 127.0.0.1:27020, and `-A X/1` logs `User-Agent: X/1`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fixed in ResumableUploadRequestHeaders: every request now carries User-Agent (-A or curl/8.22.0), Referer (-e), and, on the transfer origin only, Authorization (--oauth2-bearer wins over -u Basic) and Cookie (-b strings); a -H line naming one wins. Placed right after Host. Fields are dropped cross-origin as for -H (EXT-103). Tests added; quality run clean.
 
 ## Log
 
