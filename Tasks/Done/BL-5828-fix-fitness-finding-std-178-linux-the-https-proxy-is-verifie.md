@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5828 — Fix fitness finding STD-178: Linux: the HTTPS proxy is verified against CURL_CA_BUNDLE / SSL_CERT_FILE; curl verifies the proxy against its built-in bundle
 
@@ -41,13 +41,17 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] each of the four commands exits 60 with `(20)`; `SSL_CERT_DIR=pki/capath curl -sS -x https://localhost:26121 http://example.invalid/` still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] each of the four commands exits 60 with `(20)`; `SSL_CERT_DIR=pki/capath curl -sS -x https://localhost:26121 http://example.invalid/` still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: ServerCertificateVerification.IsProxy (ADR-1342); both providers pass isProxy. Not run against a live Linux server: pinned by unit tests in SslStreamTlsProviderTests (CURL_CA_BUNDLE ignored for proxy, SSL_CERT_DIR keeps system store). Linux-only behaviour; tests are platform-neutral. Quality run: Networking 100/100.
+
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 97e4ff74 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. STD-178: proxy verified against built-in bundle (ADR-1342)

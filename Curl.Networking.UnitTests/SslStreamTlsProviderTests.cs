@@ -1117,6 +1117,55 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsNull(verification.DefaultCaBundleFile);
     }
 
+    // STD-178: the proxy is verified against the built-in bundle, never CURL_CA_BUNDLE.
+    [TestMethod]
+    public void DefaultCaBundleFile_ProxyWithCurlCaBundleSet_IsTheBuiltInBundle()
+    {
+        var env = WriteCaFile("env-bundle.crt", s_serverCertificate.ExportCertificatePem());
+        var builtIn = WriteCaFile("built-in.crt", s_serverCertificate.ExportCertificatePem());
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == "CURL_CA_BUNDLE" ? env : null,
+            DefaultCaBundleCandidates = [Path.Combine(_caFileDirectory, "absent.crt"), builtIn],
+        }.ForProxy();
+
+        Assert.IsTrue(verification.IsProxy);
+        Assert.AreEqual(builtIn, verification.DefaultCaBundleFile);
+    }
+
+    [TestMethod]
+    public void DefaultCaBundleFile_ProxyWithCaDirectorySet_IsTheSystemStore()
+    {
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == "SSL_CERT_DIR" ? "/capath" : null,
+        }.ForHandshake(NoDiagnosticLog.Instance, CancellationToken.None, isProxy: true);
+
+        Assert.IsNull(verification.DefaultCaBundleFile);
+    }
+
+    [TestMethod]
+    public void DefaultCaBundleFile_ProxyWithEmptyCaDirectory_IsTheBuiltInBundle()
+    {
+        var builtIn = WriteCaFile("built-in-empty-dir.crt", s_serverCertificate.ExportCertificatePem());
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == "SSL_CERT_DIR" ? string.Empty : null,
+            DefaultCaBundleCandidates = [builtIn],
+        }.ForProxy();
+
+        Assert.AreEqual(builtIn, verification.DefaultCaBundleFile);
+    }
+
+    [TestMethod]
+    public void IsProxy_ForHandshakeWithoutProxy_IsFalse()
+    {
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System)
+            .ForHandshake(NoDiagnosticLog.Instance, CancellationToken.None);
+
+        Assert.IsFalse(verification.IsProxy);
+    }
+
     private static ServerCertificateVerification EnvironmentBundleVerification(
         TlsClientOptions options, bool matchesSchannelBuild, string bundle) =>
         new(options, matchesSchannelBuild, TimeProvider.System)

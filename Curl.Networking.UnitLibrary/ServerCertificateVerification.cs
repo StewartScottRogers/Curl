@@ -118,13 +118,25 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     private string? FindDefaultCaBundleFile() =>
         matchesSchannelBuild || options.HasCaCertificates || options.Insecure
             ? null
-            : NonEmptyCurlCaBundle() ?? BuiltInBundleForAnEmptiedSystemStore();
+            : IsProxy ? BuiltInBundleForAProxy() : NonEmptyCurlCaBundle() ?? BuiltInBundleForAnEmptiedSystemStore();
+
+    /// <summary>
+    /// Whether the handshake is with an HTTPS proxy. The OpenSSL build then verifies the proxy
+    /// against its built-in bundle, never the file <c>CURL_CA_BUNDLE</c> or <c>SSL_CERT_FILE</c>
+    /// names, which is for the target (BL-5828); <c>SSL_CERT_DIR</c> still reaches it.
+    /// </summary>
+    internal bool IsProxy { get; init; }
+
+    private string? BuiltInBundleForAProxy() =>
+        string.IsNullOrEmpty(ReadEnvironmentVariable("SSL_CERT_DIR")) ? FirstExistingBuiltInBundle() : null;
 
     private string? NonEmptyCurlCaBundle() =>
         ReadEnvironmentVariable("CURL_CA_BUNDLE") is { Length: > 0 } bundle ? bundle : null;
 
     private string? BuiltInBundleForAnEmptiedSystemStore() =>
-        EmptiesSystemStore() ? DefaultCaBundleCandidates.FirstOrDefault(File.Exists) : null;
+        EmptiesSystemStore() ? FirstExistingBuiltInBundle() : null;
+
+    private string? FirstExistingBuiltInBundle() => DefaultCaBundleCandidates.FirstOrDefault(File.Exists);
 
     private bool EmptiesSystemStore() =>
         ReadEnvironmentVariable("SSL_CERT_FILE") is "" || ReadEnvironmentVariable("SSL_CERT_DIR") is "";

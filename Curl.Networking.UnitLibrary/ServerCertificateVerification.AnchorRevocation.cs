@@ -49,10 +49,12 @@ internal sealed partial class ServerCertificateVerification
     /// </summary>
     /// <param name="diagnosticLog">The connect target's diagnostic log.</param>
     /// <param name="limit">Cancelled when the connect's limit passes.</param>
+    /// <param name="isProxy">Whether the handshake is with an HTTPS proxy (BL-5828).</param>
     /// <returns>A verification for one handshake.</returns>
-    internal ServerCertificateVerification ForHandshake(IDiagnosticLog diagnosticLog, CancellationToken limit) =>
+    internal ServerCertificateVerification ForHandshake(IDiagnosticLog diagnosticLog, CancellationToken limit, bool isProxy = false) =>
         new(options, matchesSchannelBuild, timeProvider)
         {
+            IsProxy = isProxy,
             FetchRevocationList = FetchRevocationList,
             RevocationFetchBudget = RevocationFetchBudget,
             RevocationDiagnosticLog = diagnosticLog,
@@ -62,6 +64,13 @@ internal sealed partial class ServerCertificateVerification
             ReadEnvironmentVariable = ReadEnvironmentVariable,
             DefaultCaBundleCandidates = DefaultCaBundleCandidates,
         };
+
+    /// <summary>
+    /// Returns a verification with this one's settings and seams for a handshake with an HTTPS
+    /// proxy, whose <see cref="IsProxy" /> is set (BL-5828).
+    /// </summary>
+    /// <returns>A verification for the proxy's handshake.</returns>
+    internal ServerCertificateVerification ForProxy() => ForHandshake(RevocationDiagnosticLog, RevocationLimit, isProxy: true);
 
     private readonly ConditionalWeakTable<X509Chain, BelowAnchorRevocationAnswer> _belowAnchorAnswers = new();
 

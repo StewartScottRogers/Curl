@@ -393,7 +393,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         bool isProxy,
         IReadOnlyList<string> applicationProtocols,
         CancellationToken cancellationToken) =>
-        AuthenticateWithAsync(_verification, plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
+        AuthenticateWithAsync(isProxy ? _verification.ForProxy() : _verification, plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
 
     /// <summary>
     /// Performs the handshake as the overload without a log does, its below-anchor revocation
@@ -416,7 +416,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         IReadOnlyList<string> applicationProtocols,
         IDiagnosticLog diagnosticLog,
         CancellationToken cancellationToken) =>
-        AuthenticateWithAsync(_verification.ForHandshake(diagnosticLog, cancellationToken), plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
+        AuthenticateWithAsync(_verification.ForHandshake(diagnosticLog, cancellationToken, isProxy), plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
 
     private async ValueTask<ConnectResult> AuthenticateWithAsync(
         ServerCertificateVerification verification,
