@@ -427,6 +427,35 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsTrue(handshake.PlaintextDisposed);
     }
 
+    // STD-174, BL-5822: a server that requests a client certificate and then ends the handshake
+    // never reaches the validation callback, so the certificate is judged when it is requested.
+    [TestMethod]
+    public void JudgeCertificateOfClientCertificateRequest_UntrustedCertificate_FailsWithUntrustedRootExit60()
+    {
+        var options = new TlsClientOptions();
+        var verification = new ServerCertificateVerification(options, SchannelBuild, TimeProvider.System);
+
+        var (peerCertificates, _, failure) = SslStreamTlsProvider.JudgeCertificateOfClientCertificateRequest(
+            verification, s_serverCertificate, new X509ChainPolicy(), CertificateHost, [], null);
+
+        Assert.AreEqual(1, peerCertificates.Length);
+        Assert.AreEqual((CurlExitCode.PeerFailedVerification, UntrustedRootLine), failure);
+    }
+
+    [TestMethod]
+    public void JudgeCertificateOfClientCertificateRequest_TrustedCertificate_Accepts()
+    {
+        var options = new TlsClientOptions();
+        var verification = new ServerCertificateVerification(options, SchannelBuild, TimeProvider.System);
+        var policy = new X509ChainPolicy { TrustMode = X509ChainTrustMode.CustomRootTrust, RevocationMode = X509RevocationMode.NoCheck };
+        policy.CustomTrustStore.Add(s_serverCertificate);
+
+        var (_, _, failure) = SslStreamTlsProvider.JudgeCertificateOfClientCertificateRequest(
+            verification, s_serverCertificate, policy, CertificateHost, [], null);
+
+        Assert.IsNull(failure);
+    }
+
     private string WriteCertificateFile(string fileName, string content) => WriteCertificateFile(fileName, System.Text.Encoding.ASCII.GetBytes(content));
 
     private string WriteCertificateFile(string fileName, byte[] content)

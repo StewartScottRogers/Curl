@@ -473,7 +473,19 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             EnabledSslProtocols = _offeredProtocols,
             AllowTlsResume = SessionPartitions.MayResume(targetHost, _options),
             CertificateChainPolicy = chainPolicy,
-            LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate, _matchesSchannelBuild),
+            LocalCertificateSelectionCallback = (sender, host, local, remote, issuers) =>
+            {
+                // The client-certificate request arrives with the server's certificate; a server
+                // that then ends the handshake for want of one never reaches the validation
+                // callback, yet curl judged the certificate first (STD-174, BL-5822).
+                if (remote is not null && chainPolicy is not null)
+                {
+                    (peerCertificates, peerVerification, verificationFailure) = JudgeCertificateOfClientCertificateRequest(
+                        verification, remote, chainPolicy, targetHost, anchorsBesideSystemStore, revocationLists);
+                }
+
+                return (ToCertificateSelection(clientCertificate, _matchesSchannelBuild) ?? ((_, _, _, _, _) => null!))(sender, host, local, remote, issuers);
+            },
             CipherSuitesPolicy = cipherSuitesPolicy,
             ApplicationProtocols = ToSslApplicationProtocols(offeredApplicationProtocols),
             RemoteCertificateValidationCallback = (sender, certificate, chain, errors) =>
@@ -534,6 +546,37 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return SchannelFailureEcho.Report(events, _matchesSchannelBuild, verificationFailure is { } rejected
             ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure)));
+    }
+
+    /// <summary>
+    /// Judges the server certificate when the server asks for a client certificate, before the
+    /// handshake can end for want of one: a server that then ends it never reaches the
+    /// validation callback, yet curl's Schannel build judged the certificate first, exit 60
+    /// (STD-174, BL-5822). The chain is built from the trust anchors alone, so a certificate
+    /// whose intermediates the server sent is judged again by the validation callback.
+    /// </summary>
+    /// <param name="verification">What judges the certificate.</param>
+    /// <param name="remote">The server's certificate.</param>
+    /// <param name="chainPolicy">The trust anchors the chain is built against.</param>
+    /// <param name="targetHost">The host the certificate is checked against.</param>
+    /// <param name="anchorsBesideSystemStore">The <c>--capath</c> roots trusted beside the system store.</param>
+    /// <param name="revocationLists">The <c>--crlfile</c> lists, or <see langword="null" />.</param>
+    /// <returns>What the server sent, the observation and the failure, or <see langword="null" /> to accept.</returns>
+    internal static (ReadOnlyMemory<byte>[] PeerCertificates, PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgeCertificateOfClientCertificateRequest(
+        ServerCertificateVerification verification,
+        X509Certificate remote,
+        X509ChainPolicy chainPolicy,
+        string targetHost,
+        X509Certificate2Collection anchorsBesideSystemStore,
+        CertificateRevocationListFile? revocationLists)
+    {
+        using var chain = new X509Chain { ChainPolicy = chainPolicy };
+        var errors = chain.Build(X509CertificateLoader.LoadCertificate(remote.GetRawCertData()))
+            ? SslPolicyErrors.None
+            : SslPolicyErrors.RemoteCertificateChainErrors;
+        var peerCertificates = ListPeerCertificates(remote, chain);
+        var (observed, failure) = verification.Judge(errors, chain, targetHost, anchorsBesideSystemStore, revocationLists, peerCertificates);
+        return (peerCertificates, observed, failure);
     }
 
     /// <summary>
