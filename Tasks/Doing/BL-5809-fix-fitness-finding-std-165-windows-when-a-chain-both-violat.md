@@ -46,3 +46,4 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
+- 2026-11-23: Backlog -> Doing. Criteria at claim: a3aa988f 69116afe 3d836d5e.
