@@ -50,3 +50,4 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
+- 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
