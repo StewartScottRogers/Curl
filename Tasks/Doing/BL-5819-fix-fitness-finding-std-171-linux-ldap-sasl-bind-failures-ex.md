@@ -50,3 +50,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: fa86ec17 69116afe 3d836d5e.
 - 2026-11-23: Doing -> Backlog. Lane 13 could not integrate: quality gates missed by 1 member(s) of files it changed: LdapOpenLdapSaslBind.SaslBindFailedAsync(Curl.Original.Protocol.Ldap.LdapExchange, Curl.Original.Protocol.Ldap.LdapBindReply, System.Threading.CancellationToken) (Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs: branch), still after a repair run. The work is on branch factory/BL-5819-lane-13-20261123-102134; start with git cherry-pick --no-commit factory/BL-5819-lane-13-20261123-102134 and fix it.
+- 2026-11-23: Backlog -> Doing. Criteria at claim: fa86ec17 69116afe 3d836d5e.
