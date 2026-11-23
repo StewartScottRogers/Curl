@@ -37,3 +37,4 @@ Found by the shift-end review of 2026-11-22 (ADR-0710; silent-failure-hunter, wi
 ## Log
 
 - 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 3c2cd0e3 6c296569 aa41a6e8 002d78b5.
