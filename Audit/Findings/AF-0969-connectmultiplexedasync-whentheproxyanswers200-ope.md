@@ -3,8 +3,8 @@ id: AF-0969
 title: ConnectMultiplexedAsync_WhenTheProxyAnswers200_OpensTheTunnel checks a log line, never that a tunnel connection was opened
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs:ConnectMultiplexedAsync_WhenTheProxyAnswers200_OpensTheTunnel:weak-assertion
 reproduction: none
 task: BL-5740
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0969 - ConnectMultiplexedAsync_WhenTheProxyAnswers200_OpensTheTunnel checks a log line, never that a tunnel connection was opened
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | Ran the Select-String. The test now asserts Assert.AreEqual(CurlExitCode.Ok, result.ExitCode); and Assert.IsNotNull(result.Connection); before the log-line check. Its connector dials only the CapsuleQuicProxyConnection fronting a QuicTestServer, so a connection can only come from a QUIC handshake carried through the CONNECT-UDP tunnel.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.

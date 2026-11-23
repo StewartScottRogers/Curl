@@ -3,8 +3,8 @@ id: AF-0961
 title: CI red 227 min (run 44941565490 onward): Pack Curl.Mcp failures left unfixed, four failed runs have no filed/covered trace line
 auditor: process
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.
 key: process:logs:pack-curl-mcp-spell-2026-11-21T19-47:ci-red
 reproduction: none
 task: BL-5730
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0961 - CI red 227 min (run 44941565490 onward): Pack Curl.Mcp failures left unfixed, four failed runs have no filed/covered trace line
 
@@ -43,7 +43,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-11-22 | 2026-11-22_0210.md | reproduces: yes | Ran the Measure-FactoryProcess.ps1 command: spell 19:47:17Z to 23:34:30Z is 227.22 min, started by run 44941565490, still reported. The Select-String over DarkFactory-20261121-113211.log shows the four runs 44942529813, 44946270671, 44946492351 and 44952616925 only in truncated 'failure on' lines and 'running ... no failing test' lines, with no filed, covered or passed since. Their ends (19:59:49Z, 20:47:30Z, 21:01:42Z, 22:29:04Z) are each more than 30 minutes before the next green run (23:34:30Z). The window holds a shift that finished tasks, so the verdict stands.
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | DarkFactory-20261121-113211.log is not in the log copy, so the Select-String found nothing. Under the 2026-11-22 window (28 tasks done) the CI red rule is not crossed: ciRedMinutes 18.83; run 45059360804 was green again within 19 minutes; run 45065328172 was filed as BL-5760 at 13:43:38. No Pack Curl.Mcp failure appears in the window.
 
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.

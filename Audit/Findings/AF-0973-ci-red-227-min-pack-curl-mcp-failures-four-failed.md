@@ -3,8 +3,8 @@ id: AF-0973
 title: CI red 227 min: Pack Curl.Mcp failures, four failed runs with no filed/covered trace line; first green run 16:34 Arizona time
 auditor: process
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.
 key: process:logs:run-44942529813-44946270671-44946492351-44952616925:ci-red
 reproduction: none
 task: BL-5744
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1351.md
 ---
 # AF-0973 - CI red 227 min: Pack Curl.Mcp failures, four failed runs with no filed/covered trace line; first green run 16:34 Arizona time
 
@@ -42,6 +42,9 @@ Select-String -Path <log folder>\DarkFactory-20261121-113211.log -Pattern '44942
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | The logs named in the reproduction are not in the copy. In the 2026-11-22 window every failed CI run is filed or green again inside 30 minutes: ciRedMinutes 18.83, slowest time-to-file 0.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces.
