@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5823 — Fix fitness finding STD-175: FTPS PROT P in active mode (-P) starts the data-connection TLS handshake only after the 150 reply, so a server that completes the handshake before sending 150 hangs
 
@@ -39,13 +39,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] command 1 prints `0123456789 [226 10]`, exit 0; user `late` and passive mode still pass.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] command 1 prints `0123456789 [226 10]`, exit 0; user `late` and passive mode still pass.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: while the transfer command's reply is awaited in active mode with PROT P, FtpSession accepts the data connection and starts the client TLS handshake at once (AcceptAndStartDataHandshakeAsync); an already waiting connection starts it in AcceptWaitingConnectionAsync. Pinned by two unit tests in FtpProtocolHandlerTlsTests (handshake count when the reply is awaited). The live mock repro was not rebuilt; the fake-connection test stands in for it. Library measured 100% line and branch. Platform-neutral.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: f4cc9630 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. FTPS active-mode PROT P data handshake starts on accept, before the 150 reply
