@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5765 — Treat only a registered extension scheme as an extension URL so a schemeless read-callback POST keeps its body
 
@@ -51,3 +51,4 @@ The shift-end review of 2026-11-22 (ADR-0710) found this in the merge `dfb9516dd
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 331bd101 e2736da1 20ec790b bcef008d da8c1361.
 - 2026-11-22: Doing -> Backlog. Code done and committed; only the htp:// criterion (moved to BL-5770) must be dropped from the criteria before Done
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 331bd101 e2736da1 bcef008d da8c1361.
+- 2026-11-22: Doing -> Done. A schemeless read-callback POST is sent over HTTP with its full body; only an explicit non-curl scheme counts as an extension URL
