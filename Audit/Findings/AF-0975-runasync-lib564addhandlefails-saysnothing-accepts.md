@@ -3,8 +3,8 @@ id: AF-0975
 title: RunAsync_Lib564AddHandleFails_SaysNothing accepts any non-zero exit and checks only that one string is absent
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs:RunAsync_Lib564AddHandleFails_SaysNothing:weak-assertion
 reproduction: none
 task: BL-5772
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_1817.md
 ---
 # AF-0975 - RunAsync_Lib564AddHandleFails_SaysNothing accepts any non-zero exit and checks only that one string is absent
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs -Patt
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1817.md | reproduces: no | Ran the Select-String reproduction: no match for Lib564AddHandleFails_SaysNothing. The test is now RunAsync_Lib564AddHandleFails_ReportsOnlyTheFailedCallAndExits32, which asserts Assert.AreEqual(32, result.ExitCode) and the exact standard error 'Lib564.cs:67 curl_multi_add_handle() failed, with code 2 (Invalid easy handle)\n'.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1817.md: the reproduction no longer reproduces.

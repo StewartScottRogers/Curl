@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1817.md | not re-audited | Not re-audited. The -Site command found no ?? false left at line 134: the code was refactored, and KeepHandleStateOf now calls DigestStaysAvailableAfter(result). The nearest ?? false it found (resolved line 152, in another member) was killed, which says nothing about this mutant.
+
 ## Log
 
 - 2026-11-22: filed proposed.

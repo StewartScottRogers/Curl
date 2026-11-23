@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_1817.md | not re-audited | Not re-audited. The -Site command ended killed, but that mutant was at line 51 of OpenSslCipherString.cs. The SHA256 alias '!IsGcm(name) && name.EndsWith("SHA256", ...)' -> '||' is at line 66 now (resolvedLine was 51), and I never ran line 66.
+
 ## Log
 
 - 2026-11-22: filed proposed.
