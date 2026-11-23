@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5788 — Fix AF-0986: Surviving mutant: the telnet trace names option 40 from a 40-entry table (>= -> >), throwing IndexOutOfRangeException
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs line 192`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs line 192`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added `ExecuteAsync_ServerSubnegotiatesFirstUnnamedOption_ReportsItByNumberAsUnknown` (TelnetProtocolHandlerTransferEventsTests). With line 192 changed to `>` it fails (IndexOutOfRange); with `>=` all 282 fast tests pass. No production change.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 037003ed 9742157d.
+- 2026-11-22: Doing -> Done. Test pins option 40 subnegotiation; mutant killed
