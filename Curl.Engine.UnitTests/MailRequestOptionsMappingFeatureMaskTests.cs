@@ -40,6 +40,21 @@ public sealed class MailRequestOptionsMappingFeatureMaskTests
         Assert.IsFalse(mail.SendsMailboxHostAsWritten);
     }
 
+    [TestMethod]
+    [DataRow("ldap")]
+    [DataRow("ldaps")]
+    public void FromCommandLine_LdapScheme_CarriesLoginOptions(string scheme)
+    {
+        MailRequestOptions? mail = MailRequestOptionsMapping.FromCommandLine(
+            EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions),
+            new EasyTransferOptions(),
+            new EasySmtpOptions(),
+            new EasyAuthenticationOptions { LoginOptions = "AUTH=DIGEST-MD5" },
+            scheme);
+
+        Assert.AreEqual("AUTH=DIGEST-MD5", mail?.LoginOptions);
+    }
+
     private static MailRequestOptions MapSmtp(EngineFeatureMask featureMask) =>
         MailRequestOptionsMapping.FromCommandLine(
             EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions),

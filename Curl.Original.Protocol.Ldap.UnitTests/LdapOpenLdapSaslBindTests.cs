@@ -31,6 +31,7 @@ public sealed class LdapOpenLdapSaslBindTests
 
     [TestMethod]
     [DataRow(HttpAuthSchemes.Digest, null)]
+    [DataRow(HttpAuthSchemes.Basic | HttpAuthSchemes.Digest | HttpAuthSchemes.Ntlm | HttpAuthSchemes.Negotiate, null)]
     [DataRow(HttpAuthSchemes.Basic, "AUTH=digest-md5")]
     [DataRow(HttpAuthSchemes.Basic, "AUTH=*")]
     public async Task ExecuteAsync_ServerOffersDigestMd5_BindsWithSaslAndNoPassword(HttpAuthSchemes schemes, string? loginOptions)

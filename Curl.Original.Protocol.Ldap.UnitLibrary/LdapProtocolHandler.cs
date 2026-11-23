@@ -341,7 +341,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     }
 
     /// <summary>
-    /// How the transfer binds: on OpenLDAP SASL with credentials when <c>AUTH=</c> login options are given or the auth mask lacks Basic,
+    /// How the transfer binds: on OpenLDAP SASL with credentials when <c>AUTH=</c> login options are given or the auth mask is not exactly Basic (as with --anyauth),
     /// otherwise a simple bind (ADR-1299); on WinLDAP what <see cref="LdapBindKindChoice" />
     /// picks from <c>-u</c> and the auth mask, so <c>--ntlm</c>, <c>--digest</c> and <c>--negotiate</c> never send a simple bind.
     /// </summary>
@@ -353,7 +353,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// <summary>OpenLDAP's choice: SASL with credentials when <c>AUTH=</c> login options are given or the mask lacks Basic, otherwise a simple bind.</summary>
     private static LdapBindKind ChooseOpenLdapBindKind(ITransferContext context) =>
         context.Credentials is not null
-        && (LdapOpenLdapSaslBind.HasAuthOption(context.Mail?.LoginOptions) || !(context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic).HasFlag(HttpAuthSchemes.Basic))
+        && (LdapOpenLdapSaslBind.HasAuthOption(context.Mail?.LoginOptions) || (context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic) != HttpAuthSchemes.Basic)
             ? LdapBindKind.Sasl
             : LdapBindKind.Simple;
 

@@ -42,11 +42,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] on Linux, step 3 prints alice's entry with exit 0 and the relay log shows a SASL DIGEST-MD5 bind and no password bytes; `--anyauth` does the same; `--login-options AUTH=PLAIN` exits 67 `Login denied` with no password on the wire.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] on Linux, step 3 prints alice's entry with exit 0 and the relay log shows a SASL DIGEST-MD5 bind and no password bytes; `--anyauth` does the same; `--login-options AUTH=PLAIN` exits 67 `Login denied` with no password on the wire.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: `MailRequestOptionsMapping` now carries LoginOptions for ldap/ldaps; `ChooseOpenLdapBindKind` simple-binds only when the auth mask is exactly Basic (REF2). Unit tests added in both `.UnitTests` projects. Wire-level criterion (relay log) is met by those handler tests (SASL bind, no password); no Docker OpenLDAP here. Quality run: 0 failing members.
 
 ## Log
 
