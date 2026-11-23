@@ -63,6 +63,19 @@ public sealed class Cgr013Tests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_OpenLdapStartTlsCertificateFailure_ExitsWith64AndTheSslMessage()
+    {
+        var plaintext = new ScriptedConnection(StartTlsAccepted);
+        const string message = "SSL: no alternative certificate subject name matches target ipv4 address '127.0.0.1'";
+        var tls = new FakeTlsProvider(ConnectResult.Failed(CurlExitCode.PeerFailedVerification, message));
+
+        TransferResult result = await Handler(LdapDialect.OpenLdap, plaintext, tls).ExecuteAsync(Context("ldap", TransportSecurityLevel.Required, new RecordingTransferEvents()));
+
+        Assert.AreEqual(CurlExitCode.UseSslFailed, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+    }
+
+    [TestMethod]
     [DataRow(TransportSecurityLevel.Required, DisplayName = "--ssl-reqd")]
     [DataRow(TransportSecurityLevel.Try, DisplayName = "--ssl")]
     public async Task ExecuteAsync_OpenLdapWithSsl_SendsStartTlsThenBindsInsideTls(TransportSecurityLevel level)

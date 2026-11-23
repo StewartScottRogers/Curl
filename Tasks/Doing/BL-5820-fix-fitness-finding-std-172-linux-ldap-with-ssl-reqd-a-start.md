@@ -35,11 +35,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the command exits 64 with the single-line message above.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command exits 64 with the single-line message above.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+LdapStartTls maps PeerFailedVerification (60) from the StartTLS handshake to UseSslFailed (64); the message is untouched and the sslcerts help is only added for exit 60, so one line remains. Test: Cgr013Tests.ExecuteAsync_OpenLdapStartTlsCertificateFailure_ExitsWith64AndTheSslMessage. Quality run: 0 failing members. Followed the finding rather than re-measuring (no Linux curl here).
 
 ## Log
 

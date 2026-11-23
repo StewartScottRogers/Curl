@@ -41,7 +41,10 @@ internal static class LdapStartTls
         ConnectResult secured = await tlsProvider.AuthenticateAsClientAsync(plaintext, context.Url.IdnHost, context.Events, context.CancellationToken).ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
-            return new TransferResult(secured.ExitCode, 0, secured.ErrorMessage);
+            // OpenLDAP reports any StartTLS failure, a certificate verification one included, as
+            // exit 64 with no sslcerts help (measured against curl 8.18, STD-172).
+            CurlExitCode exitCode = secured.ExitCode == CurlExitCode.PeerFailedVerification ? CurlExitCode.UseSslFailed : secured.ExitCode;
+            return new TransferResult(exitCode, 0, secured.ErrorMessage);
         }
 
         exchange.UseSecuredConnection(connection);
