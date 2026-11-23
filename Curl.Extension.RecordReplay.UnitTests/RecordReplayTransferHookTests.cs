@@ -267,7 +267,8 @@ public sealed class RecordReplayTransferHookTests
     [DataRow("HTTP/1.1 302 Found\r\nLocation: http://u:S1@h/p\r\nContent-Location: http://cu:S2@h/x\r\n\r\n", "HTTP/1.1 302 Found\r\nLocation: http://REDACTED:REDACTED@h/p\r\nContent-Location: http://REDACTED:REDACTED@h/x\r\n\r\n")]
     [DataRow("Location: http://u6:S3@[::1]:80/p\r\n", "Location: http://REDACTED:REDACTED@[::1]:80/p\r\n")]
     [DataRow("link: <http://a:b@h/x>; rel=next\r\nRefresh: 0; url=http://a:b@h/y\r\n", "link: <http://REDACTED:REDACTED@h/x>; rel=next\r\nRefresh: 0; url=http://REDACTED:REDACTED@h/y\r\n")]
-    [DataRow("Location: /plain?a=b@c\r\nX-Other: http://u:p@h/\r\n", "Location: /plain?a=b@c\r\nX-Other: http://u:p@h/\r\n")]
+    [DataRow("Location: /plain?a=b@c\r\nX-Other: http://u:p@h/\r\n", "Location: /plain?a=b@c\r\nX-Other: http://REDACTED:REDACTED@h/\r\n")]
+    [DataRow("HTTP/1.1 200 OK\r\nWWW-Authenticate: Bearer realm=\"http://wu:S@h/r\"\r\nX-Upstream: https://xu:S@h/q\r\n", "HTTP/1.1 200 OK\r\nWWW-Authenticate: Bearer realm=\"http://REDACTED:REDACTED@h/r\"\r\nX-Upstream: https://REDACTED:REDACTED@h/q\r\n")]
     public void RedactedHead_UrlFieldsWithUserInfo_ReplacesOnlyTheirUserInfo_Ext090(string head, string expected) =>
         Assert.AreEqual(expected, Encoding.Latin1.GetString(RecordReplayTransferHook.RedactedHead(Encoding.Latin1.GetBytes(head))));
 

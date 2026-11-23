@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpExchangeLog.cs, Curl.Extension.Har.UnitLibrary/HarDocument.cs, Curl.Extension.RecordReplay.UnitLibrary/RecordReplayTransferHook.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5838 — Fix fitness finding EXT-110: URL passwords inside other response headers are written in clear to --log-file, --har and --record
 
@@ -42,13 +42,16 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] the grep prints 0 for every file.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the grep prints 0 for every file.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Every non-secret response header value now has the user-info of any URL in it redacted (HttpExchangeLog, HarDocument, RecordReplayTransferHook), replacing the fixed Link/Refresh name list. Grep criterion is pinned by unit rows for WWW-Authenticate, Content-Security-Policy and X-Upstream; not run against a live mock. Fast tests and Measure-CodeQuality (0 failing) green.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: b1e8aac6 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. URL passwords in any response header are redacted in --log-file, --har and --record

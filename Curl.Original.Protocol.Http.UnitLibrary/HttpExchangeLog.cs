@@ -28,9 +28,6 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
     /// <summary>The headers whose values are URLs, logged with any user-info replaced by <see cref="RedactedUserInfo" />.</summary>
     private static readonly string[] UrlHeaders = ["Location", "Content-Location", "Referer"];
 
-    /// <summary>The headers that hold URLs among other text (<c>Link</c> lists them in angle brackets, <c>Refresh</c> follows <c>url=</c>), each URL logged with any user-info replaced.</summary>
-    private static readonly string[] UrlListHeaders = ["Link", "Refresh"];
-
     /// <summary>What a URL header's user-info is written as.</summary>
     internal const string RedactedUserInfo = "REDACTED:REDACTED";
 
@@ -236,7 +233,7 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
 
     /// <summary>Gives <c>name: value</c>, the value hidden when <paramref name="name" /> is a secret header.</summary>
     private static string Loggable(string name, string value) =>
-        name + ": " + (IsSecret(name) ? ValueNotLogged : IsUrlHeader(name) ? WithoutUserInfo(value) : IsUrlListHeader(name) ? WithoutUserInfoInEachUrl(value) : value);
+        name + ": " + (IsSecret(name) ? ValueNotLogged : IsUrlHeader(name) ? WithoutUserInfo(value) : WithoutUserInfoInEachUrl(value));
 
     /// <summary>Tells whether <paramref name="name" /> names a header whose value is a URL that may carry user-info.</summary>
     private static bool IsUrlHeader(string name) =>
@@ -260,10 +257,6 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
         int at = value.LastIndexOf('@', authorityEnd - 1, authorityEnd - authorityStart);
         return at < 0 ? value : string.Concat(value.AsSpan(0, authorityStart), RedactedUserInfo, value.AsSpan(at));
     }
-
-    /// <summary>Tells whether <paramref name="name" /> names a header that holds URLs among other text.</summary>
-    private static bool IsUrlListHeader(string name) =>
-        UrlListHeaders.Contains(name, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Gives <paramref name="value" /> with the user-info of every absolute URL in it replaced by <see cref="RedactedUserInfo" />.</summary>
     private static string WithoutUserInfoInEachUrl(string value)

@@ -155,6 +155,9 @@ public sealed class HttpExchangeLogTests
     [DataRow("Link", "<http://lu:LINKSECRET@host/a>; rel=\"next\", <http://host/b>; rel=\"prev\", <https://x@h:1/c?q=a@b>; rel=\"last\"", "<http://REDACTED:REDACTED@host/a>; rel=\"next\", <http://host/b>; rel=\"prev\", <https://REDACTED:REDACTED@h:1/c?q=a@b>; rel=\"last\"")]
     [DataRow("refresh", "5; url=http://fu:REFRESHSECRET@host/b", "5; url=http://REDACTED:REDACTED@host/b")]
     [DataRow("Refresh", "5", "5")]
+    [DataRow("Content-Security-Policy", "report-uri http://cs:CSPSECRET@host/r", "report-uri http://REDACTED:REDACTED@host/r")]
+    [DataRow("X-Upstream", "https://xu:XHDRSECRET@host/q", "https://REDACTED:REDACTED@host/q")]
+    [DataRow("WWW-Authenticate", "Bearer realm=\"http://wu:WWWSECRET@host/r\"", "Bearer realm=\"http://REDACTED:REDACTED@host/r\"")]
     [DataRow("Link", "</rel>; rel=next; u=://a@b", "</rel>; rel=next; u=://REDACTED:REDACTED@b")]
     public void ReplyRead_UrlHeader_LogsItWithUserInfoRedacted(string name, string value, string expected)
     {
