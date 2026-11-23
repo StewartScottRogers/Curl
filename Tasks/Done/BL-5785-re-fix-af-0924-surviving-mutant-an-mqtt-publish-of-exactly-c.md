@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5785 — Re-fix AF-0924: Surviving mutant: an MQTT publish of exactly curl's size limit can be refused with exit 100
 
@@ -36,12 +36,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs line 93`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs line 93`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The boundary tests already exist (commit ed6cfab26d, BL-5674): the mutant `>` -> `>=` now sits in IsOverPublishLimit (MqttPackets.cs:107). Applied by hand, MqttPublishLimitTests.IsOverPublishLimit_ExactlyAtLimit_IsAccepted fails; reverted, all Mqtt fast tests pass. Library code unchanged.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: be21a3c5 9742157d.
+- 2026-11-22: Doing -> Done. Mutant killed by IsOverPublishLimit_ExactlyAtLimit_IsAccepted
