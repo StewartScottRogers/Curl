@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5809 — Fix fitness finding STD-165: Windows: when a chain both violates a name constraint and has unknown revocation, the port reports the name constraint; REF reports revocation
 
@@ -37,13 +37,16 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 
 ## Acceptance criteria
 
-- [ ] both commands print `schannel: the revocation status is unknown`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] both commands print `schannel: the revocation status is unknown`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+With `--cacert`, a name-constraint violation plus an unknown or offline revocation status now reports `schannel: the revocation status is unknown`, unless `--ssl-no-revoke` or `--ssl-revoke-best-effort` masks it. Both commands in the finding take the same path. Not re-measured against Windows curl; the finding states REF. Unit tests in `ServerCertificateVerificationTests.NameConstraints.cs`. Build clean, fast tests green, quality gate 0 failing.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: a3aa988f 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. STD-165 fixed: unknown revocation status beats a name-constraint violation under --cacert

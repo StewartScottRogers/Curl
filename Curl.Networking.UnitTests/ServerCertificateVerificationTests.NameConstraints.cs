@@ -144,6 +144,30 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.IsNull(Verify(Constraints(excluded: "example.com"), Host, true));
 
     [TestMethod]
+    public void VerifyPeer_ExcludedLeafWithUnknownRevocationStatus_IsRevocationStatusUnknown()
+    {
+        var failure = Verify(
+            Constraints(excluded: "localhost"), Host, false, chainStatus: [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }]);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("schannel: the revocation status is unknown", failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_ExcludedLeafWithUnknownRevocationStatusUnderBestEffort_IsSchannelError0x8000() =>
+        Assert.AreEqual(
+            "schannel: error 0x00008000",
+            Verify(
+                Constraints(excluded: "localhost"), Host, false,
+                chainStatus: [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }], bestEffort: true)?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_ExcludedLeafWithUnknownRevocationStatusAndNoRevocationCheck_IsSchannelError0x8000() =>
+        Assert.AreEqual(
+            "schannel: error 0x00008000",
+            Verify(Constraints(excluded: "localhost"), Host, true, chainStatus: [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }])?.Message);
+
+    [TestMethod]
     [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building reports the chain incomplete instead (BL-5420).
     public void VerifyPeer_MalformedNameConstraintsExtension_IsRefusedAsATrustError()
     {
@@ -328,7 +352,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     }
 
     private (CurlExitCode ExitCode, string Message)? Verify(
-        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null)
+        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null, X509ChainStatus[]? chainStatus = null, bool bestEffort = false)
     {
         using var root = CreateAuthority("CN=Constraint Root", null, null);
         using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, constraints);
@@ -336,9 +360,9 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var caFile = Path.Combine(_directory, "anchor.pem");
         File.WriteAllText(caFile, intermediate.ExportCertificatePem());
         var verification = new ServerCertificateVerification(
-            new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: skipRevocationCheck), true, TimeProvider.System)
+            new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: skipRevocationCheck, RevocationCheckBestEffort: bestEffort), true, TimeProvider.System)
         {
-            ReadChainStatus = _ => PartialChainStatus,
+            ReadChainStatus = _ => chainStatus ?? PartialChainStatus,
         };
         var (chainPolicy, _, _) = verification.ReadTrustAnchors();
         chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
