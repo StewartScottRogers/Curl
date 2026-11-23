@@ -911,9 +911,12 @@ function Update-CiNeedsYou {
             $script:CiWatch.Logged['needs you'] = $Line
             Write-Trace '-' 'ci' $Line 'Yellow'
         }
-        if (-not $script:CiWatch.NeedsYou) {
+        # Captions the tab the first time, and again whenever a routine caption has replaced it
+        # since (BL-5768); an ALARM or WAITING caption stays.
+        $own = "$script:OwnTabText"
+        if ((-not $script:CiWatch.NeedsYou) -or (($own -cne $label) -and ($own -notmatch '^(?:ALARM|WAITING)'))) {
             $script:CiWatch.NeedsYou = $true
-            $script:CiWatch.TabBefore = "$script:OwnTabText"
+            $script:CiWatch.TabBefore = $own
             & $SetLabel $label
         }
         return
@@ -1578,6 +1581,16 @@ if ($TestCiWatch) {
     $script:OwnTabText = 'ALARM, read'
     Update-CiNeedsYou -Line '' -SetLabel $setLabel
     & $check 'a caption set since is not overwritten when CI stops needing you' 'CI needs you, read' ($script:ciLabels -join '|')
+    Update-CiNeedsYou -Line $needsLine -SetLabel $setLabel
+    $script:ciLabels = @()
+    $script:OwnTabText = 'idle, polling'
+    Update-CiNeedsYou -Line $needsLine -SetLabel $setLabel
+    Update-CiNeedsYou -Line $needsLine -SetLabel $setLabel
+    $script:OwnTabText = 'WAITING, read'
+    Update-CiNeedsYou -Line $needsLine -SetLabel $setLabel
+    & $check 'a routine caption set since is replaced again, an ALARM or WAITING one is not' 'CI needs you, read' ($script:ciLabels -join '|')
+    $script:OwnTabText = 'ALARM, read'
+    Update-CiNeedsYou -Line '' -SetLabel $setLabel
     $script:OwnTabText = $savedTabText
     # BL-999: the audit guard's failure line files one interactive-only task, once.
     $auditLog = @("audit-guard${t}Run guard${t}2026-09-29T10:00:00.0000000Z Audit guard: Audit/Findings/x.md changed on work/dark-factory since its merge base with master")

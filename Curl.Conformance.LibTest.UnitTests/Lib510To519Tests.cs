@@ -216,7 +216,9 @@ public sealed class LibTestProgramsPortedTests
 
         LibTestResult result = await LibTestPrograms.Ported.Find("lib509")!.RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreNotEqual(-1, result.ExitCode);
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual("Callbacks were invoked!\n", run.OutputText);
+        Assert.AreEqual(string.Empty, run.Error.ToString());
     }
 }
 

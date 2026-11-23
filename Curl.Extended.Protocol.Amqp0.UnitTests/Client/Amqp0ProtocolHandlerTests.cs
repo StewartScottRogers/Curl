@@ -332,6 +332,8 @@ public sealed class Amqp0ProtocolHandlerTests
     [DataRow("amqp://broker/v/q", false, 5672)]
     [DataRow("amqps://broker/v/q", true, 5671)]
     [DataRow("AMQPS://broker:9999/v/q", true, 9999)]
+    [DataRow("amqp://broker:0/v/q", false, 0)]
+    [DataRow("amqps://broker:0/v/q", true, 0)]
     public async Task ExecuteAsync_Scheme_ConnectsWithTlsAndPortFromConnector(string url, bool useTls, int port)
     {
         ScriptedAmqp0Connector connector = new(ConnectResult.Refused("Failed to connect"));

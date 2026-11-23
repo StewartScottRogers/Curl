@@ -1754,6 +1754,7 @@ internal sealed class CurlCommandRunner(
             }
 
             await SizeUploadBeforeTraceFileOpensAsync(options, index).ConfigureAwait(false);
+            await SizeFormFilesBeforeTraceFileOpensAsync(options).ConfigureAwait(false);
             await OpenTransferEventOutputOnceAsync(options).ConfigureAwait(false);
             (exitCode, bool runEnded) = await TransferEachMatchAsync(dispatch, options, index, uploadFiles, glob, exitCode)
                 .ConfigureAwait(false);
@@ -1863,6 +1864,40 @@ internal sealed class CurlCommandRunner(
             uploadSizedBeforeTrace = (uploadFile, opened.Length);
         }
     }
+
+    /// <summary>
+    /// Sizes the <c>-F</c> file parts before the run's trace file opens and truncates one of them, handing the
+    /// sizes to the form builder so a part whose file shrinks fails with exit 26 as curl 8.22.0's does (AF-0982).
+    /// Does nothing once the event output is open or without a trace file.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>A task that completes when the files are sized.</returns>
+    private async Task SizeFormFilesBeforeTraceFileOpensAsync(CommandLineOptions options)
+    {
+        if (eventStandardError is not null || options.TraceFile is null
+            || EasyOptionsFromCommandLine.HttpOf(options).MimePost is not { } mimePost)
+        {
+            return;
+        }
+
+        Dictionary<string, long> sizes = [];
+        foreach (MultipartFormPart part in FormFileParts(MultipartFormPartMapping.FromMimeBody(mimePost)))
+        {
+            FileOpenResult opened = await fileSystem.OpenForReadAsync(part.Content, CancellationToken.None).ConfigureAwait(false);
+            if (opened.Content is { } content)
+            {
+                await content.DisposeAsync().ConfigureAwait(false);
+                sizes[part.Content] = opened.Length;
+            }
+        }
+
+        formBodyBuilder.FileSizesBeforeTrace = sizes;
+    }
+
+    private static IEnumerable<MultipartFormPart> FormFileParts(IEnumerable<MultipartFormPart> parts) =>
+        parts.SelectMany(part => part.Kind is MultipartFormPartKind.FileUpload or MultipartFormPartKind.FileContent
+            ? (part.ReadsStandardInput ? [] : [part])
+            : FormFileParts(part.Parts));
 
     /// <summary>
     /// Wraps an opened <c>-T</c> file in an <see cref="UploadSizedBeforeTraceStream" /> when
