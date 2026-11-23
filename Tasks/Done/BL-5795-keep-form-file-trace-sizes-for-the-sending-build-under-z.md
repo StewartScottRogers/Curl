@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Console.UnitTests/FormFileSizedBeforeTraceTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5795 — Keep form-file trace sizes for the sending build under -Z
 
@@ -32,14 +32,18 @@ Suggested fix: stop sharing mutable state on the builder. Pass the sizes into `B
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Console.UnitTests` runs `-Z -F f=@<file> --trace-ascii <same file>` and asserts exit 26, the same as the serial test.
-- [ ] `FormSetupFailureAsync`'s check build no longer uses up or clears the sizes that the sending build reads.
-- [ ] The existing `FormFileSizedBeforeTraceTests` and `MultipartFormBodyBuilderTraceSizeTests` still pass.
-- [ ] `Curl.Console` and `Curl.Core.UnitLibrary` keep 100% line and branch coverage.
+- [x] A test in `Curl.Console.UnitTests` runs `-Z -F f=@<file> --trace-ascii <same file>` and asserts exit 26, the same as the serial test.
+- [x] `FormSetupFailureAsync`'s check build no longer uses up or clears the sizes that the sending build reads.
+- [x] The existing `FormFileSizedBeforeTraceTests` and `MultipartFormBodyBuilderTraceSizeTests` still pass.
+- [x] `Curl.Console` and `Curl.Core.UnitLibrary` keep 100% line and branch coverage.
 
 ## Notes
+
+- Chose the smaller fix: `BuildFormAsync` takes `isSendingBuild`, and `FormSetupFailureAsync`'s check build passes false, so it no longer clears the sizes the sending build reads. The builder property stays as it is, so the `--next` carry-over and parallel-build race the suggested fix would also remove are not addressed here.
+- Quality run for Curl.Console: 0 failing members. CI on Linux and macOS: the new test uses only in-memory files, so it is platform-neutral.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 3139bf72 67f76553 d2391483 4717605e.
+- 2026-11-22: Doing -> Done. Check build under -Z no longer clears the trace sizes
