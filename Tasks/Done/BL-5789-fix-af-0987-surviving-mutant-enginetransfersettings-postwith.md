@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EngineTransferSettings.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5789 — Fix AF-0987: Surviving mutant: EngineTransferSettings.PostWithoutData can default to true, turning every CLI CoAP GET into a POST and failing MQTT with exit 43
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineTransferSettings.cs line 57`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineTransferSettings.cs line 57`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The mutant (default true) is killed by Curl.Console.UnitTests PostWithoutDataDefaultTests.TransferSettingsOf_PlainCommandLine_IsNotPostWithoutData, which builds settings via EasyOptionsFromCommandLine.TransferSettingsOf as the CLI does (internal to Curl.Console, hence that test project). Applied by hand it failed; reverted, it and all Curl.Console fast tests pass. No production code changed.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 1bf9485c 9742157d.
+- 2026-11-22: Doing -> Done. Added PostWithoutDataDefaultTests in Curl.Console.UnitTests, which kills the default-true mutant.
