@@ -77,7 +77,7 @@ internal static class LdapEntryFormatter
             foreach (byte[] value in values)
             {
                 AddNameAndColon(pieces, name);
-                bool binary = IsBinary(name, value);
+                bool binary = IsBinary(LdapDialect.WinLdap, name, value);
                 Add(pieces, binary ? ": " : " ");
                 pieces.Add(binary ? Base64(value) : value);
                 Add(pieces, "\n");
@@ -104,7 +104,7 @@ internal static class LdapEntryFormatter
             foreach (byte[] value in attribute.Values)
             {
                 AddNameAndColon(pieces, attribute.Name);
-                bool binary = IsBinary(attribute.Name, value);
+                bool binary = IsBinary(LdapDialect.OpenLdap, attribute.Name, value);
                 AddSpaced(pieces, binary ? ": " : " ", binary ? Base64(value) : value);
                 Add(pieces, "\n");
             }
@@ -132,17 +132,21 @@ internal static class LdapEntryFormatter
         Add(pieces, ":");
     }
 
-    private static bool IsBinary(byte[] name, byte[] value) =>
+    private static bool IsBinary(LdapDialect dialect, byte[] name, byte[] value) =>
         (name.Length > BinarySuffix.Length && Encoding.Latin1.GetString(name).EndsWith(BinarySuffix, StringComparison.OrdinalIgnoreCase))
-        || !IsPrintable(value);
+        || !IsPrintable(dialect, value);
 
-    private static bool IsPrintable(byte[] value) =>
+    private static bool IsPrintable(LdapDialect dialect, byte[] value) =>
         value.Length == 0
-        || (!StartsUnsafe(value[0]) && !IsBlank(value[^1]) && Array.TrueForAll(value, IsPrintableAscii));
+        || (!StartsUnsafe(value[0]) && !IsBlank(value[^1]) && Array.TrueForAll(value, octet => IsPrintableAscii(octet) || (dialect == LdapDialect.OpenLdap && IsInteriorWhitespaceControl(octet))));
 
-    private static bool StartsUnsafe(byte octet) => IsBlank(octet) || octet is (byte)':' or (byte)'<';
+    private static bool IsInteriorWhitespaceControl(byte octet) => octet is 0x09 or 0x0D or 0x0A;
 
-    private static bool IsBlank(byte octet) => octet is (byte)' ' or (byte)'\t';
+    private static bool StartsUnsafe(byte octet) => IsBlank(octet) || UnsafeFirstOctets.Contains(octet);
+
+    private static readonly byte[] UnsafeFirstOctets = [0x3A, 0x3C, 0x0A, 0x0D];
+
+    private static bool IsBlank(byte octet) => octet is 0x20 or 0x09;
 
     private static bool IsPrintableAscii(byte octet) => octet is >= 0x20 and <= 0x7E;
 

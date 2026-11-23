@@ -35,4 +35,33 @@ public sealed class LdapEntryFormatterTests
         Diagnostics.Diff("formatted text", Encoding.Latin1.GetBytes("DN: x\n" + expectedAfterDn), text);
         CollectionAssert.AreEqual(Encoding.Latin1.GetBytes("DN: x\n" + expectedAfterDn), text);
     }
+
+    [TestMethod]
+    [DataRow("61 09 62", "\tv: a\tb\n\n\n")]
+    [DataRow("61 0d 62", "\tv: a\rb\n\n\n")]
+    [DataRow("6e 6c 0a", "\tv: nl\n\n\n\n")]
+    [DataRow("09 61", "\tv:: CWE=\n\n\n")]
+    [DataRow("61 20", "\tv:: YSA=\n\n\n")]
+    [DataRow("61 7f", "\tv:: YX8=\n\n\n")]
+    [DataRow("61 00 62", "\tv:: YQBi\n\n\n")]
+    public void Format_OpenLdapValueWithInteriorTabCrLf_IsPrintedRaw(string valueHex, string expectedAfterDn)
+    {
+        Diagnostics.Arrange("value", valueHex);
+        var entry = new LdapSearchEntry(Hex.Bytes("78"), [new LdapEntryAttribute(Hex.Bytes("76"), [Hex.Bytes(valueHex)])]);
+
+        byte[] text = [.. LdapEntryFormatter.FormatPieces(LdapDialect.OpenLdap, entry).SelectMany(piece => piece)];
+
+        Diagnostics.Bytes("formatted text", text);
+        CollectionAssert.AreEqual(Encoding.Latin1.GetBytes("DN: x\n" + expectedAfterDn), text);
+    }
+
+    [TestMethod]
+    public void Format_WinLdapValueWithInteriorTab_IsBase64()
+    {
+        var entry = new LdapSearchEntry(Hex.Bytes("78"), [new LdapEntryAttribute(Hex.Bytes("76"), [Hex.Bytes("61 09 62")])]);
+
+        byte[] text = [.. LdapEntryFormatter.FormatPieces(LdapDialect.WinLdap, entry).SelectMany(piece => piece)];
+
+        CollectionAssert.AreEqual(Encoding.Latin1.GetBytes("DN: x\n\tv:: YQli\n\n"), text);
+    }
 }

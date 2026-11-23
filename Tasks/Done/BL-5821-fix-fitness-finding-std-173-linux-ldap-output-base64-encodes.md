@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapEntryFormatter.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5821 — Fix fitness finding STD-173: Linux LDAP output base64-encodes values with an embedded TAB, CR or LF; curl (OpenLDAP) prints them raw
 
@@ -35,13 +35,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the Linux output is byte-identical to REF2's for the command above.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the Linux output is byte-identical to REF2's for the command above.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+OpenLDAP dialect: interior TAB, CR and LF (and a trailing LF) print raw; leading LF or CR, like leading blank, colon and less-than, stay base64 (the finding names only interior and trailing cases; leading LF/CR kept as before). Windows dialect unchanged. Not measured against real OpenLDAP here (no WSL run); followed the finding's REF2 expectation. Updated three older tests that pinned the base64 form for Linux.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: af3c65dc 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. OpenLDAP formatter prints interior TAB/CR/LF raw

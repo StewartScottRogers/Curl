@@ -34,7 +34,7 @@ public sealed class LdapValueBase64RuleTests
     }
 
     [TestMethod]
-    [DataRow("a\nb", "\tv:: YQpi\n\n\n", DisplayName = "line feed")]
+    [DataRow("a\nb", "\tv: a\nb\n\n\n", DisplayName = "line feed")]
     [DataRow(":colon", "\tv:: OmNvbG9u\n\n\n", DisplayName = "leading colon")]
     [DataRow("<lt", "\tv:: PGx0\n\n\n", DisplayName = "leading less-than")]
     [DataRow("\tlead", "\tv:: CWxlYWQ=\n\n\n", DisplayName = "leading tab")]
