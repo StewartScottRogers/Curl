@@ -314,7 +314,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// challenge, so a <c>+OK</c> now comes before the exchange has finished (RFC 4422 section 3.6, BL-5014).
     /// </summary>
     private bool NtlmUnfinished(string mechanism) =>
-        challengesHanded == 0 && (mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("LOGIN", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("CRAM-MD5", StringComparison.OrdinalIgnoreCase));
+        challengesHanded < (mechanism.Equals("DIGEST-MD5", StringComparison.OrdinalIgnoreCase) ? 2 : mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("LOGIN", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("CRAM-MD5", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
 
     /// <summary>
     /// Sends <c>AUTH &lt;mechanism&gt;</c>, with the initial response on the line when it goes

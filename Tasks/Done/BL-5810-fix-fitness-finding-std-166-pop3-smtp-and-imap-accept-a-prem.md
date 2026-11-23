@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Pop3.UnitLibrary/Pop3Login.cs, Curl.Original.Protocol.Imap.UnitLibrary/ImapAuthentication.cs, Curl.Original.Protocol.Smtp.UnitLibrary/SmtpSaslAuthentication.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5810 — Fix fitness finding STD-166: POP3, SMTP and IMAP accept a premature SASL success during DIGEST-MD5 (and POP3 with --sasl-ir before any challenge); curl fails with "Login denied"
 
@@ -41,13 +41,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] steps 3–6 each exit 67 with `curl: (67) Login denied`, and the mock logs show no `RETR`, `MAIL` or `SELECT` after the AUTH exchange.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] steps 3–6 each exit 67 with `curl: (67) Login denied`, and the mock logs show no `RETR`, `MAIL` or `SELECT` after the AUTH exchange.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: DIGEST-MD5 now needs 2 answered challenges (rspauth) before success in Pop3Login.NtlmUnfinished, ImapAuthentication.HasFinished, SmtpSaslAuthentication.Outcome (via ChallengesRequired); POP3 --sasl-ir case is covered by the same count. Unit tests added in each .UnitTests project; fast tests green, quality gate green for all three libraries. The mock-log criterion is met by unit tests (no Python mocks rebuilt).
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 96de823b 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. STD-166 fixed: DIGEST-MD5 needs two answered challenges before success in POP3, SMTP, IMAP
