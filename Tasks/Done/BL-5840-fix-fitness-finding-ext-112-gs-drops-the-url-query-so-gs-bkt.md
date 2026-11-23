@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsEndpoint.cs, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsOperations.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5840 — Fix fitness finding EXT-112: gs:// drops the URL query, so gs://bkt/?prefix=d/ lists the whole bucket
 
@@ -50,3 +50,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 11edfc82 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. gs:// list honours the URL query (prefix, delimiter, others) like s3; tests added
