@@ -41,11 +41,13 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 
 ## Acceptance criteria
 
-- [ ] step 3 exits 60 with `0x00008000` for both leaves; step 4 exits 0 for both leaves; the byte-identical `O=Evil` leaf still exits 60.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 3 exits 60 with `0x00008000` for both leaves; step 4 exits 0 for both leaves; the byte-identical `O=Evil` leaf still exits 60.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+DirectoryNameMatches now compares attribute type plus a normalised value (string type ignored, case and spaces folded, RFC 5280 7.1). Windows-only live repro not rerun; covered by unit tests. Quality gate clean for Curl.Networking.UnitLibrary (two unrelated flaky tests failed in earlier measure runs, passed on rerun).
 
 ## Log
 

@@ -302,6 +302,75 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(Excluded, Verify(Constraints(excludedName: GeneralName(6, "evil.other.org")), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), GeneralName(6, "https://evil.other.org/")))?.Message);
 
     [TestMethod]
+    public void VerifyPeer_SubjectDifferingOnlyInCaseFromTheExcludedDirectoryName_IsSchannelError0x8000() =>
+        Assert.AreEqual(Excluded, Verify(Constraints(excludedName: DirectoryName("O=Evil")), Host, true, subject: "O=EVIL")?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_SubjectDifferingOnlyInStringTypeFromTheExcludedDirectoryName_IsSchannelError0x8000() =>
+        Assert.AreEqual(Excluded, Verify(Constraints(excludedName: DirectoryName(OrganizationName(UniversalTagNumber.UTF8String, "Evil"))), Host, true, subject: "O=Evil")?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_SubjectDifferingOnlyInCaseFromThePermittedDirectoryName_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permittedName: DirectoryName(OrganizationName(UniversalTagNumber.UTF8String, "Good"))), Host, true, subject: "O=GOOD"));
+
+    [TestMethod]
+    public void VerifyPeer_SubjectWithAnotherAttributeValueThanTheExcludedDirectoryName_Accepts() =>
+        Assert.IsNull(Verify(Constraints(excludedName: DirectoryName("O=Evil")), Host, true, subject: "O=Good"));
+
+    [TestMethod]
+    public void VerifyPeer_SubjectWithAnotherAttributeTypeThanTheExcludedDirectoryName_Accepts() =>
+        Assert.IsNull(Verify(Constraints(excludedName: DirectoryName("O=Evil")), Host, true, subject: "OU=Evil"));
+
+    [TestMethod]
+    public void VerifyPeer_ExcludedDirectoryNameWithANonStringValue_DoesNotMatchAStringSubject() =>
+        Assert.IsNull(Verify(Constraints(excludedName: DirectoryName(RelativeName(writer => writer.WriteInteger(7)))), Host, true, subject: "O=Evil"));
+
+    [TestMethod]
+    public void VerifyPeer_ExcludedDirectoryNameWithAContextSpecificValue_DoesNotMatchAStringSubject() =>
+        Assert.IsNull(Verify(Constraints(excludedName: DirectoryName(RelativeName(writer => writer.WriteOctetString([1, 2], new Asn1Tag(TagClass.ContextSpecific, 0))))), Host, true, subject: "O=Evil"));
+
+    [TestMethod]
+    public void VerifyPeer_ExcludedDirectoryNameWithTwoAttributesInOneRelativeName_DoesNotMatchASubjectWithOne() =>
+        Assert.IsNull(Verify(Constraints(excludedName: DirectoryName(RelativeName(writer => writer.WriteCharacterString(UniversalTagNumber.UTF8String, "Evil"), twoAttributes: true))), Host, true, subject: "O=Evil"));
+
+    private static byte[] RelativeName(Action<AsnWriter> writeValue, bool twoAttributes = false)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSetOf())
+        {
+            using (writer.PushSequence())
+            {
+                writer.WriteObjectIdentifier("2.5.4.10");
+                writeValue(writer);
+            }
+
+            if (twoAttributes)
+            {
+                using (writer.PushSequence())
+                {
+                    writer.WriteObjectIdentifier("2.5.4.11");
+                    writeValue(writer);
+                }
+            }
+        }
+
+        return writer.Encode();
+    }
+
+    private static byte[] OrganizationName(UniversalTagNumber stringType, string value)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSetOf())
+        using (writer.PushSequence())
+        {
+            writer.WriteObjectIdentifier("2.5.4.10");
+            writer.WriteCharacterString(stringType, value);
+        }
+
+        return writer.Encode();
+    }
+
+    [TestMethod]
     public void VerifyPeer_AlternativeNameOfAnUnconstrainedKind_Accepts() =>
         Assert.IsNull(Verify(Constraints(permitted: Host), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), [0x88, 0x01, 0x2A])));
 

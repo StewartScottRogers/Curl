@@ -219,7 +219,7 @@ internal static class CertificateNameConstraints
         var nameNames = new AsnReader(name, AsnEncodingRules.DER).ReadSequence();
         while (constraintNames.HasData)
         {
-            if (!nameNames.HasData || !constraintNames.ReadEncodedValue().Span.SequenceEqual(nameNames.ReadEncodedValue().Span))
+            if (!nameNames.HasData || !RelativeNamesEqual(constraintNames.ReadSetOf(), nameNames.ReadSetOf()))
             {
                 return false;
             }
@@ -227,6 +227,44 @@ internal static class CertificateNameConstraints
 
         return true;
     }
+
+    // Attribute types are equal and values compare as RFC 5280 section 7.1 says: string type ignored, case folded, spaces folded.
+    private static bool RelativeNamesEqual(AsnReader constraint, AsnReader name)
+    {
+        var constraintAttributes = ReadAttributes(constraint);
+        var nameAttributes = ReadAttributes(name);
+        return constraintAttributes.Count == nameAttributes.Count
+            && constraintAttributes.All(attribute => nameAttributes.Contains(attribute));
+    }
+
+    private static List<(string Type, string Value)> ReadAttributes(AsnReader relativeName)
+    {
+        var attributes = new List<(string, string)>();
+        while (relativeName.HasData)
+        {
+            var pair = relativeName.ReadSequence();
+            var type = pair.ReadObjectIdentifier();
+            attributes.Add((type, NormalisedValue(pair.ReadEncodedValue())));
+        }
+
+        return attributes;
+    }
+
+    private static string NormalisedValue(ReadOnlyMemory<byte> encoded)
+    {
+        var reader = new AsnReader(encoded, AsnEncodingRules.DER);
+        var tag = reader.PeekTag();
+        if (tag.TagClass != TagClass.Universal || !StringTagValues.Contains(tag.TagValue))
+        {
+            return Convert.ToHexString(encoded.Span);
+        }
+
+        var text = reader.ReadCharacterString((UniversalTagNumber)tag.TagValue);
+        return string.Join(' ', text.Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
+    }
+
+    // UTF8String, PrintableString, TeletexString, IA5String, BMPString.
+    private static readonly int[] StringTagValues = [12, 19, 20, 22, 30];
 
     // A constraint with an @ names one mailbox, otherwise a host, or with a leading dot the hosts below it.
     private static bool EmailMatches(string constraint, string name) =>
