@@ -13,9 +13,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -86,6 +86,28 @@ internal sealed partial class ManagedEasyTransfer(
     /// </summary>
     private int cookieListItemsApplied;
 
+    /// <summary>Whether a perform with a progress callback is running, so <see cref="Info" /> shows the time elapsed since it started (BL-5796).</summary>
+    private volatile bool timeIsLive;
+
+    /// <summary>
+    /// While <see cref="timeIsLive" />, gives <paramref name="info" /> a <see cref="TransferInfo.TotalTime" /> of the time
+    /// since the perform started if that is later than the one it holds, as libcurl's <c>Curl_pgrsUpdate</c> keeps
+    /// <c>CURLINFO_TOTAL_TIME_T</c> current, so a progress callback reads the time elapsed so far and not 0.
+    /// </summary>
+    /// <param name="info">What the perform has found out.</param>
+    /// <returns><paramref name="info" />, with the live total time.</returns>
+    private TransferInfo WithLiveTotalTime(TransferInfo info)
+    {
+        if (!timeIsLive)
+        {
+            return info;
+        }
+
+        TimeSpan elapsed = shared.TimeProvider.GetElapsedTime(performStartedTimestamp);
+        return info with { TotalTime = TimeSpan.FromTicks(Math.Max(elapsed.Ticks, info.TotalTime.Ticks)) };
+    }
+
+
     /// <summary>
     /// Gets what the last perform found out (<c>curl_easy_getinfo</c>). While the handle is attached to a share handle
     /// that shares cookies, <see cref="TransferInfo.CookieList" /> is the share's cookies, read under one cookie lock
@@ -94,7 +116,7 @@ internal sealed partial class ManagedEasyTransfer(
     /// </summary>
     public TransferInfo Info
     {
-        get => WithConnectOnlySocket(optionShare is { SharesCookies: true } share ? field with { CookieList = new ShareCookieListLines(share, this) } : field);
+        get => WithLiveTotalTime(WithConnectOnlySocket(optionShare is { SharesCookies: true } share ? field with { CookieList = new ShareCookieListLines(share, this) } : field));
         private set;
     } = new();
 

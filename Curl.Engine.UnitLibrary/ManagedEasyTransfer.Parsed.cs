@@ -13,9 +13,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -64,7 +64,7 @@ internal sealed partial class ManagedEasyTransfer
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
         CallbackTransferProgress? callbackProgress = CallbackProgressUnlessToolGave(toolProgress, options, abort, () => options.Behaviour.StandardError ?? Host.StandardError.Value, shared.TimeProvider);
         pauseGate.TickWhilePaused(CallbackTransferProgress.PausedTickOf(callbackProgress), shared.TimeProvider);
-        TransferResult? result = await FollowFinishingMeterAsync(
+        TransferResult? result = await WithHoldTickAsync(callbackProgress, FollowFinishingMeterAsync(
             follower,
             state,
             CreateContext(
@@ -79,12 +79,40 @@ internal sealed partial class ManagedEasyTransfer
                 ContextTokenOf(toolProgress, cancellationToken, abort)),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
             callbackProgress,
-            callbackReads).ConfigureAwait(false);
+            callbackReads)).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
         KeepHandleStateOf(recorder, negotiateFailure, abortedHead is null ? result : abortedHead.ReportOn(result), url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
         return FinishPerformed(LastResult, options, transferUrl, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
+
+    /// <summary>
+    /// Awaits <paramref name="attempt" /> with the once-a-second progress tick of a perform with a progress callback running
+    /// (BL-5796), and with it the live <see cref="TransferInfo.TotalTime" /> (<see cref="Info" />), as libcurl's
+    /// <c>Curl_pgrsUpdate</c> runs on every pass of its loop while a server holds a transfer.
+    /// </summary>
+    /// <param name="callbackProgress">The progress callback's sink, or <see langword="null" /> for none, and no tick.</param>
+    /// <param name="attempt">The attempt, already started.</param>
+    /// <returns>The attempt's result.</returns>
+    private async Task<TransferResult?> WithHoldTickAsync(CallbackTransferProgress? callbackProgress, Task<TransferResult?> attempt)
+    {
+        if (callbackProgress is null)
+        {
+            return await attempt.ConfigureAwait(false);
+        }
+
+        timeIsLive = true;
+        await using ProgressHoldTicker ticker = ProgressHoldTicker.Start(callbackProgress.ReportWhilePaused, () => pauseGate.Directions != 0, shared.TimeProvider);
+        try
+        {
+            return await attempt.ConfigureAwait(false);
+        }
+        finally
+        {
+            timeIsLive = false;
+        }
+    }
+
 
     /// <summary>
     /// Performs the attempt as <see cref="FollowUnlessAbortedAsync" /> does, then ends the built-in progress meter

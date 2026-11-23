@@ -24,6 +24,9 @@ internal sealed class CallbackTransferProgress(Func<long, long, long, long, int>
     /// <summary>libcurl's <c>CURLE_ABORTED_BY_CALLBACK</c> text for a progress callback that aborted the transfer.</summary>
     internal const string CallbackAbortedText = "Callback aborted";
 
+    /// <summary>Serialises the callback calls of the transfer and of the once-a-second hold tick (<see cref="ProgressHoldTicker" />).</summary>
+    private readonly object reportGate = new();
+
     private long downloadTotal;
     private long downloaded;
     private long uploadTotal;
@@ -133,24 +136,27 @@ internal sealed class CallbackTransferProgress(Func<long, long, long, long, int>
     /// <returns>The meter to pass the report on to when the callback continued to it, else <see langword="null" />.</returns>
     private TransferProgressRecorder? Report()
     {
-        if (Aborted)
+        lock (reportGate)
         {
+            if (Aborted)
+            {
+                return null;
+            }
+
+            int result = report(downloadTotal, downloaded, uploadTotal, uploaded);
+            if (result is ProgressCallbackResult.Continue)
+            {
+                return MeterOf();
+            }
+
+            if (result is not 0)
+            {
+                Aborted = true;
+                abort.Cancel();
+            }
+
             return null;
         }
-
-        int result = report(downloadTotal, downloaded, uploadTotal, uploaded);
-        if (result is ProgressCallbackResult.Continue)
-        {
-            return MeterOf();
-        }
-
-        if (result is not 0)
-        {
-            Aborted = true;
-            abort.Cancel();
-        }
-
-        return null;
     }
 
     /// <summary>The built-in meter, made on first use, or <see langword="null" /> when there is nowhere to draw it.</summary>
