@@ -4,8 +4,8 @@ title: Fix fitness finding EXT-119: --resumable-upload silently bypasses --har, 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadFlow.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs]
+depends-on: [BL-5866]
+touches: [Curl.Extension.ResumableUpload.UnitLibrary, Curl.Extension.ResumableUpload.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs]
 requirement: none
 created: 2026-11-24
 completed:
@@ -45,7 +45,16 @@ Shared setup: **Shared mock for EXT-115, EXT-116, EXT-119, EXT-109, EXT-111** (H
 
 ## Notes
 
+First-pass finding (no code edited): the fix is a transport change, and it needs files BL-5866 (Doing on the shared branch) holds: `ResumableUploadRequestHeaders.cs` and `ExtensionTransferHookCatalogue.cs`. Requeued behind BL-5866.
+
+Cause confirmed: `ResumableUploadTransferHook.ExecuteAsync` sends OPTIONS/POST/PATCH through its own `ResumableUploadSession` (connector + hand-written HTTP/1.1 client) and never calls `next`, so the HAR, RecordReplay, `-v`, `--trace-ascii` and DPoP hooks and handlers never see them. The catalogue order is already right (resumable sits outside Har and RecordReplay), so the catalogue needs no change once requests go through `next`.
+
+Design for the next claim: make `ResumableUploadSession.SendAsync(method, uri, headers, body, offset)` run each request through `next` instead of the connector. Build a private `ITransferContext` wrapper in the library (Upload => null, Url => uri, Http with CustomMethod and Body = the slice read from the seekable body into memory, Headers plus the flow's headers; cross-origin: drop Authorization, Cookie and Proxy-Authorization from `-H`; NoBody for HEAD; PostWithoutData for the bodyless POST; Output via WithOutputs to a MemoryStream). Read `TransferResult.Report` (ResponseCode, ResponseHeaders) for the `ResumableUploadExchange`; map exit 56 and 55 to `canResume: true` and any other failure to `canResume: false` with the result's exit code and message. curl's stack then does auth, TLS, proxy, User-Agent and tracing, so `ResumableUploadRequestHeaders`, the whole `Http/` folder and `ResumableUploadInterruptibleConnection` can go, and the 3-argument (services) `ExecuteAsync` with them. About 28 tests in `ResumableUploadTransferHookTests` use `ScriptedConnector` and must be rewritten against a scripted `next`; add a test that each request reaches `next` (OPTIONS, POST, PATCH). Measure real exchanges against the shared mock after `dotnet build Curl.Console`. This is large (about 15 files deleted, 3 rewritten, tests rewritten, ADR, the library's CLAUDE.md): if the claim finds it past one run, split it before editing.
+
+Check BL-5866 first: with requests through `next`, `--dpop` is applied by its own hook, so BL-5866's header code may be gone or moot.
+
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 0f6d8102 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Backlog. Needs ResumableUploadRequestHeaders.cs and the hook catalogue, held by BL-5866 in Doing; waits for it. No code edited; design in Notes.
