@@ -19,9 +19,6 @@ internal sealed class RevocationListScope
     private const string AuthorityInformationAccess = "1.3.6.1.5.5.7.1.1";
     private const string IssuingDistributionPoint = "2.5.29.28";
     private const string DeltaCrlIndicator = "2.5.29.27";
-    private const string ReasonCode = "2.5.29.21";
-    private const string InvalidityDate = "2.5.29.24";
-    private const string CertificateIssuer = "2.5.29.29";
 
     private static readonly Asn1Tag ContextTag0 = new(TagClass.ContextSpecific, 0);
     private static readonly Asn1Tag ContextTag1 = new(TagClass.ContextSpecific, 1);
@@ -76,9 +73,13 @@ internal sealed class RevocationListScope
         return scope;
     }
 
-    /// <summary>Returns whether an entry's extensions make the list unusable.</summary>
+    /// <summary>
+    /// Returns whether an entry's extensions are malformed. Only malformed ones make the list
+    /// unusable: the Schannel build ignores an entry's unrecognised critical extension and its
+    /// certificate issuer one (STD-162), so they never leave a list "unknown".
+    /// </summary>
     /// <param name="entry">The entry's reader, positioned at its <c>crlEntryExtensions</c>.</param>
-    /// <returns><see langword="true" /> for an unrecognised critical extension or a certificate issuer one.</returns>
+    /// <returns><see langword="true" /> when the extensions do not parse.</returns>
     public static bool EntryExtensionsAreUnusable(AsnReader entry)
     {
         try
@@ -86,9 +87,11 @@ internal sealed class RevocationListScope
             var extensions = entry.ReadSequence();
             while (extensions.HasData)
             {
-                if (IsUnusableEntryExtension(extensions.ReadSequence()))
+                var extension = extensions.ReadSequence();
+                extension.ReadObjectIdentifier();
+                if (extension.PeekTag().HasSameClassAndValue(Asn1Tag.Boolean))
                 {
-                    return true;
+                    extension.ReadBoolean();
                 }
             }
 
@@ -98,13 +101,6 @@ internal sealed class RevocationListScope
         {
             return true;
         }
-    }
-
-    private static bool IsUnusableEntryExtension(AsnReader extension)
-    {
-        var oid = extension.ReadObjectIdentifier();
-        var critical = extension.PeekTag().HasSameClassAndValue(Asn1Tag.Boolean) && extension.ReadBoolean();
-        return oid == CertificateIssuer || (critical && oid is not (ReasonCode or InvalidityDate));
     }
 
     /// <summary>Returns whether the list answers for <paramref name="certificate" /> fetched from <paramref name="distributionPoint" />.</summary>

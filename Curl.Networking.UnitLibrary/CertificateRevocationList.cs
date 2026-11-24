@@ -106,7 +106,7 @@ internal sealed class CertificateRevocationList
     /// <summary>
     /// Returns whether the list can answer for <paramref name="certificate" /> fetched from
     /// <paramref name="distributionPoint" /> (RFC 5280, 5.2.5): it has no unrecognised critical
-    /// extension (of the list or of an entry), is not a delta list, is not indirect, does not
+    /// extension (of the list), is not a delta list, is not indirect, does not
     /// cover only some reasons, and its issuing distribution point, when it has one, names that
     /// address and admits the certificate's kind (CA or not). A list that fails is "unknown",
     /// never "not revoked" (STD-113).
@@ -184,7 +184,7 @@ internal sealed class CertificateRevocationList
 
     // revokedCertificates is present only when something is revoked; whatever follows it is
     // the [0] extensions. An entry with an unrecognised critical extension, or a certificate
-    // issuer one (an indirect list), makes the list unusable.
+    // issuer one is ignored, as the Schannel build ignores them (STD-162); a malformed one makes the list unusable.
     private static HashSet<BigInteger> ReadRevokedSerialNumbers(AsnReader signed, out bool entriesUnusable)
     {
         entriesUnusable = false;

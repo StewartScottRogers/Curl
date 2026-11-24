@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/RevocationListScope.cs, Curl.Networking.UnitLibrary/CertificateRevocationList.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5806 — Fix fitness finding STD-162: Windows: a CRL entry with a certificateIssuer extension or an unknown critical entry extension makes the whole CRL unusable; REF ignores the entry
 
@@ -37,11 +37,13 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 
 ## Acceptance criteria
 
-- [ ] both commands exit 0; a CRL with an unknown critical list-level (not entry) extension still exits 60 "unknown".
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] both commands exit 0; a CRL with an unknown critical list-level (not entry) extension still exits 60 "unknown".
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided: Decode is used for the Schannel anchor-revocation path (CoversScopeOf) and the OpenSSL --crlfile path (which never read scope), so entry extensions no longer make a list unusable; only malformed ones do. List-level unknown critical extensions still give exit 60. Not run against a live server; unit tests pin it. Platform-neutral.
 
 ## Log
 
@@ -49,3 +51,4 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 7de35c4e 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. CRL entry extensions no longer make a list unusable
