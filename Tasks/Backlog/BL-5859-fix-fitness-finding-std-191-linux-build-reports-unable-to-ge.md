@@ -4,8 +4,8 @@ title: Fix fitness finding STD-191: Linux build reports "unable to get local iss
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs]
+depends-on: [BL-5804, BL-5849]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
 requirement: none
 created: 2026-11-24
 completed:
@@ -44,8 +44,10 @@ Shared setup: Each of these findings names its own certificates, but they share 
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+Requeued unedited (no code written): the fix lives in CertificateNameConstraints.cs, which BL-5804 (Doing, STD-161, subject emailAddress as rfc822Name) holds, and BL-5849 (Backlog, STD-181, same file) covers directoryName value matching. Needed here: add UniversalString (tag 28) to StringTagValues so a UniversalString O=Evil matches the excluded directoryName, and treat subject emailAddress as an rfc822Name; both land with those two tasks, then re-measure this finding on Linux and fix any remaining verify-result mapping in ServerCertificateVerification.cs. Added both to depends-on and the file to touches.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: d911915c 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Backlog. Needs CertificateNameConstraints.cs held by BL-5804 (and BL-5849 for the same name matching); depends-on added
