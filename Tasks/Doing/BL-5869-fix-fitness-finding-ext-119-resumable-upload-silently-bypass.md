@@ -48,3 +48,4 @@ Shared setup: **Shared mock for EXT-115, EXT-116, EXT-119, EXT-109, EXT-111** (H
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 0f6d8102 69116afe 3d836d5e.
