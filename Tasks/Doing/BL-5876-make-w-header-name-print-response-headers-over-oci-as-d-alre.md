@@ -34,3 +34,4 @@ Repro: `surl --directory store --cert server.pem --key server.key --user build:b
 ## Log
 
 - 2026-11-24: Created from Surly bug report 2026-11-24T1330, finding 5.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: e04e10b4 1a7baa4e f19d9e46 3d836d5e.
