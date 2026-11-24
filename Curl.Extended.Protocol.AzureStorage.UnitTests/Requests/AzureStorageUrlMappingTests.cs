@@ -83,6 +83,47 @@ public sealed class AzureStorageUrlMappingTests
     }
 
     [TestMethod]
+    [DataRow("abfss://fs@0xstore/x", "0xstore.dfs.core.windows.net")]
+    [DataRow("abfss://fs@12345678/x", "12345678.dfs.core.windows.net")]
+    [DataRow("abfs://fs@123/x", "123.dfs.core.windows.net")]
+    [DataRow("abfs://fs@1.2.3.4.5/x", "1.2.3.4.5")]
+    public void Map_AbfsWithAllDigitOrHexLookingAccountName_GetsThePublicDfsSuffix(string url, string expectedHost)
+    {
+        // EXT-117: a valid account name that is no IPv4 address must never be sent bare.
+        Assert.AreEqual(expectedHost, AzureStorageUrlMapping.Map(new Uri(url)).Host);
+    }
+
+    [TestMethod]
+    public void Map_AzWithAllDigitAccountName_GetsThePublicBlobSuffix()
+    {
+        var endpoint = AzureStorageUrlMapping.Map(new Uri("az://12345678/ctr/b"));
+
+        Assert.AreEqual("12345678.blob.core.windows.net", endpoint.Host);
+        Assert.AreEqual("/ctr/b", endpoint.Path);
+    }
+
+    [TestMethod]
+    [DataRow("abfs://fs@0177.0.0.1/x")]
+    [DataRow("abfs://fs@127.0x0.0.1/x")]
+    [DataRow("abfs://fs@0x7f.1/x")]
+    [DataRow("abfs://fs@256.0.0.1/x")]
+    [DataRow("abfs://fs@1.2.3.256/x")]
+    public void Map_AbfsWithDottedOrOctalIpv4Spelling_UsesTheHostAsGiven(string url)
+    {
+        Assert.AreEqual(new Uri(url).Host, AzureStorageUrlMapping.Map(new Uri(url)).Host);
+    }
+
+    [TestMethod]
+    [DataRow("abfs://fs@4294967296/x")]
+    [DataRow("abfs://fs@08/x")]
+    [DataRow("abfs://fs@0x/x")]
+    [DataRow("abfs://fs@999999999999/x")]
+    public void Map_AbfsWithOutOfRangeNumericHost_IsAnAccountName(string url)
+    {
+        Assert.EndsWith(".dfs.core.windows.net", AzureStorageUrlMapping.Map(new Uri(url)).Host);
+    }
+
+    [TestMethod]
     public void Map_AbfsWithPlainAccountName_StillGetsThePublicDfsSuffix()
     {
         Assert.AreEqual("acct.dfs.core.windows.net", AzureStorageUrlMapping.Map(new Uri("abfss://fs@acct/x")).Host);

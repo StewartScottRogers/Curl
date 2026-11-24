@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Requests/AzureStorageUrlMapping.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5867 — Fix fitness finding EXT-117: az, abfs and abfss treat every all-digit or 0x... account name as an emulator host and send the token to that bare host
 
@@ -39,13 +39,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] `abfss://fs@0xstore/x` logs `Host: 0xstore.dfs.core.windows.net`; `az://12345678/ctr/b` logs `Host: 12345678.blob.core.windows.net`; `abfss://fs@0x7f000001/x` still logs `Host: 0x7f000001`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `abfss://fs@0xstore/x` logs `Host: 0xstore.dfs.core.windows.net`; `az://12345678/ctr/b` logs `Host: 12345678.blob.core.windows.net`; `abfss://fs@0x7f000001/x` still logs `Host: 0x7f000001`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision (ADR-1346): a numeric host is an emulator IP only when it parses as a routable IPv4 spelling (first octet nonzero), so 12345678 is an account but 2130706433 stays an address. Linux and macOS: tests are platform-neutral.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 70ec4bdf 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Numeric hosts are emulator IPs only when routable IPv4 spellings; tests and quality gate green

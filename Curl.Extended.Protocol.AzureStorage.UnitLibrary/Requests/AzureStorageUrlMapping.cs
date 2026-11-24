@@ -41,10 +41,75 @@ public static class AzureStorageUrlMapping
         || string.Equals(url.Host, "localhost", StringComparison.OrdinalIgnoreCase)
         || IsNumericIpv4Spelling(url.Host);
 
-    // Hex (0x7f000001) and all-digit (2130706433) hosts are IPv4 spellings the port's URL parser reads as 127.0.0.1 (EXT-105); never account names.
-    private static bool IsNumericIpv4Spelling(string host) =>
-        host.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-        || (host.Length > 0 && host.All(character => char.IsAsciiDigit(character) || character == '.'));
+    // A numeric spelling of a routable IPv4 address (0x7f000001, 2130706433, 0177.0.0.1) the port's URL parser reads as 127.0.0.1 (EXT-105);
+    // never an account name. A spelling that is no address (0xstore, a first octet of 0 as in 12345678 or 123, too many parts) is an
+    // account name: Azure account names are 3 to 24 lowercase letters and digits (EXT-117).
+    private static bool IsNumericIpv4Spelling(string host)
+    {
+        var parts = host.Split('.');
+        return parts.Length <= 4 && TryParseParts(parts, out var values) && IsRoutableAddress(values);
+    }
+
+    private static bool TryParseParts(string[] parts, out ulong[] values)
+    {
+        values = new ulong[parts.Length];
+        for (var index = 0; index < parts.Length; index++)
+        {
+            if (!TryParseIpv4Part(parts[index], out values[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // The leading parts are octets, the last part fills the remaining bytes, and the first octet is not 0.
+    private static bool IsRoutableAddress(ulong[] values)
+    {
+        var lastLimit = 1UL << (8 * (5 - values.Length));
+        var leadingPartsInRange = values.Take(values.Length - 1).All(IsOctet);
+        var firstOctet = values.Length == 1 ? values[0] >> 24 : values[0];
+        return leadingPartsInRange && values[^1] < lastLimit && firstOctet != 0;
+    }
+
+    private static bool IsOctet(ulong value) => value <= 255;
+
+    private static bool TryParseIpv4Part(string part, out ulong value)
+    {
+        value = 0;
+        var (numberBase, digits) = NumberBaseAndDigits(part);
+        if (digits.Length == 0 || digits.Length > 11)
+        {
+            return false;
+        }
+
+        foreach (var character in digits)
+        {
+            var digit = DigitValue(character);
+            if (digit >= numberBase)
+            {
+                return false;
+            }
+
+            value = (value * numberBase) + digit;
+        }
+
+        return true;
+    }
+
+    private static (ulong NumberBase, string Digits) NumberBaseAndDigits(string part)
+    {
+        if (part.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            return (16UL, part[2..]);
+        }
+
+        return (part.Length > 1 && part[0] == '0' ? 8UL : 10UL, part);
+    }
+
+    // A hexadecimal digit's value; any other character is 16, above every digit of every base.
+    private static ulong DigitValue(char character) => char.IsAsciiHexDigit(character) ? (ulong)Convert.ToInt32(character.ToString(), 16) : 16UL;
 
     private static AzureStorageEndpoint MapDfs(Uri url)
     {
