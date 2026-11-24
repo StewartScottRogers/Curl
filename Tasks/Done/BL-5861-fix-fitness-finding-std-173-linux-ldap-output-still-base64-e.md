@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapEntryFormatter.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5861 — Fix fitness finding STD-173: Linux LDAP output still base64-encodes values that start with :, <, CR or LF, or contain VT or FF; OpenLDAP curl prints them raw
 
@@ -37,13 +37,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the repro output is byte-identical to REF2.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro output is byte-identical to REF2.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+OpenLDAP dialect now base64-encodes only for a leading or trailing blank or a non-printable, non-whitespace byte (0x09-0x0D count as whitespace); leading : and < and CR/LF stay a WinLdap-only rule. Tests pinned in LdapValueBase64RuleTests and the ws-linux recording. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 0ef9dfa8 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. OpenLDAP dialect prints : < CR LF VT FF values raw
