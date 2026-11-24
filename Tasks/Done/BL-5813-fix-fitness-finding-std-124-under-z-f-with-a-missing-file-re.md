@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5813 — Fix fitness finding STD-124: under -Z, -F with a missing file reports %{conn_id}/%{xfer_id} 0, 1, 2 instead of -1 (STILL OPEN, partly fixed)
 
@@ -37,11 +37,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the command prints `000|0|-1|-1|Failed to open/read local data from file/application`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints `000|0|-1|-1|Failed to open/read local data from file/application`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed in Curl.Console/CurlCommandRunner.cs: the -Z first-batch form setup now maps an unopenable -F file to CannotOpenUploadFileFailure (FormRunEndingFailureOf), so the held transfers are reported with conn_id and xfer_id -1 as the serial path does. Test: Cgr175Tests. Quality run for Curl.Console clean. Linux and macOS: platform-neutral test.
 
 ## Log
 
@@ -49,3 +51,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 8e226002 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Under -Z a -F file that cannot be opened now reports conn_id and xfer_id -1.

@@ -79,6 +79,16 @@ public sealed class Cgr175Tests
     }
 
     [TestMethod]
+    public async Task RunAsync_ParallelFormWithMissingFile_ReportsConnectionAndTransferIdsAsMinusOne()
+    {
+        (_, string stdout, _, _) = await RunAsync(
+            "-w", "%{conn_id}|%{xfer_id}|%{errormsg}\n", "-Z", "-F", "f=@nofile.txt",
+            "http://127.0.0.1:22000/a", "http://127.0.0.1:22000/b");
+
+        Assert.AreEqual("-1|-1|Failed to open/read local data from file/application\n", stdout.ReplaceLineEndings("\n"));
+    }
+
+    [TestMethod]
     public async Task RunAsync_ParallelMissingFileFormInFirstGroup_StopsTheLaterGroupToo()
     {
         (int exitCode, _, _, List<long> sent) = await RunAsync(
