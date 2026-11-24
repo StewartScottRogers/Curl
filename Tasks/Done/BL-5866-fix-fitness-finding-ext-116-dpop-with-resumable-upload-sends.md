@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadRequestHeaders.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5866 — Fix fitness finding EXT-116: --dpop with --resumable-upload sends the DPoP-bound token as Authorization: Bearer with no DPoP proof
 
@@ -38,13 +38,17 @@ Shared setup: **Shared mock for EXT-115, EXT-116, EXT-119, EXT-109, EXT-111** (H
 
 ## Acceptance criteria
 
-- [ ] each of OPTIONS, POST and PATCH carries `Authorization: DPoP DTOK` and one `DPoP:` header.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] each of OPTIONS, POST and PATCH carries `Authorization: DPoP DTOK` and one `DPoP:` header.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: the DPoP hook sat after the resumable hook, which makes its own requests and never calls next, so DPoP never ran. Fix: moved DpopExtension.HookFor ahead of ResumableUploadExtension.HookFor in ExtensionTransferHookCatalogue; DPoP now wraps the upload and hands its DPoP: and Authorization: DPoP headers as -H lines, which ResumableUploadRequestHeaders already sends on OPTIONS, POST and PATCH in place of Bearer. Limitation: one proof (htm PUT, htu the target URL) is reused on all three requests; per-request proofs would need a signer seam in the abstractions, not filed.
+- Tests: ResumableUpload ExecuteAsync_DpopHeadersGivenByTheDpopHook_EveryRequestCarriesThemInsteadOfBearer; Composition DpopWithResumableUploadOrderTests. No end-to-end run against a mock; Measure-CodeQuality skipped as the change adds no code to a library (a reorder only).
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 70131890 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. --dpop with --resumable-upload now sends Authorization: DPoP and a DPoP header on OPTIONS, POST and PATCH

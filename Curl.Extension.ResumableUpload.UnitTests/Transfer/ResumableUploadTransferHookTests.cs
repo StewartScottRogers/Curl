@@ -313,6 +313,27 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DpopHeadersGivenByTheDpopHook_EveryRequestCarriesThemInsteadOfBearer()
+    {
+        var options = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+        var creation = new RecordedConnection("HTTP/1.1 201 Created\r\nLocation: /u/1\r\nContent-Length: 0\r\n\r\n");
+        var append = new RecordedConnection(IetfAppended);
+        var connector = new ScriptedConnector(ConnectResult.Connected(options), ConnectResult.Connected(creation), ConnectResult.Connected(append));
+        var context = Context(
+            "http://up.example.com/files",
+            http: new HttpRequestOptions { BearerToken = "DTOK", Headers = ["DPoP: proof", "Authorization: DPoP DTOK"] });
+
+        await new ResumableUploadTransferHook().ExecuteAsync(context, Services(connector), NeverSent);
+
+        foreach (var written in new[] { options.Written, creation.Written, append.Written })
+        {
+            StringAssert.Contains(written, "Authorization: DPoP DTOK");
+            StringAssert.Contains(written, "DPoP: proof");
+            Assert.DoesNotContain("Bearer", written);
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ClosedConnectionOrLocationOnAnotherHost_ConnectsAgainToTheRightTarget()
     {
         var options = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
