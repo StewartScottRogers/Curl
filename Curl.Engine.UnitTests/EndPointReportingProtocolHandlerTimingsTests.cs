@@ -114,7 +114,7 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_CancelledBeforeConnecting_CarriesNoReport_BL5491()
+    public async Task ExecuteAsync_CancelledBeforeConnecting_CarriesTimingsOnly_BL5843()
     {
         ManualTimeProvider time = new();
         EndPointReportingProtocolHandler handler = new(
@@ -124,7 +124,9 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
         OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             async () => await handler.ExecuteAsync(ContextOf(time)));
 
-        Assert.IsNull(EndPointReportingProtocolHandler.ReportCarriedBy(cancelled));
+        TransferReport report = EndPointReportingProtocolHandler.ReportCarriedBy(cancelled)!;
+        Assert.IsNotNull(report.Timings);
+        Assert.IsNull(report.RemoteEndPoint);
     }
 
     [TestMethod]

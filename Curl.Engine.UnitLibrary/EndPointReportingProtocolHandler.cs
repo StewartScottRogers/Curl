@@ -58,11 +58,11 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         {
             result = TransferResult.Failure(CurlExitCode.CouldntConnect, refused.Message);
         }
-        catch (OperationCanceledException cancelled) when (recorder.FirstConnectTimings is not null)
+        catch (OperationCanceledException cancelled)
         {
-            // A watchdog's cancellation leaves no result: carry the connected transfer's report on the exception for the caller that ends it (BL-5491).
+            // A watchdog's cancellation leaves no result: carry the transfer's report on the exception for the caller that ends it (BL-5491), a UDP channel's or a handshake still running's too, so -w knows its total time (BL-5843).
             TransferResult connected = recorder.ReportOn(TransferResult.Failure(CurlExitCode.OperationTimedOut, cancelled.Message));
-            cancelled.Data[ReportDataKey] = StampTimingsAndUploadSize(connected, context, started, UploadedBy(context, UploadPosition(context) - uploadStart, true)).Report;
+            cancelled.Data[ReportDataKey] = StampTimingsAndUploadSize(connected, context, started, UploadedBy(context, UploadPosition(context) - uploadStart, true), true).Report;
             throw;
         }
 
@@ -71,9 +71,9 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     }
 
     // Gives a report with no timings the transfer's connect and total times and, when it sent none itself, the bytes the upload stream gave (BL-5410). A failure with no report stays without one (BL-5421), and one that never connected sent nothing.
-    private TransferResult StampTimingsAndUploadSize(TransferResult result, ITransferContext context, long started, long uploaded)
+    private TransferResult StampTimingsAndUploadSize(TransferResult result, ITransferContext context, long started, long uploaded, bool cancelled = false)
     {
-        if (result.Report is null && !result.IsSuccess)
+        if (result.Report is null && !result.IsSuccess && !cancelled)
         {
             return result;
         }
