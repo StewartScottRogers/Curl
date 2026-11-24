@@ -2247,7 +2247,7 @@ internal sealed class CurlCommandRunner(
             failure => ReportSkippedAsync(dispatch, options, transfer, state, failure));
         if (!await UploadFileOpensAsync(transfer.UploadFile).ConfigureAwait(false))
         {
-            await run.AbandonFirstBatchAsync(CannotOpenUploadFileFailure).ConfigureAwait(false);
+            await run.AbandonFirstBatchAsync(CannotOpenUploadFileFailure, startsOthersWhenExtraFails: true).ConfigureAwait(false);
             return true;
         }
 

@@ -169,9 +169,26 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// <returns>A task that completes when the held transfers are reported.</returns>
     /// <param name="reportsOnlyFirst">Whether only the first held transfer is reported, as curl 8.22.0 does for a
     /// <c>-F</c> file that cannot be opened (STD-123, BL-5812).</param>
-    internal async Task AbandonFirstBatchAsync(TransferResult failure, bool reportsOnlyFirst = false)
+    /// <param name="startsOthersWhenExtraFails">Whether, when the failing transfer is the batch's extra one (past
+    /// <c>--parallel-max</c>), the others start and only it is reported, as curl 8.22.0 has started them by then
+    /// (STD-169, BL-5817).</param>
+    internal async Task AbandonFirstBatchAsync(
+        TransferResult failure,
+        bool reportsOnlyFirst = false,
+        bool startsOthersWhenExtraFails = false)
     {
         setupsLeftInFirstBatch = 0;
+        if (startsOthersWhenExtraFails && heldTransfers.Count - 1 >= maxRunning)
+        {
+            int failingIndex = heldTransfers.Count - 1;
+            (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held = [.. heldTransfers];
+            heldTransfers.Clear();
+            await StartHeldWithinMaxExceptAsync(held, failingIndex).ConfigureAwait(false);
+            RecordSetupFailure(failure, endsTheRun: true);
+            await held[failingIndex].Abandon(failure).ConfigureAwait(false);
+            return;
+        }
+
         RecordSetupFailure(failure, endsTheRun: true);
         foreach ((_, Func<TransferResult, Task> abandon) in heldTransfers)
         {

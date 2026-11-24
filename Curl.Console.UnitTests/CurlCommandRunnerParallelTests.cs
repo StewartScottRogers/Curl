@@ -351,6 +351,24 @@ public sealed class CurlCommandRunnerParallelTests
     }
 
     [TestMethod]
+    public async Task RunAsync_UploadFileMissingOnTheBatchsExtraTransfer_RunsTheEarlierOneAndFailsWith26()
+    {
+        // STD-169, BL-5817: --parallel-max 1 holds two transfers; the second's -T file is missing.
+        HeldTransferHandler http = new();
+        fileSystem.UnreadablePaths.Add("nosuch");
+
+        Task<int> run = RunAsync(http, ["-Z", "--parallel-max", "1", "-s", A, "--next", "-T", "nosuch", B, "--next", "http://h/c"]);
+        await http.WhenStartedAsync("/a");
+        http.Finish("/a", "a");
+
+        int exitCode = await run;
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Assert.AreEqual(26, exitCode);
+        Assert.AreEqual("a", standardOutput.Text);
+        Assert.HasCount(1, http.Started);
+    }
+
+    [TestMethod]
     public async Task RunAsync_OneHostWithoutParallelImmediate_StartsTheOthersOnceTheFirstHasEnded()
     {
         // BL-520: -Z -s http://127.0.0.1/a /b /c: /b and /c connect once /a has ended.

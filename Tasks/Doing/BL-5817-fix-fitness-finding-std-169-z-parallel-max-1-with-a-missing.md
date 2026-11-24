@@ -35,9 +35,9 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] stdout is `hello` and stderr has exactly one (26) line.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] stdout is `hello` and stderr has exactly one (26) line.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -58,3 +58,4 @@ Re-reported in fitness review 2026-11-24T0708 (commit `1e5d591`, the `preview` r
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Notes updated from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 2227ebf4 69116afe 3d836d5e.
+- 2026-11-24: Fixed: when the -T file of the first batch's extra transfer (past --parallel-max) cannot be opened, the transfers within --parallel-max start and only the failing one is reported, as for STD-183 (ParallelRun.AbandonFirstBatchAsync, startsOthersWhenExtraFails). Unit test added; Measure-CodeQuality clean for Curl.Console.
