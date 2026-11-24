@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs, Curl.Networking.UnitLibrary/CertificateRevocationList.cs, Curl.Networking.UnitLibrary/RevocationListScope.cs, Curl.Networking.UnitTests/IntermediateOnlyProxyCacertTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5856 — Fix fitness finding STD-188: Windows: a delta CRL entry with reason removeFromCRL does not lift a certificateHold in the base CRL
 
@@ -37,13 +37,16 @@ Shared setup: Each of these findings names its own certificates, but they share 
 
 ## Acceptance criteria
 
-- [ ] `d_remove` exits 0, direct and proxy; `d_hold` still exits 60.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `d_remove` exits 0, direct and proxy; `d_hold` still exits 60.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+The base list's hold is lifted only by a usable delta (signed, current, a delta of that base) listing the serial with reason removeFromCRL (8); `CertificateRevocationList` now keeps such entries apart (`Releases`) so a delta no longer counts them as revocations. A hold with no delta, or a delta with another reason, still fails with exit 60. Direct and proxy share this path; pinned by unit tests in IntermediateOnlyProxyCacertTests (no live Python-mock repro). Touches widened to the three sibling files the fix needed. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 621e9b95 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Delta removeFromCRL lifts a base certificateHold

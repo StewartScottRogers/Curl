@@ -103,6 +103,40 @@ internal sealed class RevocationListScope
         }
     }
 
+    /// <summary>Returns whether an entry's <c>crlEntryExtensions</c> carry the reason code removeFromCRL (8).</summary>
+    /// <param name="extensions">The entry's encoded extensions, empty when it has none.</param>
+    /// <returns><see langword="true" /> when the reasonCode extension is removeFromCRL.</returns>
+    public static bool EntryReasonIsRemoveFromCrl(ReadOnlyMemory<byte> extensions)
+    {
+        if (extensions.IsEmpty)
+        {
+            return false;
+        }
+
+        var list = new AsnReader(extensions, AsnEncodingRules.DER).ReadSequence();
+        while (list.HasData)
+        {
+            var extension = list.ReadSequence();
+            var isReasonCode = extension.ReadObjectIdentifier() == "2.5.29.21";
+            if (extension.PeekTag().HasSameClassAndValue(Asn1Tag.Boolean))
+            {
+                extension.ReadBoolean();
+            }
+
+            if (isReasonCode)
+            {
+                return new AsnReader(extension.ReadOctetString(), AsnEncodingRules.DER).ReadEnumeratedValue<CrlReason>() == CrlReason.RemoveFromCrl;
+            }
+        }
+
+        return false;
+    }
+
+    private enum CrlReason
+    {
+        RemoveFromCrl = 8,
+    }
+
     /// <summary>Returns whether the list answers for <paramref name="certificate" /> fetched from <paramref name="distributionPoint" />.</summary>
     /// <param name="certificate">The certificate checked.</param>
     /// <param name="distributionPoint">The address the list came from.</param>

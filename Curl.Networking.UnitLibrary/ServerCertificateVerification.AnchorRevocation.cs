@@ -124,31 +124,47 @@ internal sealed partial class ServerCertificateVerification
             .FirstOrDefault();
         return first is null
             ? BelowAnchorRevocation.Unresolved
-            : first.Revokes(certificate) ? BelowAnchorRevocation.Revoked : DeltaRevocationOf(first, certificate, issuer, budget);
+            : first.Revokes(certificate) ? RevokedUnlessDeltaReleases(first, certificate, issuer, budget) : DeltaRevocationOf(first, certificate, issuer, budget);
     }
 
     // The delta lists a base list or the certificate points to through freshestCRL (RFC 5280, 5.2.6): each
     // pointer needs a usable delta list, and a pointer with none (unfetchable, unusable, or not http) leaves the status unknown.
     private BelowAnchorRevocation DeltaRevocationOf(CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var pointers = new[] { baseList.FreshestCrlValue, certificate.Extensions[FreshestCrlOid]?.RawData }.OfType<byte[]>();
+        var pointers = FreshestPointers(baseList, certificate);
         var outcomes = pointers.Select(pointer => DeltaRevocationOf(pointer, baseList, certificate, issuer, budget)).ToArray();
         return outcomes.Contains(BelowAnchorRevocation.Revoked)
             ? BelowAnchorRevocation.Revoked
             : outcomes.Contains(BelowAnchorRevocation.Unresolved) ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
     }
 
+    // A hold in the base list is lifted by a usable delta entry with reason removeFromCRL (RFC 5280, 5.3.1; STD-188).
+    private BelowAnchorRevocation RevokedUnlessDeltaReleases(CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    {
+        return FreshestPointers(baseList, certificate).SelectMany(pointer => UsableDeltas(pointer, baseList, certificate, issuer, budget)).Any(delta => delta.Releases(certificate))
+            ? BelowAnchorRevocation.Clean
+            : BelowAnchorRevocation.Revoked;
+    }
+
+    private static IEnumerable<byte[]> FreshestPointers(CertificateRevocationList baseList, X509Certificate2 certificate) =>
+        new[] { baseList.FreshestCrlValue, certificate.Extensions[FreshestCrlOid]?.RawData }.OfType<byte[]>();
+
     private BelowAnchorRevocation DeltaRevocationOf(byte[] pointer, CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var deltas = DistributionPointUris(pointer)
+        var deltas = UsableDeltas(pointer, baseList, certificate, issuer, budget);
+        return deltas.Length == 0
+            ? BelowAnchorRevocation.Unresolved
+            : deltas.Any(delta => delta.Revokes(certificate)) ? BelowAnchorRevocation.Revoked : BelowAnchorRevocation.Clean;
+    }
+
+    private CertificateRevocationList[] UsableDeltas(byte[] pointer, CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    {
+        return DistributionPointUris(pointer)
             .Select(uri => TryFetchRevocationList(uri, budget))
             .Select(der => der is null ? null : DecodeOrNothing(der))
             .OfType<CertificateRevocationList>()
             .Where(delta => delta.CoversCertificatesIssuedFor(certificate) && delta.IsSignedBy(issuer) && delta.NextUpdate >= timeProvider.GetUtcNow() && delta.IsDeltaOf(baseList, certificate))
             .ToArray();
-        return deltas.Length == 0
-            ? BelowAnchorRevocation.Unresolved
-            : deltas.Any(delta => delta.Revokes(certificate)) ? BelowAnchorRevocation.Revoked : BelowAnchorRevocation.Clean;
     }
 
     // A list is usable when it decodes, is the issuer's, is signed by the issuer and names a next update not yet passed (one naming none fails closed).

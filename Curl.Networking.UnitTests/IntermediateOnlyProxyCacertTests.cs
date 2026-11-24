@@ -334,6 +334,41 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
     }
 
+    private static byte[] HeldBaseList(Pki pki) =>
+        TestRevocationList.Write(
+            pki.Intermediate,
+            nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
+            revokedSerialNumbers: [pki.LeafSerial],
+            extensions: [TestRevocationList.Extension("2.5.29.20", false, Number(5)), FreshestExtension(DeltaAddress)],
+            entryExtensions: [TestRevocationList.Extension("2.5.29.21", false, [0x0A, 0x01, 0x06])]);
+
+    private static byte[] DeltaWithReason(Pki pki, byte reason) =>
+        TestRevocationList.Write(
+            pki.Intermediate,
+            nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
+            revokedSerialNumbers: [pki.LeafSerial],
+            extensions: [TestRevocationList.Extension("2.5.29.27", true, Number(5))],
+            entryExtensions: [TestRevocationList.Extension("2.5.29.21", false, [0x0A, 0x01, reason])]);
+
+    [TestMethod]
+    public void VerifyPeer_DeltaListRemovesTheLeafFromCrlAfterAHold_Accepts()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyWithDelta(pki, HeldBaseList(pki), DeltaWithReason(pki, 8));
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_HoldWithoutADeltaListOrWithAnotherDeltaReason_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, VerifyWithDelta(pki, HeldBaseList(pki), null)?.Message);
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, VerifyWithDelta(pki, HeldBaseList(pki), DeltaWithReason(pki, 1))?.Message);
+    }
+
     [TestMethod]
     public void VerifyPeer_DeltaListIsValidAndEmpty_Accepts()
     {

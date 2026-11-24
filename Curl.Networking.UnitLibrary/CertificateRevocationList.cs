@@ -39,6 +39,7 @@ internal sealed class CertificateRevocationList
     private readonly byte[] _signature;
     private readonly byte[] _issuerName;
     private readonly HashSet<BigInteger> _revokedSerialNumbers;
+    private readonly HashSet<BigInteger> _removedSerialNumbers;
     private readonly RevocationListScope _scope;
 
     private CertificateRevocationList(
@@ -49,6 +50,7 @@ internal sealed class CertificateRevocationList
         DateTimeOffset thisUpdate,
         DateTimeOffset? nextUpdate,
         HashSet<BigInteger> revokedSerialNumbers,
+        HashSet<BigInteger> removedSerialNumbers,
         RevocationListScope scope)
     {
         _scope = scope;
@@ -59,6 +61,7 @@ internal sealed class CertificateRevocationList
         ThisUpdate = thisUpdate;
         NextUpdate = nextUpdate;
         _revokedSerialNumbers = revokedSerialNumbers;
+        _removedSerialNumbers = removedSerialNumbers;
     }
 
     /// <summary>Gets when the list was issued: before it, the list is not valid yet.</summary>
@@ -96,11 +99,11 @@ internal sealed class CertificateRevocationList
         var issuerName = signed.ReadEncodedValue().ToArray();
         var thisUpdate = ReadTime(signed);
         var nextUpdate = signed.HasData && IsTime(signed.PeekTag()) ? ReadTime(signed) : (DateTimeOffset?)null;
-        var revokedSerialNumbers = ReadRevokedSerialNumbers(signed, out var entriesUnusable);
+        var revokedSerialNumbers = ReadRevokedSerialNumbers(signed, out var removedSerialNumbers, out var entriesUnusable);
         var scope = RevocationListScope.Read(signed);
         scope.Unusable |= entriesUnusable;
         return new CertificateRevocationList(
-            signedPart, signatureAlgorithm, signature, issuerName, thisUpdate, nextUpdate, revokedSerialNumbers, scope);
+            signedPart, signatureAlgorithm, signature, issuerName, thisUpdate, nextUpdate, revokedSerialNumbers, removedSerialNumbers, scope);
     }
 
     /// <summary>
@@ -167,7 +170,16 @@ internal sealed class CertificateRevocationList
     /// <param name="certificate">The certificate checked.</param>
     /// <returns><see langword="true" /> when its serial number is listed.</returns>
     public bool Revokes(X509Certificate2 certificate) =>
-        _revokedSerialNumbers.Contains(new BigInteger(certificate.SerialNumberBytes.Span, isUnsigned: false, isBigEndian: true));
+        _revokedSerialNumbers.Contains(SerialNumberOf(certificate));
+
+    /// <summary>Returns whether the list lifts a hold on <paramref name="certificate" />: an entry with reason <c>removeFromCRL</c> (RFC 5280, section 5.3.1), a delta list's way to undo a <c>certificateHold</c>.</summary>
+    /// <param name="certificate">The certificate checked.</param>
+    /// <returns><see langword="true" /> when its serial number is listed with reason removeFromCRL.</returns>
+    public bool Releases(X509Certificate2 certificate) =>
+        _removedSerialNumbers.Contains(SerialNumberOf(certificate));
+
+    private static BigInteger SerialNumberOf(X509Certificate2 certificate) =>
+        new(certificate.SerialNumberBytes.Span, isUnsigned: false, isBigEndian: true);
 
     // AlgorithmIdentifier: the OID, then parameters, which are read past.
     private static string ReadAlgorithm(AsnReader reader)
@@ -185,9 +197,10 @@ internal sealed class CertificateRevocationList
     // revokedCertificates is present only when something is revoked; whatever follows it is
     // the [0] extensions. An entry with an unrecognised critical extension, or a certificate
     // issuer one is ignored, as the Schannel build ignores them (STD-162); a malformed one makes the list unusable.
-    private static HashSet<BigInteger> ReadRevokedSerialNumbers(AsnReader signed, out bool entriesUnusable)
+    private static HashSet<BigInteger> ReadRevokedSerialNumbers(AsnReader signed, out HashSet<BigInteger> removedSerialNumbers, out bool entriesUnusable)
     {
         entriesUnusable = false;
+        removedSerialNumbers = [];
         var serialNumbers = new HashSet<BigInteger>();
         if (!signed.HasData || !signed.PeekTag().HasSameClassAndValue(Asn1Tag.Sequence))
         {
@@ -197,12 +210,20 @@ internal sealed class CertificateRevocationList
         var revoked = signed.ReadSequence();
         while (revoked.HasData)
         {
-            var entry = revoked.ReadSequence();
-            serialNumbers.Add(entry.ReadInteger());
-            entry.ReadEncodedValue();
-            entriesUnusable |= entry.HasData && RevocationListScope.EntryExtensionsAreUnusable(entry);
+            entriesUnusable |= ReadRevokedEntry(revoked.ReadSequence(), serialNumbers, removedSerialNumbers);
         }
 
         return serialNumbers;
+    }
+
+    // Files the entry's serial number under revoked or, for reason removeFromCRL, under removed; returns whether the entry is unusable.
+    private static bool ReadRevokedEntry(AsnReader entry, HashSet<BigInteger> revoked, HashSet<BigInteger> removed)
+    {
+        var serialNumber = entry.ReadInteger();
+        entry.ReadEncodedValue();
+        var extensions = entry.HasData ? entry.PeekEncodedValue() : default;
+        var unusable = entry.HasData && RevocationListScope.EntryExtensionsAreUnusable(entry);
+        (!unusable && RevocationListScope.EntryReasonIsRemoveFromCrl(extensions) ? removed : revoked).Add(serialNumber);
+        return unusable;
     }
 }
