@@ -342,7 +342,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         {
             LdapBindKind.LogonUser => await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false),
             LdapBindKind.Simple => await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false),
-            LdapBindKind.Sasl => await LdapOpenLdapSaslBind.BindAsync(exchange, context.Credentials!, context.Url.IdnHost, LdapOpenLdapSaslBind.AllowsDigest(context.Mail?.LoginOptions, context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic), context.CancellationToken).ConfigureAwait(false),
+            LdapBindKind.Sasl => await LdapOpenLdapSaslBind.BindAsync(exchange, context.Credentials!, context.Url.IdnHost, LdapOpenLdapSaslBind.AllowsDigest(context.Mail?.LoginOptions, context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic), LdapOpenLdapSaslBind.AllowsPlain(context.Mail?.LoginOptions, context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic), context.CancellationToken).ConfigureAwait(false),
             _ => await LdapAuthenticatedBind.BindAsync(bindKind, exchange, context.Credentials!, context.Url.IdnHost, context.Url.Scheme == TlsScheme, logonTokenSource, context.CancellationToken).ConfigureAwait(false),
         };
     }

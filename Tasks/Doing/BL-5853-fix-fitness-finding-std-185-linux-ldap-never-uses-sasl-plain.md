@@ -35,11 +35,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the first repro prints `DN: cn=one,dc=example,dc=org`, exit 0, and the server log shows a SASL bind with mechanism `PLAIN`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first repro prints `DN: cn=one,dc=example,dc=org`, exit 0, and the server log shows a SASL bind with mechanism `PLAIN`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided: PLAIN is tried after DIGEST-MD5 when offered and allowed (AUTH=PLAIN/*, or the mask holding Basic when no AUTH=). LOGIN, CRAM-MD5 and NTLM are not added here. Unit tests pin the PLAIN bind (credentials are the test user cn=u,dc=x); CI platform-neutral.
 
 ## Log
 
