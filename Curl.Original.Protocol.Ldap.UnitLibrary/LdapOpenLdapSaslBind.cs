@@ -13,6 +13,18 @@ internal static class LdapOpenLdapSaslBind
 {
     private const string AuthPrefix = "AUTH=";
 
+    private static readonly string[] KnownMechanisms = ["EXTERNAL", "GSSAPI", "DIGEST-MD5", "CRAM-MD5", "NTLM", "XOAUTH2", "OAUTHBEARER", "PLAIN", "LOGIN"];
+
+    /// <summary>
+    /// Whether <paramref name="loginOptions" /> are what curl's <c>Curl_sasl_parse_url_auth_option</c> accepts (STD-184): empty, or
+    /// <c>;</c>-separated items that are each exactly <c>AUTH=</c> and a known SASL mechanism or <c>*</c>. Anything else, an empty item included, is exit 49.
+    /// </summary>
+    public static bool AreWellFormed(string? loginOptions) =>
+        string.IsNullOrEmpty(loginOptions)
+        || loginOptions.Split(';').All(item =>
+            item.StartsWith(AuthPrefix, StringComparison.OrdinalIgnoreCase)
+            && (item[AuthPrefix.Length..] == "*" || KnownMechanisms.Contains(item[AuthPrefix.Length..], StringComparer.OrdinalIgnoreCase)));
+
     /// <summary>Whether <paramref name="loginOptions" /> carry an <c>AUTH=</c> option, which selects SASL.</summary>
     public static bool HasAuthOption(string? loginOptions) =>
         SplitOptions(loginOptions).Any(option => option.StartsWith(AuthPrefix, StringComparison.OrdinalIgnoreCase));

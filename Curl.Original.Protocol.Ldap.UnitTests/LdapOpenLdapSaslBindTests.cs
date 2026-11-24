@@ -96,6 +96,29 @@ public sealed class LdapOpenLdapSaslBindTests
     }
 
     [TestMethod]
+    [DataRow("AUTH:DIGEST-MD5")]
+    [DataRow("DIGEST-MD5")]
+    [DataRow("AUTHDIGEST-MD5")]
+    [DataRow("SASL=DIGEST-MD5")]
+    [DataRow("FOO=bar")]
+    [DataRow("AUTH=BOGUS")]
+    [DataRow("AUTH=")]
+    [DataRow("AUTH=+LOGIN")]
+    [DataRow("AUTH=DIGEST-MD5 AUTH=PLAIN")]
+    [DataRow(" AUTH=DIGEST-MD5")]
+    [DataRow(";AUTH=DIGEST-MD5")]
+    [DataRow("AUTH=DIGEST-MD5;FOO=1")]
+    [DataRow("AUTH=DIGEST-MD5;AUTH=BOGUS")]
+    public async Task ExecuteAsync_MalformedLoginOptions_FailsWith49BeforeSendingAnything(string loginOptions)
+    {
+        // Measured with curl 8.18.0 (OpenLDAP, Linux): "curl: (49) Malformed option provided in a setopt", no connection (STD-184).
+        (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Basic, loginOptions);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, "Malformed option provided in a setopt"), result);
+        Assert.AreEqual(0, sent.Length);
+    }
+
+    [TestMethod]
     [DataRow(HttpAuthSchemes.Ntlm, null)]
     [DataRow(HttpAuthSchemes.Basic, "AUTH=NTLM")]
     public async Task ExecuteAsync_ServerOffersNtlm_FailsWith67LikeCurlsOpenLdapBuild(HttpAuthSchemes schemes, string? loginOptions)
@@ -135,7 +158,7 @@ public sealed class LdapOpenLdapSaslBindTests
     [TestMethod]
     public async Task ExecuteAsync_BasicAndNoAuthOption_SendsTheSimpleBind()
     {
-        (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Basic, "other", "30 0c 02 01 01 61 07 0a 01 00 04 00 04 00", "30 0c 02 01 02 65 07 0a 01 00 04 00 04 00");
+        (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Basic, null, "30 0c 02 01 01 61 07 0a 01 00 04 00 04 00", "30 0c 02 01 02 65 07 0a 01 00 04 00 04 00");
 
         Assert.AreEqual(TransferResult.Success(0), result, result.ToString());
         Assert.IsTrue(sent.AsSpan().IndexOf("secret"u8) >= 0);

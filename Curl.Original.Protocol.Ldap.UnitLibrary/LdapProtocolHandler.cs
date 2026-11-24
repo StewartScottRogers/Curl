@@ -133,12 +133,19 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
             : null;
 
+    // The refusals curl makes before it connects: control bytes in the credentials (exit 43) and, in the OpenLDAP build, malformed --login-options (exit 49, STD-184).
+    private TransferResult? RefuseBeforeConnecting(ITransferContext context) =>
+        RefuseControlBytes(context.Credentials)
+        ?? (dialect == LdapDialect.OpenLdap && !LdapOpenLdapSaslBind.AreWellFormed(context.Mail?.LoginOptions)
+            ? TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, "Malformed option provided in a setopt")
+            : null);
+
     // Reads the URL, connects, binds and searches; ExecuteAsync logs how it ended.
     private async ValueTask<TransferResult> ConnectAndSearchAsync(ITransferContext context)
     {
-        if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
+        if (RefuseBeforeConnecting(context) is { } optionsRefused)
         {
-            return credentialsRefused;
+            return optionsRefused;
         }
 
         // The OpenLDAP build reads the URL before it connects and again to search; the Windows

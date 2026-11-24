@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapOpenLdapSaslBindTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5852 — Fix fitness finding STD-184: Linux LDAP: a malformed --login-options value makes the port send the password in a cleartext simple bind; curl refuses with exit 49 before connecting
 
@@ -38,13 +38,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the first repro prints `curl: (49) Malformed option provided in a setopt`, exits 49, and the relay sees no connection.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first repro prints `curl: (49) Malformed option provided in a setopt`, exits 49, and the relay sees no connection.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Touches widened to LdapProtocolHandler.cs and the sasl-bind tests (no other Doing task holds them). `LdapOpenLdapSaslBind.AreWellFormed` validates --login-options like curl (only `AUTH=<known mechanism|*>` items, no empty items); the OpenLDAP handler refuses with exit 49 before connecting (unit test pins zero bytes sent for the finding's shapes). The Windows dialect is unchanged. The existing test using login options "other" now uses none, as curl would refuse it. Quality run: Ldap library 100%/100%, 0 failing members; fast tests 876 pass.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: a7f1b18a 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. OpenLDAP --login-options validated like curl: malformed values exit 49 before connecting
