@@ -79,13 +79,32 @@ public sealed class FtpNumHeadersTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_Upload_CountsNoHeaders()
+    public async Task ExecuteAsync_Upload_CountsOneHeader()
     {
         FtpRun run = await FtpRun.ExecuteAsync(
             FileUrl,
             LoggedIn + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n150 Opening\r\n226 Transfer complete\r\n221 Bye\r\n",
             adjust: c => new TransferContext { Url = c.Url, Output = c.Output, Upload = new MemoryStream([1, 2, 3]) });
 
-        Assert.AreEqual(0, NumHeaders(run.Report));
+        Assert.AreEqual(1, NumHeaders(run.Report));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithColonsInReplies_CountsEveryReplyLineHoldingAColon()
+    {
+        FtpRun run = await FtpRun.ExecuteAsync(
+            FileUrl,
+            "220 hello: ready\r\n331 pass: please\r\n230 login: ok\r\n257 \"/\" is cwd\r\n229 Entering Extended Passive Mode (|||61744|)\r\n200 type: x\r\n150 opening: data\r\n226 done\r\n221 Bye\r\n",
+            adjust: c => new TransferContext { Url = c.Url, Output = c.Output, Upload = new MemoryStream([1, 2, 3]) });
+
+        Assert.AreEqual(5, NumHeaders(run.Report));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FailedDownloadWithColonsInReplies_CountsTheReplyLinesHoldingAColon()
+    {
+        FtpRun run = await FtpRun.ExecuteAsync(FileUrl, "220 hi: there\r\n530 no: way\r\n");
+
+        Assert.AreEqual(2, NumHeaders(run.Report));
     }
 }

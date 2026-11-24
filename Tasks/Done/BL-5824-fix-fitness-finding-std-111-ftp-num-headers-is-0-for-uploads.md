@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5824 — Fix fitness finding STD-111: FTP %{num_headers} is 0 for uploads and for transfers that end in a data-connection timeout (STILL OPEN, partly fixed)
 
@@ -40,11 +40,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the three commands print `1`, `5`, `[4]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the three commands print `1`, `5`, `[4]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed in FtpSession.PseudoHeadersOf: uploads now count colon reply lines, or the one transfer-complete line on success (REF 1 and 5). A failed transfer already counts colon lines; pinned by a unit test (the 4 for the timeout case follows). Not measured against live mock servers. Quality run: 0 failing members.
 
 ## Log
 
@@ -52,3 +54,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 4895e582 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Uploads count colon reply lines or the transfer-complete line
