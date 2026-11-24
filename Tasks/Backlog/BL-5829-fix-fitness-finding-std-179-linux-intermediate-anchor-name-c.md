@@ -48,8 +48,24 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Notes
 
+Re-reported in fitness review 2026-11-24T0708 (commit `1e5d591`, the `preview` release binaries) as `Linux, intermediate anchor: name constraints are applied to a dotless subject CN; OpenSSL curl ignores it (STILL OPEN, unchanged)`. Where it differs from the Context above, this report wins:
+
+
+- **Severity:** Low · **Confidence:** Confirmed (2 runs) · **Area:** HTTPS / HTTPS-proxy name constraints, Linux build.
+- **Certificates:** CA `intexcl.pem` (signed by root, `nameConstraints=critical,excluded;DNS:localhost`) issuing leaf `leafcnexcl` (`CN=localhost`, no SAN, EKU serverAuth) on 26110. CA `intnc.pem` (`permitted;DNS:example.com`) issuing `leafcnnc` (`CN=localhost`, no SAN) on 26111. `capath_excl/` and `capath_nc/` hold those CAs, rehashed.
+- **Repro (Linux):**
+  - `curl -sS -w '%{ssl_verify_result}\n' --cacert intexcl.pem https://localhost:26110/`
+  - `curl -sS --capath capath_excl https://localhost:26110/`
+  - `curl -sS --proxy-cacert intexcl.pem -x https://localhost:26110 http://example.invalid/`
+  - `curl -sS --cacert intnc.pem https://localhost:26111/` and `--capath capath_nc`
+- **Expected (REF2):** `hello`, `0`, exit 0 for all five.
+- **Actual (.NET Linux):** exit 60 `excluded subtree violation (48)` (first three) and `permitted subtree violation (47)` (last two).
+- **Likely location:** `Curl.Networking.UnitLibrary/CertificateNameConstraints.cs`, `ListNames` → `DnsNamesOrCommonNames`: the CryptoAPI CN rule also runs on the OpenSSL build. There, only check a CN that contains a dot and is a valid hostname.
+- **Acceptance check:** all five exit 0 with `hello`; a dotted CN `www.example.com` under `excluded;DNS:example.com` still exits 60 `(48)`.
+
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Notes updated from fitness review 2026-11-24T0708.

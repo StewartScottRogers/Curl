@@ -41,8 +41,19 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Notes
 
+Re-reported in fitness review 2026-11-24T0708 (commit `1e5d591`, the `preview` release binaries) as ``-Z --parallel-max 1` with a missing `-T` file in a later `--next` group skips the earlier transfer and prints (26) twice (STILL OPEN, unchanged)`. Where it differs from the Context above, this report wins:
+
+
+- **Severity:** Low · **Confidence:** Confirmed · **Area:** `-Z` / `--next` / `-T`.
+- **Repro:** `curl -sS -Z --parallel-max 1 http://127.0.0.1:23000/hello --next -T nofile.txt http://127.0.0.1:23000/echo/ --next http://127.0.0.1:23000/json -w "[%{exitcode}]\n"` (`/hello` returns `hello`).
+- **Expected (REF 8.22):** stdout `hello`; stderr `curl: cannot open 'nofile.txt'`, `curl: try 'curl --help' or 'curl --manual' for more information`, one `curl: (26) Failed to open/read local data from file/application`; exit 26.
+- **Actual (.NET):** empty stdout, `(26)` printed twice, exit 26. The hello transfer never runs.
+- **Likely location:** `Curl.Console/CurlCommandRunner.cs` `HoldInFirstBatchAsync`: the first batch holds `--parallel-max` + 1 transfers and `AbandonFirstBatchAsync(CannotOpenUploadFileFailure)` abandons the valid one too.
+- **Acceptance check:** stdout `hello`, exactly one `(26)` line, exit 26.
+
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Notes updated from fitness review 2026-11-24T0708.
