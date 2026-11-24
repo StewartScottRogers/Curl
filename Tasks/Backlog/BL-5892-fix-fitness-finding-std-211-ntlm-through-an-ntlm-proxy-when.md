@@ -1,0 +1,47 @@
+---
+id: BL-5892
+title: Fix fitness finding STD-211: NTLM through an NTLM proxy: when the origin handshake cannot complete, the port returns the 401 body with exit 0; curl keeps negotiating and fails with exit 47
+priority: Low
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Authentication.UnitLibrary/RankedHttpAuthenticator.cs]
+requirement: none
+created: 2026-11-24
+completed:
+---
+# BL-5892 — Fix fitness finding STD-211: NTLM through an NTLM proxy: when the origin handshake cannot complete, the port returns the 401 body with exit 0; curl keeps negotiating and fails with exit 47
+
+## Goal
+
+STD-211 from the outside fitness review of 2026-11-24 13:58 no longer reproduces: NTLM through an NTLM proxy: when the origin handshake cannot complete, the port returns the 401 body with exit 0; curl keeps negotiating and fails with exit 47. Curl behaves as the finding's acceptance check states.
+
+## Context
+
+From the outside fitness review `Curl-Fitness-Review-2026-11-24T1358` (commit `1e5d591`, the `preview` release binaries). That review was a deeper second pass of the same commit as `Curl-Fitness-Review-2026-11-24T0708`, covering areas the earlier pass did not test.
+
+In the finding, .NET is this Curl, REF is curl 8.22.0 Schannel on Windows (Git for Windows `curl.exe`), REF2 is curl 8.18.0 OpenSSL on WSL Ubuntu. Measure real curl with `Record-CurlExchange.ps1` before pinning output text.
+
+The reviewer's mock servers were Python, and some findings used real servers in Docker (Dovecot, GreenMail, Samba, Mosquitto, Kafka, Prosody, SeaweedFS, Azurite); rebuild any mock you need in PowerShell or C# (never Python). Mock servers bind 127.0.0.1 and port numbers are examples. Check that it still reproduces on the current branch first.
+
+The finding, verbatim:
+
+- **Severity:** Low · **Confidence:** Probable (2 runs Windows, 1 run Linux; the trigger is a proxy that opens a new upstream connection for every request) · **Area:** HTTP NTLM through an NTLM proxy. Both platforms.
+- **Mock:** an NTLM proxy on 127.0.0.1:33013 that verifies NTLMv2 and forwards each request on a new upstream connection; an NTLM origin on 127.0.0.1:33000 `/ntlm` that keeps handshake state per connection (so the Type 3 never matches a Type 2 on the same connection).
+- **Repro:** `curl -sS -w "%{http_code}\n" -x http://127.0.0.1:33013 -U user:pass --proxy-ntlm -u user:pass --ntlm http://127.0.0.1:33000/ntlm; echo $?`
+- **Expected (REF 8.22.0 and REF2 8.18.0):** about 50 authentication rounds, then `curl: (47) Maximum (50) redirects followed`, `%{http_code}` 407, exit 47.
+- **Actual (.NET, Windows and Linux):** after one failed Type 3 it prints the origin's 401 body (`type3 without type2 on this conn`), `%{http_code}` 401, exit 0.
+- **Likely location:** the auth retry loop (`Curl.Authentication.UnitLibrary/RankedHttpAuthenticator.cs`) and the HTTP transfer logic that counts auth rounds against `--max-redirs`.
+- **Acceptance check:** the repro exits 47 with `Maximum (50) redirects followed`.
+
+## Acceptance criteria
+
+- [ ] the repro exits 47 with `Maximum (50) redirects followed`.
+- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [ ] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+## Log
+
+- 2026-11-24: Created from fitness review 2026-11-24T1358.
