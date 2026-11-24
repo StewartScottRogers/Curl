@@ -82,6 +82,47 @@ public sealed class OAuth2TransferHookTests
     }
 
     [TestMethod]
+    [DataRow("DPoP: eyJ0eXAiOiJkcG9wK2p3dCJ9.e30.c2ln")]
+    [DataRow("dpop:proof")]
+    public async Task ExecuteAsync_TransferCarriesADpopProof_FailsWithExit2AndAsksNoEndpoint(string proofHeader)
+    {
+        var connector = new QueuedConnector(new RecordedConnection(FlowResponses.Token()));
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("https://api.example.com/resource"),
+            Output = new MemoryStream(),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["X-Own: 1", proofHeader] },
+        };
+
+        var result = await Hook(null).ExecuteAsync(context, Services(connector), NeverSent);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.AreEqual(OAuth2TransferHook.DpopProofMessage, result.ErrorMessage);
+        Assert.AreEqual(0, connector.ConnectCount);
+    }
+
+    [TestMethod]
+    [DataRow("DPoP:")]
+    [DataRow("DPoP:  ")]
+    [DataRow("DPoP-Nonce: n")]
+    public async Task ExecuteAsync_HeaderCarriesNoDpopProof_SendsTheBearerToken(string header)
+    {
+        var connector = new QueuedConnector(new RecordedConnection(FlowResponses.Token("TOK123")));
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("https://api.example.com/resource"),
+            Output = new MemoryStream(),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = [header] },
+        };
+        List<string> headers = [];
+
+        var result = await Hook(null).ExecuteAsync(context, Services(connector), Recording(headers));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "Authorization: Bearer TOK123" }, headers);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoServices_FailsWithExit2()
     {
         ITransferHook hook = Hook(null);

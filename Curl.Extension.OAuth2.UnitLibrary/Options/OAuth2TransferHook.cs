@@ -13,6 +13,9 @@ namespace Curl.Extension.OAuth2.Options;
 /// <remarks>
 /// A failed flow fails the transfer with the flow's exit code and message, and the transfer is never sent; so does a token
 /// whose type is not Bearer, which RFC 6749 §7.1 forbids a client to use, with <see cref="CurlExitCode.WeirdServerReply"/>.
+/// An HTTP transfer that already carries a <c>DPoP</c> proof header (from <c>--dpop</c>, whose hook runs before this one, or
+/// <c>-H</c>) fails with <see cref="CurlExitCode.FailedInit"/> before any endpoint is asked: the proof has no <c>ath</c> for
+/// the flow's token, which would go as a Bearer token bound to no key (RFC 9449 §4.2, §7.1, ADR-1347).
 /// </remarks>
 /// <param name="configuration">What the options ask for, or <see langword="null"/> when they are wrong.</param>
 /// <param name="optionError">What is wrong with the options, when <paramref name="configuration"/> is <see langword="null"/>.</param>
@@ -23,6 +26,12 @@ internal sealed class OAuth2TransferHook(OAuth2Configuration? configuration, str
 {
     /// <summary>The failure when the host gives no connector.</summary>
     public const string NoServicesMessage = "The OAuth 2.0 options need curl's connector, which this transfer was not given.";
+
+    /// <summary>The failure when the transfer carries a DPoP proof, which the flow's token cannot be bound to.</summary>
+    public const string DpopProofMessage =
+        "The --oauth2-* options cannot be combined with --dpop or -H \"DPoP: ...\": curl cannot yet bind the flow's access token to a DPoP proof.";
+
+    private const string DpopHeaderPrefix = "DPoP:";
 
     private string? firstHopToken;
 
@@ -42,6 +51,11 @@ internal sealed class OAuth2TransferHook(OAuth2Configuration? configuration, str
             return TransferResult.Failure(CurlExitCode.FailedInit, optionError!);
         }
 
+        if (SendsDpopProof(context))
+        {
+            return TransferResult.Failure(CurlExitCode.FailedInit, DpopProofMessage);
+        }
+
         if (TryHopWithoutAsking(context, out var hop))
         {
             return await next(hop);
@@ -56,6 +70,11 @@ internal sealed class OAuth2TransferHook(OAuth2Configuration? configuration, str
         Volatile.Write(ref firstHopToken, accessToken);
         return await next(WithBearer(context, accessToken));
     }
+
+    private static bool SendsDpopProof(ITransferContext context) => context.Http is { } http && http.Headers.Any(IsDpopProof);
+
+    private static bool IsDpopProof(string header) =>
+        header.StartsWith(DpopHeaderPrefix, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(header[DpopHeaderPrefix.Length..]);
 
     /// <summary>
     /// Gives the transfer for a followed hop without asking the token endpoint again: without the token when curl withholds its
