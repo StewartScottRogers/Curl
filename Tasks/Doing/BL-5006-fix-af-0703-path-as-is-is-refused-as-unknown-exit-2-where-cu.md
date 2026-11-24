@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-11-18: Backlog -> Blocked. Stewart: rejected AF-0703 (planted defect, not a Curl bug); held off lanes until Stewart says otherwise
 - 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): AF-0703 was rejected by Stewart on 2026-11-12 as the audit's planted defect, not a Curl defect; --path-as-is is registered.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
