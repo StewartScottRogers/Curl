@@ -277,12 +277,26 @@ internal static class CertificateNameConstraints
             return Convert.ToHexString(encoded.Span);
         }
 
-        var text = reader.ReadCharacterString((UniversalTagNumber)tag.TagValue);
+        var text = ReadText(reader, tag);
         return string.Join(' ', text.Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
     }
 
-    // UTF8String, PrintableString, TeletexString, IA5String, BMPString.
-    private static readonly int[] StringTagValues = [12, 19, 20, 22, 30];
+    // UniversalString is four bytes per character, big endian (UTF-32BE); every other type the reader decodes itself.
+    private static string ReadText(AsnReader reader, Asn1Tag tag)
+    {
+        if (tag.TagValue != UniversalStringTagValue)
+        {
+            return reader.ReadCharacterString((UniversalTagNumber)tag.TagValue);
+        }
+
+        reader.TryReadPrimitiveCharacterStringBytes(tag, out var bytes);
+        return new System.Text.UTF32Encoding(bigEndian: true, byteOrderMark: false).GetString(bytes.Span);
+    }
+
+    private const int UniversalStringTagValue = 28;
+
+    // UTF8String, PrintableString, TeletexString, IA5String, UniversalString, BMPString.
+    private static readonly int[] StringTagValues = [12, 19, 20, 22, UniversalStringTagValue, 30];
 
     // A constraint with an @ names one mailbox, otherwise a host, or with a leading dot the hosts below it.
     private static bool EmailMatches(string constraint, string name) =>

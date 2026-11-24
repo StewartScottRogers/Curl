@@ -336,6 +336,18 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(Excluded, Verify(Constraints(excludedName: DirectoryName(OrganizationName(UniversalTagNumber.UTF8String, "Evil"))), Host, true, subject: "O=Evil")?.Message);
 
     [TestMethod]
+    public void VerifyPeer_SubjectMatchingAnExcludedUniversalStringDirectoryName_IsSchannelError0x8000() =>
+        Assert.AreEqual(Excluded, Verify(Constraints(excludedName: DirectoryName(UniversalStringOrganizationName("eVIL "))), Host, true, subject: "O=Evil")?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_SubjectMatchingAPermittedUniversalStringDirectoryName_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permittedName: DirectoryName(UniversalStringOrganizationName("Good"))), Host, true, subject: "O=Good"));
+
+    [TestMethod]
+    public void VerifyPeer_SubjectDifferingFromAPermittedUniversalStringDirectoryName_IsRefused() =>
+        Assert.IsNotNull(Verify(Constraints(permittedName: DirectoryName(UniversalStringOrganizationName("Good"))), Host, true, subject: "O=Bad"));
+
+    [TestMethod]
     public void VerifyPeer_SubjectDifferingOnlyInCaseFromThePermittedDirectoryName_Accepts() =>
         Assert.IsNull(Verify(Constraints(permittedName: DirectoryName(OrganizationName(UniversalTagNumber.UTF8String, "Good"))), Host, true, subject: "O=GOOD"));
 
@@ -387,6 +399,20 @@ public sealed class ServerCertificateVerificationNameConstraintTests
                     writeValue(writer);
                 }
             }
+        }
+
+        return writer.Encode();
+    }
+
+    private static byte[] UniversalStringOrganizationName(string value)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSetOf())
+        using (writer.PushSequence())
+        {
+            writer.WriteObjectIdentifier("2.5.4.10");
+            var content = new System.Text.UTF32Encoding(true, false).GetBytes(value);
+            writer.WriteEncodedValue([(byte)UniversalTagNumber.UniversalString, (byte)content.Length, .. content]);
         }
 
         return writer.Encode();

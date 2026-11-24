@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5849 — Fix fitness finding STD-181: Windows: an excluded directoryName name constraint is bypassed when the leaf's subject attribute is a UniversalString
 
@@ -40,13 +40,16 @@ Shared setup: Each of these findings names its own certificates, but they share 
 
 ## Acceptance criteria
 
-- [ ] `curl -sS https://localhost:<port of xdir_univ>/ --cacert ncExclDir.pem --ssl-no-revoke` exits 60 with `schannel: error 0x00008000` (same for `xdir_univ_case` and the proxy form), and `dir_good_univ` under `ncPermDir.pem` exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS https://localhost:<port of xdir_univ>/ --cacert ncExclDir.pem --ssl-no-revoke` exits 60 with `schannel: error 0x00008000` (same for `xdir_univ_case` and the proxy form), and `dir_good_univ` under `ncPermDir.pem` exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+UniversalString (tag 28) added to the string tags and decoded as UTF-32BE in CertificateNameConstraints.NormalisedValue (ReadText). The live Schannel repro was not rerun; the unit tests pin excluded, permitted and refused UniversalString directoryName constraints. Measure-CodeQuality: 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 32d50958 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. UniversalString directoryName name constraints now compare as UTF-32BE
