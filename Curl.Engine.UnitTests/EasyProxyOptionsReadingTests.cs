@@ -85,7 +85,8 @@ public sealed class EasyProxyOptionsReadingTests
         Diagnostics.Act("credential user", proxy?.Credential?.UserName);
 
         Diagnostics.Assert("credential user", "u", proxy?.Credential?.UserName);
-        Assert.AreSame(user, proxy!.Credential);
+        Assert.AreEqual("u", proxy!.Credential!.UserName);
+        Assert.AreEqual("p", proxy.Credential.Password);
     }
 
     [TestMethod]

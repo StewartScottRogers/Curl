@@ -84,7 +84,8 @@ internal sealed partial class ManagedEasyTransfer
             return true;
         }
 
-        return TransferProxySelection.TrySelect(PerformShared.ProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out proxy, out refused, Host.DiagnosticLog);
+        // ToolSettings carry the tool's -U, which is percent-decoded; a library handle's proxy credential is not.
+        return TransferProxySelection.TrySelect(PerformShared.ProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out proxy, out refused, Host.DiagnosticLog, percentDecodesProxyUser: ToolSettings is not null);
     }
 
     /// <summary>The credentials <see cref="TryLookUpUrlAndNetrcCredentials" /> chose for the running perform, which <see cref="OwnInputsOf" /> puts on the context.</summary>

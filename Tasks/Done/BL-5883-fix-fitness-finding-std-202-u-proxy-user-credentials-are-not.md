@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferProxySelection.cs]
+touches: [Curl.Engine.UnitLibrary/TransferProxySelection.cs, Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Preparation.cs, Curl.Engine.UnitTests/Std202Tests.cs, Curl.Engine.UnitTests/EasyProxyOptionsReadingTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5883 — Fix fitness finding STD-202: -U / --proxy-user credentials are not percent-decoded, so the wrong proxy credential is sent
 
@@ -39,13 +39,20 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] `curl -sS -x http://127.0.0.1:32090 -U "u%3Ax:p%40ss" http://127.0.0.1:32080/plain/a` sends `Proxy-Authorization: Basic dTp4OnBAc3M=`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS -x http://127.0.0.1:32090 -U "u%3Ax:p%40ss" http://127.0.0.1:32080/plain/a` sends `Proxy-Authorization: Basic dTp4OnBAc3M=`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Done directly rather than through the `/feature` subagent stages: a one-method fix, and the run's cost cap is small.
+- Measured on real curl 8.22.0 (Windows, `Record-CurlExchange.ps1`): `-U u%3Ax:p%40ss` sends `Basic dTp4OnBAc3M=`; `%zz`, `%4` and a lone `%` stay as they are; `%ff%C3%A9:%e9` sends those raw bytes; a `%00` in either half is exit 3 `URL using bad/illegal format or missing URL` for every transfer (proxy, no proxy, `file://`, `--noproxy`, URL with its own proxy credential, unusable `-x`). Curl matches the bytes, exit code and `-v` user line (checked end to end).
+- Decided (Claude, Stewart's delegation; no ADR, as it only matches curl): the library path stays undecoded. Upstream test503, on the ratchet, sends `CURLOPT_PROXYUSERPWD` `test%20:ing%41` literally, so `ManagedEasyTransfer` asks `TrySelect` to decode only under `ToolSettings`.
+- Touches widened to `TransferCredentialLookup.cs` (its byte-level decoder made internal and reused), `ManagedEasyTransfer.Preparation.cs`, the Engine `CLAUDE.md`, `Std202Tests.cs` and `EasyProxyOptionsReadingTests.cs` (it asserted the same credential instance). No other task in Doing names any of them.
+- Build clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: f2ace235 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. -U / --proxy-user is percent-decoded as curl 8.22.0 does; a decoded NUL is exit 3
