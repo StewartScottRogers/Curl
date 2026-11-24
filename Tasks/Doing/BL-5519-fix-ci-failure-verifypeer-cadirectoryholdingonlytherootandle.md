@@ -35,3 +35,4 @@ Lanes test only on Windows, so reproduce with `gh run view 44422933399 --log-fai
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Deferred. already fixed, CI green on 3f13bfd2d
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 4c35ad4a.
