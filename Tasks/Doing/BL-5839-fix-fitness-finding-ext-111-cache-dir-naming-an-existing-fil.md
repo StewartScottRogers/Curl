@@ -37,9 +37,9 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] the first command prints a message naming `--cache-dir` and `recfile` (exit 2 or 23, or a `Warning:` line).
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command prints a message naming `--cache-dir` and `recfile` (exit 2 or 23, or a `Warning:` line).
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
