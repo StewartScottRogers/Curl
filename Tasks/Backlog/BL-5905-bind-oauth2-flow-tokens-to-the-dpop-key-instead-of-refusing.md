@@ -1,5 +1,5 @@
 ---
-id: BL-5903
+id: BL-5905
 title: Bind --oauth2-* flow tokens to the --dpop key instead of refusing the combination (ADR-1347)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5903 — Bind --oauth2-* flow tokens to the --dpop key instead of refusing the combination (ADR-1347)
+# BL-5905 — Bind --oauth2-* flow tokens to the --dpop key instead of refusing the combination (ADR-1347)
 
 ## Goal
 
