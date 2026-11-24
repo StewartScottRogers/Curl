@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Telnet.Fakes;
@@ -23,6 +24,18 @@ public sealed class FaultingConnection(params byte[][] reads) : IConnection
     /// <summary>Gets a value indicating whether every write fails.</summary>
     public bool WritesFail { get; init; }
 
+    /// <summary>
+    /// Gets the socket error inside the failed read's <see cref="IOException" />, or
+    /// <see langword="null" /> for a failure with none.
+    /// </summary>
+    public SocketException? ReadFailure { get; init; }
+
+    /// <summary>
+    /// Gets the socket error every write fails with, inside an <see cref="IOException" />,
+    /// or <see langword="null" /> when writes meet <see cref="WritesFail" />.
+    /// </summary>
+    public SocketException? WriteFailure { get; init; }
+
     /// <inheritdoc />
     public bool IsSecure => false;
 
@@ -43,14 +56,14 @@ public sealed class FaultingConnection(params byte[][] reads) : IConnection
         }
 
         return ReadFailsAfterReads
-            ? ValueTask.FromException<int>(new IOException("Connection reset by peer."))
+            ? ValueTask.FromException<int>(new IOException("Connection reset by peer.", ReadFailure))
             : new ValueTask<int>(never.Task);
     }
 
     /// <inheritdoc />
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
-        WritesFail
-            ? ValueTask.FromException(new IOException("Connection reset by peer."))
+        WritesFail || WriteFailure is not null
+            ? ValueTask.FromException(new IOException("Connection reset by peer.", WriteFailure))
             : ValueTask.CompletedTask;
 
     /// <inheritdoc />

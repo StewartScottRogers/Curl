@@ -15,6 +15,19 @@ internal sealed class TelnetOutbox(ITransferEvents events)
 {
     private readonly Queue<Step> steps = new();
 
+    private bool writeTried;
+
+    private bool writeFailed;
+
+    /// <summary>
+    /// Tells whether a connection read that fails now struck the option negotiation, so
+    /// that the session lost what the server sent: a reply the connection did not take, or
+    /// replies sent while no data has been written yet (BL-5882).
+    /// </summary>
+    /// <param name="bytesWritten">The bytes written to the output so far.</param>
+    /// <returns><see langword="true" /> when the failed read is a receive failure.</returns>
+    public bool ReadFailureLosesData(long bytesWritten) => writeFailed || (writeTried && bytesWritten == 0);
+
     /// <summary>Queues an information line.</summary>
     /// <param name="text">The line.</param>
     public void ReportInfo(string text) => steps.Enqueue(new Step(text, null, null, null));
@@ -57,9 +70,13 @@ internal sealed class TelnetOutbox(ITransferEvents events)
             if (step.Reply is not { } reply)
             {
                 Report(step);
+                continue;
             }
-            else if (await trySend(reply).ConfigureAwait(false) is { } failure)
+
+            writeTried = true;
+            if (await trySend(reply).ConfigureAwait(false) is { } failure)
             {
+                writeFailed = true;
                 events.ReportInfo(step.DescribeFailure!(failure));
             }
         }

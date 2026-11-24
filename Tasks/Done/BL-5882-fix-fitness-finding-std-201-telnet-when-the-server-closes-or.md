@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs, Curl.Original.Protocol.Telnet.UnitLibrary/TelnetOutbox.cs]
+touches: [Curl.Original.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs, Curl.Original.Protocol.Telnet.UnitLibrary/TelnetOutbox.cs, Curl.Original.Protocol.Telnet.UnitLibrary/CLAUDE.md, Curl.Original.Protocol.Telnet.UnitTests/TelnetProtocolHandlerNegotiationResetTests.cs, Curl.Original.Protocol.Telnet.UnitTests/Fakes/FaultingConnection.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5882 — Fix fitness finding STD-201: TELNET: when the server closes or resets during option negotiation, the port drops the data it already received and exits 0
 
@@ -37,13 +37,22 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the 8-run loop never prints `0/0`; every run shows `size_download` ≥ 7 or a non-zero exit code.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the 8-run loop never prints `0/0`; every run shows `size_download` ≥ 7 or a non-zero exit code.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Touches widened with the library CLAUDE.md, the new test file and its fake; the only other Doing task naming Telnet on origin/work/dark-factory was this one.
+- Reproduced on the current branch (debug build): `0/7` with exit 0 after `Sending data failed (10053)`, and `0/18`; no `0/0` in 15 runs, but a read failing before `login: ` is written gave exit 0 with nothing.
+- curl 8.23.0 Windows, same mock: `0/18`, `56/7 Recv failure: Connection was reset`, `55/0`. A reset 300 ms after `login: ` was read (with or without `DO TTYPE`): exit 0.
+- Fix (ADR-1347): a failed read exits 56 when a reply failed to send, or replies went and no data was written yet; otherwise exit 0 as before. curl 55 for a failed upload was already matched.
+- Acceptance loop after the fix, 3 x 8 runs with a PowerShell mock: only `56/7` and `0/18`; never `0/0`.
+- Measure-CodeQuality for the Telnet library: 0 failing members. Full solution build clean, fast tests green. No command-line option changed, so `--ai-help` is untouched.
+- Linux and macOS behaviour is filed as BL-5903; the new tests are platform-neutral.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 3db95686 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. A TELNET reset during option negotiation now exits 56 instead of exit 0 with data lost
