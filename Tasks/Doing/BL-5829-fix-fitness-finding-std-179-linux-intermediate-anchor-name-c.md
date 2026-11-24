@@ -69,3 +69,4 @@ Re-reported in fitness review 2026-11-24T0708 (commit `1e5d591`, the `preview` r
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Notes updated from fitness review 2026-11-24T0708.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 82fc63dd 69116afe 3d836d5e.
