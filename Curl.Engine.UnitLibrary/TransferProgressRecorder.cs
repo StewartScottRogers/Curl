@@ -47,6 +47,9 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// <summary>How often the meter and the bar are refreshed while no data arrives, as curl's progress callback runs about once a second.</summary>
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(1);
 
+    /// <summary>The gap between speed samples that lets a draw through: a second less 50 ms, so a once-a-second tick that a coarse timer fires a few milliseconds early still draws and the meter skips no second (BL-5863).</summary>
+    private const long SampleIntervalMicroseconds = 950000;
+
     /// <summary>
     /// How many times curl 8.21.0 draws the status line once a transfer is done: after the
     /// transfer state, after the done state, and in <c>Curl_pgrsDone</c>. Measured on a
@@ -468,7 +471,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     {
         int next = sampleCount % SpeedSampleCount;
         latest = (next + SpeedSampleCount - 1) % SpeedSampleCount;
-        if (Microseconds(sampleTimes[latest], now) >= 1000000)
+        if (Microseconds(sampleTimes[latest], now) >= SampleIntervalMicroseconds)
         {
             sampleCount++;
             latest = next;
