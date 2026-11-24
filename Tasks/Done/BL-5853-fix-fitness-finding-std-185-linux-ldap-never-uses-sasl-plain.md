@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5853 — Fix fitness finding STD-185: Linux LDAP never uses SASL PLAIN (or LOGIN, CRAM-MD5, NTLM); curl binds with PLAIN when the server offers it
 
@@ -47,3 +47,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 18cb9324 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. SASL PLAIN bind when offered and allowed; unit tested
