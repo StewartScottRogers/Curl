@@ -37,7 +37,7 @@ service REST API at `x-ms-version: 2025-01-05` and HTTP/1.1 (RFC 9112), by the c
 | AzureStorage:RFC9112-6.1-1 | MUST NOT | A sender does not send `Content-Length` in a message that carries `Transfer-Encoding`; every request body here is framed by `Content-Length` alone. | AzureBlobRequestHeaderCases.Upload_EightMiBAndMoreWithBearer_FramesEveryBodyByContentLengthOverTls |
 | AzureStorage:AuthorizeOAuth-2 | MUST | A request authorized with OAuth is sent over HTTPS. | AzureBlobRequestHeaderCases.Upload_EightMiBAndMoreWithBearer_FramesEveryBodyByContentLengthOverTls |
 | AzureStorage:ListBlobs-3 | OPTIONAL | `maxresults` limits a page's size; without it the service chooses (up to 5,000). | n/a: curl's client sends no `maxresults` and follows `NextMarker` whatever the page size |
-| AzureStorage:GetBlob-2 | OPTIONAL | `Range` or `x-ms-range` reads part of a blob. | n/a: curl's client reads the whole blob |
+| AzureStorage:GetBlob-2 | OPTIONAL | `Range` or `x-ms-range` reads part of a blob. | n/a: curl's client reads the whole blob; `-r` and `-C` are refused with exit 4 before any request (ADR-1347, `AzureStorageByteRangeRefusalTests`) |
 
 Data Lake Storage Gen2 (`abfs://`, `abfss://`) has its own matrix: [AzureStorage-DataLake.md](AzureStorage-DataLake.md).
 

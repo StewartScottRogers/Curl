@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3RequestMethod.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageRequestMethod.cs]
+touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3RequestMethod.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client, Curl.Extended.Protocol.AzureStorage.UnitLibrary/CLAUDE.md, Curl.Extended.Protocol.AzureStorage.UnitTests/Client, Documentation/Conformance/Extended/AzureStorage.md]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5897 — Fix fitness finding EXT-122: s3:// and az:// silently ignore -r and -C; -C - appends the whole object to the partial file
 
@@ -42,13 +42,26 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] after the `head -c 300` setup, `curl -sS -C - s3://bkt/small.bin -o part.bin` either leaves `part.bin` byte-identical to `small.bin` (1000 bytes) or exits 4 naming the unsupported option; `curl -sS -r 10-19 s3://bkt/small.bin` writes exactly 10 bytes or exits 4. The same for az.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] after the `head -c 300` setup, `curl -sS -C - s3://bkt/small.bin -o part.bin` either leaves `part.bin` byte-identical to `small.bin` (1000 bytes) or exits 4 naming the unsupported option; `curl -sS -r 10-19 s3://bkt/small.bin` writes exactly 10 bytes or exits 4. The same for az.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- The `s3://` half no longer reproduced: BL-5873 (after the reviewed commit) sends a signed `Range` header for `-r`
+  and `-C` on downloads. Checked with the built binary against a recorded loopback server: `-C -` onto 300 bytes sent
+  `range: bytes=300-` and left 1000 bytes; `-r 10-19` sent `range: bytes=10-19` and wrote 10 bytes.
+  `S3RangeDownloadTests` already pins it, so no S3 code changed.
+- `az://`/`abfs[s]://` now refuse `-r` and `-C` (other than offset 0) with exit 4 (ADR-1347, Claude's decision).
+  Built binary: `-C -`, `-C 300` and `-r 10-19` exit 4 and leave the 300-byte partial file untouched.
+  The refusal is its own class (`AzureStorageByteRangeRefusal`) because a range is not a request method, so
+  `touches` was widened to the Azure `Client` folders, its `CLAUDE.md` and its conformance matrix (no other task in
+  Doing named them).
+- Fast tests: 115 assemblies passed. `Measure-CodeQuality.ps1` on the Azure Storage library: 0 failing members.
+- Follow-ups filed: BL-5903 (gs://), BL-5904 (oci://), BL-5905 (s3 uploads, lists, deletes).
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: ac9571ab 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. az:// and abfs[s]:// refuse -r and -C with exit 4 and leave the partial file alone; s3:// already honours them (BL-5873)
