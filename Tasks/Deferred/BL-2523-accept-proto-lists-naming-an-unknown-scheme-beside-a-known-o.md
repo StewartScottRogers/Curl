@@ -30,6 +30,7 @@ Measured 2026-10-16 during BL-2491 on Windows' curl 8.21.0 (Schannel): `-s -S --
 
 - 2026-11-02 (lane 4): Re-measured on this machine's curl 8.22.0 (Schannel, the target per ADR-0479). `-s -S --proto =ipfs,http http://127.0.0.1:1/`, `--proto =ipfs` and `-v --proto =ipfs,http` all print `curl: unrecognized protocol 'ipfs'`, `curl: option --proto: is badly used here` and the try-help line, then exit 2. That is the same as Curl today, and `CommandLineProtocolSetOptionTests` already pins it (the "ipfs unknown" row). Making Curl accept the list, as the Goal and criterion 1 ask, would break drop-in parity with 8.22.0. Criterion 2's "no unrecognized protocol line" was only true of 8.21.0. The criteria cannot be met as written without going against the target curl, and a lane may not reword them (BL-2488). No code was changed.
 - 2026-11-18 (lane 8): Re-measured after the Deferred clear: this machine's curl is still 8.22.0 (Schannel) and `-s -S --proto =ipfs,http http://127.0.0.1:1/` still prints `unrecognized protocol 'ipfs'`, `option --proto: is badly used here`, the try-help line and exits 2, as Curl does. The criteria (written for 8.21.0) still cannot be met without breaking parity, and a lane may not reword them (BL-2488), so this goes to Blocked for Stewart to close it or reword it. No code was changed.
+- 2026-11-24 (lane 5): Re-measured on this machine's curl 8.23.0 (Schannel): `-s -S --proto =ipfs,http http://127.0.0.1:1/` prints `curl: unrecognized protocol 'ipfs'`, `curl: option --proto: is badly used here`, the try-help line and exits 2, exactly as Curl does and `CommandLineProtocolSetOptionTests` pins. Stewart's 2026-11-18 closing decision (matches the target curl; do not reopen unless the target moves) still holds: the newer curl still refuses, so this goes back to Deferred. No code was changed.
 
 ## Log
 
@@ -47,3 +48,4 @@ Measured 2026-10-16 during BL-2491 on Windows' curl 8.21.0 (Schannel): `-s -S --
 - 2026-11-18: Blocked -> Deferred. Stewart 2026-11-18: closed, matches curl 8.22.0 (the target refuses --proto =ipfs,http with exit 2, as Curl does); do not reopen unless the target version moves
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 9cafc694 46d4e715 a0b0533f.
+- 2026-11-24: Doing -> Deferred. Still closed under Stewart's 2026-11-18 decision: curl 8.23.0 refuses --proto =ipfs,http with exit 2 exactly as Curl does; reopen only if the target curl accepts it
