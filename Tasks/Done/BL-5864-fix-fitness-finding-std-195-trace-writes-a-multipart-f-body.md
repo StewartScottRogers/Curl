@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs]
+touches: [Curl.Core.UnitLibrary/Multipart/ConcatenatedReadStream.cs, Curl.Core.UnitTests/Multipart/ConcatenatedReadStreamChunkReadTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5864 — Fix fitness finding STD-195: --trace writes a multipart -F body with file parts as one "Send data" block, where curl splits it per part
 
@@ -35,13 +35,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the repro's trace shows four Send data blocks: 448, 203, 98, 62.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro's trace shows four Send data blocks: 448, 203, 98, 62.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- The fix is in ConcatenatedReadStream.cs (the read-once-per-fill rule for file segments applied only when a callback segment existed; now it always applies, as curl's mime_read stops filling after a file read), so touches was moved there from MultipartFormBodyBuilder.cs. Measured: the repro now traces 448, 203, 98, 62. Pinned by a unit test in ConcatenatedReadStreamChunkReadTests. Full fast suite green; Measure-CodeQuality for Curl.Core.UnitLibrary: 0 failing members. CI on Linux/macOS: change is platform-neutral.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 2d5f458c 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Trace splits multipart body per file part: 448, 203, 98, 62
