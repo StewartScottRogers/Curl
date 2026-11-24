@@ -34,3 +34,4 @@ Repro: `surl -v --cert server.pem --key server.key --dns-transport tls dns://127
 ## Log
 
 - 2026-11-24: Created from Surly bug report 2026-11-24T1330, finding 3.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 5c1940c5 24a270bb 36a6d25e 3d836d5e.
