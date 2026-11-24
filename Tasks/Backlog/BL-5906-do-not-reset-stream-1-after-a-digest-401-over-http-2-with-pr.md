@@ -1,5 +1,5 @@
 ---
-id: BL-5878
+id: BL-5906
 title: Do not reset stream 1 after a Digest 401 over HTTP/2 with prior knowledge
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5878 — Do not reset stream 1 after a Digest 401 over HTTP/2 with prior knowledge
+# BL-5906 — Do not reset stream 1 after a Digest 401 over HTTP/2 with prior knowledge
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-5880
+id: BL-5908
 title: Match OpenLDAP on ldap:// StartTLS with --ssl-reqd, --ssl or an untrusted certificate on Linux
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5880 — Match OpenLDAP on ldap:// StartTLS with --ssl-reqd, --ssl or an untrusted certificate on Linux
+# BL-5908 — Match OpenLDAP on ldap:// StartTLS with --ssl-reqd, --ssl or an untrusted certificate on Linux
 
 ## Goal
 

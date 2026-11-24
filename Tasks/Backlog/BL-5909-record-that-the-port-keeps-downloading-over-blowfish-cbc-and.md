@@ -1,5 +1,5 @@
 ---
-id: BL-5881
+id: BL-5909
 title: Record that the port keeps downloading over blowfish-cbc and cast128-cbc where macOS libssh2 crashes (ADR)
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5881 — Record that the port keeps downloading over blowfish-cbc and cast128-cbc where macOS libssh2 crashes (ADR)
+# BL-5909 — Record that the port keeps downloading over blowfish-cbc and cast128-cbc where macOS libssh2 crashes (ADR)
 
 ## Goal
 

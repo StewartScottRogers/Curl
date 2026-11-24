@@ -1,5 +1,5 @@
 ---
-id: BL-5879
+id: BL-5907
 title: Bind with SASL over ldap:// as OpenLDAP does on Linux: challenge-response, bearer, EXTERNAL, GSSAPI and any-mechanism binds
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5879 — Bind with SASL over ldap:// as OpenLDAP does on Linux: challenge-response, bearer, EXTERNAL, GSSAPI and any-mechanism binds
+# BL-5907 — Bind with SASL over ldap:// as OpenLDAP does on Linux: challenge-response, bearer, EXTERNAL, GSSAPI and any-mechanism binds
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-5882
+id: BL-5910
 title: Exit 25 on a chunked PUT to an HTTP/1.0 server on Linux and macOS (upstream tests 1072 and 1073)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5882 — Exit 25 on a chunked PUT to an HTTP/1.0 server on Linux and macOS (upstream tests 1072 and 1073)
+# BL-5910 — Exit 25 on a chunked PUT to an HTTP/1.0 server on Linux and macOS (upstream tests 1072 and 1073)
 
 ## Goal
 

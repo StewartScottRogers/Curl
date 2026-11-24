@@ -1,5 +1,5 @@
 ---
-id: BL-5877
+id: BL-5905
 title: Finish an active-mode FTP listing with -P when the server answers slowly (upstream test 251)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5877 — Finish an active-mode FTP listing with -P when the server answers slowly (upstream test 251)
+# BL-5905 — Finish an active-mode FTP listing with -P when the server answers slowly (upstream test 251)
 
 ## Goal
 
