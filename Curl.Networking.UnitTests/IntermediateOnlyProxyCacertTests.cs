@@ -248,6 +248,43 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.AreEqual(fetched.Count, fetched.Distinct().Count());
     }
 
+    private const string SecondPointAddress = "http://127.0.0.1:1/second.crl";
+
+    [TestMethod]
+    public void VerifyPeer_FirstUsableListIsCleanAndSecondRevokes_Accepts()
+    {
+        using var pki = new Pki(revokeLeaf: false, secondDistributionPoint: SecondPointAddress);
+        var revoking = pki.BuildCrlOfIssuer([pki.LeafSerial], DateTimeOffset.UtcNow.AddDays(3));
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? revoking : pki.CrlBytes, NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_FirstUsableListRevokesAndSecondIsClean_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: true, secondDistributionPoint: SecondPointAddress);
+        var clean = pki.BuildCrlOfIssuer([], DateTimeOffset.UtcNow.AddDays(3));
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? clean : pki.CrlBytes, NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_FirstListUnusableAndSecondRevokes_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: true, secondDistributionPoint: SecondPointAddress);
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? pki.CrlBytes : throw new IOException("404"), NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
     private const string DeltaAddress = "http://127.0.0.1:1/delta.crl";
 
     private const string FreshestCrlOid = "2.5.29.46";
@@ -527,13 +564,13 @@ public sealed class IntermediateOnlyProxyCacertTests
 
         private readonly RSA _intermediateKey;
 
-        public Pki(bool revokeLeaf, bool withDistributionPoint = true, string? freshestCrlAddress = null)
+        public Pki(bool revokeLeaf, bool withDistributionPoint = true, string? freshestCrlAddress = null, string? secondDistributionPoint = null)
         {
             _root = CreateAuthority("CN=Proxy Root", null, out _);
             using var intermediate = CreateAuthority("CN=Proxy Intermediate", _root, out _intermediateKey);
             Intermediate = intermediate.CopyWithPrivateKey(_intermediateKey);
             LeafSerial = [0x42, 0x17];
-            Leaf = CreateLeaf(Intermediate, LeafSerial, withDistributionPoint, freshestCrlAddress);
+            Leaf = CreateLeaf(Intermediate, LeafSerial, withDistributionPoint, freshestCrlAddress, secondDistributionPoint);
             CrlBytes = BuildCrlOfIssuer(revokeLeaf ? [LeafSerial] : [], DateTimeOffset.UtcNow.AddDays(3));
         }
 
@@ -608,7 +645,7 @@ public sealed class IntermediateOnlyProxyCacertTests
             return request.Create(issuer, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(20), [1, 2, 3]);
         }
 
-        private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, byte[] serial, bool withDistributionPoint, string? freshestCrlAddress)
+        private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, byte[] serial, bool withDistributionPoint, string? freshestCrlAddress, string? secondDistributionPoint)
         {
             using var key = RSA.Create(2048);
             var request = new CertificateRequest($"CN={Host}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -619,7 +656,7 @@ public sealed class IntermediateOnlyProxyCacertTests
             request.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
             if (withDistributionPoint)
             {
-                request.CertificateExtensions.Add(CertificateRevocationListBuilder.BuildCrlDistributionPointExtension([UnreachableCrlAddress]));
+                request.CertificateExtensions.Add(CertificateRevocationListBuilder.BuildCrlDistributionPointExtension(secondDistributionPoint is null ? [UnreachableCrlAddress] : [UnreachableCrlAddress, secondDistributionPoint]));
             }
 
             if (freshestCrlAddress is not null)

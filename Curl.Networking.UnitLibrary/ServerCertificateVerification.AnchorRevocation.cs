@@ -117,14 +117,14 @@ internal sealed partial class ServerCertificateVerification
 
     private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var outcomes = CrlDistributionPointUris(certificate)
+        // CryptoAPI stops at the first usable list (STD-163): a later point is never asked, so its answer cannot overrule it.
+        var first = CrlDistributionPointUris(certificate)
             .Select(uri => UsableRevocationList(uri, certificate, issuer, budget))
             .OfType<CertificateRevocationList>()
-            .Select(list => list.Revokes(certificate) ? BelowAnchorRevocation.Revoked : DeltaRevocationOf(list, certificate, issuer, budget))
-            .ToArray();
-        return outcomes.Contains(BelowAnchorRevocation.Revoked)
-            ? BelowAnchorRevocation.Revoked
-            : outcomes.Contains(BelowAnchorRevocation.Clean) ? BelowAnchorRevocation.Clean : BelowAnchorRevocation.Unresolved;
+            .FirstOrDefault();
+        return first is null
+            ? BelowAnchorRevocation.Unresolved
+            : first.Revokes(certificate) ? BelowAnchorRevocation.Revoked : DeltaRevocationOf(first, certificate, issuer, budget);
     }
 
     // The delta lists a base list or the certificate points to through freshestCRL (RFC 5280, 5.2.6): each

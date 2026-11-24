@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5807 — Fix fitness finding STD-163: Windows: when one of a leaf's two CRL distribution points lists it as revoked and the other is clean, the port refuses; REF accepts
 
@@ -37,11 +37,13 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 
 ## Acceptance criteria
 
-- [ ] the command exits 0 (or the deviation is documented as deliberate in an ADR).
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command exits 0 (or the deviation is documented as deliberate in an ADR).
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: `RevocationOf` now takes the first usable CRL (CryptoAPI stops there) instead of `Any(Revokes)` across all points; a later point is never fetched. Unusable earlier points are skipped. Tests: three in `IntermediateOnlyProxyCacertTests`. Quality run for Curl.Networking.UnitLibrary: 0 failing members. Linux/macOS: tests are platform-neutral.
 
 ## Log
 
@@ -49,3 +51,4 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: fac26c5c 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. First usable CRL decides, as CryptoAPI does
