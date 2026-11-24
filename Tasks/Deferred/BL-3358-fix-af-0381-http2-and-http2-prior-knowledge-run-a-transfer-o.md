@@ -9,6 +9,7 @@ touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2Row.cs]
 requirement: none
 created: 2026-10-23
 completed:
+lane: no
 ---
 # BL-3358 — Fix AF-0381: --http2 and --http2-prior-knowledge run a transfer on Windows where the Schannel reference curl refuses them with exit 2
 
@@ -52,6 +53,8 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 - 2026-11-02 (lane 2): Claimed again after Stewart's "complete all existing tasks". Checked first: ADR-0871 still stands, and ADR-0929 (2026-10-26) records Stewart confirming "Keep HTTP/2 on" a second time; `CommandLineOptionTable.HttpVersionRows.cs` still runs both options, as those ADRs require. The only way to meet the criteria (exit 2 on Windows) is to undo two of Stewart's own decisions, which the delegation does not cover, and the general instruction to finish tasks does not reverse them. BL-3372 (the 16/56 flip) is Done, and AF-0381 is already closed by Stewart citing ADR-0871. No code changed. Deferred again; to revive it, Stewart reverses ADR-0871 and ADR-0929, or files a new task with criteria that match them.
 
+- 2026-11-24 (lane 3): Claimed after Stewart's undefer "to give the idle lanes work". That was a general board sweep, not a reversal of the HTTP/2 decisions. Checked first: ADR-0871 is still Accepted, ADR-0929 and ADR-1282 still stand, and later ADRs (ADR-1309, ADR-1313) build on HTTP/2 and HTTP/3 running on Windows. Meeting the criteria (exit 2 for --http2 on Windows) would undo them, and the delegation does not cover that. No code changed. Interactive only: added `lane: no` so lanes stop spending claims on it. Remove `lane: no` once Stewart reverses ADR-0871 and ADR-0929, or rewrites the criteria to match them. Deferred again.
+
 ## Log
 
 - 2026-10-23: Created.
@@ -66,3 +69,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/2 stays on for Windows (ADR-0871, ADR-0929); doing this would make --http2 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-24: Doing -> Deferred. ADR-0871/ADR-0929 (Stewart's 'Keep HTTP/2 on') still stand; exit-2 criteria would undo them. lane: no until Stewart reverses them.
