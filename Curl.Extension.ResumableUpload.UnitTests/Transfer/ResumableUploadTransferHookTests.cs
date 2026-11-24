@@ -195,6 +195,60 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_CredentialsWithAwsSigV4_FailsInitWithoutSendingBasic()
+    {
+        var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        var context = Context("http://up.example.com/files", http: new HttpRequestOptions { AwsSigV4 = "aws:amz:us-east-1:s3" }, credentials: new System.Net.NetworkCredential("AKID", "SECRETKEY99"));
+
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage, "--aws-sigv4");
+        Assert.IsFalse(connection.Written.Contains("Authorization", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Digest)]
+    [DataRow(HttpAuthSchemes.Ntlm)]
+    [DataRow(HttpAuthSchemes.Negotiate)]
+    [DataRow(HttpAuthSchemes.Digest | HttpAuthSchemes.Basic)]
+    public async Task ExecuteAsync_CredentialsWithAnotherAuthScheme_FailsInitWithoutSendingBasic(HttpAuthSchemes schemes)
+    {
+        var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        var context = Context("http://up.example.com/files", http: new HttpRequestOptions { AuthSchemes = schemes }, credentials: new System.Net.NetworkCredential("u", "pw"));
+
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.IsFalse(connection.Written.Contains("Authorization", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ExecuteAsync_CredentialsWithBasicOrNoHttpOptions_SendsBasic(bool withHttpOptions)
+    {
+        var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        var http = withHttpOptions ? new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Basic } : null;
+        var context = Context("http://up.example.com/files", http: http, credentials: new System.Net.NetworkCredential("u", "pw"));
+
+        await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+
+        StringAssert.Contains(connection.Written, "Authorization: Basic dTpwdw==\r\n");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CredentialsWithHttpSignature_FailsInit()
+    {
+        var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        var context = Context("http://up.example.com/files", http: new HttpRequestOptions { HttpSignature = new HttpSignatureSettings("hmac-sha256", "k", "id", null) }, credentials: new System.Net.NetworkCredential("u", "pw"));
+
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_BearerTokenWithoutUserAgent_SendsBearerAndDefaultAgent()
     {
         var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);

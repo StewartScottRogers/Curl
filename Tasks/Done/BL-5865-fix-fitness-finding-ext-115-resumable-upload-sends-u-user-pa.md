@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadRequestHeaders.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5865 — Fix fitness finding EXT-115: --resumable-upload sends -u user:password as cleartext Authorization: Basic even with --aws-sigv4, --digest, --ntlm, --negotiate or --anyauth
 
@@ -39,13 +39,16 @@ Shared setup: **Shared mock for EXT-115, EXT-116, EXT-119, EXT-109, EXT-111** (H
 
 ## Acceptance criteria
 
-- [ ] after the first repro, no `Authorization: Basic` line reaches the server and the requests carry `AWS4-HMAC-SHA256` (or the command exits non-zero naming the unsupported combination); with `--digest`, no Basic line appears.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] after the first repro, no `Authorization: Basic` line reaches the server and the requests carry `AWS4-HMAC-SHA256` (or the command exits non-zero naming the unsupported combination); with `--digest`, no Basic line appears.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision: with -u and --aws-sigv4, --httpsig, --digest, --ntlm, --negotiate or --anyauth, --resumable-upload exits 2 (FailedInit) naming the option instead of sending Basic. It never sends the password in clear for another method. Only plain Basic sends Authorization: Basic. Measure-CodeQuality for the library: 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 7d7a5c0b 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. resumable upload refuses -u with another auth method instead of sending Basic

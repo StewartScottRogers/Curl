@@ -52,10 +52,25 @@ internal static class ResumableUploadRequestHeaders
             return "Bearer " + token;
         }
 
-        return context.Credentials is { UserName.Length: > 0 } credentials
-            ? "Basic " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(credentials.UserName + ":" + credentials.Password))
-            : null;
+        return context.Credentials is { UserName.Length: > 0 } credentials ? BasicAuthorizationOf(context, credentials) : null;
     }
+
+    private static string BasicAuthorizationOf(ITransferContext context, System.Net.NetworkCredential credentials)
+    {
+        if (UnsupportedAuthOption(context.Http) is { } option)
+        {
+            throw new ResumableUploadTransferException(CurlExitCode.FailedInit, $"--resumable-upload cannot authenticate with {option}: it only sends -u as Basic, and never sends the password in clear for another method.", canResume: false);
+        }
+
+        return "Basic " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(credentials.UserName + ":" + credentials.Password));
+    }
+
+    private static string? UnsupportedAuthOption(Curl.Protocol.Abstractions.HttpRequestOptions? http) =>
+        http is null ? null
+        : http.AwsSigV4 is not null ? "--aws-sigv4"
+        : http.HttpSignature is not null ? "--httpsig"
+        : http.AuthSchemes is HttpAuthSchemes.Basic ? null
+        : "--digest, --ntlm, --negotiate or --anyauth";
 
     private static void AddUnlessSetWhenNotEmpty(List<KeyValuePair<string, string>> headers, List<KeyValuePair<string, string>> already, string name, string? value)
     {
