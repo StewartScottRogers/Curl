@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5850 — Fix fitness finding STD-182: Linux --capath / SSL_CERT_DIR holding both root and intermediate rejects a valid chain when the server sends only its leaf
 
@@ -50,3 +50,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 71fc81cb 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. --capath anchors count as present in the unsent-intermediate checks; unit test added; quality gate clean
