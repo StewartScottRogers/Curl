@@ -34,3 +34,4 @@ Repro: `surl --directory store --cert server.pem --key server.key --user AKIAIOS
 ## Log
 
 - 2026-11-24: Created from Surly bug report 2026-11-24T1330, finding 2.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 944fda24 d8ed0a1f 575b2b3a 3d836d5e.
