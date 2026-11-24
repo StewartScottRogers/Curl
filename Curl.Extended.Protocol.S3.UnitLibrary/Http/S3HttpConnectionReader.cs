@@ -63,7 +63,16 @@ internal sealed class S3HttpConnectionReader(IConnection connection)
     private async ValueTask<bool> FillAsync(CancellationToken cancellationToken)
     {
         start = 0;
-        end = await connection.ReadAsync(buffer, cancellationToken);
+        end = 0;
+        try
+        {
+            end = await connection.ReadAsync(buffer, cancellationToken);
+        }
+        catch (IOException failure)
+        {
+            throw new S3HttpException(S3HttpFailure.ReceiveFailed, "Recv failure: Connection was reset", failure);
+        }
+
         return end > 0;
     }
 }

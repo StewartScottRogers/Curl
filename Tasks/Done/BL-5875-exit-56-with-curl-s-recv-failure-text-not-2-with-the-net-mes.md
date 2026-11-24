@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3TransferException.cs, Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpFailure.cs, Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpConnectionReader.cs, Curl.Extended.Protocol.S3.UnitTests/Http/S3HttpFailure]
+touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3TransferException.cs, Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpFailure.cs, Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpConnectionReader.cs, Curl.Extended.Protocol.S3.UnitTests/Http/S3HttpFailure, Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpException.cs, Curl.Extended.Protocol.S3.UnitLibrary/Http/S3ContentLengthBodyStream.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3ProtocolHandler.cs, Curl.Extended.Protocol.S3.UnitTests/Client, Curl.Extended.Protocol.S3.UnitTests/Http]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5875 — Exit 56 with curl's recv-failure text, not 2 with the .NET message, when an s3:// connection drops mid-transfer
 
@@ -24,14 +24,19 @@ Repro: the S3 server from BL-5873 (`surl --directory store ... s3://127.0.0.1:P/
 
 ## Acceptance criteria
 
-- [ ] A test-double connection that throws a reset mid-body makes the `s3://` GET exit 56 with curl's recv-failure message, pinned by a unit test.
-- [ ] A connection that closes before `Content-Length` bytes exits as the https path does (18, `transfer closed with N bytes remaining to read`), pinned by a unit test.
-- [ ] No .NET exception text reaches stderr for these cases.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A test-double connection that throws a reset mid-body makes the `s3://` GET exit 56 with curl's recv-failure message, pinned by a unit test.
+- [x] A connection that closes before `Content-Length` bytes exits as the https path does (18, `transfer closed with N bytes remaining to read`), pinned by a unit test.
+- [x] No .NET exception text reaches stderr for these cases.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided: S3HttpConnectionReader turns an IOException into S3HttpFailure.ReceiveFailed ("Recv failure: Connection was reset", exit 56); a Content-Length body cut short is the new S3HttpFailure.BodyShort ("transfer closed with N bytes remaining to read", exit 18); S3ProtocolHandler maps them. Other failures stay exit 8. touches widened to the handler, exception and test folders (no other lane holds them).
+- OCI client: OciHttpClient already catches IOException; not re-measured, no follow-up filed.
+- Quality run: 0 failing members; criteria 3 (no .NET text) holds as the mapped message replaces the IOException text.
 
 ## Log
 
 - 2026-11-24: Created from Surly bug report 2026-11-24T1330, finding 4.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: a28d6029 656cbfba 36a6d25e 3d836d5e.
+- 2026-11-24: Doing -> Done. s3:// mid-body reset exits 56 with Recv failure text; short Content-Length exits 18

@@ -45,9 +45,16 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
         }
         catch (S3HttpException failure)
         {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message) with { Report = headReporter.Report };
+            return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message) with { Report = headReporter.Report };
         }
     }
+
+    private static CurlExitCode ExitCodeOf(S3HttpFailure failure) => failure switch
+    {
+        S3HttpFailure.ReceiveFailed => CurlExitCode.RecvError,
+        S3HttpFailure.BodyShort => CurlExitCode.PartialFile,
+        _ => CurlExitCode.WeirdServerReply,
+    };
 
     private static string KeyOf(CurlUrl url)
     {

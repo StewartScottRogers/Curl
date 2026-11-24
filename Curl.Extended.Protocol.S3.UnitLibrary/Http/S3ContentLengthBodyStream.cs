@@ -18,7 +18,7 @@ internal sealed class S3ContentLengthBodyStream(S3HttpConnectionReader reader, l
         var read = await reader.ReadAsync(buffer[..(int)Math.Min(buffer.Length, remaining)], cancellationToken);
         if (read == 0)
         {
-            throw ClosedEarly();
+            throw new S3HttpException(S3HttpFailure.BodyShort, $"transfer closed with {remaining} bytes remaining to read");
         }
 
         remaining -= read;

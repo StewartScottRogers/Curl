@@ -12,6 +12,9 @@ internal sealed class QueuedS3Connector(params string[] responses) : IConnector
     /// <summary>The response that makes the connection be refused instead.</summary>
     public const string Refuse = "refuse";
 
+    /// <summary>Prefix of a response whose connection throws a reset <see cref="IOException"/> once the recorded bytes are read.</summary>
+    public const string ResetAfter = "reset-after:";
+
     public List<RecordedConnection> Connections { get; } = [];
 
     public List<ConnectTarget> Targets { get; } = [];
@@ -29,7 +32,8 @@ internal sealed class QueuedS3Connector(params string[] responses) : IConnector
             return ValueTask.FromResult(ConnectResult.Refused("Failed to connect to minio port 9000"));
         }
 
-        RecordedConnection connection = new(response);
+        bool reset = response.StartsWith(ResetAfter, StringComparison.Ordinal);
+        RecordedConnection connection = new(reset ? response[ResetAfter.Length..] : response, resetAtEnd: reset);
         Connections.Add(connection);
         return ValueTask.FromResult(ConnectResult.Connected(connection));
     }
