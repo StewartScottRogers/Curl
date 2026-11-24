@@ -1402,3 +1402,4 @@ Each option and the specific reason it lost.
 | [1358](ADR-1358-oci-refuses-range-and-resume.md) | oci:// refuses -r and -C with exit 4 (BL-5913) | Accepted | 2026-11-24 |
 | [1359](ADR-1359-gs-downloads-send-a-range-header-for-r-and-c-and-uploads-and-lists-refuse-them.md) | gs:// downloads send a Range header for -r and -C; uploads and listings refuse them (BL-5912) | Accepted | 2026-11-24 |
 | [1360](ADR-1360-xmpp-gets-typed-d-text-as-utf-8.md) | xmpp gets typed -d text as UTF-8 (BL-5915) | Accepted | 2026-11-24 |
+| [1347](ADR-1347-a-bearer-token-prefers-only-the-bearer-mechanisms-until-an-auth-option.md) | --oauth2-bearer prefers only the bearer mechanisms until an AUTH= login option (BL-5880) | Accepted | 2026-11-24 |

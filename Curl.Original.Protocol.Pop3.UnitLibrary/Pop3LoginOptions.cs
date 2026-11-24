@@ -6,12 +6,13 @@ namespace Curl.Original.Protocol.Pop3;
 /// </summary>
 /// <param name="Method">The ways allowed.</param>
 /// <param name="RequiredMechanism">
-/// The SASL mechanism <c>AUTH=&lt;mech&gt;</c> named, in the case it was written, or
-/// <see langword="null" /> when the options named none.
+/// The SASL mechanism <c>AUTH=&lt;mech&gt;</c> named, in the case it was written,
+/// <c>*</c> for <c>AUTH=*</c>, or <see langword="null" /> when no option named either.
 /// </param>
 /// <remarks>
 /// Measured with <c>Record-CurlExchange.ps1 -Pop3</c> (BL-548): keys and values are compared
-/// case-insensitively (<c>auth=+apop</c> works); <c>AUTH=*</c> is the same as no option;
+/// case-insensitively (<c>auth=+apop</c> works); <c>AUTH=*</c> allows every way, as no
+/// option does, but unlike no option also under <c>--oauth2-bearer</c> (BL-5880);
 /// <c>AUTH=+APOP</c> allows only <c>APOP</c>; <c>AUTH=&lt;mech&gt;</c> allows only that SASL
 /// mechanism; a mechanism curl does not know (<c>AUTH=USER</c>) or any other key
 /// (<c>FOO=bar</c>) is exit 3 before a byte is sent. Of several <c>AUTH=</c> options the
@@ -72,7 +73,7 @@ internal sealed record Pop3LoginOptions(Pop3LoginMethod Method, string? Required
     {
         if (value == AnyValue)
         {
-            return Any;
+            return Any with { RequiredMechanism = AnyValue };
         }
 
         if (value.Equals(ApopValue, StringComparison.OrdinalIgnoreCase))

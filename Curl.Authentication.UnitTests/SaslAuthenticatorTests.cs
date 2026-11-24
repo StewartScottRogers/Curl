@@ -568,6 +568,25 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
+    [DataRow("PLAIN", new[] { "PLAIN", "XOAUTH2" }, "PLAIN", DisplayName = "AUTH=PLAIN: PLAIN")]
+    [DataRow("*", new[] { "PLAIN", "LOGIN", "DIGEST-MD5", "CRAM-MD5", "XOAUTH2" }, "DIGEST-MD5", DisplayName = "AUTH=*: DIGEST-MD5 before XOAUTH2")]
+    [DataRow("*", new[] { "PLAIN", "XOAUTH2" }, "XOAUTH2", DisplayName = "AUTH=*: XOAUTH2 before PLAIN")]
+    [DataRow("LOGIN", new[] { "PLAIN", "LOGIN" }, "LOGIN", DisplayName = "AUTH=LOGIN: LOGIN")]
+    public void ChooseMechanism_BearerTokenWithAuthOption_PicksAsCurl(string requiredMechanism, string[] offered, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("offered", string.Join(" ", offered));
+        diagnostics.Arrange("bearer token", "tok");
+
+        string? chosen = Authenticator.ChooseMechanism(
+            Request(new NetworkCredential("u", "p"), bearerToken: "tok", requiredMechanism: requiredMechanism), offered);
+
+        diagnostics.Act("chosen", chosen);
+        diagnostics.Assert("chosen", expected, chosen);
+        Assert.AreEqual(expected, chosen);
+    }
+
+    [TestMethod]
     public void ChooseMechanism_BearerTokenWithoutUser_PicksOAuthBearer()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

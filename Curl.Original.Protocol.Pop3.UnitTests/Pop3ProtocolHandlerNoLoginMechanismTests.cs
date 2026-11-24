@@ -167,6 +167,31 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
         CollectionAssert.AreEqual((string[])["< -ERR denied\r\n", Closing], events.Transcript.TakeLast(2).ToArray());
     }
 
+    [TestMethod]
+    [DataRow(TimestampGreeting, DefaultCapa, Overlap, DisplayName = "No APOP and no USER beside SASL PLAIN LOGIN")]
+    [DataRow(Greeting, "+OK\r\nUSER\r\n.\r\n", Offered, DisplayName = "No USER without SASL")]
+    public async Task ExecuteAsync_BearerTokenWithUserAndNoAuthOption_SendsNoPassword(string greeting, string capaReply, string expectedLine)
+    {
+        // curl 8.22.0 prefers only the bearer mechanisms here (BL-5880).
+        (TransferResult result, RecordingTransferEvents events, byte[] sent) = await RunAsync(greeting + capaReply, "user", "tok", null);
+
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Assert.AreEqual("CAPA\r\n", Encoding.Latin1.GetString(sent));
+        CollectionAssert.AreEqual((string[])[expectedLine, Closing], events.Transcript.TakeLast(2).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(TimestampGreeting, "AUTH=*", "CAPA\r\nAPOP user ", DisplayName = "AUTH=* sends APOP")]
+    [DataRow(TimestampGreeting, "AUTH=+APOP", "CAPA\r\nAPOP user ", DisplayName = "AUTH=+APOP sends APOP")]
+    [DataRow(Greeting, "AUTH=*", "CAPA\r\nUSER user\r\n", DisplayName = "AUTH=* sends USER")]
+    public async Task ExecuteAsync_BearerTokenWithAuthOption_LogsInAsTheOptionAllows(string greeting, string loginOptions, string expectedStart)
+    {
+        (_, _, byte[] sent) = await RunAsync(greeting + "+OK\r\nUSER\r\n.\r\n-ERR no\r\n", "user", "tok", loginOptions);
+
+        Assert.StartsWith(expectedStart, Encoding.Latin1.GetString(sent));
+    }
+
     private async Task<(TransferResult Result, RecordingTransferEvents Events, byte[] Sent)> RunAsync(
         string replies, string? user, string? bearerToken, string? loginOptions, string path = "1", string password = "secret")
     {

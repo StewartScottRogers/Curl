@@ -29,6 +29,9 @@ namespace Curl.Original.Protocol.Imap;
 /// (BL-1220). An exchange that cannot answer a challenge and gives a
 /// <see cref="ISaslExchange.CancelReason" /> is cancelled the same way, after that reason
 /// is written as a <c>-v</c> info line (BL-1348).</item>
+/// <item>With <c>--oauth2-bearer</c> and no <c>AUTH=</c> option only OAUTHBEARER and XOAUTH2
+/// are used and <c>LOGIN</c> is never sent; any <c>AUTH=</c> option allows what it names,
+/// token or not (BL-5880).</item>
 /// <item>No choice: with a user, <c>LOGINDISABLED</c> not advertised and the options
 /// allowing it, <c>LOGIN user password</c>, each as <see cref="ImapQuoting" /> writes it;
 /// answered other than <c>OK</c> it is exit 67 <c>Access denied. </c> and the byte curl
@@ -39,6 +42,9 @@ namespace Curl.Original.Protocol.Imap;
 internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthenticator? authenticator, ITransferContext context)
 {
     private const string External = "EXTERNAL";
+
+    /// <summary>The <see cref="SaslRequest.RequiredMechanism" /> that allows any mechanism.</summary>
+    private const string AnyMechanism = "*";
 
     private const string DefaultServiceName = "imap";
 
@@ -228,19 +234,21 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
         || (options.NamedMechanisms.Contains(External) && offered.Contains(External, StringComparer.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Whether <c>LOGIN</c> may be sent: there is a user, the options allow it and the server
-    /// did not advertise <c>LOGINDISABLED</c>.
+    /// Whether <c>LOGIN</c> may be sent: there is a user, the options allow it, the server
+    /// did not advertise <c>LOGINDISABLED</c> and curl does not prefer the bearer mechanisms
+    /// alone.
     /// </summary>
     private bool MayLogIn(SaslRequest request, ImapLoginOptions options, IReadOnlySet<string> capabilities) =>
-        request.Credential is not null && options.AllowsLogin && !capabilities.Contains("LOGINDISABLED") && !BearerWithheld(options);
+        request.Credential is not null && options.AllowsLogin && !capabilities.Contains("LOGINDISABLED") && !PrefersBearerAlone(request, options);
 
     /// <summary>
-    /// Whether a redirect withheld the <c>--oauth2-bearer</c> token and no <c>AUTH=</c> option
-    /// names a mechanism, so curl's preferred mechanisms are the bearer ones alone and it
-    /// never falls back to <c>LOGIN</c> (upstream test779, BL-2090).
+    /// Whether <c>--oauth2-bearer</c> was given, even if a redirect withheld the token, and no
+    /// <c>AUTH=</c> option names a mechanism, so curl's preferred mechanisms are the bearer
+    /// ones alone and it never falls back to <c>LOGIN</c> (upstream test779, BL-2090,
+    /// BL-5880).
     /// </summary>
-    private bool BearerWithheld(ImapLoginOptions options) =>
-        context.Mail is { BearerTokenWithheld: true } && !options.NamesMechanisms;
+    private bool PrefersBearerAlone(SaslRequest request, ImapLoginOptions options) =>
+        !options.NamesMechanisms && (request.BearerToken is not null || context.Mail is { BearerTokenWithheld: true });
 
     private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
 
@@ -306,6 +314,8 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// <summary>
     /// Asks the authenticator for a mechanism among those offered that the options allow:
     /// <c>EXTERNAL</c> first when the options name it, as curl prefers it, then any other.
+    /// With <c>AUTH=</c> options the request requires <c>*</c>, so a bearer token does not
+    /// keep the password mechanisms from being chosen (BL-5880).
     /// </summary>
     private (string Mechanism, SaslRequest Request)? ChooseMechanism(SaslRequest request, ImapLoginOptions options, IReadOnlyList<string> offered)
     {
@@ -321,7 +331,8 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
             return (externalMechanism, external);
         }
 
-        return authenticator.ChooseMechanism(request, allowed) is { } mechanism ? (mechanism, request) : null;
+        SaslRequest preferred = options.NamesMechanisms ? request with { RequiredMechanism = AnyMechanism } : request;
+        return authenticator.ChooseMechanism(preferred, allowed) is { } mechanism ? (mechanism, preferred) : null;
     }
 
     /// <summary>

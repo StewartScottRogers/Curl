@@ -17,7 +17,7 @@ public sealed class Pop3LoginOptionsTests
     [TestMethod]
     [DataRow(null, "Any", null)]
     [DataRow("", "Any", null)]
-    [DataRow("AUTH=*", "Any", null)]
+    [DataRow("AUTH=*", "Any", "*")]
     [DataRow("AUTH=+APOP", "Apop", null)]
     [DataRow("auth=+apop", "Apop", null)]
     [DataRow("Auth=plain", "Sasl", "plain")]

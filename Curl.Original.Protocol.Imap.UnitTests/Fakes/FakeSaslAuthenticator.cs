@@ -33,7 +33,7 @@ public sealed class FakeSaslAuthenticator(string mechanism, byte[]? initialRespo
     public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms)
     {
         Choices.Add((request, [.. offeredMechanisms]));
-        bool required = request.RequiredMechanism is null || string.Equals(request.RequiredMechanism, mechanism, StringComparison.OrdinalIgnoreCase);
+        bool required = request.RequiredMechanism is null or "*" || string.Equals(request.RequiredMechanism, mechanism, StringComparison.OrdinalIgnoreCase);
         return required && offeredMechanisms.Contains(mechanism, StringComparer.OrdinalIgnoreCase) ? mechanism : null;
     }
 
