@@ -49,3 +49,4 @@ The finding, verbatim:
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 742311db 69116afe 3d836d5e.
