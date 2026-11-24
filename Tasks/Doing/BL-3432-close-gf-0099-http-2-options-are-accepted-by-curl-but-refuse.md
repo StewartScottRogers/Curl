@@ -71,3 +71,4 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 - 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs
 - 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/2 stays on for Windows (ADR-0871, ADR-0929); doing this would make --http2 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 4f192eea 3314e1db ca72db98 7fbbecd2 1fd5de8c 28346828.
