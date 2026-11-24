@@ -72,7 +72,7 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
     private static Task<long> ReadAsync(S3Operations operations, ITransferContext context, string key) =>
         IsPrefix(key)
             ? operations.ListAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output)
-            : operations.DownloadAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output);
+            : operations.DownloadAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output, context.ResumeFrom, context.RangeText);
 
     private static Task<long> UploadObjectAsync(S3Operations operations, Stream upload, string key) =>
         IsPrefix(key)

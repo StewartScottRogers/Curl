@@ -20,22 +20,27 @@ namespace Curl.Extended.Protocol.S3.Client;
 /// <param name="headReporter">Shows the heads and keeps what <c>-w</c> reports about the response.</param>
 internal sealed class S3Client(IConnector connector, ITransferContext context, S3Configuration configuration, S3Endpoint endpoint, S3HttpHeadReporter headReporter)
 {
+    /// <summary>The status of a range S3 cannot satisfy.</summary>
+    internal const int RangeNotSatisfiable = 416;
+
     /// <summary>Sends a request and reads its successful response.</summary>
     /// <typeparam name="T">What the response gives.</typeparam>
     /// <param name="method">The method.</param>
     /// <param name="path">The absolute path, before percent-encoding.</param>
     /// <param name="query">The query parameters, before percent-encoding.</param>
     /// <param name="body">The body, or <see langword="null"/> for none.</param>
-    /// <param name="readResponse">Reads the response, whose status is below 300, while the connection is open.</param>
+    /// <param name="readResponse">Reads the response, whose status is below 300 (or 416 to a request with a <paramref name="range"/>), while the connection is open.</param>
+    /// <param name="range">The <c>Range</c> header value to send and sign, or <see langword="null"/> for none.</param>
     /// <returns>What <paramref name="readResponse"/> gives.</returns>
     internal async Task<T> ExchangeAsync<T>(
         string method,
         string path,
         IReadOnlyList<KeyValuePair<string, string>> query,
         byte[]? body,
-        Func<S3HttpResponse, Task<T>> readResponse)
+        Func<S3HttpResponse, Task<T>> readResponse,
+        string? range = null)
     {
-        S3HttpRequest request = RequestFor(method, path, query, body);
+        S3HttpRequest request = RequestFor(method, path, query, body, range);
         ConnectTarget target = new(endpoint.Host, endpoint.Port, endpoint.UseTls) { Proxy = context.Proxy, Events = context.Events, DiagnosticLog = context.DiagnosticLog };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken);
         if (connect.Connection is not { } connection)
@@ -47,7 +52,7 @@ internal sealed class S3Client(IConnector connector, ITransferContext context, S
         await using (connection.ConfigureAwait(false))
         {
             S3HttpResponse response = await new S3HttpClientConnection(connection, headReporter).SendAsync(request, context.CancellationToken);
-            if (response.StatusCode >= 300)
+            if (response.StatusCode >= 300 && !(range is not null && response.StatusCode == RangeNotSatisfiable))
             {
                 throw await FailureOfAsync(response);
             }
@@ -87,9 +92,14 @@ internal sealed class S3Client(IConnector connector, ITransferContext context, S
             ? new S3TransferException(CurlExitCode.HttpReturnedError, $"S3 returned error {statusCode}: {error.Code}: {error.Message}")
             : new S3TransferException(CurlExitCode.HttpReturnedError, $"S3 returned error {statusCode}");
 
-    private S3HttpRequest RequestFor(string method, string path, IReadOnlyList<KeyValuePair<string, string>> query, byte[]? body)
+    private S3HttpRequest RequestFor(string method, string path, IReadOnlyList<KeyValuePair<string, string>> query, byte[]? body, string? range)
     {
         List<KeyValuePair<string, string>> headers = [new("host", endpoint.HostHeader)];
+        if (range is not null)
+        {
+            headers.Add(new("range", range));
+        }
+
         if (configuration.SessionToken is { } sessionToken)
         {
             headers.Add(new("x-amz-security-token", sessionToken));

@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Operations.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Configuration.cs, Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpRequest.cs, Curl.Extended.Protocol.S3.UnitTests/Client/S3Operations]
+touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Operations.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Configuration.cs, Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpRequest.cs, Curl.Extended.Protocol.S3.UnitTests/Client/S3Operations, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Client.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3ProtocolHandler.cs, Curl.Extended.Protocol.S3.UnitTests/Client/S3RangeDownloadTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5873 — Send a Range header for -r and -C - on s3:// downloads, so a ranged or resumed GET returns 206
 
@@ -24,14 +24,19 @@ Repro: `surl --directory store --cert server.pem --key server.key --user AKIAIOS
 
 ## Acceptance criteria
 
-- [ ] `-r 0-9` on an `s3://` GET sends `Range: bytes=0-9`, and the 206 body (10 bytes) is written, pinned by a unit test against a test-double connection.
-- [ ] `-C -` with a partial output file sends `Range: bytes=<size>-` and appends; `-C <n>` sends `bytes=<n>-`, each pinned by a unit test.
-- [ ] A 200 reply to a ranged request behaves as curl's https path does (measure it; record it in Notes), pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `-r 0-9` on an `s3://` GET sends `Range: bytes=0-9`, and the 206 body (10 bytes) is written, pinned by a unit test against a test-double connection.
+- [x] `-C -` with a partial output file sends `Range: bytes=<size>-` and appends; `-C <n>` sends `bytes=<n>-`, each pinned by a unit test.
+- [x] A 200 reply to a ranged request behaves as curl's https path does (measure it; record it in Notes), pinned by a test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added S3Client.cs, S3ProtocolHandler.cs and a new test file to touches (the range threads through them; no other Doing task holds them). S3HttpRequest.cs and S3Configuration.cs needed no change: the range travels as a signed `range` header and the handler reads ResumeFrom and RangeText from the context.
+- Behaviour copied from the https path (HttpRangeHeader, HttpDownloadConditions; read from code, not re-measured against a live server): `-r` text sent as `bytes=<text>`; a 200 reply to `-r` writes the whole body; `-C n` (n>0) sends `bytes=n-`; resume with 416 is success with 0 bytes; resume with 200 whose Content-Length equals n is 0 bytes, else exit 33; `-r` with 416 fails exit 22. Quality run clean (0 failing, 100/100).
+- Linux/macOS CI: tests are platform-neutral.
 
 ## Log
 
 - 2026-11-24: Created from Surly bug report 2026-11-24T1330, finding 2.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 944fda24 d8ed0a1f 575b2b3a 3d836d5e.
+- 2026-11-24: Doing -> Done. s3:// downloads send a signed Range header for -r and -C; 416/200 resume handled as over https

@@ -23,8 +23,34 @@ internal sealed class S3Operations(S3Client client, S3Endpoint endpoint, string 
     /// <param name="query">The URL's own query parameters, sent as they are (for example <c>versionId</c>).</param>
     /// <param name="output">Where the object's bytes go.</param>
     /// <returns>The number of bytes written.</returns>
-    internal Task<long> DownloadAsync(string key, IReadOnlyList<KeyValuePair<string, string>> query, Stream output) =>
-        client.ExchangeAsync("GET", endpoint.PathOf(bucket, key), query, null, response => CopyAsync(response.Body, output));
+    /// <param name="resumeFrom">The <c>-C</c> offset: above zero sends <c>Range: bytes=N-</c> and appends what follows; as curl does over https, a 416 means nothing is left, and a 200 that is not exactly the bytes already held fails with exit 33.</param>
+    /// <param name="rangeText">The <c>-r</c> text as typed, sent as <c>Range: bytes=</c> and the text; whatever status S3 answers is delivered as over https.</param>
+    internal Task<long> DownloadAsync(string key, IReadOnlyList<KeyValuePair<string, string>> query, Stream output, long? resumeFrom = null, string? rangeText = null)
+    {
+        bool resuming = resumeFrom is > 0;
+        string? range = resuming ? string.Create(CultureInfo.InvariantCulture, $"bytes={resumeFrom}-") : rangeText is null ? null : "bytes=" + rangeText;
+        return client.ExchangeAsync("GET", endpoint.PathOf(bucket, key), query, null, response => ReadObjectAsync(response, output, resuming ? resumeFrom : null), range);
+    }
+
+    private async Task<long> ReadObjectAsync(S3HttpResponse response, Stream output, long? resumeFrom)
+    {
+        if (response.StatusCode == S3Client.RangeNotSatisfiable)
+        {
+            return resumeFrom is null
+                ? throw S3Client.ErrorOf(response.StatusCode, await client.ReadTextAsync(response))
+                : 0;
+        }
+
+        return resumeFrom is { } offset && response.StatusCode != 206
+            ? NothingLeftOf(response, offset)
+            : await CopyAsync(response.Body, output);
+    }
+
+    // A resume answered with the whole object: only one exactly the size already held has nothing to add, as over https.
+    private static long NothingLeftOf(S3HttpResponse response, long offset) =>
+        long.TryParse(response.FindHeader("Content-Length"), CultureInfo.InvariantCulture, out long length) && length == offset
+            ? 0
+            : throw new S3TransferException(CurlExitCode.RangeError, "HTTP server does not seem to support byte ranges. Cannot resume.");
 
     /// <summary>Deletes the object at <paramref name="key"/> (DeleteObject); a 204 is success, any other 3xx or above fails as the other operations do.</summary>
     /// <param name="key">The object key.</param>
