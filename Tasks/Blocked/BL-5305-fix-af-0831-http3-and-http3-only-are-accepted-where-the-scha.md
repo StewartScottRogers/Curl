@@ -57,3 +57,4 @@ Stewart decided 2026-11-16 (option 1, keep HTTP/3 on): --http3 and --http3-only 
 - 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/3 stays accepted on every platform (ADR-1282); doing this would make --http3 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-24: Doing -> Blocked. Stewart: Fixing this makes --http3/--http3-only exit 2, reversing your 2026-11-16 and 2026-11-22 decisions (ADR-1282); the 2026-11-24 undefer was a bulk move, so confirm you want ADR-1282 reversed, else close AF-0831 as a known difference.
