@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+No code change: AF-0703 was rejected by Stewart as the audit's planted defect. In this tree --path-as-is is registered (CommandLineOptionTable.cs:332, alias table line 174); the reproduction on a fresh Debug build gives exit 0 and request.bin written. Build clean; no source changed so the fast tests are unaffected.
 
 ## Log
 
