@@ -39,13 +39,16 @@ internal sealed partial class ServerCertificateVerification
             return errors | SslPolicyErrors.RemoteCertificateNameMismatch;
         }
 
-        // OpenSSL's check ignores one trailing dot on each side, .NET's on Linux does not
-        // (BL-5855, STD-187).
-        return errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
-            && SchannelCommonNameCheck.DnsAlternativeNameMatches(leaf, targetHost)
+        return WithoutNameMismatchOpenSslTrailingDotAccepts(errors, leaf, targetHost);
+    }
+
+    // OpenSSL's check ignores one trailing dot on each side, .NET's on Linux does not
+    // (BL-5855, STD-187).
+    private static SslPolicyErrors WithoutNameMismatchOpenSslTrailingDotAccepts(SslPolicyErrors errors, X509Certificate2 leaf, string targetHost) =>
+        errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
+        && SchannelCommonNameCheck.DnsAlternativeNameMatches(leaf, targetHost)
             ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
             : errors;
-    }
 
     // With --cacert curl's Schannel build checks the name itself and, for a certificate
     // with no DNS subjectAltName, matches the common name, which .NET's check does not
