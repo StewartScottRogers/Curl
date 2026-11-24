@@ -19,17 +19,18 @@ REM  for the Curl project -- no other files required.
 REM
 REM  It performs these steps, each a no-op if already satisfied:
 REM
-REM      [1/7] Ensure git            (installs via winget if missing)
-REM      [2/7] Ensure Node.js / npm  (installs via winget if missing)
-REM      [3/7] Ensure Claude Code    (installs/updates via npm)
-REM      [4/7] Ensure herdr          (installs/updates the terminal multiplexer)
-REM      [5/7] Clone / update repo   (into %USERPROFILE%\Curl)
-REM      [6/7] Ensure herdr server   (starts a compatible one if needed)
-REM      [7/7] Launch Claude         (as a tracked pane anchored to the repo)
+REM      [1/8] Ensure git            (installs via winget if missing)
+REM      [2/8] Ensure Node.js / npm  (installs via winget if missing)
+REM      [3/8] Ensure Claude Code    (installs/updates via npm)
+REM      [4/8] Ensure cipher MCP     (installs/updates it, registers it with Claude)
+REM      [5/8] Ensure herdr          (installs/updates the terminal multiplexer)
+REM      [6/8] Clone / update repo   (into %USERPROFILE%\Curl)
+REM      [7/8] Ensure herdr server   (starts a compatible one if needed)
+REM      [8/8] Launch Claude         (as a tracked pane anchored to the repo)
 REM
 REM  Claude shows up as a tracked "Claude" pane in herdr's sidebar; its live state
 REM  (idle / working / blocked) is reported by herdr's native Claude integration
-REM  hook. Step [4/7] guarantees both the "claude" and "copilot" integration hooks
+REM  hook. Step [5/8] guarantees both the "claude" and "copilot" integration hooks
 REM  are installed, running each install unless status confirms it already is.
 REM
 REM  WHERE IT RUNS THE REPO FROM
@@ -87,12 +88,12 @@ where winget >nul 2>nul && set "WINGET=winget"
 
 
 REM -----------------------------------------------------------------------------
-REM  [1/7]  Ensure git  (needed to clone the repo)
+REM  [1/8]  Ensure git  (needed to clone the repo)
 REM -----------------------------------------------------------------------------
 REM  Prefer git on PATH; otherwise try its default install location. Only if both
 REM  miss do we install it, then look again (a fresh winget install does not update
 REM  THIS session's PATH, so we must probe the known path directly).
-echo [1/7] Checking for git ...
+echo [1/8] Checking for git ...
 set "GIT="
 where git >nul 2>nul && set "GIT=git"
 if not defined GIT if exist "%ProgramFiles%\Git\cmd\git.exe" set "GIT=%ProgramFiles%\Git\cmd\git.exe"
@@ -118,9 +119,9 @@ if not defined GIT (
 
 
 REM -----------------------------------------------------------------------------
-REM  [2/7]  Ensure Node.js / npm  (needed to install Claude Code)
+REM  [2/8]  Ensure Node.js / npm  (needed to install Claude Code)
 REM -----------------------------------------------------------------------------
-echo [2/7] Checking for Node.js / npm ...
+echo [2/8] Checking for Node.js / npm ...
 set "NPM="
 where npm >nul 2>nul && set "NPM=npm"
 if not defined NPM if exist "%ProgramFiles%\nodejs\npm.cmd" set "NPM=%ProgramFiles%\nodejs\npm.cmd"
@@ -152,11 +153,11 @@ set "PATH=%PATH%;%ProgramFiles%\nodejs;%APPDATA%\npm"
 
 
 REM -----------------------------------------------------------------------------
-REM  [3/7]  Ensure Claude Code  (npm global package), then update it
+REM  [3/8]  Ensure Claude Code  (npm global package), then update it
 REM -----------------------------------------------------------------------------
 REM  Missing  -> install. Present -> best-effort update (an offline failure is
 REM  swallowed so the launch still proceeds on the version already installed).
-echo [3/7] Checking for Claude Code ...
+echo [3/8] Checking for Claude Code ...
 where claude >nul 2>nul
 if not errorlevel 1 goto :claude_update
 
@@ -176,13 +177,55 @@ call claude update 2>nul
 
 
 REM -----------------------------------------------------------------------------
-REM  [4/7]  Ensure herdr, update it, and install its Claude integration hook
+REM  [4/8]  Ensure the cipher memory MCP server, update it, register it with Claude
+REM -----------------------------------------------------------------------------
+REM  cipher (npm @byterover/cipher, https://mcpmarket.com/server/cipher) gives
+REM  Claude a persistent memory over MCP. It is installed into its own folder,
+REM  not npm's global one: a global install on Windows fails with ENOTEMPTY while
+REM  npm swaps its large tree. Every launch reinstalls @latest, so it stays
+REM  current. --ignore-scripts skips a native build that needs Visual Studio; the
+REM  one native module cipher needs, better-sqlite3, is then fetched prebuilt,
+REM  because without it cipher prints a SQLite error onto stdout and breaks MCP.
+REM
+REM  Claude is pointed at node and cipher's script by full path, never at a bare
+REM  "cipher": on Windows that name is System32\cipher.exe, the EFS tool. The
+REM  registration is user-wide and redone on every launch, so it always names the
+REM  current install. cipher reads OPENAI_API_KEY (embeddings) from the
+REM  environment Claude inherits. Any failure here only warns: Claude still starts.
+echo [4/8] Ensuring the cipher MCP server ...
+set "CIPHER_DIR=%LOCALAPPDATA%\cipher-mcp"
+set "CIPHER_ENTRY=%CIPHER_DIR%\node_modules\@byterover\cipher\dist\src\app\index.cjs"
+set "CIPHER_SQLITE=%CIPHER_DIR%\node_modules\better-sqlite3"
+if not exist "%CIPHER_DIR%" mkdir "%CIPHER_DIR%"
+REM  A quoted bare "npm" makes npm.cmd look for npm in the CURRENT folder, so
+REM  call npm by its full path (NPM is just "npm" when it was found on PATH).
+set "CIPHER_NPM=%NPM%"
+if /I "%NPM%"=="npm" for /f "delims=" %%N in ('where npm.cmd 2^>nul') do if /I "!CIPHER_NPM!"=="npm" set "CIPHER_NPM=%%N"
+call "%CIPHER_NPM%" install --prefix "%CIPHER_DIR%" @byterover/cipher@latest --ignore-scripts --no-audit --no-fund --loglevel=error
+if not exist "%CIPHER_ENTRY%" (
+    echo       WARNING: cipher could not be installed; Claude will start without it.
+    goto :cipher_ready
+)
+if not exist "%CIPHER_SQLITE%\build\Release\better_sqlite3.node" (
+    pushd "%CIPHER_SQLITE%"
+    call "%CIPHER_NPM%" exec --yes -- prebuild-install
+    popd
+)
+call claude mcp remove cipher -s user >nul 2>nul
+call claude mcp add cipher -s user -- node "%CIPHER_ENTRY%" --mode mcp >nul
+if errorlevel 1 echo       WARNING: cipher could not be registered with Claude.
+
+:cipher_ready
+
+
+REM -----------------------------------------------------------------------------
+REM  [5/8]  Ensure herdr, update it, and install its Claude integration hook
 REM -----------------------------------------------------------------------------
 REM  Locate herdr on PATH first, then at its default install location. If missing,
 REM  run the official Windows installer (a PowerShell script that drops versioned
 REM  binaries under %USERPROFILE%\.herdr and points %LOCALAPPDATA%\Programs\Herdr\
 REM  bin at the current one), then probe the known path again.
-echo [4/7] Checking for herdr ...
+echo [5/8] Checking for herdr ...
 set "HERDR="
 where herdr >nul 2>nul && set "HERDR=herdr"
 if not defined HERDR if exist "%LOCALAPPDATA%\Programs\Herdr\bin\herdr.exe" set "HERDR=%LOCALAPPDATA%\Programs\Herdr\bin\herdr.exe"
@@ -214,11 +257,11 @@ call :ensure_integration copilot
 
 
 REM -----------------------------------------------------------------------------
-REM  [5/7]  Clone or update the repo  (skipped when using an in-place checkout)
+REM  [6/8]  Clone or update the repo  (skipped when using an in-place checkout)
 REM -----------------------------------------------------------------------------
 REM  We only touch the DEFAULT clone location. If REPO_DIR points at a checkout the
 REM  script was launched from, we leave that working tree strictly alone.
-echo [5/7] Preparing the repository ...
+echo [6/8] Preparing the repository ...
 if /I not "%REPO_DIR%"=="%DEFAULT_REPO_DIR%" goto :repo_ready
 
 if exist "%REPO_DIR%\.git" (
@@ -241,7 +284,7 @@ if not exist "%REPO_DIR%\.git" (
 
 
 REM -----------------------------------------------------------------------------
-REM  [6/7]  Ensure a COMPATIBLE herdr server is running to host the pane
+REM  [7/8]  Ensure a COMPATIBLE herdr server is running to host the pane
 REM -----------------------------------------------------------------------------
 REM  A server from an older herdr build still answers "status: running" but also
 REM  "private_protocol_compatible: no" (its wire protocol is older than this
@@ -253,7 +296,7 @@ REM  We match private_protocol_compatible specifically, NOT a bare "compatible: 
 REM  findstr /C: is a substring match and the status output also carries an
 REM  "endpoint_compatible:" line, so a bare pattern would match that instead and a
 REM  server with a stale private protocol would sail through the check.
-echo [6/7] Ensuring a herdr server is running ...
+echo [7/8] Ensuring a herdr server is running ...
 set "SRV_RUNNING="
 set "SRV_COMPAT="
 "%HERDR%" status server 2>nul | findstr /I /C:"status: running" >nul && set "SRV_RUNNING=1"
@@ -285,10 +328,10 @@ goto :die
 
 
 REM -----------------------------------------------------------------------------
-REM  [7/7]  Launch Claude as a tracked pane inside herdr
+REM  [8/8]  Launch Claude as a tracked pane inside herdr
 REM -----------------------------------------------------------------------------
 :server_ready
-echo [7/7] Launching Claude in herdr ...
+echo [8/8] Launching Claude in herdr ...
 
 REM  Choose a friendly, incrementing tab label ("Claude", "Claude 2", ...) by
 REM  counting the claude agents herdr already tracks. The agent itself is

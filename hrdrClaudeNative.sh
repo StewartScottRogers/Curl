@@ -14,17 +14,18 @@
 #
 #  It performs these steps, each a no-op if already satisfied:
 #
-#      [1/7] Ensure git            (installs via the system package manager)
-#      [2/7] Ensure Node.js / npm  (installs via the system package manager)
-#      [3/7] Ensure Claude Code    (installs/updates via npm)
-#      [4/7] Ensure herdr          (installs/updates the terminal multiplexer)
-#      [5/7] Clone / update repo   (into $HOME/Curl)
-#      [6/7] Ensure herdr server   (stops an incompatible one)
-#      [7/7] Launch Claude         (as a tracked pane anchored to the repo)
+#      [1/8] Ensure git            (installs via the system package manager)
+#      [2/8] Ensure Node.js / npm  (installs via the system package manager)
+#      [3/8] Ensure Claude Code    (installs/updates via npm)
+#      [4/8] Ensure cipher MCP     (installs/updates it, registers it with Claude)
+#      [5/8] Ensure herdr          (installs/updates the terminal multiplexer)
+#      [6/8] Clone / update repo   (into $HOME/Curl)
+#      [7/8] Ensure herdr server   (stops an incompatible one)
+#      [8/8] Launch Claude         (as a tracked pane anchored to the repo)
 #
 #  Claude shows up as a tracked "Claude" pane in herdr's sidebar; its live state
 #  (idle / working / blocked) is reported by herdr's native Claude integration
-#  hook. Step [4/7] guarantees both the "claude" and "copilot" integration hooks
+#  hook. Step [5/8] guarantees both the "claude" and "copilot" integration hooks
 #  are installed, running each install unless status confirms it already is.
 #
 #  WHERE IT RUNS THE REPO FROM
@@ -58,7 +59,7 @@
 #  and types the claude command into it. Its output goes to a log file so it
 #  never draws over herdr's screen.
 #
-#  JSON from herdr's API is parsed with node, which step [2/7] guarantees.
+#  JSON from herdr's API is parsed with node, which step [2/8] guarantees.
 # =============================================================================
 
 set -u
@@ -125,9 +126,9 @@ fetch_to_stdout() {
 
 
 # -----------------------------------------------------------------------------
-#  [1/7]  Ensure git  (needed to clone the repo)
+#  [1/8]  Ensure git  (needed to clone the repo)
 # -----------------------------------------------------------------------------
-echo "[1/7] Checking for git ..."
+echo "[1/8] Checking for git ..."
 if ! command -v git >/dev/null 2>&1; then
     echo "      git not found - installing via ${PKG:-a package manager} ..."
     [ -n "$PKG" ] || die "no supported package manager found, so git cannot be auto-installed. Install git, then retry."
@@ -137,9 +138,9 @@ fi
 
 
 # -----------------------------------------------------------------------------
-#  [2/7]  Ensure Node.js / npm  (needed to install Claude Code)
+#  [2/8]  Ensure Node.js / npm  (needed to install Claude Code)
 # -----------------------------------------------------------------------------
-echo "[2/7] Checking for Node.js / npm ..."
+echo "[2/8] Checking for Node.js / npm ..."
 if ! command -v npm >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
     echo "      Node.js not found - installing via ${PKG:-a package manager} ..."
     [ -n "$PKG" ] || die "no supported package manager found, so Node.js cannot be auto-installed. Install Node.js LTS from nodejs.org, then retry."
@@ -167,11 +168,11 @@ export PATH="$PATH:$NPM_PREFIX/bin"
 
 
 # -----------------------------------------------------------------------------
-#  [3/7]  Ensure Claude Code  (npm global package), then update it
+#  [3/8]  Ensure Claude Code  (npm global package), then update it
 # -----------------------------------------------------------------------------
 #  Missing  -> install. Present -> best-effort update (an offline failure is
 #  swallowed so the launch still proceeds on the version already installed).
-echo "[3/7] Checking for Claude Code ..."
+echo "[3/8] Checking for Claude Code ..."
 if command -v claude >/dev/null 2>&1; then
     echo "      updating Claude Code ..."
     claude update >/dev/null 2>&1 || true
@@ -185,11 +186,40 @@ fi
 
 
 # -----------------------------------------------------------------------------
-#  [4/7]  Ensure herdr, update it, and install its integration hooks
+#  [4/8]  Ensure the cipher memory MCP server, update it, register it with Claude
+# -----------------------------------------------------------------------------
+#  cipher (npm @byterover/cipher, https://mcpmarket.com/server/cipher) gives
+#  Claude a persistent memory over MCP. It is installed into its own folder and
+#  reinstalled at @latest on every launch, so it stays current; better-sqlite3,
+#  its one native module, is fetched prebuilt (without it cipher prints a SQLite
+#  error onto stdout and breaks MCP). Claude is pointed at node and cipher's
+#  script by full path, and the user-wide registration is redone every launch.
+#  cipher reads OPENAI_API_KEY (embeddings) from the environment Claude
+#  inherits. Any failure here only warns: Claude still starts.
+echo "[4/8] Ensuring the cipher MCP server ..."
+CIPHER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/cipher-mcp"
+CIPHER_ENTRY="$CIPHER_DIR/node_modules/@byterover/cipher/dist/src/app/index.cjs"
+CIPHER_SQLITE="$CIPHER_DIR/node_modules/better-sqlite3"
+mkdir -p "$CIPHER_DIR"
+npm install --prefix "$CIPHER_DIR" @byterover/cipher@latest --ignore-scripts --no-audit --no-fund --loglevel=error || true
+if [ -f "$CIPHER_ENTRY" ]; then
+    if [ ! -f "$CIPHER_SQLITE/build/Release/better_sqlite3.node" ]; then
+        (cd "$CIPHER_SQLITE" && npm exec --yes -- prebuild-install) || true
+    fi
+    claude mcp remove cipher -s user >/dev/null 2>&1 || true
+    claude mcp add cipher -s user -- node "$CIPHER_ENTRY" --mode mcp >/dev/null \
+        || echo "      WARNING: cipher could not be registered with Claude."
+else
+    echo "      WARNING: cipher could not be installed; Claude will start without it."
+fi
+
+
+# -----------------------------------------------------------------------------
+#  [5/8]  Ensure herdr, update it, and install its integration hooks
 # -----------------------------------------------------------------------------
 #  Locate herdr on PATH first, then at the usual per-user install locations. If
 #  missing, run the official Unix installer, then probe again.
-echo "[4/7] Checking for herdr ..."
+echo "[5/8] Checking for herdr ..."
 find_herdr() {
     HERDR="$(command -v herdr 2>/dev/null || true)"
     for p in "$HOME/.local/bin/herdr" "$HOME/.herdr/bin/herdr"; do
@@ -228,11 +258,11 @@ ensure_integration copilot
 
 
 # -----------------------------------------------------------------------------
-#  [5/7]  Clone or update the repo  (skipped when using an in-place checkout)
+#  [6/8]  Clone or update the repo  (skipped when using an in-place checkout)
 # -----------------------------------------------------------------------------
 #  We only touch the DEFAULT clone location. If REPO_DIR points at a checkout
 #  the script was launched from, we leave that working tree strictly alone.
-echo "[5/7] Preparing the repository ..."
+echo "[6/8] Preparing the repository ..."
 if [ "$REPO_DIR" = "$DEFAULT_REPO_DIR" ]; then
     if [ -e "$REPO_DIR/.git" ]; then
         echo "      updating existing checkout ..."
@@ -246,14 +276,14 @@ fi
 
 
 # -----------------------------------------------------------------------------
-#  [6/7]  Make sure any running herdr server is COMPATIBLE
+#  [7/8]  Make sure any running herdr server is COMPATIBLE
 # -----------------------------------------------------------------------------
 #  A server from an older herdr build still answers "status: running" but also
 #  "private_protocol_compatible: no"; every pane/agent API call against it fails
 #  with protocol_mismatch, so stop it and let step 7 start a fresh one. We match
 #  private_protocol_compatible specifically: the status output also carries an
 #  "endpoint_compatible:" line that a bare "compatible: yes" would match.
-echo "[6/7] Checking the herdr server ..."
+echo "[7/8] Checking the herdr server ..."
 server_running()    { "$HERDR" status server 2>/dev/null | grep -iq "status: running"; }
 server_compatible() { "$HERDR" status server 2>/dev/null | grep -iq "private_protocol_compatible: yes"; }
 
@@ -269,7 +299,7 @@ fi
 
 
 # -----------------------------------------------------------------------------
-#  [7/7]  Launch Claude as a tracked pane inside herdr
+#  [8/8]  Launch Claude as a tracked pane inside herdr
 # -----------------------------------------------------------------------------
 #  launch_claude_pane creates a labelled tab in the "Curl" workspace (creating
 #  the workspace if needed), anchored to the repo with CLAUDE_MODEL forwarded
@@ -321,7 +351,7 @@ launch_claude_pane() {
         || { echo "ERROR: herdr could not launch Claude in the pane."; return 1; }
 }
 
-echo "[7/7] Launching Claude in herdr ..."
+echo "[8/8] Launching Claude in herdr ..."
 if [ -n "$SERVER_READY" ]; then
     launch_claude_pane || die "could not start Claude in herdr."
     echo
