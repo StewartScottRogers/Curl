@@ -13,31 +13,49 @@ namespace Curl.Networking;
 /// </summary>
 internal sealed partial class ServerCertificateVerification
 {
-    // The OpenSSL build refuses the whole file (exit 77) unless every CERTIFICATE block in
-    // it parses and there is at least one; ImportFromPem skips a block whose body is not
-    // base64, so the blocks imported are counted against the blocks begun. The Schannel
-    // build trusts whatever parses.
+    // The thumbprints of the --cacert certificates whose OpenSSL settings refuse server
+    // authentication; empty in the Schannel build and under -k.
+    private IReadOnlySet<string> rejectedCaCertificates = new HashSet<string>();
+
+    private const long CertificateRejectedVerifyResult = 28;
+
+    private const string OpenSslCertificateRejectedRefusal = "SSL certificate OpenSSL verify result: certificate rejected (28)";
+
+    // The OpenSSL build refuses the whole file (exit 77) unless every CERTIFICATE and TRUSTED
+    // CERTIFICATE block in it parses and there is at least one. The Schannel build trusts
+    // whatever CERTIFICATE blocks parse.
     // A CURLOPT_CAINFO_BLOB is read as the file would be, and wins over it (ADR-0704).
     private X509Certificate2Collection ReadCaCertificates()
     {
         var pem = options.CaCertificateBlob is { } blob
             ? Encoding.ASCII.GetString(blob.Span)
             : ReadCaCertificateFile(CaCertificateFile!);
-        var certificates = new X509Certificate2Collection();
         if (matchesSchannelBuild)
         {
+            var certificates = new X509Certificate2Collection();
             ImportParsableCertificates(certificates, pem);
             return certificates;
         }
 
-        certificates.ImportFromPem(pem);
-        if (certificates.Count == 0 || certificates.Count != pem.AsSpan().Count(PemCertificateBegin))
-        {
-            throw new CryptographicException("The file holds no certificate, or one that could not be decoded.");
-        }
-
-        return certificates;
+        var file = OpenSslCaFile.Read(pem);
+        rejectedCaCertificates = file.RejectedForServerAuthentication;
+        return file.Certificates;
     }
+
+    // OpenSSL, with partial chains allowed as curl sets it, stops at the lowest certificate above
+    // the server's own that the trust store lists, else at the server's own, and fails the chain
+    // when that one's settings refuse server authentication (BL-5879).
+    private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateRefusal(X509Chain? chain) =>
+        chain is { ChainElements.Count: > 0 } && rejectedCaCertificates.Contains(DecidingCertificate(chain).Thumbprint)
+            ? (CurlExitCode.PeerFailedVerification, OpenSslCertificateRejectedRefusal)
+            : null;
+
+    private static X509Certificate2 DecidingCertificate(X509Chain chain) =>
+        chain.ChainElements
+            .Skip(1)
+            .Select(element => element.Certificate)
+            .FirstOrDefault(certificate => chain.ChainPolicy.CustomTrustStore.Any(anchor => anchor.Thumbprint == certificate.Thumbprint))
+        ?? chain.ChainElements[0].Certificate;
 
     // An empty --cacert names no file, so it is unusable (exit 77) rather than the
     // ArgumentException File.ReadAllText throws for it (GF-0097).

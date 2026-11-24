@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/OpenSslCaFile.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/OpenSslCaFileTests.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.TrustedCertificate.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5879 — Fix fitness finding STD-198: Linux --cacert: OpenSSL TRUSTED CERTIFICATE blocks are ignored, including their reject (distrust) settings
 
@@ -40,13 +40,25 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] `curl -sS --cacert rejectplusroot.pem https://localhost:31950/` exits 60 with `certificate rejected`; `curl -sS --cacert roottrustout.pem https://localhost:31950/` exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS --cacert rejectplusroot.pem https://localhost:31950/` exits 60 with `certificate rejected`; `curl -sS --cacert roottrustout.pem https://localhost:31950/` exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Done without pipeline subagents, to stay inside the run's cost cap.
+- Reproduced rules measured with `openssl verify -partial_chain -purpose sslserver` 3.5; recorded in ADR-1347.
+- Acceptance check run in WSL Ubuntu: a self-contained linux-x64 publish of this change and curl 8.18.0 (OpenSSL 3.5.5)
+  against `openssl s_server` on 31950 gave identical stderr, `%{ssl_verify_result}` and exit code for
+  `roottrustout.pem` (0), `rejectplusroot.pem` (60, `certificate rejected (28)`) and `rootreject.pem` (60).
+- `touches` widened to the refusal wiring, the new `OpenSslCaFile.cs`, its tests and the library notes; no task in
+  Doing on `origin/work/dark-factory` named any of them.
+- Quality run: 100% line and branch; its two methods at complexity 12 were split, then checked at 6 and 4 from a
+  cobertura run of `Curl.Networking.UnitTests`.
+- `--capath` files in the trusted format are left to BL-5903.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 09c4b73f 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. The OpenSSL build honours TRUSTED CERTIFICATE trust and reject settings in --cacert, as curl 8.18.0 does

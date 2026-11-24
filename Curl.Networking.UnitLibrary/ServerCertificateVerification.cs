@@ -25,8 +25,6 @@ namespace Curl.Networking;
 /// <param name="timeProvider">Dates the OpenSSL verify result's validity checks.</param>
 internal sealed partial class ServerCertificateVerification(TlsClientOptions options, bool matchesSchannelBuild, TimeProvider timeProvider)
 {
-    private const string PemCertificateBegin = "-----BEGIN CERTIFICATE-----";
-
     private static readonly Oid ServerAuthentication = new("1.3.6.1.5.5.7.3.1");
 
     /// <summary>
@@ -401,8 +399,13 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
 
     private const long UnsuitablePurposeVerifyResult = 26;
 
-    private static PeerVerification WithPurposeVerifyResult(PeerVerification observed, string refusalMessage) =>
-        refusalMessage == OpenSslUnsuitablePurposeRefusal ? observed with { VerifyResult = UnsuitablePurposeVerifyResult } : observed;
+    private static PeerVerification WithRefusalVerifyResult(PeerVerification observed, string refusalMessage) =>
+        refusalMessage switch
+        {
+            OpenSslUnsuitablePurposeRefusal => observed with { VerifyResult = UnsuitablePurposeVerifyResult },
+            OpenSslCertificateRejectedRefusal => observed with { VerifyResult = CertificateRejectedVerifyResult },
+            _ => observed,
+        };
 
     private const string OpenSslUnsuitablePurposeRefusal = "SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)";
 
@@ -412,7 +415,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             ? null
             : (CurlExitCode.PeerFailedVerification, OpenSslUnsuitablePurposeRefusal);
 
-    // The first refusal: a revoked staple, the chain or name, then a --crlfile list. A list's
+    // The first refusal: a rejected --cacert certificate, a revoked staple, the chain or name, then a --crlfile list. A list's
     // refusal is OpenSSL's verify result too, so %{ssl_verify_result} reports its code, 23 for
     // a revoked certificate and 12 for an expired list (measured with curl 8.18.0, CGR-168).
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) Refusal(
@@ -426,16 +429,25 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         X509Chain? reasonChain)
     {
         var purposeRefusal = PurposeRefusal(anchoredErrors, chain, anchorsBesideSystemStore);
-        var refusal = RevokedStapleRefusal(stapled) ?? purposeRefusal ?? VerifyPeer(anchoredErrors, chain, targetHost, [], reasonChain);
+        var refusal = RejectedCaCertificateOrRevokedStapleRefusal(chain, stapled) ?? purposeRefusal ?? VerifyPeer(anchoredErrors, chain, targetHost, [], reasonChain);
         if (refusal is not null)
         {
-            return (WithPurposeVerifyResult(observed, refusal.Value.Message), refusal);
+            return (WithRefusalVerifyResult(observed, refusal.Value.Message), refusal);
         }
 
-        return revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
+        return RevocationListVerdict(observed, chain, revocationLists);
+    }
+
+    private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateOrRevokedStapleRefusal(X509Chain? chain, OcspStapleStatus? stapled) =>
+        RejectedCaCertificateRefusal(chain) ?? RevokedStapleRefusal(stapled);
+
+    private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) RevocationListVerdict(
+        PeerVerification observed,
+        X509Chain? chain,
+        CertificateRevocationListFile? revocationLists) =>
+        revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
             ? (observed with { VerifyResult = verifyResult }, (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslRevocationListRefusal(verifyResult)))
             : (observed, null);
-    }
 
     // A good staple answers the revocation status the online check could not fetch.
     private SslPolicyErrors WithoutUnavailableRevocationAGoodStapleAnswers(SslPolicyErrors errors, X509Chain? chain, OcspStapleStatus? stapled) =>
