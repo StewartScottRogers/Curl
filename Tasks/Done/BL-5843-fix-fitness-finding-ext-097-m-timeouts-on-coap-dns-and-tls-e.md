@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/TransferPerformer.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5843 — Fix fitness finding EXT-097: -m timeouts on coap, dns and TLS extension schemes report zero times; a receive ended by -m reports %{time_starttransfer} 0 (STILL OPEN, partly fixed)
 
@@ -55,3 +55,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 4e0bb70a 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. EXT-097: cancelled transfers carry timed reports; starttransfer stamped when bytes arrived
