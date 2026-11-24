@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.OciRegistry.UnitLibrary/Http/OciHttpHeadReporter.cs, Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client/TransferEventsConnector.cs, Curl.Extended.Protocol.OciRegistry.UnitTests/Http/OciHttpHeadReporter]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5876 — Make -w %header{name} print response headers over oci://, as -D already shows them
 
@@ -37,3 +37,4 @@ OciHttpHeadReporter now records the last response's header fields (reset at each
 
 - 2026-11-24: Created from Surly bug report 2026-11-24T1330, finding 5.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: e04e10b4 1a7baa4e f19d9e46 3d836d5e.
+- 2026-11-24: Doing -> Done. Reporter records final response headers
