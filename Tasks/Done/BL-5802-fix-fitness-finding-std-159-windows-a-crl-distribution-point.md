@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5802 — Fix fitness finding STD-159: Windows: a CRL distribution point limited to some reasons is treated as a complete CRL
 
@@ -41,11 +41,13 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 
 ## Acceptance criteria
 
-- [ ] step 2 exits 60 with `schannel: the revocation status is unknown`; a leaf with a plain DP (no `reasons`) and an empty CRL still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 2 exits 60 with `schannel: the revocation status is unknown`; a leaf with a plain DP (no `reasons`) and an empty CRL still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- AddUrisOfPoint now drops a distribution point carrying `reasons [1]`, so the leaf has no usable list and the status stays unknown (exit 60, schannel: the revocation status is unknown); a plain point is unchanged. Also applies to freshestCRL points. Unit test pins both. Network step 2 not run live (Python PKI); the platform-neutral unit test covers it. Quality run: 0 failing.
 
 ## Log
 
@@ -53,3 +55,4 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 4993ad99 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. A CRL distribution point limited to reasons no longer counts as a complete CRL

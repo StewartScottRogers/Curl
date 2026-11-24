@@ -168,14 +168,13 @@ public sealed class IntermediateOnlyProxyCacertTests
     }
 
     [TestMethod]
-    public void CrlDistributionPointUris_ExtensionHoldingReasonsRelativeNamesAndOtherNames_ListsOnlyHttpAddresses()
+    public void CrlDistributionPointUris_ExtensionHoldingRelativeNamesAndOtherNames_ListsOnlyHttpAddresses()
     {
         var writer = new AsnWriter(AsnEncodingRules.DER);
         using (writer.PushSequence())
         {
             using (writer.PushSequence())
             {
-                writer.WriteBitString(new byte[] { 0x80 }, 7, new Asn1Tag(TagClass.ContextSpecific, 1));
                 using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
                 {
                     using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 1)))
@@ -199,6 +198,37 @@ public sealed class IntermediateOnlyProxyCacertTests
         CollectionAssert.AreEqual(new[] { new Uri("http://x.test/a.crl") }, uris.ToArray());
     }
 
+    [TestMethod]
+    public void CrlDistributionPointUris_PointLimitedToReasons_ListsOnlyTheOtherPointsAddresses()
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            WritePoint(writer, "http://x.test/partial.crl", withReasons: true);
+            WritePoint(writer, "http://x.test/full.crl", withReasons: false);
+        }
+
+        var uris = ServerCertificateVerification.CrlDistributionPointUris(CertificateWith(writer.Encode()));
+
+        CollectionAssert.AreEqual(new[] { new Uri("http://x.test/full.crl") }, uris.ToArray());
+    }
+
+    private static void WritePoint(AsnWriter writer, string address, bool withReasons)
+    {
+        using (writer.PushSequence())
+        {
+            using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
+            using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
+            {
+                writer.WriteCharacterString(UniversalTagNumber.IA5String, address, new Asn1Tag(TagClass.ContextSpecific, 6));
+            }
+
+            if (withReasons)
+            {
+                writer.WriteBitString(new byte[] { 0x80 }, 7, new Asn1Tag(TagClass.ContextSpecific, 1));
+            }
+        }
+    }
     [TestMethod]
     public void CrlDistributionPointUris_ExtensionThatDoesNotParse_ListsNone()
     {

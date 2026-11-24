@@ -17,6 +17,7 @@ internal sealed partial class ServerCertificateVerification
     private const string FreshestCrlOid = "2.5.29.46";
 
     private static readonly Asn1Tag ContextTag0 = new(TagClass.ContextSpecific, 0);
+    private static readonly Asn1Tag ContextTag1 = new(TagClass.ContextSpecific, 1);
 
     private static readonly Asn1Tag ContextTag6 = new(TagClass.ContextSpecific, 6);
 
@@ -227,13 +228,18 @@ internal sealed partial class ServerCertificateVerification
         return uris;
     }
 
-    // DistributionPoint ::= SEQUENCE { distributionPoint [0] { fullName [0] GeneralNames }, ... }
+    // DistributionPoint ::= SEQUENCE { distributionPoint [0] { fullName [0] GeneralNames }, reasons [1], ... }
+    // A point limited to some reasons holds only a partial list, which proves nothing about the
+    // other reasons, so it yields no address and the status stays unknown, as CryptoAPI reports it.
     private static void AddUrisOfPoint(AsnReader point, List<Uri> uris)
     {
+        var pointUris = new List<Uri>();
+        var limitedToReasons = false;
         while (point.HasData)
         {
             if (!point.PeekTag().HasSameClassAndValue(ContextTag0))
             {
+                limitedToReasons |= point.PeekTag().HasSameClassAndValue(ContextTag1);
                 point.ReadEncodedValue();
                 continue;
             }
@@ -241,8 +247,13 @@ internal sealed partial class ServerCertificateVerification
             var name = point.ReadSequence(ContextTag0);
             while (name.HasData)
             {
-                AddUrisOfFullName(name, uris);
+                AddUrisOfFullName(name, pointUris);
             }
+        }
+
+        if (!limitedToReasons)
+        {
+            uris.AddRange(pointUris);
         }
     }
 
