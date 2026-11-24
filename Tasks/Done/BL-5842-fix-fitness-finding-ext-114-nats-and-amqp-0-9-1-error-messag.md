@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary/NatsSubject.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientMessages.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5842 — Fix fitness finding EXT-114: NATS and AMQP 0-9-1 error messages print raw control characters (CR/LF, ESC) from the URL or the server's text
 
@@ -37,11 +37,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] `od -c` of both commands shows `\x0D\x0A` and `\x1B` text instead of raw bytes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `od -c` of both commands shows `\x0D\x0A` and `\x1B` text instead of raw bytes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Escaped control characters as xNN (as Kafka does) in NatsSubject messages and Amqp0ClientMessages.ClosedByServer; unit tests added; quality run clean for both libraries.
 
 ## Log
 
@@ -49,3 +51,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 6f11eb38 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Control characters escaped as \xNN in NATS and AMQP messages
