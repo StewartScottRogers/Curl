@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5804 — Fix fitness finding STD-161: Windows: rfc822Name name constraints ignore the emailAddress attribute in the leaf's subject
 
@@ -55,3 +55,4 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: bf125247 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Subject emailAddress now checked as rfc822Name; unit tests and quality green
