@@ -209,18 +209,50 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
     private async Task AbandonFirstBatchOnFatalFailureAsync(TransferResult failure)
     {
-        RecordSetupFailure(failure, endsTheRun: true);
-        FirstFailure ??= failure;
-        await heldTransfers[fatalSetupFailureIndex].Abandon(failure).ConfigureAwait(false);
-        for (int index = 0; index < heldTransfers.Count; index++)
+        // The batch holds --parallel-max transfers and one more. When the failing one is that extra one, the
+        // others have started by then and run on; otherwise nothing starts and those within --parallel-max are
+        // aborted. The extra one, failing or not, is reported with the failure (STD-183, BL-5851).
+        (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held = [.. heldTransfers];
+        heldTransfers.Clear();
+        bool startsTheOthers = fatalSetupFailureIndex >= maxRunning;
+        if (startsTheOthers)
         {
-            if (index != fatalSetupFailureIndex)
-            {
-                await heldTransfers[index].Abandon(AbortedResult).ConfigureAwait(false);
-            }
+            await StartHeldWithinMaxExceptAsync(held, fatalSetupFailureIndex).ConfigureAwait(false);
         }
 
-        heldTransfers.Clear();
+        RecordSetupFailure(failure, endsTheRun: true);
+        FirstFailure ??= failure;
+        for (int index = 0; index < held.Length; index++)
+        {
+            TransferResult? reported = ResultReportedFor(index, failure, startsTheOthers);
+            if (reported is not null)
+            {
+                await held[index].Abandon(reported).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task StartHeldWithinMaxExceptAsync(
+        (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held,
+        int exceptIndex)
+    {
+        for (int index = 0; index < held.Length && index < maxRunning; index++)
+        {
+            if (index != exceptIndex)
+            {
+                await held[index].Start().ConfigureAwait(false);
+            }
+        }
+    }
+
+    private TransferResult? ResultReportedFor(int index, TransferResult failure, bool startsTheOthers)
+    {
+        if (index >= maxRunning || index == fatalSetupFailureIndex)
+        {
+            return failure;
+        }
+
+        return startsTheOthers ? null : AbortedResult;
     }
 
     private TransferResult? fatalSetupFailure;

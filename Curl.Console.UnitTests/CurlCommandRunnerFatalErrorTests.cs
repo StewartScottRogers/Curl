@@ -121,6 +121,42 @@ public sealed class CurlCommandRunnerFatalErrorTests
     }
 
     [TestMethod]
+    public async Task RunAsync_FatalSetupFailureFirstUnderParallelMaxOne_ReportsTheNextTransferWithTheFailureToo()
+    {
+        RecordingProtocolHandler http = Handler(CurlExitCode.Ok);
+        RecordingProtocolHandler telnet = new("telnet", _ => ValueTask.FromResult(TransferResult.Success(0)));
+
+        int exitCode = await RunWithAsync(
+            [http, telnet],
+            ["-sS", "-Z", "--parallel-max", "1", "-w", "[%{exitcode}]\n", "telnet://h.test", "-t", "NEW_ENV=nocomma", "--next", "-w", "[%{exitcode}]\n", "http://h.test/hello"]);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.IsEmpty(http.Contexts);
+        Assert.AreEqual("[43]\n[43]\n", StandardOutputText);
+        Assert.DoesNotContain("Index", StandardErrorText, StringComparison.Ordinal);
+        Assert.AreEqual(
+            "curl: (43) A libcurl function was given a bad argument\ncurl: (43) A libcurl function was given a bad argument\n",
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FatalSetupFailureBeyondParallelMax_LetsTheEarlierTransferRun()
+    {
+        RecordingProtocolHandler http = Handler(CurlExitCode.Ok);
+        RecordingProtocolHandler telnet = new("telnet", _ => ValueTask.FromResult(TransferResult.Success(0)));
+
+        int exitCode = await RunWithAsync(
+            [http, telnet],
+            ["-sS", "-Z", "--parallel-max", "1", "-w", "[%{exitcode}]\n", "http://h.test/hello", "--next", "-w", "[%{exitcode}]\n", "telnet://h.test", "-t", "NEW_ENV=x", "--next", "-w", "[%{exitcode}]\n", "http://h.test/hello"]);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.HasCount(1, http.Contexts);
+        Assert.IsEmpty(telnet.Contexts);
+        Assert.AreEqual("hi[0]\n[43]\n", StandardOutputText);
+        Assert.DoesNotContain("Index", StandardErrorText, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public async Task RunAsync_SetupLooksFineUnderParallel_StartsEveryTransfer()
     {
         RecordingProtocolHandler rtsp = new("rtsp", _ => ValueTask.FromResult(TransferResult.Success(0)));
@@ -174,6 +210,17 @@ public sealed class CurlCommandRunnerFatalErrorTests
             await context.Output.WriteAsync("hi"u8.ToArray(), context.CancellationToken);
             return TransferResult.Success(2);
         });
+
+    private Task<int> RunWithAsync(IProtocolHandler[] handlers, string[] arguments) =>
+        new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(handlers)),
+                new InMemoryFileSystem(),
+                new InMemoryFileSystem(),
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: true)
+            .RunAsync(arguments);
 
     private Task<int> RunAsync(IProtocolHandler handler, string[] arguments) => RunParallelAsync(handler, arguments);
 

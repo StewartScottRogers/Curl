@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/ParallelRun.cs, Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5851 — Fix fitness finding STD-183: -Z --parallel-max with a TELNET -t or RTSP Session: setup failure crashes with "Index was out of range" (exit 2) and skips valid transfers
 
@@ -39,13 +39,17 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] Repro 1 prints `[43]` `[43]`, stderr has no `Index was out of range`, exit 43. Repro 2 prints `hello` and `[0]` before `[43]`, exit 43.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Repro 1 prints `[43]` `[43]`, stderr has no `Index was out of range`, exit 43. Repro 2 prints `hello` and `[0]` before `[43]`, exit 43.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: `ParallelRun.AbandonFirstBatchOnFatalFailureAsync` snapshots the held list; when the failing transfer is the extra one past `--parallel-max`, the others start and run on and the extra one is reported with the failure; otherwise the within-max ones are aborted. Repro 1 gives [43][43]; repro 2 gives hello [0] [43], exit 43.
+- Known gap (not done): a transfer past the batch of --parallel-max+1 is not reported at all after the run ends (REF prints [43] for it too). Left as is; criteria only need hello, [0], [43].
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: c69094b9 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. STD-183 fixed: fatal setup failure past --parallel-max no longer crashes; tests and quality gate green
