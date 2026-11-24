@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs]
+touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/SslStreamConnection.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Std192ClientCertificateRefusalTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5860 — Fix fitness finding STD-192: Windows: with -k, a server that requires a client certificate gives a different exit-56 message
 
@@ -34,13 +34,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the port prints the schannel `SEC_E_ILLEGAL_MESSAGE` text, exit 56.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the port prints the schannel `SEC_E_ILLEGAL_MESSAGE` text, exit 56.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Schannel build: when the server asked for a client certificate, none was presented and no plaintext was read, a socket abort or reset ending the read is reported as the schannel SEC_E_ILLEGAL_MESSAGE text (exit 56). Platform-neutral unit tests pin it (Std192ClientCertificateRefusalTests). Measure-CodeQuality.ps1 was not run in the overtime run (time limit); the change adds few branches, all exercised by the new tests.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 63a08c31 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Schannel exit-56 text for a server-required client certificate now matches REF; unit tests pass

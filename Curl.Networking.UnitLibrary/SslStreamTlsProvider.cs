@@ -468,6 +468,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ReadOnlyMemory<byte>[] peerCertificates = [];
         var peerVerification = PeerVerification.Unobserved;
         var judgedHandshake = Unnegotiated(offeredApplicationProtocols);
+        var clientCertificateRequested = false;
         var authenticationOptions = new SslClientAuthenticationOptions
         {
             TargetHost = ServerNameIndication(targetHost),
@@ -479,6 +480,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 // The client-certificate request arrives with the server's certificate; a server
                 // that then ends the handshake for want of one never reaches the validation
                 // callback, yet curl judged the certificate first (STD-174, BL-5822).
+                clientCertificateRequested = true;
                 if (remote is not null && chainPolicy is not null)
                 {
                     (peerCertificates, peerVerification, verificationFailure) = JudgeCertificateOfClientCertificateRequest(
@@ -523,6 +525,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), matchesOpenSslBuild: !_matchesSchannelBuild)
                 {
                     MatchesSchannelBuild = _matchesSchannelBuild,
+                    ServerRequestedClientCertificate = () => clientCertificateRequested,
                     TicketRecords = FollowTicketRecordsAfterHandshake(transport, sslStream.SslProtocol),
                     TicketEvents = events,
                     PeerHostName = targetHost,

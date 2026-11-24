@@ -58,6 +58,13 @@ internal sealed class SslStreamConnection(
     /// <summary>Gets whether the curl build being matched is the Schannel one, which words a read cut by an alert its own way.</summary>
     internal bool MatchesSchannelBuild { get; init; }
 
+    /// <summary>Whether the server asked for a client certificate during the handshake (STD-192).</summary>
+    internal Func<bool> ServerRequestedClientCertificate { get; init; } = static () => false;
+
+    private bool _plaintextReceived;
+
+    private bool RefusedForWantOfCertificate => ServerRequestedClientCertificate() && !_plaintextReceived;
+
     /// <summary>
     /// Gets the detector that tells, at the first read returning plaintext, how many session
     /// ticket records came before it; <see langword="null" /> when none is watching (BL-1089).
@@ -103,11 +110,11 @@ internal sealed class SslStreamConnection(
             throw new MissingCloseNotifyException(missingCloseNotifyMessage);
         }
         catch (IOException failure) when (
-            TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null, plaintext.IsSecure) is not null)
+            TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null, plaintext.IsSecure, RefusedForWantOfCertificate) is not null)
         {
             // MissingCloseNotifyException is the exception whose message the HTTP handler prints as it stands.
             throw new MissingCloseNotifyException(
-                TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null, plaintext.IsSecure)!);
+                TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null, plaintext.IsSecure, RefusedForWantOfCertificate)!);
         }
 
         if (read == 0 && !buffer.IsEmpty && transport.TransportEnded)
@@ -115,6 +122,7 @@ internal sealed class SslStreamConnection(
             throw new MissingCloseNotifyException(missingCloseNotifyMessage);
         }
 
+        _plaintextReceived |= read > 0;
         TicketRecords?.ReportTicketRecords(read, TicketEvents);
         ReportShutdownAfterCloseNotify(read, buffer.IsEmpty, TicketRecords, TicketEvents);
         return read;
