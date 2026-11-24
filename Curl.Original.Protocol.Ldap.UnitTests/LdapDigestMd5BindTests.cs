@@ -135,6 +135,16 @@ public sealed class LdapDigestMd5BindTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DigestOverLdapsChallengeOffersOnlyAuth_AnswersQopAuthAndReturnsTheEntry()
+    {
+        (TransferResult result, byte[] sent, string output) = await RunAsync("ldaps", HttpAuthSchemes.Digest, ChallengeReply(), BindSuccess2, DigestSearchEntry, DigestSearchDone);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        StringAssert.Contains(Encoding.ASCII.GetString(sent), "qop=auth,");
+        StringAssert.Contains(output, "cn=a");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_BasicAgainstAlwaysSuccessServer_BindsAndReturnsTheEntry()
     {
         (TransferResult result, _, string output) = await RunAsync(HttpAuthSchemes.Basic, PlainBindSuccess, SearchEntry, SearchDone3);
@@ -149,14 +159,17 @@ public sealed class LdapDigestMd5BindTests
         return $"30 {(creds.Length + 14):x2} 02 01 01 61 {(creds.Length + 9):x2} 0a 01 0e 04 00 04 00 87 {creds.Length:x2} {Convert.ToHexString(creds)}";
     }
 
-    private static async Task<(TransferResult Result, byte[] Sent, string Output)> RunAsync(HttpAuthSchemes schemes, params string[] replies)
+    private static Task<(TransferResult Result, byte[] Sent, string Output)> RunAsync(HttpAuthSchemes schemes, params string[] replies) =>
+        RunAsync("ldap", schemes, replies);
+
+    private static async Task<(TransferResult Result, byte[] Sent, string Output)> RunAsync(string scheme, HttpAuthSchemes schemes, params string[] replies)
     {
         var connection = new ScriptedConnection([.. replies.Select(Hex.Bytes)]);
         var handler = new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), LdapDialect.WinLdap, new FakeLogonTokenSource(2));
         var output = new MemoryStream();
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse("ldap://127.0.0.1:18389/dc=example"),
+            Url = CurlUrl.Parse(scheme + "://127.0.0.1:18389/dc=example"),
             Output = output,
             Credentials = new NetworkCredential("cn=admin,dc=x", "pw"),
             Http = new Curl.Protocol.Abstractions.HttpRequestOptions { AuthSchemes = schemes },

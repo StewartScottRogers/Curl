@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5854 — Fix fitness finding STD-186: Windows ldaps:// with --digest fails with exit 38 "Operations Error"; curl binds with DIGEST-MD5 qop=auth over TLS and succeeds
 
@@ -35,13 +35,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the repro prints alice's entry, exit 0; a plain-`ldap://` relay that strips `auth-int`/`auth-conf` from the challenge still fails as REF does.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro prints alice's entry, exit 0; a plain-`ldap://` relay that strips `auth-int`/`auth-conf` from the challenge still fails as REF does.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Over ldaps:// DigestAsync now answers qop=auth (TLS already protects the session) and starts no confidentiality layer; plain ldap:// still refuses it as before (Operations Error). Unit test ExecuteAsync_DigestOverLdapsChallengeOffersOnlyAuth pins it. Ldap quality gate: 100/100, complexity 10. No ADR: extends ADR-1302 as the finding states.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: f5edafec 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. ldaps digest answers qop=auth
