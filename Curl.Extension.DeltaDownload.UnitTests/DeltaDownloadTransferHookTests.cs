@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 
 namespace Curl.Extension.DeltaDownload.UnitTests;
@@ -88,16 +89,54 @@ public sealed class DeltaDownloadTransferHookTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_AJoinedFileWhoseSha1Differs_RunsTheTransferAgainAsCurlDoes_Zsync06Sha1()
+    public async Task ExecuteAsync_AJoinedFileWhoseSha1DiffersButAWholeFileThatMatches_WritesTheWholeFile_Zsync06Sha1()
     {
-        var changed = Encoding.ASCII.GetBytes("AAAABBBBCCCCDDDDEEEEFG");
-        var origin = new ByteRangeOrigin(changed);
+        var origin = new ByteRangeOrigin(Target) { Rewrite = response => response.Code == 206 ? response with { Body = new byte[response.Body.Length] } : response };
         var context = Context();
 
-        await Hook("AAAA").ExecuteAsync(context, origin.Invoke);
+        var result = await Hook("AAAA").ExecuteAsync(context, origin.Invoke);
 
         CollectionAssert.AreEqual(new[] { "bytes=4-21", null }, origin.Ranges);
-        CollectionAssert.AreEqual(changed, Bytes(context.Output));
+        CollectionAssert.AreEqual(Target, Bytes(context.Output));
+        Assert.AreEqual("HTTP/1.1 200 X\r\n\r\n", Encoding.Latin1.GetString(Bytes(context.HeaderOutput!)));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AWholeFileRunAgainWhoseSha1StillDiffers_FailsWithExit61AndNothingWritten_Adr1347()
+    {
+        var origin = new ByteRangeOrigin(Encoding.ASCII.GetBytes("AAAABBBBCCCCDDDDEEEEFG"));
+        var context = Context();
+
+        var result = await Hook("AAAA").ExecuteAsync(context, origin.Invoke);
+
+        CollectionAssert.AreEqual(new[] { "bytes=4-21", null }, origin.Ranges);
+        AssertSha1Mismatch(result, context);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AServerThatIgnoresRangeAndSendsAWrongFile_FailsWithExit61AndNothingWritten_Adr1347()
+    {
+        var origin = new ByteRangeOrigin(Target) { Rewrite = _ => new(200, [], Encoding.ASCII.GetBytes("AAAABBBBCCCCDDDDEEEEFG")) };
+        var context = Context();
+
+        var result = await Hook("AAAA").ExecuteAsync(context, origin.Invoke);
+
+        Assert.HasCount(1, origin.Ranges);
+        AssertSha1Mismatch(result, context);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TheTransferRunAgainFails_FailsTheTransferWithNothingWritten()
+    {
+        var failure = TransferResult.Failure(CurlExitCode.PartialFile, "cut off");
+        var origin = new ByteRangeOrigin(Target) { Rewrite = response => response.Code == 206 ? Spoil(response, "code") : response with { Result = failure } };
+        var context = Context();
+
+        var result = await Hook("AAAA").ExecuteAsync(context, origin.Invoke);
+
+        Assert.AreSame(failure, result);
+        Assert.AreEqual(0, context.Output.Length);
     }
 
     [TestMethod]
@@ -159,6 +198,16 @@ public sealed class DeltaDownloadTransferHookTests
     private static ValueTask<TransferResult> NoServer(ITransferContext context) => throw new AssertFailedException("The server was contacted.");
 
     private static byte[] Bytes(Stream stream) => ((MemoryStream)stream).ToArray();
+
+    private static void AssertSha1Mismatch(TransferResult result, TransferContext context)
+    {
+        Assert.AreEqual(CurlExitCode.BadContentEncoding, result.ExitCode);
+        var expected = Convert.ToHexStringLower(SHA1.HashData(Target));
+        Assert.StartsWith($"--zsync: SHA-1 mismatch: expected {expected}, got ", result.ErrorMessage);
+        Assert.AreEqual(200, result.Report!.ResponseCode);
+        Assert.AreEqual(0, context.Output.Length);
+        Assert.AreEqual(0, context.HeaderOutput!.Length);
+    }
 
     private static ByteRangeOrigin.Response Spoil(ByteRangeOrigin.Response response, string defect) => defect switch
     {

@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.DeltaDownload.UnitLibrary/DeltaDownloadTransferHook.cs]
+touches: [Curl.Extension.DeltaDownload.UnitLibrary/DeltaDownloadTransferHook.cs, Curl.Extension.DeltaDownload.UnitTests/DeltaDownloadTransferHookTests.cs, Documentation/Planning/Decisions/ADR-1092-zsync-fetches-only-the-blocks-a-seed-file-lacks-following-zsync-0-6.md]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5896 — Fix fitness finding EXT-121: --zsync writes a file whose SHA-1 differs from the control file and exits 0
 
@@ -36,13 +36,22 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits non-zero with a SHA-1 mismatch message and does not leave a wrong `z2.bin`; the untampered URL `http://127.0.0.1:37200/f.bin` still exits 0 with a byte-identical file.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro exits non-zero with a SHA-1 mismatch message and does not leave a wrong `z2.bin`; the untampered URL `http://127.0.0.1:37200/f.bin` still exits 0 with a byte-identical file.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced in the code: both fallback paths (the second run, and a 200 to a range) wrote unchecked.
+  Decision in ADR-1347: every written body must match the control file's SHA-1, else exit 61 with nothing written.
+- Repro run against a PowerShell loopback server: tampered URL exits 61, `--zsync: SHA-1 mismatch: ...`, no `z2.bin`;
+  untampered URL exits 0 with a byte-identical file.
+- Added to `touches`: the hook's test file and ADR-1092 (its fallback sentence became false); no other task in Doing
+  named them.
+- Measure-CodeQuality for the library: 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 2b100592 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. --zsync writes a body only when its SHA-1 matches the control file; otherwise exit 61 with nothing written (ADR-1347).

@@ -1390,3 +1390,4 @@ Each option and the specific reason it lost.
 | [1346](ADR-1346-azure-storage-numeric-host-is-an-ip-only-when-it-is-a-routable-ipv4-spelling.md) | An Azure Storage numeric host is an emulator IP only when it is a routable IPv4 spelling (BL-5867) | Accepted | 2026-11-24 |
 | [1347](ADR-1347-an-oauth2-flow-refuses-a-transfer-that-carries-a-dpop-proof.md) | An --oauth2-* flow refuses a transfer that carries a DPoP proof (BL-5898) | Accepted | 2026-11-24 |
 | [1348](ADR-1348-az-and-abfs-refuse-range-and-resume.md) | az:// and abfs[s]:// refuse -r and -C with exit 4 (BL-5897) | Accepted | 2026-11-24 |
+| [1347](ADR-1347-zsync-writes-a-whole-response-only-when-its-sha-1-matches-the-control-file.md) | --zsync writes a whole response only when its SHA-1 matches the control file's, and exits 61 otherwise (BL-5896) | Accepted | 2026-11-24 |
