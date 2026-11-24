@@ -53,6 +53,8 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Original.Protocol.Http.UnitLib
 
 - 2026-11-02 (lane 2): Claimed again after Stewart's "complete all existing tasks". Checked first: ADR-0871 is still Accepted and ADR-0929 records Stewart confirming "Keep HTTP/2 on" a second time; criterion 1 (exit 2 for --http2 on Windows) can only be met by undoing both of Stewart's own decisions, which the delegation does not cover, and a general instruction to finish tasks does not reverse them (same finding as BL-3358's run today). GF-0098 closes on the decided:ADR-0871 platform exclusion instead. No code changed. Deferred again; to revive it, Stewart reverses ADR-0871 and ADR-0929, or files a new task with criteria that match them.
 
+- 2026-11-24 (lane 3): Claimed again after Stewart undeferred it to give idle lanes work. Checked first: ADR-0871 and ADR-0929 are still Accepted (HTTP/2 stays on for Windows), and undeferring to fill idle lanes does not reverse them (same finding as BL-3358's run today, commit da603b9ad0). Criterion 1 still needs --http2 refused with exit 2, which only Stewart can decide. No code changed; deferred again. Revive only if Stewart reverses ADR-0871 and ADR-0929.
+
 ## Log
 
 - 2026-10-23: Created.
@@ -67,3 +69,4 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Original.Protocol.Http.UnitLib
 - 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/2 stays on for Windows (ADR-0871, ADR-0929); doing this would make --http2 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: bbcffc50 1fd5de8c 28346828.
+- 2026-11-24: Doing -> Deferred. ADR-0871 and ADR-0929 (Stewart's 'Keep HTTP/2 on') still Accepted; the exit-2 criterion would undo them. Revisit only if Stewart reverses ADR-0871.
