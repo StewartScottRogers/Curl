@@ -35,7 +35,7 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
 
         GcsHmacKey? hmacKey = context.Credentials is { } user ? new GcsHmacKey(user.UserName, user.Password, RegionOf(context)) : null;
         GcsHttpHeadReporter headReporter = new(context.Events, context.HeaderOutput);
-        GcsOperations operations = new(new GcsClient(connector, context, endpoint, BearerTokenOf(context), hmacKey, headReporter), context.Url.Host, context.CancellationToken);
+        GcsOperations operations = new(new GcsClient(connector, context, endpoint, BearerTokenOf(context), hmacKey, headReporter), GcsEndpoint.BucketOf(context.Url.OriginalString, context.Url.Host), context.CancellationToken);
         try
         {
             long downloaded = await TransferAsync(operations, context, ObjectNameOf(context.Url));

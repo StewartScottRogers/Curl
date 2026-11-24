@@ -50,6 +50,20 @@ internal sealed record GcsEndpoint(string Host, int Port, bool UseTls)
                 : new KeyValuePair<string, string>(Decode(parameter[..equals]), Decode(parameter[(equals + 1)..]));
         })];
 
+    /// <summary>Gives the bucket as the URL's authority text wrote it, because <c>Host</c> rewrites an all-digit or hex name into a dotted quad (EXT-120).</summary>
+    /// <param name="originalUrl">The URL as the command line gave it.</param>
+    /// <param name="fallback">The normalised host, used when the URL has no <c>://</c> or the authority names no bucket.</param>
+    /// <returns>The bucket name.</returns>
+    internal static string BucketOf(string originalUrl, string fallback)
+    {
+        int schemeEnd = originalUrl.IndexOf("://", StringComparison.Ordinal);
+        string rest = schemeEnd < 0 ? string.Empty : originalUrl[(schemeEnd + 3)..];
+        string authority = rest.Split('/', '?', '#')[0];
+        string hostAndPort = authority[(authority.LastIndexOf('@') + 1)..];
+        string name = hostAndPort.Split(':')[0];
+        return name.Length == 0 || name[0] == '[' ? fallback : name;
+    }
+
     private static string Decode(string text) => Uri.UnescapeDataString(text.Replace('+', ' '));
 
     /// <summary>Gives the path, before percent-encoding, of <paramref name="objectName"/> in <paramref name="bucket"/>; an empty name gives the bucket itself.</summary>

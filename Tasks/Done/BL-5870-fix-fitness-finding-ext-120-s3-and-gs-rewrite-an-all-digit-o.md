@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Endpoint.cs, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsEndpoint.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5870 — Fix fitness finding EXT-120: s3:// and gs:// rewrite an all-digit or hex bucket name into a dotted quad, so reads, writes and lists go to a different bucket
 
@@ -37,13 +37,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the s3 repro logs `PUT /k` with `host: 12345678.s3.us-east-1.amazonaws.com` (or `PUT /12345678/k`), never `0.188.97.78`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the s3 repro logs `PUT /k` with `host: 12345678.s3.us-east-1.amazonaws.com` (or `PUT /12345678/k`), never `0.188.97.78`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed: `S3Endpoint.BucketOf` and `GcsEndpoint.BucketOf` read the bucket from the URL's original authority text (falls back to the normalised host for an empty or bracketed authority). Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 0f7ed03c 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. BucketOf reads bucket from original URL text

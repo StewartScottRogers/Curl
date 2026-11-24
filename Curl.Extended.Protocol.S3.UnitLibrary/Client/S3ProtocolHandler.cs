@@ -25,7 +25,7 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
             return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
         }
 
-        string bucket = context.Url.Host;
+        string bucket = S3Endpoint.BucketOf(context.Url.OriginalString, context.Url.Host);
         S3Configuration configuration = S3Configuration.From(environment, context.Credentials);
         if (S3Endpoint.For(bucket, configuration.Region, configuration.EndpointUrl) is not { } endpoint)
         {
