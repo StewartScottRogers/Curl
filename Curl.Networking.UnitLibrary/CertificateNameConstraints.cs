@@ -23,6 +23,8 @@ internal static class CertificateNameConstraints
 
     private const string CommonNameOid = "2.5.4.3";
 
+    private const string EmailAddressOid = "1.2.840.113549.1.9.1";
+
     private const string AlternativeNameOid = "2.5.29.17";
 
     // An empty directory name is the two bytes of an empty SEQUENCE.
@@ -105,15 +107,31 @@ internal static class CertificateNameConstraints
         names.AddRange(DnsNamesOrCommonNames(leaf, dnsNames).Select(name => (DnsNameTag, System.Text.Encoding.ASCII.GetBytes(name))));
         names.AddRange(extensions.SelectMany(extension => extension.EnumerateIPAddresses()).Select(address => (IpAddressTag, address.GetAddressBytes())));
 
-        // directoryName, rfc822Name and URI names are constrained too; the subject counts as a directoryName (BL-5436).
+        // directoryName, rfc822Name and URI names are constrained too; the subject counts as a directoryName (BL-5436)
+        // and its emailAddress attributes as rfc822Names (RFC 5280 §4.2.1.10, BL-5804).
+        names.AddRange(ListSubjectNames(leaf));
+        names.AddRange(ListOtherAlternativeNames(leaf));
+        return names;
+    }
+
+    private static List<(Asn1Tag Tag, byte[] Value)> ListSubjectNames(X509Certificate2 leaf)
+    {
+        var names = new List<(Asn1Tag, byte[])>();
         if (leaf.SubjectName.RawData.Length > EmptyNameLength)
         {
             names.Add((DirectoryNameTag, leaf.SubjectName.RawData));
         }
 
-        names.AddRange(ListOtherAlternativeNames(leaf));
+        names.AddRange(ListSubjectEmailAddresses(leaf).Select(address => (EmailTag, System.Text.Encoding.ASCII.GetBytes(address))));
         return names;
     }
+
+    private static List<string> ListSubjectEmailAddresses(X509Certificate2 leaf) =>
+        leaf.SubjectName.EnumerateRelativeDistinguishedNames()
+            .Where(rdn => !rdn.HasMultipleElements && rdn.GetSingleElementType().Value == EmailAddressOid)
+            .Select(rdn => rdn.GetSingleElementValue())
+            .OfType<string>()
+            .ToList();
 
     private static List<(Asn1Tag Tag, byte[] Value)> ListOtherAlternativeNames(X509Certificate2 leaf)
     {

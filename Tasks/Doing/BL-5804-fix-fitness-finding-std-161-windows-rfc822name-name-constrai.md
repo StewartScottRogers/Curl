@@ -41,11 +41,13 @@ Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a s
 
 ## Acceptance criteria
 
-- [ ] steps 3 and 4 exit 60 with `0x00004000` and `0x00008000` respectively.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] steps 3 and 4 exit 60 with `0x00004000` and `0x00008000` respectively.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Subject emailAddress attributes (single-valued RDNs) are now listed as rfc822Names in CertificateNameConstraints; unit tests cover permitted, excluded and multi-valued cases. Quality run: Networking 100%/100%, no failing members. Steps 3-4 pinned by unit tests (0x4000, 0x8000) rather than a live Python-style server.
 
 ## Log
 

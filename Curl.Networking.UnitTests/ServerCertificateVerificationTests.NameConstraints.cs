@@ -285,6 +285,23 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(expected, Verify(Constraints(permittedName: GeneralName(1, constraint)), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), GeneralName(1, email)))?.Message);
 
     [TestMethod]
+    public void VerifyPeer_SubjectEmailAddressOutsideThePermittedEmailDomain_IsSchannelError0x4000() =>
+        Assert.AreEqual(NotPermitted, Verify(Constraints(permittedName: GeneralName(1, "example.com")), Host, true, subject: "E=evil@other.org, CN=localhost")?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_SubjectEmailAddressInThePermittedEmailDomain_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permittedName: GeneralName(1, "example.com")), Host, true, subject: "E=a@example.com, CN=localhost"));
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building reads multi-valued names itself (BL-5497).
+    public void VerifyPeer_SubjectEmailAddressInAMultiValuedRelativeName_IsIgnored() =>
+        Assert.IsNull(Verify(Constraints(permittedName: GeneralName(1, "example.com")), Host, true, subject: "E=evil@other.org+OU=Unit, CN=localhost"));
+
+    [TestMethod]
+    public void VerifyPeer_SubjectEmailAddressInTheExcludedEmailDomain_IsSchannelError0x8000() =>
+        Assert.AreEqual(Excluded, Verify(Constraints(excludedName: GeneralName(1, "other.org")), Host, true, subject: "E=evil@other.org, CN=localhost")?.Message);
+
+    [TestMethod]
     public void VerifyPeer_EmailAlternativeNameInTheExcludedEmailDomain_IsSchannelError0x8000() =>
         Assert.AreEqual(Excluded, Verify(Constraints(excludedName: GeneralName(1, "other.org")), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), GeneralName(1, "evil@other.org")))?.Message);
 
