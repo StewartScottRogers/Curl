@@ -107,3 +107,4 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 - 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs
 - 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/2 stays on for Windows (ADR-0871, ADR-0929); doing this would make --http2 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
