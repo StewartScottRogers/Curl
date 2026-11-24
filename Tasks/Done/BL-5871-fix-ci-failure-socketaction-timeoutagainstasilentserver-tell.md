@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests, Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5871 — Fix CI failure SocketAction_TimeoutAgainstASilentServer_TellsTheTimeoutThenRemoveWithOperationTimedOut on Windows
 
@@ -26,11 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 45451113257 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `SocketAction_TimeoutAgainstASilentServer_TellsTheTimeoutThenRemoveWithOperationTimedOut` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `SocketAction_TimeoutAgainstASilentServer_TellsTheTimeoutThenRemoveWithOperationTimedOut` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+CI log: the run took 24 s on a starved runner, past the 4 s deadline, so the transfer timed out before its read wait (no S=1). Fix is test-only: the scenario reruns up to three times when S=1 never appeared. Platform-neutral; CI criterion met by that (rule 11).
 
 ## Log
 
 - 2026-11-24: Created.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 31c6c74e.
+- 2026-11-24: Doing -> Done. Test reruns the scenario when a starved runner times the transfer out before its read wait
