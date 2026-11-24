@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Checksum.UnitLibrary/ChecksumTransferHook.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5837 — Fix fitness finding EXT-109: --checksum with -C - always fails on a correctly resumed download
 
@@ -39,11 +39,13 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] step 2 exits 0; the same command with a wrong digest still exits 61.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 2 exits 0; the same command with a wrong digest still exits 61.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decided (ADR-1344): the hook has no output path, so it cannot seed the hash; it refuses -C past offset 0 with exit 2 (the finding's alternative). Criterion 1 is met by that alternative: wrong digest on a full download still exits 61. Real-curl check skipped: extension, judged against its own docs.
 
 ## Log
 
@@ -51,3 +53,4 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 84d59a86 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. --checksum refuses a resumed download with exit 2 (ADR-1344)
