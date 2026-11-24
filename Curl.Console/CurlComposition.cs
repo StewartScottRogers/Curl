@@ -709,7 +709,7 @@ internal static class CurlComposition
     /// <param name="options">The option group.</param>
     /// <returns>The group's extension option values, holding none when it gave none.</returns>
     internal static ExtensionOptionValues ExtensionOptionValuesOf(CommandLineOptions options) =>
-        new(options.ExtensionOptionValues);
+        new(options.ExtensionOptionValues, new ExtensionTlsTrust(options.Insecure, options.CaCertificateFile, options.CaCertificateDirectory));
 
     /// <summary>
     /// Gives what the engine puts each of an option group's protocol handlers through (ADR-1007): the transfer hooks
