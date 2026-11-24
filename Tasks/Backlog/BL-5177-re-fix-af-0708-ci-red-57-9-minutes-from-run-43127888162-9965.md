@@ -1,0 +1,60 @@
+---
+id: BL-5177
+title: Re-fix AF-0708: CI red 57.9 minutes from run 43127888162 (99659d3d, WriteOut_AfterADownload_ReportsEachVariable)
+priority: Low
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [RunDarkFactory.ps1]
+lane: no
+requirement: none
+created: 2026-11-14
+completed:
+---
+# BL-5177 — Re-fix AF-0708: CI red 57.9 minutes from run 43127888162 (99659d3d, WriteOut_AfterADownload_ReportsEachVariable)
+
+## Goal
+
+The cause of the factory behaviour the audit office reported as AF-0708 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
+
+## Context
+
+Filed from audit finding AF-0708 (Low, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0708-ci-red-57-9-minutes-from-run-43127888162-99659d3d.md`.
+
+Re-fix: the earlier task(s) BL-5005 reached Done, and a later re-audit by the process auditor found the reproduction still reproduces:
+
+- 2026-11-13 | 2026-11-13_2321.md | reproduces: yes | Ran the reproduction with -Since 2026-11-05: run 43127888162 is still in ciRedSpells at 57.92 minutes. The window also holds new spells over 30 minutes without a filing trace.
+
+Location: `logs/ci-runs.json`
+
+Location: `logs/ci-runs.json`
+
+ciRedSpells: 2026-11-12T00:54:44Z to 01:52:39Z, 57.92 minutes, run 43127888162 on 99659d3d. The 190859 logs first call it a regression at 17:53:03, then flaky ('filed') at 18:53:10, about an hour later.
+
+Reproduction, from the finding:
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-11-05 -LogRoot <logs> -CiRunsJson <logs>/ci-runs.json -OutFile $env:TEMP\process.json; (Get-Content $env:TEMP\process.json -Raw | ConvertFrom-Json).ciRedSpells | Where-Object minutes -gt 30
+```
+
+- Expected: No spell over 30 minutes
+- Actual: A 57.92-minute spell at run 43127888162
+
+The reproduction measures a frozen copy of the logs, which no fix can change, so this task's evidence is the same measurement run over the live logs written after the fix landed (ADR-0761). The finding closes only when a later re-audit by the process auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+## Log
+
+- 2026-11-14: Created.
+- 2026-11-14: Backlog -> Deferred. Nothing left to fix in the factory: the finding's Expected line is the 'no spell over 30 minutes' rule Stewart replaced on 2026-11-12. Under the current rule every failed CI run from 2026-11-13 06:48 to 2026-11-14 12:00 Arizona was filed or covered within 10 minutes (11 runs), though two spells ran 67 and 110 minutes while fixes went through CI. PR #343 has the process re-audit apply the current rule, so the next audit can close the finding; look again only if that re-audit still says it reproduces.
+- 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-19: Backlog -> Deferred. Its finding closed on a reliable re-audit (audit 20261119-013420, closed-how reliable-reaudit); nothing left to fix
+- 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
