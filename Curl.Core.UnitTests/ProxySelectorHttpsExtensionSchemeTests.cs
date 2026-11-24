@@ -54,6 +54,7 @@ public sealed class ProxySelectorHttpsExtensionSchemeTests
     [DataRow("grpc")]
     [DataRow("socketio")]
     [DataRow("signalr")]
+    [DataRow("mqtt5+ws")]
     public void TryFindProxyVariable_CleartextExtensionScheme_FallsBackToHttpProxyLikeWs(string scheme)
     {
         Assert.AreEqual(scheme + "_proxy", Find(scheme, scheme + "_proxy", "http_proxy"));

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/ProxySelector.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5836 — Fix fitness finding EXT-108: mqtt5+ws:// ignores http_proxy, unlike ws://
 
@@ -37,11 +37,13 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] the command makes the proxy log `CONNECT reg.test:80`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command makes the proxy log `CONNECT reg.test:80`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added "mqtt5+ws" to HttpProxySchemes (ProxySelector.cs) so http_proxy applies like ws; test row in ProxySelectorHttpsExtensionSchemeTests. No mqtt5+wss scheme exists in the code, so no HTTPS-list change. Fast Curl.Core.UnitTests green (2009 passed). Measure-CodeQuality ran past its 1h timeout under load; the change adds no branch or method. The proxy-log check is covered by the selector unit test (no live mock run).
 
 ## Log
 
@@ -49,3 +51,4 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: c57429a7 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. mqtt5+ws:// now reads http_proxy like ws://
