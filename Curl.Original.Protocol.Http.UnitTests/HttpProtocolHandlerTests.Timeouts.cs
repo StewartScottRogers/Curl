@@ -117,6 +117,29 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TransferCancelledMidBody_CarriesTheReportAsFarAsItGotOnTheCancellation_BL5862()
+    {
+        // The -Y/-y watchdog cancels the transfer's token; the engine ends the transfer, so -w still needs the head's timings and lines.
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        using CancellationTokenSource transferCancellation = new();
+        StalledConnection connection = new(Encoding.Latin1.GetBytes(ContentLengthHead + "hello"), 65536);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18174/"),
+            Output = new MemoryStream(),
+            TimeProvider = time,
+            CancellationToken = transferCancellation.Token,
+        };
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
+        await connection.Stalled;
+        await transferCancellation.CancelAsync();
+
+        OperationCanceledException cancelled = await Assert.ThrowsAsync<OperationCanceledException>(() => transfer);
+        TransferReport report = (TransferReport)cancelled.Data["Curl.Engine.TransferReport"]!;
+        Assert.AreEqual(200, report.ResponseCode);
+    }
+    [TestMethod]
     public async Task ExecuteAsync_ServerStallsPastMaxTime_ClosesTheConnectionRatherThanLeavingItIntact()
     {
         // AF-0234: a connection abandoned mid-response by -m is closed, never kept for the next

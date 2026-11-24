@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Core.UnitLibrary/LowSpeedWatchdog.cs]
+touches: [Curl.Core.UnitLibrary/LowSpeedWatchdog.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5862 — Fix fitness finding STD-193: -Y/-y low-speed abort zeroes %{time_pretransfer}, %{time_starttransfer} and %{num_headers}
 
@@ -35,13 +35,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the repro prints non-zero `time_starttransfer` and `time_pretransfer` and `num_headers` 1.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro prints non-zero `time_starttransfer` and `time_pretransfer` and `num_headers` 1.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+The watchdog was not the cause: HttpProtocolHandler built its own report only for -m (EndedByLimit); a -Y/-y cancellation left with none, so the engine stamped a report with no pretransfer, starttransfer or headers. Fix: the HTTP handler puts exchange.Report on any other cancellation's Data, and EndPointReportingProtocolHandler keeps that report (adding end points). touches widened to those two files; no other Doing task holds them. Repro now prints [0.52 0.50 1 39 200 28]. Tests added in both .UnitTests projects; Engine, Http, Console fast tests green; Measure-CodeQuality 0 failing members for both libraries. Linux/macOS: change is platform-neutral.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: d29a6180 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. HTTP handler carries its report on a -Y/-y cancellation; engine keeps it

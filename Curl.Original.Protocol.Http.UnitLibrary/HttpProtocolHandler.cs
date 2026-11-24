@@ -1563,6 +1563,12 @@ public sealed class HttpProtocolHandler(
         {
             return OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
         }
+        catch (OperationCanceledException canceled)
+        {
+            // A cancellation that is not this exchange's own limit (the -Y/-y watchdog) ends the transfer in the engine, which reads the report as far as the exchange got from the exception (BL-5862).
+            canceled.Data[CancelledReportDataKey] = exchange.Report(body);
+            throw;
+        }
 
         ReportTransferDone(requestStream, connect);
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
@@ -1755,6 +1761,9 @@ public sealed class HttpProtocolHandler(
 
         return System.Text.Encoding.Latin1.GetString(headBytes).Split("\r\n\r\n").Select(head => Math.Max(0, head.Split("\r\n").Length - 1)).LastOrDefault(count => count > 0);
     }
+
+    /// <summary>The key the engine reads a cancelled transfer's report from, spelled as <c>EndPointReportingProtocolHandler.ReportDataKey</c> spells it (BL-5862).</summary>
+    private const string CancelledReportDataKey = "Curl.Engine.TransferReport";
 
     private static KeyValuePair<string, string> HeaderOfLine(string line)
     {

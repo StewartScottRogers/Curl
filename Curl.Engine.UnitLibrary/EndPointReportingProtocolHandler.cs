@@ -60,8 +60,11 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         }
         catch (OperationCanceledException cancelled)
         {
-            // A watchdog's cancellation leaves no result: carry the transfer's report on the exception for the caller that ends it (BL-5491), a UDP channel's or a handshake still running's too, so -w knows its total time (BL-5843).
-            TransferResult connected = recorder.ReportOn(TransferResult.Failure(CurlExitCode.OperationTimedOut, cancelled.Message));
+            // A watchdog's cancellation leaves no result: carry the transfer's report on the exception for the caller that ends it (BL-5491), a UDP channel's or a handshake still running's too, so -w knows its total time (BL-5843); a report the handler carried keeps its timings and header count (BL-5862).
+            TransferReport? handlerReport = ReportCarriedBy(cancelled);
+            TransferResult connected = recorder.ReportOn(
+                TransferResult.Failure(CurlExitCode.OperationTimedOut, cancelled.Message) with { Report = handlerReport },
+                handlerCountsConnections: handlerReport is not null);
             cancelled.Data[ReportDataKey] = StampTimingsAndUploadSize(connected, context, started, UploadedBy(context, UploadPosition(context) - uploadStart, true), true).Report;
             throw;
         }
