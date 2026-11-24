@@ -91,7 +91,15 @@ public sealed class ServerCertificateVerificationUnsentIntermediateTests
         Assert.AreNotEqual(UnableToGetLocalIssuer + "!", failure?.Message);
     }
 
-    private static (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgeAgainstCapathRoot(bool sendIntermediate, bool anchorIsTheRoot)
+    [TestMethod]
+    public void Judge_UnsentIntermediateTheCapathAlsoHolds_Accepts()
+    {
+        var (_, failure) = JudgeAgainstCapathRoot(sendIntermediate: false, anchorIsTheRoot: true, capathHoldsIntermediate: true);
+
+        Assert.IsNull(failure);
+    }
+
+    private static (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgeAgainstCapathRoot(bool sendIntermediate, bool anchorIsTheRoot, bool capathHoldsIntermediate = false)
     {
         using var root = CreateCa("CN=Capath Root", null, 1);
         using var intermediate = CreateCa("CN=Capath Intermediate", root, 2);
@@ -112,7 +120,9 @@ public sealed class ServerCertificateVerificationUnsentIntermediateTests
         ReadOnlyMemory<byte>[] sent = sendIntermediate ? [leaf.RawData, intermediate.RawData] : [leaf.RawData];
         var verification = new ServerCertificateVerification(new TlsClientOptions(), matchesSchannelBuild: false, TimeProvider.System);
 
-        return verification.Judge(SslPolicyErrors.RemoteCertificateChainErrors, chain, "capath.test", [anchorIsTheRoot ? root : otherRoot], null, sent);
+        X509Certificate2Collection anchors = capathHoldsIntermediate ? [root, intermediate] : [anchorIsTheRoot ? root : otherRoot];
+
+        return verification.Judge(SslPolicyErrors.RemoteCertificateChainErrors, chain, "capath.test", anchors, null, sent);
     }
 
     private static X509Certificate2 CreateCa(string subject, X509Certificate2? issuer, byte serial)

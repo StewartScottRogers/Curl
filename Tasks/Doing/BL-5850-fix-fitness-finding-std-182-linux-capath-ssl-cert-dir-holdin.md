@@ -38,11 +38,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] `curl -sS --capath /tmp/a6cp_both https://localhost:26103/` prints `hello`, exit 0. With int1 planted only in `~/.dotnet/corefx/cryptography/x509stores/ca` and a `--capath` that holds only root, the same URL still exits 60 `(20)`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS --capath /tmp/a6cp_both https://localhost:26103/` prints `hello`, exit 0. With int1 planted only in `~/.dotnet/corefx/cryptography/x509stores/ca` and a `--capath` that holds only root, the same URL still exits 60 `(20)`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: `WasSent` in ServerCertificateVerification.cs now also counts a chain element the --capath anchors hold as present, in both unsent-intermediate checks (OpenSSL reads --capath, so such an element is not completed from .NET's store). Intermediates from the CurrentUser CA store or AIA are still refused (exit 60, 20). Test: Judge_UnsentIntermediateTheCapathAlsoHolds_Accepts. Quality run for Curl.Networking.UnitLibrary: 0 failing members. Not measured against live curl: the existing refusal tests pin the store-only case.
 
 ## Log
 

@@ -347,17 +347,18 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     // server did not send was completed from that store, which OpenSSL never reads: it fails
     // with "unable to get local issuer certificate (20)" (BL-5449, STD-131). The first
     // element is the server's own and the last the anchor, neither of which need be sent.
-    private bool RelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, ReadOnlyMemory<byte>[] peerCertificates)
+    // An element the --capath holds is a trust source OpenSSL reads too, so it needs no sending (STD-182).
+    private bool RelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates)
     {
         return !matchesSchannelBuild
             && !options.Insecure
             && chain is not null
             && peerCertificates.Length > 0
-            && chain.ChainElements.Skip(1).Take(Math.Max(0, AnchorIndexOf(chain) - 1)).Any(element => !WasSent(element.Certificate, peerCertificates));
+            && chain.ChainElements.Skip(1).Take(Math.Max(0, AnchorIndexOf(chain) - 1)).Any(element => !WasSent(element.Certificate, peerCertificates, anchors));
     }
 
     private bool RelyingOnAnUnsentIntermediate(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates) =>
-        RelyingOnAnIntermediateTheServerDidNotSend(chain, peerCertificates)
+        RelyingOnAnIntermediateTheServerDidNotSend(chain, anchors, peerCertificates)
         || AnchoredChainRelyingOnAnIntermediateTheServerDidNotSend(chain, anchors, peerCertificates);
 
     // The same test for the chain rebuilt against the --capath roots, which the system store's
@@ -372,11 +373,13 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         using var rebuilt = RebuildAgainstAnchors(chain, anchors, requireServerAuthentication: true, out _);
         return rebuilt is not null
             && EndsAtAnchor(rebuilt, anchors)
-            && rebuilt.ChainElements.Skip(1).Take(Math.Max(0, rebuilt.ChainElements.Count - 2)).Any(element => !WasSent(element.Certificate, peerCertificates));
+            && rebuilt.ChainElements.Skip(1).Take(Math.Max(0, rebuilt.ChainElements.Count - 2)).Any(element => !WasSent(element.Certificate, peerCertificates, anchors));
     }
 
-    private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates) =>
-        peerCertificates.Any(sent => sent.Span.SequenceEqual(certificate.RawData));
+    private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates, X509Certificate2Collection anchors) =>
+        peerCertificates.Any(sent => sent.Span.SequenceEqual(certificate.RawData))
+        || anchors.Any(anchor => anchor.RawData.AsSpan().SequenceEqual(certificate.RawData));
+
     // The Schannel build checks revocation with CertGetCertificateChain on the context Schannel
     // attached the server's stapled OCSP response to, so a staple that says good or revoked
     // answers for the server's own certificate before any online check (CGR-014, ADR-0834).
