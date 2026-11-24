@@ -108,7 +108,8 @@ internal sealed partial class ServerCertificateVerification
     private bool RevocationStatusIsUnknownAndChecked(X509Chain? chain) =>
         !options.SkipRevocationCheck
         && !options.RevocationCheckBestEffort
-        && ReadChainStatus(chain).Any(status => (status.Status & UnavailableRevocationFlags) != 0);
+        && ReadChainStatus(chain).Any(status => (status.Status & UnavailableRevocationFlags) != 0)
+        && ReadBelowAnchorRevocation(chain!) is not BelowAnchorRevocation.Clean;
 
     // A chain error with a name constraint of a CA in the chain broken by the server certificate
     // is named by Schannel's trust error (BL-5375); 0 for any other failure.

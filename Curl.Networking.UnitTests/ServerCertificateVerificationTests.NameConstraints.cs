@@ -147,11 +147,20 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     public void VerifyPeer_ExcludedLeafWithUnknownRevocationStatus_IsRevocationStatusUnknown()
     {
         var failure = Verify(
-            Constraints(excluded: "localhost"), Host, false, chainStatus: [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }]);
+            Constraints(excluded: "localhost"), Host, false, chainStatus: [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }],
+            belowAnchorStatus: [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }]);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual("schannel: the revocation status is unknown", failure?.Message);
     }
+
+    [TestMethod]
+    public void VerifyPeer_ExcludedLeafWhoseCrlResolvedBelowTheAnchor_IsSchannelError0x8000() =>
+        Assert.AreEqual(
+            "schannel: error 0x00008000",
+            Verify(
+                Constraints(excluded: "localhost"), Host, false,
+                chainStatus: [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }], belowAnchorStatus: [])?.Message);
 
     [TestMethod]
     public void VerifyPeer_ExcludedLeafWithUnknownRevocationStatusUnderBestEffort_IsSchannelError0x8000() =>
@@ -447,7 +456,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     }
 
     private (CurlExitCode ExitCode, string Message)? Verify(
-        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null, X509ChainStatus[]? chainStatus = null, bool bestEffort = false)
+        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null, X509ChainStatus[]? chainStatus = null, bool bestEffort = false, X509ChainStatus[]? belowAnchorStatus = null)
     {
         using var root = CreateAuthority("CN=Constraint Root", null, null);
         using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, constraints);
@@ -458,6 +467,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
             new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: skipRevocationCheck, RevocationCheckBestEffort: bestEffort), true, TimeProvider.System)
         {
             ReadChainStatus = _ => chainStatus ?? PartialChainStatus,
+            ReadCertificatesBelowAnchorStatus = _ => belowAnchorStatus ?? [],
         };
         var (chainPolicy, _, _) = verification.ReadTrustAnchors();
         chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;

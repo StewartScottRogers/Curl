@@ -37,11 +37,13 @@ Shared setup: Each of these findings names its own certificates, but they share 
 
 ## Acceptance criteria
 
-- [ ] `pxdir_evil` prints `schannel: error 0x00008000`; a leaf with no CDP under `ncExclDns.pem` still prints "the revocation status is unknown".
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `pxdir_evil` prints `schannel: error 0x00008000`; a leaf with no CDP under `ncExclDns.pem` still prints "the revocation status is unknown".
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+RevocationStatusIsUnknownAndChecked now also requires the below-anchor revocation check not to be Clean, so a CRL resolved below the anchor yields 0x00008000; a leaf with no CDP still reports unknown. Quality run: 0 failing members.
 
 ## Log
 
