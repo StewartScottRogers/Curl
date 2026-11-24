@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5817 — Fix fitness finding STD-169: -Z --parallel-max 1 with a missing -T file in a later --next group does not run the earlier transfer, and prints (26) twice
 
@@ -59,3 +59,4 @@ Re-reported in fitness review 2026-11-24T0708 (commit `1e5d591`, the `preview` r
 - 2026-11-24: Notes updated from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 2227ebf4 69116afe 3d836d5e.
 - 2026-11-24: Fixed: when the -T file of the first batch's extra transfer (past --parallel-max) cannot be opened, the transfers within --parallel-max start and only the failing one is reported, as for STD-183 (ParallelRun.AbandonFirstBatchAsync, startsOthersWhenExtraFails). Unit test added; Measure-CodeQuality clean for Curl.Console.
+- 2026-11-24: Doing -> Done. Missing -T file on the batch's extra transfer now runs the earlier transfers and prints (26) once
