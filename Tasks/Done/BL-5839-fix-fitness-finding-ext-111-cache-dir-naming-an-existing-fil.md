@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.HttpCache.UnitLibrary/CacheDirectory.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5839 — Fix fitness finding EXT-111: --cache-dir naming an existing file silently caches nothing, exit 0
 
@@ -49,3 +49,4 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 35127fdc 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. CacheDirectory refuses a path naming an existing file with the --cache-dir cannot use message
