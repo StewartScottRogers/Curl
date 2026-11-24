@@ -167,13 +167,19 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// </summary>
     /// <param name="failure">The setup failure.</param>
     /// <returns>A task that completes when the held transfers are reported.</returns>
-    internal async Task AbandonFirstBatchAsync(TransferResult failure)
+    /// <param name="reportsOnlyFirst">Whether only the first held transfer is reported, as curl 8.22.0 does for a
+    /// <c>-F</c> file that cannot be opened (STD-123, BL-5812).</param>
+    internal async Task AbandonFirstBatchAsync(TransferResult failure, bool reportsOnlyFirst = false)
     {
         setupsLeftInFirstBatch = 0;
         RecordSetupFailure(failure, endsTheRun: true);
         foreach ((_, Func<TransferResult, Task> abandon) in heldTransfers)
         {
             await abandon(failure).ConfigureAwait(false);
+            if (reportsOnlyFirst)
+            {
+                break;
+            }
         }
 
         heldTransfers.Clear();

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5812 — Fix fitness finding STD-123: -Z with -F name=@missing-file reports a separate (26) failure for every URL instead of stopping after the first (STILL OPEN, partly fixed)
 
@@ -39,11 +39,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the command prints exactly `[http://127.0.0.1:23000/echo/a 26]` and one (26) line, exit 26.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints exactly `[http://127.0.0.1:23000/echo/a 26]` and one (26) line, exit 26.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed: a -F file that cannot be opened abandons the -Z first batch but reports only the first held transfer (ParallelRun.AbandonFirstBatchAsync reportsOnlyFirst), matching REF: one (26) line, one -w line. Updated Cgr175Tests pin (was three reports). Quality run clean. CI platforms: change is platform-neutral.
 
 ## Log
 
@@ -51,3 +53,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 54dfb14c 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Fixed: -Z -F missing file reports once

@@ -2253,7 +2253,7 @@ internal sealed class CurlCommandRunner(
 
         if (await FormSetupFailureAsync(options, transfer).ConfigureAwait(false) is { } formFailure)
         {
-            await run.AbandonFirstBatchAsync(formFailure).ConfigureAwait(false);
+            await run.AbandonFirstBatchAsync(formFailure, reportsOnlyFirst: true).ConfigureAwait(false);
             return true;
         }
 
