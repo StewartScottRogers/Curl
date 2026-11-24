@@ -24,12 +24,14 @@ Repro: `surl --directory store --cert server.pem --key server.key --user build:b
 
 ## Acceptance criteria
 
-- [ ] `-w "%header{docker-content-digest}"` over `oci://` prints the digest from the final response, pinned by a unit test with a test-double registry.
-- [ ] `%{header_json}` over `oci://` lists the final response's headers, pinned by a unit test.
-- [ ] After a bearer-token round trip, the headers are the final response's, not the 401's, pinned by a unit test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `-w "%header{docker-content-digest}"` over `oci://` prints the digest from the final response, pinned by a unit test with a test-double registry.
+- [x] `%{header_json}` over `oci://` lists the final response's headers, pinned by a unit test.
+- [x] After a bearer-token round trip, the headers are the final response's, not the 401's, pinned by a unit test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+OciHttpHeadReporter now records the last response's header fields (reset at each status line, so the 401 of a token round trip is dropped) into TransferReport.ResponseHeaders; the handler already hands the report to -w. Unit tests use the reporter directly (one test covers digest, duplicates and the round trip). S3 not checked for the same gap.
 
 ## Log
 

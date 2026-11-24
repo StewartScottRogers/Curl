@@ -128,6 +128,25 @@ public sealed class OciHttpHeadReporterTests
         Assert.AreEqual(Response, Encoding.Latin1.GetString(headerOutput.ToArray()));
     }
 
+    [TestMethod]
+    public async Task Report_AfterATokenRoundTrip_ListsOnlyTheFinalResponsesHeaders()
+    {
+        var reporter = new OciHttpHeadReporter(NoTransferEvents.Instance, null);
+        foreach (string line in new[]
+        {
+            "HTTP/1.1 401 Unauthorized", "Www-Authenticate: Bearer realm=\"x\"", "",
+            "HTTP/1.1 200 OK", "Docker-Content-Digest: sha256:abc", "X-Dup: 1", "X-Dup: 2", "no colon here", "",
+        })
+        {
+            await reporter.ReportResponseLineAsync(line, CancellationToken.None);
+        }
+
+        KeyValuePair<string, string>[] headers = [.. reporter.Report!.ResponseHeaders];
+        CollectionAssert.AreEqual(
+            new KeyValuePair<string, string>[] { new("Docker-Content-Digest", "sha256:abc"), new("X-Dup", "1"), new("X-Dup", "2") },
+            headers);
+    }
+
     private sealed class HeadEvents : ITransferEvents
     {
         public StringBuilder Request { get; } = new();
