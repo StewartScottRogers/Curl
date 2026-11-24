@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Imap.UnitLibrary/ImapAuthentication.cs, Curl.Original.Protocol.Pop3.UnitLibrary/Pop3Login.cs]
+touches: [Curl.Original.Protocol.Imap.UnitLibrary/ImapAuthentication.cs, Curl.Original.Protocol.Pop3.UnitLibrary/Pop3Login.cs, Curl.Original.Protocol.Pop3.UnitLibrary/Pop3LoginOptions.cs, Curl.Authentication.UnitLibrary/SaslMechanismRanking.cs, Curl.Protocol.Abstractions.UnitLibrary/SaslRequest.cs, Curl.Original.Protocol.Imap.UnitTests/ImapProtocolHandlerAuthenticationTests.cs, Curl.Original.Protocol.Imap.UnitTests/Fakes/FakeSaslAuthenticator.cs, Curl.Original.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerNoLoginMechanismTests.cs, Curl.Original.Protocol.Pop3.UnitTests/Pop3LoginOptionsTests.cs, Curl.Authentication.UnitTests/SaslAuthenticatorTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5880 — Fix fitness finding STD-199: IMAP and POP3 with --oauth2-bearer fall back to a cleartext password LOGIN or APOP when the server offers no OAuth mechanism, and refuse an explicit AUTH=PLAIN
 
@@ -40,13 +40,21 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] repro 1 exits 67 `Login denied` and the `-v` output has no `LOGIN` line; repro 2 exits 67 with no `APOP` or `USER` line; repro 3 sends `AUTHENTICATE PLAIN` and exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] repro 1 exits 67 `Login denied` and the `-v` output has no `LOGIN` line; repro 2 exits 67 with no `APOP` or `USER` line; repro 3 sends `AUTHENTICATE PLAIN` and exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured curl 8.22.0 (Schannel) with `Record-CurlExchange.ps1`; the table is in ADR-1347. Curl now sends the same commands in every case measured except one, no `-u` with `AUTH=PLAIN` (older behaviour, filed as BL-5903 with the withheld-token cases). The `-v` `no overlap` line and `curl: (67) Login denied` match for IMAP and POP3.
+- The three repros, run against the recorder with Curl: 1 exits 67 after `A001 CAPABILITY` only; 2 exits 67 after `CAPA` only; 3 sends `AUTHENTICATE PLAIN` and exits 0.
+- Done directly, without the feature pipeline's subagents, to stay inside the lane's cost cap.
+- `touches` widened: refusing `AUTH=PLAIN` came from `SaslMechanismRanking` (never a password mechanism with a token), which also affected SMTP, and POP3 could not tell `AUTH=*` from no option (`Pop3LoginOptions`). No other task in Doing named any added file. SMTP needed no code change: it already passed the `AUTH=` value as the required mechanism, and its measured answers now match.
+- Quality: `Measure-CodeQuality.ps1` for Imap, Pop3 and Authentication, 0 failing members. `Curl.Protocol.Abstractions` changed only a doc comment. Fast tests: the one failure of the full run (an IMAP assertion expecting the old `RequiredMechanism`) was updated and that project rerun green.
+- Platform: no test or output added depends on the platform. `dotnet format whitespace` on the changed files is clean; the full `dotnet format` did not finish within 10 minutes while other lanes built.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 742311db 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. IMAP and POP3 with --oauth2-bearer send no password unless an AUTH= login option allows it, and AUTH= choices are honoured as curl 8.22.0 does
