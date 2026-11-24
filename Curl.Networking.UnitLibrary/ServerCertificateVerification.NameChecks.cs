@@ -34,8 +34,16 @@ internal sealed partial class ServerCertificateVerification
             errors |= SslPolicyErrors.RemoteCertificateChainErrors;
         }
 
-        return OpenSslCommonNameRefusal.RefusesHostName(leaf, targetHost)
-            ? errors | SslPolicyErrors.RemoteCertificateNameMismatch
+        if (OpenSslCommonNameRefusal.RefusesHostName(leaf, targetHost))
+        {
+            return errors | SslPolicyErrors.RemoteCertificateNameMismatch;
+        }
+
+        // OpenSSL's check ignores one trailing dot on each side, .NET's on Linux does not
+        // (BL-5855, STD-187).
+        return errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
+            && SchannelCommonNameCheck.DnsAlternativeNameMatches(leaf, targetHost)
+            ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
             : errors;
     }
 

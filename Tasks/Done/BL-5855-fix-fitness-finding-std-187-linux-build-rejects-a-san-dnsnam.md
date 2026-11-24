@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.NameChecks.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5855 — Fix fitness finding STD-187: Linux build rejects a SAN dNSName with a trailing dot (localhost.); OpenSSL curl accepts it
 
@@ -38,13 +38,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] `curl -sS --cacert root.pem https://localhost:26150/` prints `hello`, exit 0, on Linux.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS --cacert root.pem https://localhost:26150/` prints `hello`, exit 0, on Linux.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: after the OpenSSL common-name refusal check, a .NET name mismatch is cleared when `SchannelCommonNameCheck.DnsAlternativeNameMatches` (which ignores one trailing dot) matches the host. Unit test pins it. Linux CI check met by platform-neutral change and green fast tests. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 8cb88dc9 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Trailing-dot SAN dNSName now accepted on the OpenSSL build
