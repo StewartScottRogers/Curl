@@ -46,3 +46,4 @@ Shared setup: Each of these findings names its own certificates, but they share 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 621e9b95 69116afe 3d836d5e.
