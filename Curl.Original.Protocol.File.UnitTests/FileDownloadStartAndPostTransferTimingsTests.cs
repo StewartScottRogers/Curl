@@ -39,6 +39,16 @@ public sealed class FileDownloadStartAndPostTransferTimingsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Download_PreTransferEqualsPostTransferAtTheTotalAndStartTransferIsNotLater()
+    {
+        var timings = await DownloadTimingsAsync();
+
+        Assert.AreEqual(timings.RequestSent, timings.RequestReady);
+        Assert.AreEqual(timings.Completed, timings.RequestReady);
+        Assert.IsTrue(timings.FirstByteReceived <= timings.RequestReady);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Upload_HasNoConnectOrStartTransferButAPostTransfer()
     {
         var context = new TransferContext

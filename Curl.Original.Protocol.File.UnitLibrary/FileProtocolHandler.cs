@@ -210,7 +210,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // path resolves, and is posted when it ends (BL-5387); an upload keeps its BL-5327 timings.
         var timings = isUpload
             ? new TransferTimings(started, new ConnectTimings(started, resolved, null, null), completed, completed, null, completed)
-            : new TransferTimings(started, new ConnectTimings(started, resolved, null, null), resolved, completed, resolved, completed);
+            : new TransferTimings(started, new ConnectTimings(started, resolved, null, null), completed, completed, resolved, completed);
         return result with { Report = report with { Timings = timings } };
     }
     /// <summary>

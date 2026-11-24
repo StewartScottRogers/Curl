@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5826 — Fix fitness finding STD-177: file:// download: %{time_pretransfer} and %{time_starttransfer} are stamped at the start, and %{time_posttransfer} differs from pretransfer
 
@@ -35,11 +35,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] `pre` equals `post`, both ≈ `tot`, and `st` ≤ `pre`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `pre` equals `post`, both ≈ `tot`, and `st` ≤ `pre`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Download timings now stamp pretransfer and posttransfer both at completion (equal, ~total) and starttransfer at the resolve stamp (<= pretransfer). Upload unchanged. Test added in FileDownloadStartAndPostTransferTimingsTests; File tests 511 pass; quality run 0 failing members.
 
 ## Log
 
@@ -47,3 +49,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 317dbe7b 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. file:// download pretransfer equals posttransfer at total, starttransfer not later
