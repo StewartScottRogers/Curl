@@ -208,6 +208,33 @@ public sealed class CertificateRevocationListFileTests
     }
 
     [TestMethod]
+    public void FirstRefusal_WithAChainEndingAtAnIntermediateAnchor_IsUnableToGetIssuerCertificate()
+    {
+        using var intermediateKey = RSA.Create(2048);
+        var intermediateRequest = new CertificateRequest("CN=STD180 Intermediate", intermediateKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        intermediateRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
+        using var intermediate = intermediateRequest.Create(s_root, Now.AddDays(-1), Now.AddDays(1), [18]);
+        using var intermediateWithKey = intermediate.CopyWithPrivateKey(intermediateKey);
+        using var leafKey = RSA.Create(2048);
+        using var leaf = new CertificateRequest("CN=std180.example", leafKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)
+            .Create(intermediateWithKey, Now.AddDays(-1), Now.AddDays(1), [19]);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.CustomTrustStore.Add(intermediate);
+        chain.Build(leaf);
+        Diagnostics.Arrange("chain length", chain.ChainElements.Count);
+
+        var refusal = Load(TestRevocationList.Pem(EmptyListFromRoot())).FirstRefusal(chain, Now);
+        Diagnostics.Act("refusal", refusal);
+
+        Diagnostics.Assert("chain length", 2, chain.ChainElements.Count);
+        Assert.AreEqual(2, chain.ChainElements.Count);
+        Diagnostics.Assert("refusal", OpenSslVerifyResult.UnableToGetIssuerCertificate, refusal);
+        Assert.AreEqual(OpenSslVerifyResult.UnableToGetIssuerCertificate, refusal);
+    }
+
+    [TestMethod]
     public void FirstRefusal_WithAnIntermediateTheListDoesNotCover_RefusesTheServerCertificateFirst()
     {
         using var intermediateKey = RSA.Create(2048);

@@ -201,6 +201,7 @@ internal static class TlsFailureMessages
     // measured with curl 8.18.0's OpenSSL 3.5.5 build (BL-609); the others are OpenSSL's table.
     private static readonly FrozenDictionary<long, string> OpenSslRevocationListErrorTexts = new Dictionary<long, string>
     {
+        [OpenSslVerifyResult.UnableToGetIssuerCertificate] = "unable to get issuer certificate",
         [OpenSslVerifyResult.UnableToGetCertificateRevocationList] = "unable to get certificate CRL",
         [OpenSslVerifyResult.CertificateRevocationListSignatureFailure] = "CRL signature failure",
         [OpenSslVerifyResult.CertificateRevocationListNotYetValid] = "CRL is not yet valid",

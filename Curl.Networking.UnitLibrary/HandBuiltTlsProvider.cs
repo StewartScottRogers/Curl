@@ -307,6 +307,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var (prepared, preparationFailure, alertRecord) = await PrepareWithEchAsync(verification, events, targetHost, offeredApplicationProtocols, plaintext.RemoteEndPoint, cancellationToken).ConfigureAwait(false);
         if (prepared is null)
         {
+            SslStreamTlsProvider.ReportUnusableCrlFile(events, preparationFailure!.ExitCode, isProxy, _matchesSchannelBuild);
             return await FailBeforeHandshakeAsync(plaintext, preparationFailure!, alertRecord, cancellationToken).ConfigureAwait(false);
         }
 

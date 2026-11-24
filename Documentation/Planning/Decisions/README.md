@@ -1386,3 +1386,4 @@ Each option and the specific reason it lost.
 | [1342](ADR-1342-the-openssl-build-verifies-an-https-proxy-against-its-built-in-bundle.md) | The OpenSSL build verifies an HTTPS proxy against its built-in bundle (BL-5828) | Accepted | 2026-11-23 |
 | [1343](ADR-1343-openldap-sasl-bind-failures-exit-67-login-denied-or-authentication-cancelled.md) | OpenLDAP SASL bind failures exit 67 Login denied or Authentication cancelled (BL-5819) | Accepted | 2026-11-23 |
 | [1344](ADR-1344-checksum-refuses-a-resumed-download.md) | --checksum refuses a resumed download (BL-5837) | Accepted | 2026-11-24 |
+| [1344](ADR-1344-crlfile-with-a-non-self-signed-anchor-is-unable-to-get-issuer-certificate.md) | --crlfile with a non-self-signed anchor is unable to get issuer certificate (BL-5830) | Accepted | 2026-11-24 |

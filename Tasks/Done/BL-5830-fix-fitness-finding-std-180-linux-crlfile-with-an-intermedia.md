@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5830 — Fix fitness finding STD-180: Linux --crlfile with an intermediate-only anchor reports "certificate revoked (23)" where OpenSSL reports "unable to get issuer certificate (2)"
 
@@ -40,11 +40,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the first two print `(2)` and `2`, exit 60; the third prints `1`, exit 82.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first two print `(2)` and `2`, exit 60; the third prints `1`, exit 82.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: FirstRefusal returns 2 for a non-self-signed last chain certificate; ReportUnusableCrlFile reports verify result 1 for exit 82 (ADR-1344). Verified by unit tests only (the finding's Linux servers were not rebuilt); fast tests green, Measure-CodeQuality 0 failing.
 
 ## Log
 
@@ -52,3 +54,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 1898b3a1 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Linux --crlfile with an intermediate-only anchor reports unable to get issuer certificate (2); unusable CRL file reports verify result 1

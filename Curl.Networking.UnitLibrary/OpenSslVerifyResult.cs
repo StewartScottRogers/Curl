@@ -65,6 +65,9 @@ internal static class OpenSslVerifyResult
     /// <summary><c>X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN</c>.</summary>
     internal const long SelfSignedCertificateInChain = 19;
 
+    /// <summary><c>X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT</c>.</summary>
+    internal const long UnableToGetIssuerCertificate = 2;
+
     /// <summary><c>X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY</c>.</summary>
     internal const long UnableToGetIssuerCertificateLocally = 20;
 
