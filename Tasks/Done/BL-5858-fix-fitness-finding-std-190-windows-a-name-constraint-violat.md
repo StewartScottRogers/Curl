@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5858 — Fix fitness finding STD-190: Windows: a name-constraint violation is reported as "revocation status is unknown" even when the leaf's CRL was fetched and is clean
 
@@ -49,3 +49,4 @@ RevocationStatusIsUnknownAndChecked now also requires the below-anchor revocatio
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 45139bdb 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. RevocationStatusIsUnknownAndChecked ignores a CRL resolved below the anchor; unit test added
