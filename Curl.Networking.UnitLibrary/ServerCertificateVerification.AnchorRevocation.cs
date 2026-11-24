@@ -149,24 +149,31 @@ internal sealed partial class ServerCertificateVerification
     private static IEnumerable<byte[]> FreshestPointers(CertificateRevocationList baseList, X509Certificate2 certificate) =>
         new[] { baseList.FreshestCrlValue, certificate.Extensions[FreshestCrlOid]?.RawData }.OfType<byte[]>();
 
+    // A delta that is expired or newer than the base list is not usable, yet CryptoAPI still reports the leaf revoked when it lists it (STD-189).
     private BelowAnchorRevocation DeltaRevocationOf(byte[] pointer, CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var deltas = UsableDeltas(pointer, baseList, certificate, issuer, budget);
-        return deltas.Length == 0
-            ? BelowAnchorRevocation.Unresolved
-            : deltas.Any(delta => delta.Revokes(certificate)) ? BelowAnchorRevocation.Revoked : BelowAnchorRevocation.Clean;
+        var candidates = CandidateDeltas(pointer, certificate, issuer, budget);
+        var deltas = candidates.Where(delta => IsCurrentDeltaOf(delta, baseList, certificate)).ToArray();
+        return candidates.Any(delta => delta.Revokes(certificate))
+            ? BelowAnchorRevocation.Revoked
+            : deltas.Length == 0 ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
     }
 
-    private CertificateRevocationList[] UsableDeltas(byte[] pointer, CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    private CertificateRevocationList[] UsableDeltas(byte[] pointer, CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget) =>
+        CandidateDeltas(pointer, certificate, issuer, budget).Where(delta => IsCurrentDeltaOf(delta, baseList, certificate)).ToArray();
+
+    private bool IsCurrentDeltaOf(CertificateRevocationList delta, CertificateRevocationList baseList, X509Certificate2 certificate) =>
+        delta.NextUpdate >= timeProvider.GetUtcNow() && delta.IsDeltaOf(baseList, certificate);
+
+    private CertificateRevocationList[] CandidateDeltas(byte[] pointer, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
         return DistributionPointUris(pointer)
             .Select(uri => TryFetchRevocationList(uri, budget))
             .Select(der => der is null ? null : DecodeOrNothing(der))
             .OfType<CertificateRevocationList>()
-            .Where(delta => delta.CoversCertificatesIssuedFor(certificate) && delta.IsSignedBy(issuer) && delta.NextUpdate >= timeProvider.GetUtcNow() && delta.IsDeltaOf(baseList, certificate))
+            .Where(delta => delta.CoversCertificatesIssuedFor(certificate) && delta.IsSignedBy(issuer))
             .ToArray();
     }
-
     // A list is usable when it decodes, is the issuer's, is signed by the issuer and names a next update not yet passed (one naming none fails closed).
     private CertificateRevocationList? UsableRevocationList(Uri uri, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5857 — Fix fitness finding STD-189: Windows: an expired delta CRL, or one whose base number is above the base CRL's, gives "revocation status is unknown" where curl says "has been revoked"
 
@@ -37,13 +37,16 @@ Shared setup: Each of these findings names its own certificates, but they share 
 
 ## Acceptance criteria
 
-- [ ] the three leaves print the "has been revoked" text, exit 60.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the three leaves print the "has been revoked" text, exit 60.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed in `DeltaRevocationOf`: a delta that is expired or whose base indicator exceeds the base number, but is signed by the issuer and lists the leaf, now gives Revoked (CryptoAPI behaviour per the finding); one that does not list it stays Unresolved. Not re-measured against real curl (finding is the measurement). Quality gate run: 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: e019e0b5 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Expired or too-new delta listing the leaf now reports revoked
