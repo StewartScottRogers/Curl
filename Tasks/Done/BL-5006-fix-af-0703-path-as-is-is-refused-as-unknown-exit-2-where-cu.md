@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CurlOptionAliasTable.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-24
 ---
 # BL-5006 — Fix AF-0703: --path-as-is is refused as unknown (exit 2) where curl accepts it and sends the request
 
@@ -57,3 +57,4 @@ No code change: AF-0703 was rejected by Stewart as the audit's planted defect. I
 - 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): AF-0703 was rejected by Stewart on 2026-11-12 as the audit's planted defect, not a Curl defect; --path-as-is is registered.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-24: Doing -> Done. Reproduction passes on current tree (exit 0, request sent); no code change needed.
