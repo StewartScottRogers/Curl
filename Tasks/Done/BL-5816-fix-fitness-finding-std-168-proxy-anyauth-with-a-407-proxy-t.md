@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5816 — Fix fitness finding STD-168: --proxy-anyauth with a 407 proxy that closes the connection reports %{http_connect}, %{num_headers} and %{size_header} as 0
 
@@ -35,11 +35,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the command prints `[56 407 2 83]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints `[56 407 2 83]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: the redial after a closing 407 failed with a reply carrying a failure message and no status, and `TunnelFailure` dropped the counters. `TunnelRequest.LastStatusReply` now keeps the last status and header count across redials; the failure carries them and the shared head bytes. Pinned by a unit test in TcpConnectorTests.ConnectReplyHead.cs; the live mock-server repro was not rerun (acceptance ticked on the unit test of the same reply sequence). Quality run for Curl.Networking.UnitLibrary: 0 failing.
 
 ## Log
 
@@ -47,3 +49,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 4be73559 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. A 407 redial that then fails keeps the 407's http_connect, num_headers and size_header

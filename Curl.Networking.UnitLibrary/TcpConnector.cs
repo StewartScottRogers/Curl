@@ -1478,6 +1478,7 @@ public sealed partial class TcpConnector(
         var answersChallenge = false;
         var reconnects = 0;
         var replyHeadBytes = new StrongBox<long>();
+        var lastStatusReply = new StrongBox<(int StatusCode, int HeaderCount)>();
         while (true)
         {
             // A 407 answered on a connection the proxy closes is sent again on a new one, as
@@ -1485,7 +1486,7 @@ public sealed partial class TcpConnector(
             var (result, redialAuthorization) = await CarryingTimingsIfCanceledAsync(
                 DialAndOpenThroughProxyAsync(
                     addresses,
-                    new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents) { HeadOutput = headOutput, ReplyHeadBytes = replyHeadBytes },
+                    new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents) { HeadOutput = headOutput, ReplyHeadBytes = replyHeadBytes, LastStatusReply = lastStatusReply },
                     proxyAuthorization,
                     cancellationToken),
                 new ConnectTimings(started, nameResolved, null, null)).ConfigureAwait(false);
@@ -1921,7 +1922,7 @@ public sealed partial class TcpConnector(
 
             if (!onThisConnection)
             {
-                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure, tunnel.Target.Events, tunnel.ReplyHeadBytes.Value).ConfigureAwait(false);
+                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure, tunnel.Target.Events, tunnel.ReplyHeadBytes.Value, tunnel.LastStatusReply.Value).ConfigureAwait(false);
             }
 
             proxyAuthorization = answer;
@@ -1956,11 +1957,12 @@ public sealed partial class TcpConnector(
         string? redialAuthorization,
         string? firstSspiFailure,
         ITransferEvents events,
-        long headBytes)
+        long headBytes,
+        (int StatusCode, int HeaderCount) lastStatusReply)
     {
         await connection.DisposeAsync().ConfigureAwait(false);
         exception?.Throw();
-        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure, events, headBytes), null) : (null, redialAuthorization);
+        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure, events, headBytes, lastStatusReply), null) : (null, redialAuthorization);
     }
 
     /// <summary>
@@ -2108,6 +2110,11 @@ public sealed partial class TcpConnector(
             trace.ReportReceiving(events);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
             tunnel.ReplyHeadBytes.Value += reply.Head.Length;
+            if (reply.StatusCode > 0)
+            {
+                tunnel.LastStatusReply.Value = (reply.StatusCode, reply.HeaderCount);
+            }
+
             ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate));
             ConnectTunnelVerboseLines.ReportReplyFailure(events, reply);
             trace.ReportResponse(events, reply.OpensTunnel);
@@ -2193,11 +2200,11 @@ public sealed partial class TcpConnector(
         }
     }
 
-    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure, ITransferEvents events, long headBytes)
+    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure, ITransferEvents events, long headBytes, (int StatusCode, int HeaderCount) lastStatusReply)
     {
         if (reply.FailureMessage is { } failureMessage)
         {
-            return ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage);
+            return ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage, null, 0, lastStatusReply.StatusCode, connectReplyHeadersStored: lastStatusReply.HeaderCount, proxyConnectHeaderBytes: lastStatusReply.StatusCode > 0 ? headBytes : 0);
         }
 
         var refused = $"CONNECT tunnel failed, response {reply.StatusCode}";
@@ -2740,5 +2747,12 @@ public sealed partial class TcpConnector(
         /// <c>%{size_header}</c> (upstream test1288, BL-2010).
         /// </summary>
         public StrongBox<long> ReplyHeadBytes { get; init; } = new();
+
+        /// <summary>
+        /// Gets the status code and header count of the last reply that carried a status, shared by
+        /// the redials, which curl 8.22.0 still reports as <c>%{http_connect}</c> and
+        /// <c>%{num_headers}</c> when a later CONNECT fails with no status of its own (STD-168).
+        /// </summary>
+        public StrongBox<(int StatusCode, int HeaderCount)> LastStatusReply { get; init; } = new();
     }
 }
