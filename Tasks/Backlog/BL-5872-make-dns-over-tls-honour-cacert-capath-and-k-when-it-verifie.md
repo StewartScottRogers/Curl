@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.EncryptedDns.UnitLibrary/DnsOverTls, Curl.Extension.EncryptedDns.UnitTests/DnsOverTls]
+touches: [Curl.Extension.EncryptedDns.UnitLibrary/DnsOverTls, Curl.Extension.EncryptedDns.UnitTests/DnsOverTls, Curl.Extension.EncryptedDns.UnitLibrary/EncryptedDnsExtension.cs, Curl.Extension.EncryptedDns.UnitLibrary/CLAUDE.md, Curl.Extension.Abstractions.UnitLibrary/ExtensionOptionValues.cs, Curl.Extension.Abstractions.UnitLibrary/ExtensionTlsTrust.cs, Curl.Extension.Abstractions.UnitLibrary/CLAUDE.md, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/ExtensionCommandLineOptionTests.cs]
 requirement: none
 created: 2026-11-24
 completed:
@@ -31,7 +31,14 @@ Repro: `surl -v --cert server.pem --key server.key --dns-transport tls dns://127
 
 ## Notes
 
+- Done and committed (ADR-1347): `--dns-over-tls` gets the transfer's `-k`, `--cacert`, `--capath` through `ExtensionOptionValues.TlsTrust`; option help and CLAUDE.md say so. Build clean; Measure-CodeQuality for Abstractions and EncryptedDns: 0 failing members, its 69 test projects passed.
+- Touches widened: the hook had no way to see the transfer's options; no other task in Doing named these files.
+- Left: criteria 1 and 2. `DnsOverTlsTrustTests` pins only the mapping to `TlsClientOptions`. Add unit tests that resolve through a test-double DoT server over an in-memory duplex `IConnection` (server side `SslStream`, certificate from a private CA): resolves with `--cacert`, resolves with `-k` and an untrusted certificate, fails without either. `DnsOverTlsResolver` takes the connector, so inject a fake one and `new SslStreamTlsProvider(hook.TlsOptions, TimeProvider.System)`. Check whether Linux/macOS chain building answers the same.
+- `--dns-over-quic` does not read `TlsTrust`; outside this task.
+- Criterion 3 is partly done: the option help and CLAUDE.md say it, but `curl --ai-help` printed no `dns-over-tls` trust text; `--extended-help` shows only `EncryptedDnsExtension.Description`. Check where `--ai-help` should carry it.
+
 ## Log
 
 - 2026-11-24: Created from Surly bug report 2026-11-24T1330, finding 1.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: d597ab5e 5829f2b6 3f81e2b0 3d836d5e.
+- 2026-11-24: Doing -> Backlog. Code committed; left: end-to-end DoT handshake unit tests (criteria 1-2) and --ai-help trust text (criterion 3), see Notes
