@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-24
 ---
 # BL-5748 — Send TELNET standard input bytes unchanged on Windows; CR LF stays CR LF
 
@@ -39,6 +39,9 @@ From Surly cookbook bug report `2026-11-22T0726-Curl-bug-report.md` (batch 10 of
   curl. A caller needing CR LF on the wire on Windows uses `-T -`, as with curl. A re-measure here hung and was abandoned;
   ADR-0848's measurement stands.
 - The acceptance criteria were written on the wrong premise and are not met as stated; closed as "not a bug".
+- 2026-11-24 (lane 7, after Stewart undeferred it): ADR-0848's text-mode read is still in place
+  (`Curl.Engine.UnitLibrary/WindowsTextModeReadStream.cs`, pinned by `Cgr112Tests` in Curl.Engine.UnitTests and
+  Curl.Cli.UnitTests). `dotnet build` is clean and the fast tests pass with 0 failures. Closed with no code change.
 
 ## Log
 
@@ -48,3 +51,4 @@ From Surly cookbook bug report `2026-11-22T0726-Curl-bug-report.md` (batch 10 of
 - 2026-11-22: Blocked -> Deferred. Decided by Claude under Stewart's delegation: curl 8.22.0 on Windows also sends a TELNET stdin CR LF as LF (ADR-0848), so the port matches the platform's curl; no change.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 35bd87c1 bd179971 f0707225.
+- 2026-11-24: Doing -> Done. Not a bug: Windows curl 8.22.0 also sends TELNET stdin CR LF as LF (ADR-0848); Curl matches, no code change
