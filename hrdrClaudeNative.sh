@@ -17,7 +17,7 @@
 #      [1/8] Ensure git            (installs via the system package manager)
 #      [2/8] Ensure Node.js / npm  (installs via the system package manager)
 #      [3/8] Ensure Claude Code    (installs/updates via npm)
-#      [4/8] Ensure cipher MCP     (installs/updates it, registers it with Claude)
+#      [4/8] Ensure ByteRover MCP  (installs/updates brv, registers it with Claude)
 #      [5/8] Ensure herdr          (installs/updates the terminal multiplexer)
 #      [6/8] Clone / update repo   (into $HOME/Curl)
 #      [7/8] Ensure herdr server   (stops an incompatible one)
@@ -82,6 +82,10 @@ die() {
 #  Configuration
 # -----------------------------------------------------------------------------
 export CLAUDE_MODEL="${CLAUDE_MODEL:-opus}"
+# How long Claude waits for an MCP server to start, in milliseconds. ByteRover's
+# "brv mcp" (step 4) takes about 20s to answer, more on a busy machine, past
+# Claude's 30s default; step 8 forwards this into Claude's pane.
+export MCP_TIMEOUT="${MCP_TIMEOUT:-90000}"
 REPO_URL="https://github.com/StewartScottRogers/Curl.git"
 DEFAULT_REPO_DIR="$HOME/Curl"
 # The herdr workspace Claude always opens in. Step 7 reuses the workspace with
@@ -186,31 +190,28 @@ fi
 
 
 # -----------------------------------------------------------------------------
-#  [4/8]  Ensure the cipher memory MCP server, update it, register it with Claude
+#  [4/8]  Ensure the ByteRover MCP server, update it, register it with Claude
 # -----------------------------------------------------------------------------
-#  cipher (npm @byterover/cipher, https://mcpmarket.com/server/cipher) gives
-#  Claude a persistent memory over MCP. It is installed into its own folder and
-#  reinstalled at @latest on every launch, so it stays current; better-sqlite3,
-#  its one native module, is fetched prebuilt (without it cipher prints a SQLite
-#  error onto stdout and breaks MCP). Claude is pointed at node and cipher's
-#  script by full path, and the user-wide registration is redone every launch.
-#  cipher reads OPENAI_API_KEY (embeddings) from the environment Claude
-#  inherits. Any failure here only warns: Claude still starts.
-echo "[4/8] Ensuring the cipher MCP server ..."
-CIPHER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/cipher-mcp"
-CIPHER_ENTRY="$CIPHER_DIR/node_modules/@byterover/cipher/dist/src/app/index.cjs"
-CIPHER_SQLITE="$CIPHER_DIR/node_modules/better-sqlite3"
-mkdir -p "$CIPHER_DIR"
-npm install --prefix "$CIPHER_DIR" @byterover/cipher@latest --ignore-scripts --no-audit --no-fund --loglevel=error || true
-if [ -f "$CIPHER_ENTRY" ]; then
-    if [ ! -f "$CIPHER_SQLITE/build/Release/better_sqlite3.node" ]; then
-        (cd "$CIPHER_SQLITE" && npm exec --yes -- prebuild-install) || true
-    fi
+#  ByteRover (npm byterover-cli, command "brv"; the successor of the deprecated
+#  cipher, https://mcpmarket.com/server/cipher) gives Claude a project context
+#  tree over MCP: "brv mcp" serves the brv-query and brv-curate tools. It is
+#  installed into its own folder and reinstalled at @latest on every launch, so
+#  it stays current. Claude is pointed at node and brv's script by full path,
+#  the user-wide registration is redone every launch, and the old "cipher"
+#  registration is removed. brv's LLM provider is set once with
+#  "brv providers connect". Any failure here only warns: Claude still starts.
+echo "[4/8] Ensuring the ByteRover MCP server ..."
+BRV_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/byterover-cli"
+BRV_ENTRY="$BRV_DIR/node_modules/byterover-cli/bin/run.js"
+mkdir -p "$BRV_DIR"
+npm install --prefix "$BRV_DIR" byterover-cli@latest --no-audit --no-fund --loglevel=error || true
+if [ -f "$BRV_ENTRY" ]; then
     claude mcp remove cipher -s user >/dev/null 2>&1 || true
-    claude mcp add cipher -s user -- node "$CIPHER_ENTRY" --mode mcp >/dev/null \
-        || echo "      WARNING: cipher could not be registered with Claude."
+    claude mcp remove byterover -s user >/dev/null 2>&1 || true
+    claude mcp add byterover -s user -- node "$BRV_ENTRY" mcp >/dev/null \
+        || echo "      WARNING: ByteRover could not be registered with Claude."
 else
-    echo "      WARNING: cipher could not be installed; Claude will start without it."
+    echo "      WARNING: ByteRover could not be installed; Claude will start without it."
 fi
 
 
@@ -327,14 +328,15 @@ launch_claude_pane() {
         const h = process.env.HERDR, e = process.env;
         const run = (...a) => JSON.parse(execFileSync(h, a, { encoding: "utf8" }));
         const env = "CLAUDE_MODEL=" + e.CLAUDE_MODEL;
+        const timeout = "MCP_TIMEOUT=" + e.MCP_TIMEOUT;
         const ws = (run("workspace", "list").result.workspaces || [])
             .find(w => w.label === e.HERDR_WORKSPACE_LABEL);
         let r;
         if (ws) {
             r = run("tab", "create", "--workspace", ws.workspace_id, "--cwd", e.REPO_DIR,
-                    "--env", env, "--label", e.AGENT_LABEL, "--focus").result;
+                    "--env", env, "--env", timeout, "--label", e.AGENT_LABEL, "--focus").result;
         } else {
-            r = run("workspace", "create", "--cwd", e.REPO_DIR, "--env", env,
+            r = run("workspace", "create", "--cwd", e.REPO_DIR, "--env", env, "--env", timeout,
                     "--label", e.HERDR_WORKSPACE_LABEL, "--focus").result;
             execFileSync(h, ["tab", "rename", r.tab.tab_id, e.AGENT_LABEL]);
         }

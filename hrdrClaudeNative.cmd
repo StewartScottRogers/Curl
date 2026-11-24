@@ -22,7 +22,7 @@ REM
 REM      [1/8] Ensure git            (installs via winget if missing)
 REM      [2/8] Ensure Node.js / npm  (installs via winget if missing)
 REM      [3/8] Ensure Claude Code    (installs/updates via npm)
-REM      [4/8] Ensure cipher MCP     (installs/updates it, registers it with Claude)
+REM      [4/8] Ensure ByteRover MCP  (installs/updates brv, registers it with Claude)
 REM      [5/8] Ensure herdr          (installs/updates the terminal multiplexer)
 REM      [6/8] Clone / update repo   (into %USERPROFILE%\Curl)
 REM      [7/8] Ensure herdr server   (starts a compatible one if needed)
@@ -66,6 +66,10 @@ REM ----------------------------------------------------------------------------
 REM  Configuration
 REM -----------------------------------------------------------------------------
 if not defined CLAUDE_MODEL set "CLAUDE_MODEL=opus"
+REM  How long Claude waits for an MCP server to start, in milliseconds. ByteRover's
+REM  "brv mcp" (step 4) takes about 20s to answer, more on a busy machine, past
+REM  Claude's 30s default; step 8 forwards this into Claude's pane.
+if not defined MCP_TIMEOUT set "MCP_TIMEOUT=90000"
 set "REPO_URL=https://github.com/StewartScottRogers/Curl.git"
 set "DEFAULT_REPO_DIR=%USERPROFILE%\Curl"
 REM  The herdr workspace Claude always opens in. Step 7 reuses the workspace with
@@ -177,45 +181,39 @@ call claude update 2>nul
 
 
 REM -----------------------------------------------------------------------------
-REM  [4/8]  Ensure the cipher memory MCP server, update it, register it with Claude
+REM  [4/8]  Ensure the ByteRover MCP server, update it, register it with Claude
 REM -----------------------------------------------------------------------------
-REM  cipher (npm @byterover/cipher, https://mcpmarket.com/server/cipher) gives
-REM  Claude a persistent memory over MCP. It is installed into its own folder,
-REM  not npm's global one: a global install on Windows fails with ENOTEMPTY while
-REM  npm swaps its large tree. Every launch reinstalls @latest, so it stays
-REM  current. --ignore-scripts skips a native build that needs Visual Studio; the
-REM  one native module cipher needs, better-sqlite3, is then fetched prebuilt,
-REM  because without it cipher prints a SQLite error onto stdout and breaks MCP.
+REM  ByteRover (npm byterover-cli, command "brv"; the successor of the deprecated
+REM  cipher, https://mcpmarket.com/server/cipher) gives Claude a project context
+REM  tree over MCP: "brv mcp" serves the brv-query and brv-curate tools. It is
+REM  installed into its own folder, not npm's global one: a global install of a
+REM  large tree on Windows fails with ENOTEMPTY. Every launch reinstalls @latest,
+REM  so it stays current (the first install takes several minutes).
 REM
-REM  Claude is pointed at node and cipher's script by full path, never at a bare
-REM  "cipher": on Windows that name is System32\cipher.exe, the EFS tool. The
-REM  registration is user-wide and redone on every launch, so it always names the
-REM  current install. cipher reads OPENAI_API_KEY (embeddings) from the
-REM  environment Claude inherits. Any failure here only warns: Claude still starts.
-echo [4/8] Ensuring the cipher MCP server ...
-set "CIPHER_DIR=%LOCALAPPDATA%\cipher-mcp"
-set "CIPHER_ENTRY=%CIPHER_DIR%\node_modules\@byterover\cipher\dist\src\app\index.cjs"
-set "CIPHER_SQLITE=%CIPHER_DIR%\node_modules\better-sqlite3"
-if not exist "%CIPHER_DIR%" mkdir "%CIPHER_DIR%"
+REM  Claude is pointed at node and brv's script by full path, so nothing depends
+REM  on PATH. The registration is user-wide and redone on every launch, so it
+REM  always names the current install; the old "cipher" registration is removed.
+REM  brv's LLM provider is set once with "brv providers connect" (or "brv webui").
+REM  Any failure here only warns: Claude still starts.
+echo [4/8] Ensuring the ByteRover MCP server ...
+set "BRV_DIR=%LOCALAPPDATA%\byterover-cli"
+set "BRV_ENTRY=%BRV_DIR%\node_modules\byterover-cli\bin\run.js"
+if not exist "%BRV_DIR%" mkdir "%BRV_DIR%"
 REM  A quoted bare "npm" makes npm.cmd look for npm in the CURRENT folder, so
 REM  call npm by its full path (NPM is just "npm" when it was found on PATH).
-set "CIPHER_NPM=%NPM%"
-if /I "%NPM%"=="npm" for /f "delims=" %%N in ('where npm.cmd 2^>nul') do if /I "!CIPHER_NPM!"=="npm" set "CIPHER_NPM=%%N"
-call "%CIPHER_NPM%" install --prefix "%CIPHER_DIR%" @byterover/cipher@latest --ignore-scripts --no-audit --no-fund --loglevel=error
-if not exist "%CIPHER_ENTRY%" (
-    echo       WARNING: cipher could not be installed; Claude will start without it.
-    goto :cipher_ready
-)
-if not exist "%CIPHER_SQLITE%\build\Release\better_sqlite3.node" (
-    pushd "%CIPHER_SQLITE%"
-    call "%CIPHER_NPM%" exec --yes -- prebuild-install
-    popd
+set "BRV_NPM=%NPM%"
+if /I "%NPM%"=="npm" for /f "delims=" %%N in ('where npm.cmd 2^>nul') do if /I "!BRV_NPM!"=="npm" set "BRV_NPM=%%N"
+call "%BRV_NPM%" install --prefix "%BRV_DIR%" byterover-cli@latest --no-audit --no-fund --loglevel=error
+if not exist "%BRV_ENTRY%" (
+    echo       WARNING: ByteRover could not be installed; Claude will start without it.
+    goto :byterover_ready
 )
 call claude mcp remove cipher -s user >nul 2>nul
-call claude mcp add cipher -s user -- node "%CIPHER_ENTRY%" --mode mcp >nul
-if errorlevel 1 echo       WARNING: cipher could not be registered with Claude.
+call claude mcp remove byterover -s user >nul 2>nul
+call claude mcp add byterover -s user -- node "%BRV_ENTRY%" mcp >nul
+if errorlevel 1 echo       WARNING: ByteRover could not be registered with Claude.
 
-:cipher_ready
+:byterover_ready
 
 
 REM -----------------------------------------------------------------------------
@@ -361,7 +359,7 @@ REM  workspace does not exist yet it is created, and its own first tab hosts
 REM  Claude (renamed to the agent label) so no empty tab is left behind. Either
 REM  way the workspace is then focused so Claude is on screen.
 set "PANE_ID="
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$ws = @((& $env:HERDR workspace list | ConvertFrom-Json).result.workspaces | Where-Object { $_.label -eq $env:HERDR_WORKSPACE_LABEL })[0]; if ($ws) { $r = (& $env:HERDR tab create --workspace $ws.workspace_id --cwd $env:REPO_DIR --env ('CLAUDE_MODEL=' + $env:CLAUDE_MODEL) --label $env:AGENT_LABEL --focus | ConvertFrom-Json).result } else { $r = (& $env:HERDR workspace create --cwd $env:REPO_DIR --env ('CLAUDE_MODEL=' + $env:CLAUDE_MODEL) --label $env:HERDR_WORKSPACE_LABEL --focus | ConvertFrom-Json).result; & $env:HERDR tab rename $r.tab.tab_id $env:AGENT_LABEL | Out-Null }; & $env:HERDR workspace focus $r.root_pane.workspace_id | Out-Null; $r.root_pane.pane_id"`) do set "PANE_ID=%%P"
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$ws = @((& $env:HERDR workspace list | ConvertFrom-Json).result.workspaces | Where-Object { $_.label -eq $env:HERDR_WORKSPACE_LABEL })[0]; if ($ws) { $r = (& $env:HERDR tab create --workspace $ws.workspace_id --cwd $env:REPO_DIR --env ('CLAUDE_MODEL=' + $env:CLAUDE_MODEL) --env ('MCP_TIMEOUT=' + $env:MCP_TIMEOUT) --label $env:AGENT_LABEL --focus | ConvertFrom-Json).result } else { $r = (& $env:HERDR workspace create --cwd $env:REPO_DIR --env ('CLAUDE_MODEL=' + $env:CLAUDE_MODEL) --env ('MCP_TIMEOUT=' + $env:MCP_TIMEOUT) --label $env:HERDR_WORKSPACE_LABEL --focus | ConvertFrom-Json).result; & $env:HERDR tab rename $r.tab.tab_id $env:AGENT_LABEL | Out-Null }; & $env:HERDR workspace focus $r.root_pane.workspace_id | Out-Null; $r.root_pane.pane_id"`) do set "PANE_ID=%%P"
 if not defined PANE_ID (
     set "ERRMSG=herdr could not create a pane for Claude."
     goto :die
