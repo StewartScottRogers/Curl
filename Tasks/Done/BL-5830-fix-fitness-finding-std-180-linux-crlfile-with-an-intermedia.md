@@ -46,7 +46,7 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Notes
 
-- Fix: FirstRefusal returns 2 for a non-self-signed last chain certificate; ReportUnusableCrlFile reports verify result 1 for exit 82 (ADR-1344). Verified by unit tests only (the finding's Linux servers were not rebuilt); fast tests green, Measure-CodeQuality 0 failing.
+- Fix: FirstRefusal returns 2 for a non-self-signed last chain certificate; ReportUnusableCrlFile reports verify result 1 for exit 82 (ADR-1345). Verified by unit tests only (the finding's Linux servers were not rebuilt); fast tests green, Measure-CodeQuality 0 failing.
 
 ## Log
 

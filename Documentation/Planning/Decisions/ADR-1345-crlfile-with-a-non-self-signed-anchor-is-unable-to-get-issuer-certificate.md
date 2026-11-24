@@ -1,4 +1,4 @@
-# ADR-1344: --crlfile with a non-self-signed anchor is "unable to get issuer certificate (2)"
+# ADR-1345: --crlfile with a non-self-signed anchor is "unable to get issuer certificate (2)"
 
 - Status: Accepted
 - Date: 2026-11-24
