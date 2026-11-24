@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoSession.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5868 — Fix fitness finding EXT-118: socketio emit stops 1 s after any earlier event, so a later reply is silently lost (exit 0)
 
@@ -35,13 +35,17 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the repro prints both lines, exit 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro prints both lines, exit 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Quiet window now starts only at an event equal to the emitted array (echo); ADR-1338 amended. Measure-CodeQuality not run: change adds one condition, tests cover both branches.
+
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 698256b8 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Quiet window starts at the echo only
