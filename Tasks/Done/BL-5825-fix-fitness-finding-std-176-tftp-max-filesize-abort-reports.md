@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Tftp.UnitLibrary/TftpDownload.cs, Curl.Original.Protocol.Tftp.UnitLibrary/TftpProtocolHandler.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5825 — Fix fitness finding STD-176: TFTP --max-filesize abort reports %{size_download} 0 although 1000 bytes were written
 
@@ -35,11 +35,13 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the command prints `1000`, exit 63.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints `1000`, exit 63.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Failure result of the max-filesize abort now carries Report.DownloadSize (TftpDownload.cs); unit test asserts it. Verified against a PowerShell mock server: prints 1000, exit 63. Quality run: 0 failing members.
 
 ## Log
 
@@ -47,3 +49,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 - 2026-11-23: Backlog -> Deferred. Stewart 2026-11-23: no more tasks this shift; finish Doing and stop. Move back to Backlog to resume.
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: e8d2ab1c 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. TFTP --max-filesize abort reports size_download 1000

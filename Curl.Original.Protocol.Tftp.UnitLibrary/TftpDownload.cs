@@ -443,7 +443,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             CultureInfo.InvariantCulture,
             $"Exceeded the maximum allowed file size ({limit}) with {bytesTransferred} bytes");
         events.MaxFileSizeExceeded(message);
-        return TransferResult.Failure(CurlExitCode.FilesizeExceeded, message, bytesTransferred);
+        return TransferResult.Failure(CurlExitCode.FilesizeExceeded, message, bytesTransferred) with { Report = new TransferReport { DownloadSize = bytesTransferred } };
     }
 
     /// <summary>
