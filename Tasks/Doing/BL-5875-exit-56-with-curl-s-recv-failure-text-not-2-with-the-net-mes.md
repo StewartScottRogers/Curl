@@ -34,3 +34,4 @@ Repro: the S3 server from BL-5873 (`surl --directory store ... s3://127.0.0.1:P/
 ## Log
 
 - 2026-11-24: Created from Surly bug report 2026-11-24T1330, finding 4.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: a28d6029 656cbfba 36a6d25e 3d836d5e.
