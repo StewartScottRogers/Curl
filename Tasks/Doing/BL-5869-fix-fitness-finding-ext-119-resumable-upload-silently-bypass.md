@@ -58,3 +58,4 @@ Check BL-5866 first: with requests through `next`, `--dpop` is applied by its ow
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 0f6d8102 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Needs ResumableUploadRequestHeaders.cs and the hook catalogue, held by BL-5866 in Doing; waits for it. No code edited; design in Notes.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 0f6d8102 69116afe 3d836d5e.
