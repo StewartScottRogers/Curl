@@ -30,3 +30,4 @@ Measured in BL-5941 with `Record-CurlExchange.ps1 -ListenAddress <WSL gateway> -
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 64992237 3d836d5e.
