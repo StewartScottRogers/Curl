@@ -8,7 +8,7 @@ depends-on: [BL-5915]
 touches: [Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.ProxyConnect.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.OsErrno.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/AbortedHeadRecordingTransferEvents.cs, Curl.Engine.UnitTests/Std212Tests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5893 — Fix fitness finding STD-212: %{http_connect} is 000 for FTP, FTPS, SFTP, SCP, DICT, TELNET and GOPHER through --proxytunnel; for DICT, TELNET and GOPHER the CONNECT status lands in %{response_code}
 
@@ -39,9 +39,9 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the FTP repro prints `200|226|2`; the DICT repro prints `200|000|000`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the FTP repro prints `200|226|2`; the DICT repro prints `200|000|000`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -66,9 +66,18 @@ The finding, verbatim:
      `ReportConnectionOpened`, so reset `responseCode` and `httpVersion` there (keep
      `headerSize`).
 
+- 2026-11-24 (lane 11): implemented the plan above. `EndPointRecordingConnector` hands every connect result's
+  `ProxyConnectResponseCode` to `ConnectionEndPointRecorder.RecordProxyConnect` (new `.ProxyConnect.cs`), which
+  puts it on the report when the handler gave none; `AbortedHeadRecordingTransferEvents.ReportConnectionOpened`
+  forgets the CONNECT reply's status. Measured with this build through a loopback tunnelling proxy: FTP
+  `200|226|2` (exit 0); DICT, GOPHER and TELNET `200|000|000|1` (exit 28), as curl 8.22.0. Tests: `Std212Tests`
+  (7). Build clean, fast tests green, Measure-CodeQuality for Curl.Engine.UnitLibrary 0 failing members. The tests are
+  pure in-memory (no path, OS error or certificate), so they are platform-neutral.
+
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: ca22b4f3 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waits for BL-5915, which holds Curl.Engine.UnitTests; diagnosed and planned in Notes, no code changed.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: ca22b4f3 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. %{http_connect} is the CONNECT status for every scheme through -p; DICT/TELNET/GOPHER no longer report it as %{response_code}
