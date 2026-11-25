@@ -15,9 +15,10 @@ internal sealed class ResumableUploadSession(ITransferContext context, Func<ITra
 {
     /// <summary>
     /// The exit codes meaning the connection or the request's stream broke, so the upload can go on from the server's
-    /// offset (ADR-1398): 52 (nothing received), 55 and 56 (sending or receiving broke), 92 (the server reset the HTTP/2
-    /// stream), 16 (the HTTP/2 connection closed before the final response head, or failed on a framing or protocol
-    /// error) and 18 (the response was cut off part-way).
+    /// offset (ADR-1398, ADR-1399): 52 (nothing received), 55 and 56 (sending or receiving broke), 92 (the server reset
+    /// the HTTP/2 stream), 16 (the HTTP/2 connection closed before the final response head, or failed on a framing or
+    /// protocol error), 95 (the HTTP/3 request stream was reset before any response body byte, closed before the final
+    /// response head, or carried a response head without a valid status) and 18 (the response was cut off part-way).
     /// </summary>
     private static readonly CurlExitCode[] ConnectionBreaks =
     [
@@ -26,6 +27,7 @@ internal sealed class ResumableUploadSession(ITransferContext context, Func<ITra
         CurlExitCode.RecvError,
         CurlExitCode.Http2Stream,
         CurlExitCode.Http2,
+        CurlExitCode.Http3,
         CurlExitCode.PartialFile,
     ];
 

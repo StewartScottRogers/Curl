@@ -1440,3 +1440,4 @@ Each option and the specific reason it lost.
 | [1396](ADR-1396-the-schannel-build-refuses-a-cacert-file-with-a-certificate-block-it-cannot-read.md) | The Schannel build refuses a `--cacert` file with a CERTIFICATE block it cannot read (BL-5884) | Accepted | 2026-11-25 |
 | [1397](ADR-1397-pop3-logs-a-bearer-token-without-a-user-in-with-an-empty-credential.md) | POP3 logs a bearer token without a user in with an empty credential, and counts a withheld token (BL-5962) | Accepted | 2026-11-25 |
 | [1398](ADR-1398-resumable-upload-also-resumes-after-exit-16-18-and-92.md) | Resumable upload also resumes after exit 16, 18 and 92 (BL-5965) | Accepted | 2026-11-25 |
+| [1399](ADR-1399-resumable-upload-also-resumes-after-exit-95.md) | Resumable upload also resumes after exit 95 (BL-5969) | Accepted | 2026-11-25 |
