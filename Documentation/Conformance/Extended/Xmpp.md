@@ -54,3 +54,9 @@ the client logs in in plaintext when STARTTLS is not offered; `xmpps://` is secu
 
 `-T file` publishes like `-d`: the file's bytes become the message `<body/>` sent to the path JID (the upload stream is
 read into memory first when `-d` gave no data). It never receives or consumes; `XmppUploadTests` pins it.
+
+A message body from `-d` or `-T` is sent as the text its bytes spell in UTF-8. Bytes that are not valid UTF-8 cannot be
+carried unchanged, so the transfer fails with exit 43, `XMPP message body is not valid UTF-8`, before it connects
+(ADR-1347; `XmppUploadTests` pins it). On Windows a typed `-d` argument arrives as bytes in the ANSI code page
+(ADR-0838), so typed non-ASCII text is refused this way; give it as a UTF-8 file with `-d @file`, `--data-binary @file`
+or `-T`.
