@@ -1,5 +1,5 @@
 ---
-id: BL-5921
+id: BL-5926
 title: Report a host name mismatch before certificate rejected (28) in the Linux build as curl 8.18 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5921 — Report a host name mismatch before certificate rejected (28) in the Linux build as curl 8.18 does
+# BL-5926 — Report a host name mismatch before certificate rejected (28) in the Linux build as curl 8.18 does
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-5922
+id: BL-5927
 title: Make the Linux build read X509 CERTIFICATE blocks in --cacert and --capath files as OpenSSL does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5922 — Make the Linux build read X509 CERTIFICATE blocks in --cacert and --capath files as OpenSSL does
+# BL-5927 — Make the Linux build read X509 CERTIFICATE blocks in --cacert and --capath files as OpenSSL does
 
 ## Goal
 

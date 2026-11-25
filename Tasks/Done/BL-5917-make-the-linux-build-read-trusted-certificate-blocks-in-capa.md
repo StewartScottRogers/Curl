@@ -32,7 +32,7 @@ Follow-up from BL-5879 (ADR-1351), which honours these settings in `--cacert` on
 - Measured (WSL curl 8.18.0, OpenSSL 3.5.5): rejected root in `--capath` exit 60 (28), trusted exit 0; first copy wins (`.0` before `.1`, earlier directory first); the `--cacert` copy wins over the `--capath` one; rejected `--capath` root beside an unrelated `--cacert` still (28); undecodable first block adds nothing.
 - Choice: without `--cacert`, a rejected certificate that roots a fault-free system store chain is not refused, as curl's default CA file copy would win.
 - Quality: the full `-Library` run found two methods over the complexity gate; both split, then rescored with `-SkipTestRun` over a fresh Networking.UnitTests coverage run, where none of the changed members fail.
-- Follow-ups: BL-5921 (host name mismatch is reported before (28), contrary to ADR-1351), BL-5922 (`X509 CERTIFICATE` blocks).
+- Follow-ups: BL-5926 (host name mismatch is reported before (28), contrary to ADR-1351), BL-5927 (`X509 CERTIFICATE` blocks).
 
 ## Log
 
