@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-5804, BL-5849]
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/CertificateNameConstraints.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5859 — Fix fitness finding STD-191: Linux build reports "unable to get local issuer certificate (20)" for an excluded-subtree violation through a subject UniversalString or emailAddress
 
@@ -39,12 +39,15 @@ Shared setup: Each of these findings names its own certificates, but they share 
 
 ## Acceptance criteria
 
-- [ ] both commands print `excluded subtree violation (48)`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] both commands print `excluded subtree violation (48)`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 Requeued unedited (no code written): the fix lives in CertificateNameConstraints.cs, which BL-5804 (Doing, STD-161, subject emailAddress as rfc822Name) holds, and BL-5849 (Backlog, STD-181, same file) covers directoryName value matching. Needed here: add UniversalString (tag 28) to StringTagValues so a UniversalString O=Evil matches the excluded directoryName, and treat subject emailAddress as an rfc822Name; both land with those two tasks, then re-measure this finding on Linux and fix any remaining verify-result mapping in ServerCertificateVerification.cs. Added both to depends-on and the file to touches.
+
+- 2026-11-24 (lane 8): re-measured on Linux after BL-5804 and BL-5849 landed. Built the certificates (UniversalString O=Evil under excluded directoryName O=Evil; subject E=evil@other.org under excluded rfc822Name other.org; PrintableString O=Evil as control) with a PowerShell script, served each with openssl s_server in WSL Ubuntu, and ran curl 8.18.0 (OpenSSL) and a linux-x64 self-contained publish of Curl with --cacert the issuing CA: all three print "curl: (60) SSL certificate OpenSSL verify result: excluded subtree violation (48)" from both. The dependencies fixed it: StatusOf, IsPartialChainAtListedAnchor and CaCertificateFileAnchorsChain all ask CertificateNameConstraints.FindViolation, which now matches both names, so no change to ServerCertificateVerification.cs was needed.
+- Added two OpenSSL-build tests to Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs that pin the (48) message (Windows and Linux chain engines, OSX excluded like the existing OpenSSL-build verify-result test); added that file to touches, which no other task in Doing holds. Only test code changed, so no quality run was needed; dotnet build is clean and Curl.Networking.UnitTests fast tests pass (4598 passed, 33 skipped). The tests are platform-neutral: no paths or OS error text.
 
 ## Log
 
@@ -52,3 +55,4 @@ Requeued unedited (no code written): the fix lives in CertificateNameConstraints
 - 2026-11-24: Backlog -> Doing. Criteria at claim: d911915c 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Needs CertificateNameConstraints.cs held by BL-5804 (and BL-5849 for the same name matching); depends-on added
 - 2026-11-24: Backlog -> Doing. Criteria at claim: d911915c 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Linux build reports excluded subtree violation (48) for a UniversalString O=Evil subject and a subject emailAddress under excluded constraints, as curl 8.18.0 does
