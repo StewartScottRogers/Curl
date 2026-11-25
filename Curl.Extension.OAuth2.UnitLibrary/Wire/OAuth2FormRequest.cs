@@ -13,6 +13,9 @@ public sealed record OAuth2FormRequest(string Body, string? Authorization)
     /// <summary>The <c>Content-Type</c> the body is sent with.</summary>
     public const string ContentType = "application/x-www-form-urlencoded";
 
+    /// <summary>Gets the <c>DPoP</c> header's value, the request's proof (RFC 9449 §5), or <see langword="null" /> to send none.</summary>
+    public string? DpopProof { get; init; }
+
     /// <summary>
     /// Writes the request for <paramref name="client"/> (RFC 6749 §2.3.1, §3.2.1): a public client adds
     /// its <c>client_id</c> to the fields, a confidential one sends HTTP Basic or adds <c>client_id</c>

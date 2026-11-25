@@ -21,7 +21,7 @@ public static class DpopExtension
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "dpop",
-        "Binds OAuth 2.0 access tokens to a key: signs a DPoP proof JWT for every HTTP request, sends --oauth2-bearer as Authorization: DPoP and answers DPoP-Nonce challenges (RFC 9449). It cannot yet be combined with the --oauth2-* flows: such a transfer fails with exit 2.",
+        "Binds OAuth 2.0 access tokens to a key: signs a DPoP proof JWT for every HTTP request, sends --oauth2-bearer as Authorization: DPoP and answers DPoP-Nonce challenges (RFC 9449). With an --oauth2-* flow, the token and refresh requests carry a proof too, the token must be of type DPoP (exit 8 otherwise), and it is sent as Authorization: DPoP with its hash in the request's proof.",
         [],
         [Option],
         new Uri("https://www.rfc-editor.org/rfc/rfc9449"));

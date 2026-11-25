@@ -26,6 +26,10 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   text, `result with { Report = result.Report with { ExtensionWriteOutValues = ... } }`): `%{name}` prints
   the value only for a name curl has no variable of, so a curl variable is never shadowed, and a name
   given no value stays unknown (ADR-1130).
+- `Transfer/IDpopKeySource` is a transfer hook that holds a DPoP key (RFC 9449) and `Transfer/IDpopKey` that key as
+  other hooks get it: its JWK thumbprint and a proof for a `POST`. The hooking handler lends the first source among the
+  hooks to the others as `TransferHookServices.DpopKeySource`, so a token one of them fetches is bound to the key
+  (ADR-1356).
 - `Connection/IConnectionHook` supplies the connector (and optionally the datagram connector) a
   transfer runs over in place of curl's, given curl's so it can reach a first hop through it.
   `ConnectionHooks.ActivatedBy` keeps the one hook whose option was given and throws an

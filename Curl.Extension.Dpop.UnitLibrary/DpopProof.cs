@@ -23,6 +23,10 @@ internal static class DpopProof
         return signingInput + "." + Base64Url.EncodeToString(key.Sign(Encoding.ASCII.GetBytes(signingInput)));
     }
 
+    /// <summary>Gives a fresh <c>jti</c>: 16 random octets in base64url.</summary>
+    /// <returns>The identifier.</returns>
+    public static string NewId() => Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
+
     /// <summary>Gives a token's <c>ath</c>: the base64url SHA-256 of its ASCII (RFC 9449 §4.2).</summary>
     /// <param name="accessToken">The access token.</param>
     /// <returns>The hash.</returns>

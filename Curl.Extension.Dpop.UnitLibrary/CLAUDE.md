@@ -7,8 +7,9 @@ only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers it brings.
   `Curl.Extension.Composition` registers.
 - `DpopTransferHook` sends a fresh DPoP proof with every HTTP request, sends `--oauth2-bearer` as
   `Authorization: DPoP`, keeps each origin's last `DPoP-Nonce` and retries a 400 or 401 that brings a new one once.
-  `DpopAttempt` holds one try's response until the hook keeps it. Its hook runs before the OAuth2 extension's, which
-  refuses a transfer that carries the proof, because a flow's token cannot yet be bound to the key (ADR-1347).
+  `DpopAttempt` holds one try's response until the hook keeps it. Its hook is an `IDpopKeySource`: it lends the key
+  (`DpopPostProofKey`) to the OAuth2 extension's hook, which runs before it, proves its token requests with that key and
+  adds `Authorization: DPoP <token>` for this hook to sign with its `ath` (ADR-1356).
 - `DpopProof` builds the proof JWT from a `DpopRequest`; `DpopKey` (`EcDpopKey`, `RsaDpopKey`) signs it and gives
   the public JWK; `DpopKeyFile` reads the PEM key file.
 

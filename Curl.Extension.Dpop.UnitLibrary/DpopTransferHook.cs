@@ -1,6 +1,4 @@
-using System.Buffers.Text;
 using System.Collections.Concurrent;
-using System.Security.Cryptography;
 using Curl.Extension.Abstractions.Transfer;
 
 namespace Curl.Extension.Dpop;
@@ -8,18 +6,22 @@ namespace Curl.Extension.Dpop;
 /// <summary>
 /// The <c>--dpop</c> transfer hook (ADR-1145). Every HTTP request carries a fresh DPoP proof in a <c>DPoP</c> header
 /// (RFC 9449 §4.1), signed with the key read once from the key file. An <c>--oauth2-bearer</c> token, or the token of a
-/// <c>-H "Authorization: DPoP ..."</c>, is bound to the proof by <c>ath</c>, and <c>--oauth2-bearer</c>'s is sent as
-/// <c>Authorization: DPoP</c> (§7.1). The last <c>DPoP-Nonce</c> each origin sent goes into its proofs, and a 400 or 401
+/// <c>Authorization: DPoP</c> header (<c>-H</c>'s, or an outer hook's for a token it fetched with this hook's key), is
+/// bound to the proof by <c>ath</c>, and <c>--oauth2-bearer</c>'s is sent as <c>Authorization: DPoP</c> (§7.1) unless
+/// such a header already sends a token. The last <c>DPoP-Nonce</c> each origin sent goes into its proofs, and a 400 or 401
 /// answer that brings a new one is retried once with it (§8, §9); the response is held until then, so only the one
 /// kept is written. A transfer that is not HTTP runs as it would without the hook.
 /// </summary>
 /// <param name="keyFile">The PEM file of the private key.</param>
-internal sealed class DpopTransferHook(string keyFile) : ITransferHook
+internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
 {
     private const string AuthorizationPrefix = "Authorization: DPoP ";
 
     private readonly ConcurrentDictionary<string, string> _noncesByOrigin = new(StringComparer.Ordinal);
     private DpopKey? _key;
+
+    public async ValueTask<IDpopKey?> ReadDpopKeyAsync(CancellationToken cancellationToken) =>
+        await ReadKeyAsync(cancellationToken) is { } key ? new DpopPostProofKey(key) : null;
 
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
@@ -28,16 +30,15 @@ internal sealed class DpopTransferHook(string keyFile) : ITransferHook
             return await next(context);
         }
 
-        _key ??= await DpopKeyFile.ReadAsync(keyFile, context.CancellationToken);
-        if (_key is null)
+        if (await ReadKeyAsync(context.CancellationToken) is not { } key)
         {
             return TransferResult.Failure(CurlExitCode.ReadError, $"Failed to read a DPoP private key from {keyFile}");
         }
 
-        var attempt = await AttemptAsync(_key, context, next);
+        var attempt = await AttemptAsync(key, context, next);
         if (attempt.AsksForNewNonce)
         {
-            attempt = await AttemptAsync(_key, context, next);
+            attempt = await AttemptAsync(key, context, next);
         }
 
         await attempt.WriteToAsync(context);
@@ -55,10 +56,17 @@ internal sealed class DpopTransferHook(string keyFile) : ITransferHook
         : context.Upload is not null ? "PUT"
         : "GET");
 
-    /// <summary>Gives the access token the request sends: <c>--oauth2-bearer</c>'s, else that of a <c>-H "Authorization: DPoP ..."</c>.</summary>
-    internal static string? AccessTokenOf(HttpRequestOptions http) =>
-        http.BearerToken
-        ?? http.Headers.Where(header => header.StartsWith(AuthorizationPrefix, StringComparison.OrdinalIgnoreCase)).Select(header => header[AuthorizationPrefix.Length..].Trim()).FirstOrDefault();
+    /// <summary>
+    /// Gives the access token the request sends: that of an <c>Authorization: DPoP ...</c> header, which curl sends in place
+    /// of its own, else <c>--oauth2-bearer</c>'s.
+    /// </summary>
+    internal static string? AccessTokenOf(HttpRequestOptions http) => HeaderTokenOf(http) ?? http.BearerToken;
+
+    private static string? HeaderTokenOf(HttpRequestOptions http) =>
+        http.Headers.Where(header => header.StartsWith(AuthorizationPrefix, StringComparison.OrdinalIgnoreCase)).Select(header => header[AuthorizationPrefix.Length..].Trim()).FirstOrDefault();
+
+    private async ValueTask<DpopKey?> ReadKeyAsync(CancellationToken cancellationToken) =>
+        _key ??= await DpopKeyFile.ReadAsync(keyFile, cancellationToken);
 
     private static bool SendsBody(ITransferContext context) =>
         context.PostData is not null || context.PostWithoutData || context.Http!.Body is not null;
@@ -67,7 +75,7 @@ internal sealed class DpopTransferHook(string keyFile) : ITransferHook
     {
         var origin = context.Url.Scheme.ToLowerInvariant() + "://" + context.Url.Host.ToLowerInvariant() + ":" + context.Url.Port;
         var nonce = _noncesByOrigin.GetValueOrDefault(origin);
-        var proof = DpopProof.Create(key, new DpopRequest(NewProofId(), MethodOf(context), TargetUriOf(context.Url), context.TimeProvider.GetUtcNow(), AccessTokenOf(context.Http!), nonce));
+        var proof = DpopProof.Create(key, new DpopRequest(DpopProof.NewId(), MethodOf(context), TargetUriOf(context.Url), context.TimeProvider.GetUtcNow(), AccessTokenOf(context.Http!), nonce));
         var attempt = new DpopAttempt(context.DumpHeaderOutput is not null);
         attempt.Result = await next(context.WithRequestHeaders(HeadersFor(proof, context.Http!)).WithOutputs(attempt.Body, attempt.Head, attempt.DumpedHead));
         if (NonceGivenBy(attempt.Result) is { } given)
@@ -82,7 +90,7 @@ internal sealed class DpopTransferHook(string keyFile) : ITransferHook
     private static List<string> HeadersFor(string proof, HttpRequestOptions http)
     {
         List<string> headers = ["DPoP: " + proof];
-        if (http.BearerToken is { } bearer)
+        if (http.BearerToken is { } bearer && HeaderTokenOf(http) is null)
         {
             headers.Add(AuthorizationPrefix + bearer);
         }
@@ -92,6 +100,4 @@ internal sealed class DpopTransferHook(string keyFile) : ITransferHook
 
     private static string? NonceGivenBy(TransferResult result) =>
         result.Report?.ResponseHeaders.FirstOrDefault(field => field.Key.Equals("DPoP-Nonce", StringComparison.OrdinalIgnoreCase)).Value;
-
-    private static string NewProofId() => Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
 }

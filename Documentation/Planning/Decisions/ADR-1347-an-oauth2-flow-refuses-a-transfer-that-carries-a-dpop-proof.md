@@ -1,6 +1,6 @@
 # ADR-1347 — An --oauth2-* flow refuses a transfer that carries a DPoP proof
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-1356](ADR-1356-an-oauth2-flow-binds-its-token-to-the-dpop-key.md), which binds the token; only a `-H "DPoP: ..."` beside a flow is still refused
 - **Date:** 2026-11-24
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-5898.

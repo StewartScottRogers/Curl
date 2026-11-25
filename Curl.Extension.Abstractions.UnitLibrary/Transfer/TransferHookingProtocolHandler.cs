@@ -14,6 +14,8 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// <param name="services">What the host lends the hooks to make their own requests (ADR-1039), or <see langword="null" /> for none.</param>
 internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, IReadOnlyList<ITransferHook> hooks, TransferHookServices? services = null) : IProtocolHandler
 {
+    private readonly TransferHookServices? lentServices = services?.WithDpopKeySourceFrom(hooks);
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => handler.SupportedSchemes;
 
@@ -84,9 +86,9 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
         }
 
         Func<ITransferContext, ValueTask<TransferResult>> next = inner => ExecuteThroughHooksAsync(index + 1, inner);
-        return services is null
+        return lentServices is null
             ? hooks[index].ExecuteAsync(context, next)
-            : hooks[index].ExecuteAsync(context, services, next);
+            : hooks[index].ExecuteAsync(context, lentServices, next);
     }
 
     /// <summary>Gives the delay the first hook asking for a repeat names, or <see langword="null" /> when none asks.</summary>
