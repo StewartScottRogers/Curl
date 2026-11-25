@@ -52,7 +52,7 @@ Each 56 also prints `* Recv failure: Connection reset by peer` before
   (`$client.Client.Close(0)`) at its three reset sites; added to `touches` (no task in Doing held it).
 - curl `master` `lib/telnet.c` keeps `ECONNRESET` as the receive error (its macOS comment only adds
   a debug log), so macOS takes the Linux answer; macOS itself is not measured.
-- Design: every failed read off Windows is exit 56 (ADR-1376, amends ADR-1352). The handler's
+- Design: every failed read off Windows is exit 56 (ADR-1382, amends ADR-1352). The handler's
   internal `RunsOnWindows` lets tests cover both rules on any platform, so coverage does not depend
   on the CI runner. Tests that pinned exit 0 through the public handler are now Windows-only, each
   with an off-Windows counterpart.

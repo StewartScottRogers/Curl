@@ -10,7 +10,7 @@ namespace Curl.Original.Protocol.Telnet;
 /// Pins each platform's answer to a <c>telnet://</c> connection reset, with the handler
 /// choosing its platform itself: curl 8.23.0 on Windows exits 0 unless the reset strikes
 /// the option negotiation (BL-5882, ADR-1352), and curl 8.18.0 on Linux always exits 56
-/// <c>Recv failure: Connection reset by peer</c> (BL-5918, ADR-1376), which macOS shares.
+/// <c>Recv failure: Connection reset by peer</c> (BL-5918, ADR-1382), which macOS shares.
 /// </summary>
 [TestClass]
 public sealed class TelnetProtocolHandlerResetByPlatformTests

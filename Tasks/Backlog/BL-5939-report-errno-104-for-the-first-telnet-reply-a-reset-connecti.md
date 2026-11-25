@@ -18,7 +18,7 @@ On Linux, `-v` output for a TELNET server that resets before any negotiation rep
 
 ## Context
 
-Found by BL-5918 (ADR-1376), 2026-11-25, in WSL Ubuntu: curl 8.18.0 printed
+Found by BL-5918 (ADR-1382), 2026-11-25, in WSL Ubuntu: curl 8.18.0 printed
 `Sending data failed (104)` then `(32)` for the rest; Curl published for `linux-x64` printed
 `(32)` for all six. Measure with `Record-CurlExchange.ps1 -ResetAfterResponse -Response '\xFF\xFD\x18'
 -ListenAddress <WSL host address> -Curl wsl.exe`. First find where the socket's pending error is

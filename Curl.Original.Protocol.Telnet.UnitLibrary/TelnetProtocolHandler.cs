@@ -34,7 +34,7 @@ namespace Curl.Original.Protocol.Telnet;
 /// <para>
 /// A connection failure is met as the platform's curl meets it. On Linux and macOS a
 /// read the connection fails, as a reset does, ends the session with exit 56
-/// (<see cref="CurlExitCode.RecvError" />) (ADR-1376). On Windows it ends the session like
+/// (<see cref="CurlExitCode.RecvError" />) (ADR-1382). On Windows it ends the session like
 /// a close, with exit 0, unless it strikes the option negotiation (a reply the connection
 /// did not take, or replies sent and no data written yet): then it ends with exit 56, so
 /// what the server sent is never lost under exit 0 (ADR-1352). A send of the

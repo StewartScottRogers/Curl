@@ -22,7 +22,7 @@ internal sealed class TelnetOutbox(ITransferEvents events, bool runsOnWindows)
 
     /// <summary>
     /// Tells whether a connection read that fails now is a receive failure. On Linux and
-    /// macOS every failed read is one (BL-5918, ADR-1376). On Windows only a read that
+    /// macOS every failed read is one (BL-5918, ADR-1382). On Windows only a read that
     /// struck the option negotiation is, as the session lost what the server sent: a reply
     /// the connection did not take, or replies sent while no data has been written yet
     /// (BL-5882, ADR-1352).

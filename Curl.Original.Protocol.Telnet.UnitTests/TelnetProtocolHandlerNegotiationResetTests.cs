@@ -10,7 +10,7 @@ namespace Curl.Original.Protocol.Telnet;
 /// Pins how a <c>telnet://</c> session meets a connection read that fails during the option
 /// negotiation: exit 56, never exit 0 with the server's data lost (BL-5882, ADR-1352),
 /// against curl 8.23.0 on Windows. The Windows rule runs on every platform here, beside
-/// the Linux and macOS rule (BL-5918, ADR-1376); each platform's own answer is pinned in
+/// the Linux and macOS rule (BL-5918, ADR-1382); each platform's own answer is pinned in
 /// <c>TelnetProtocolHandlerResetByPlatformTests</c>.
 /// </summary>
 [TestClass]

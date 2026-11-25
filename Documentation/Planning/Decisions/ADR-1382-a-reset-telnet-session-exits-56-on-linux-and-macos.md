@@ -1,4 +1,4 @@
-# ADR-1376: A reset TELNET session exits 56 on Linux and macOS (BL-5918)
+# ADR-1382: A reset TELNET session exits 56 on Linux and macOS (BL-5918)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1352.
 

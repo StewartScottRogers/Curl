@@ -1,6 +1,6 @@
 # ADR-1352: A TELNET read that fails during the option negotiation exits 56 (BL-5882)
 
-Status: Accepted. Decided by Claude under Stewart's delegation. Amended by ADR-1376: the
+Status: Accepted. Decided by Claude under Stewart's delegation. Amended by ADR-1382: the
 rule below is Windows's alone (Linux and macOS exit 56 on every failed read), and
 `TelnetOutbox.ReadFailureLosesData` is now `TelnetOutbox.FailedReadIsReceiveError`.
 
