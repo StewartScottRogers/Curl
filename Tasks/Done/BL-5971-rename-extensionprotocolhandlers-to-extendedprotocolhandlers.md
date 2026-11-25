@@ -40,7 +40,7 @@ The touches list is every file that names the class today. Any lane task that ad
   than one Edit call each; encodings and line endings are unchanged.
 - `Curl.Cli.UnitLibrary` held a second, private `"CURL_EXTENSIONS"` constant the task did not
   list, and may not reference an extension project. `CommandLineParser` now takes
-  `knowsPortOnlyOptions` from its host (ADR-1401). Added to `touches`: `CommandLineParser.cs`,
+  `knowsPortOnlyOptions` from its host (ADR-1402). Added to `touches`: `CommandLineParser.cs`,
   `CommandLineGlobalState.cs`, `CommandLineOptions.cs` and `CommandLineExtensionOptionTests.cs`;
   no other task in Doing on `origin/work/dark-factory` named `Curl.Cli`.
 - "Defined once" is about production code: tests still write the literal `"CURL_EXTENSIONS"`,

@@ -1,4 +1,4 @@
-# ADR-1401: The parser takes from its host whether it reads the options only Curl has
+# ADR-1402: The parser takes from its host whether it reads the options only Curl has
 
 - Status: Accepted
 - Date: 2026-11-25

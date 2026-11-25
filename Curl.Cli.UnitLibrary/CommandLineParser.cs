@@ -215,7 +215,7 @@ public static class CommandLineParser
     /// Parses <paramref name="arguments"/> as the overload without <paramref name="extensionOptions"/> does, also
     /// reading each of <paramref name="extensionOptions"/> where curl has no option of its name (ADR-1006). A host
     /// whose extensions are off passes none, and <see langword="false"/> as <paramref name="knowsPortOnlyOptions"/>,
-    /// so every such name, and every option only Curl has, is refused as curl refuses an unknown option (ADR-1401).
+    /// so every such name, and every option only Curl has, is refused as curl refuses an unknown option (ADR-1402).
     /// </summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
     /// <param name="pathExists">Reports whether a path exists, as for the overload with <paramref name="pathExists"/>.</param>
