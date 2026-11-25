@@ -30,7 +30,7 @@ Measured with `Record-CurlExchange.ps1` (BL-5925): an HTTP server answering `302
 
 ## Notes
 
-- The engine now builds `MailRequestOptions` for `http` and `https` too (ADR-1378). `RedirectFollower` already carried the first hop's `Mail`, so only its comment changed.
+- The engine now builds `MailRequestOptions` for `http` and `https` too (ADR-1388). `RedirectFollower` already carried the first hop's `Mail`, so only its comment changed.
 - Added to `touches`: `TransferContextFactoryMailTests.cs` (its `http` row pinned `Mail` null) and `ITransferContext.cs` (the `Mail` doc said null for every non-mail scheme). No task in Doing on origin/work/dark-factory named either.
 - Measured 2026-11-25 with both command lines against curl 8.22.0 and Curl, a 302 server beside `Record-CurlExchange.ps1 -Smtp` and `-Imap`: transcripts identical, exit 0 for all four.
 - The Linux and macOS criteria are covered by platform-neutral tests; fast tests green on Windows. Measure-CodeQuality.ps1 for Core, Engine and Protocol.Abstractions: 100% line and branch, 0 failing members.

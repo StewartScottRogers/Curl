@@ -1,4 +1,4 @@
-# ADR-1378: An HTTP transfer carries the mail options, for a redirect followed to a mail URL
+# ADR-1388: An HTTP transfer carries the mail options, for a redirect followed to a mail URL
 
 - Status: Accepted
 - Date: 2026-11-25

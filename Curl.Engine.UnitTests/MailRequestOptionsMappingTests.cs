@@ -10,7 +10,7 @@ namespace Curl.Engine;
 
 /// <summary>
 /// Pins that <see cref="MailRequestOptionsMapping.FromCommandLine" /> gives an HTTP URL the command
-/// line's mail options, so a redirect followed to a mail URL still has them (ADR-1378).
+/// line's mail options, so a redirect followed to a mail URL still has them (ADR-1388).
 /// </summary>
 [TestClass]
 public sealed class MailRequestOptionsMappingTests

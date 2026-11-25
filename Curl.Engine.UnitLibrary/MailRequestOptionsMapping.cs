@@ -16,7 +16,7 @@ internal static class MailRequestOptionsMapping
     /// <summary>
     /// The schemes whose transfers carry <see cref="MailRequestOptions" />, matched without case: the mail
     /// and LDAP schemes, whose handlers read them, and <c>http</c> and <c>https</c>, so that a redirect
-    /// followed to a mail URL still has them (ADR-1378).
+    /// followed to a mail URL still has them (ADR-1388).
     /// </summary>
     private static readonly HashSet<string> SchemesCarryingMailOptions = new(StringComparer.OrdinalIgnoreCase)
     {
