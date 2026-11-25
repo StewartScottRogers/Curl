@@ -105,6 +105,7 @@ public sealed partial class HttpProtocolHandler
         int storedLength = StoredLengthOf(trailers.Span, requestStream is null ? int.MaxValue : HttpResponseHeadReader.MaximumHeaderCount - body.HeadersStored);
         await WriteHeadersAsync(context.HeaderOutput, trailers[..storedLength], cancellationToken).ConfigureAwait(false);
         ReportStreamTrailers(body, requestStream, context.Events, trailers.Span[..storedLength]);
+        ReportEmptyStreamData(head, body, requestStream, context);
         if (storedLength < trailers.Length)
         {
             throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders)
@@ -135,6 +136,22 @@ public sealed partial class HttpProtocolHandler
         }
 
         body.StreamTrailers = pairs;
+    }
+
+    /// <summary>
+    /// Reports the empty data that ends an HTTP/2 response, after its trailers, which <c>-v</c>
+    /// shows as <c>{ [0 bytes data]</c> (<see cref="Http2StreamConnection.EndedWithEmptyData" />):
+    /// a response with no body, or one a trailer ends (measured, curl 8.18.0, BL-5946 Notes).
+    /// Nothing for a body without a length that ended without a byte, whose empty data the body
+    /// reader has reported already. A discarded body never comes here.
+    /// </summary>
+    private static void ReportEmptyStreamData(HttpResponseHead head, HttpResponseBodyReader body, IHttpStreamConnection? requestStream, ITransferContext context)
+    {
+        bool isReportedByReader = HttpResponseBodyReader.HasBody(head, context.NoBody) && body.ExpectedLength is null && body.BytesWritten == 0;
+        if (requestStream is Http2StreamConnection { EndedWithEmptyData: true } && !isReportedByReader)
+        {
+            context.Events.ReportDataReceived([]);
+        }
     }
 
     /// <summary>

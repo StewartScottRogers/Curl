@@ -71,6 +71,14 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>Gets or sets whether the body is not wanted, as with <c>-I</c>: the response then ends at the first DATA frame after the final head, or when the peer closes after it, while a trailer HEADERS right after the head is still read (BL-5391, BL-5468).</summary>
     internal bool EndsAtFinalHead { get; init; }
 
+    /// <summary>
+    /// Gets whether the response ended in a way curl reports empty data for: END_STREAM came on a
+    /// HEADERS frame, the final head or a trailer, or on a DATA frame of a response with no body
+    /// bytes (measured, curl 8.18.0, BL-5946 Notes). Not so for one <c>-I</c> ends at a DATA
+    /// frame, which is reported there (<see cref="HttpStreamOpenedLines.UnwantedDataReceived" />).
+    /// </summary>
+    internal bool EndedWithEmptyData { get; private set; }
+
     /// <summary>The body length the final head promises (RFC 9113 section 8.1.1), or <see langword="null" /> when it promises none.</summary>
     private long? promisedBodyLength;
 
@@ -573,6 +581,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             }
         }
 
+        EndedWithEmptyData = frame.IsEndStream;
         await EndResponseAsync(IsEndedBy(frame), cancellationToken).ConfigureAwait(false);
     }
 
@@ -657,6 +666,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         }
 
         received.Enqueue(frame.Content);
+        EndedWithEmptyData = frame.IsEndStream && bodyBytesReceived == 0;
         await EndResponseAsync(frame.IsEndStream, cancellationToken).ConfigureAwait(false);
     }
 
