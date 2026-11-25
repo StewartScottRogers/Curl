@@ -207,6 +207,46 @@ public sealed class CertificateRevocationListFileTests
         Assert.AreEqual(OpenSslVerifyResult.CertificateRevocationListSignatureFailure, refusal);
     }
 
+    // curl 8.18.0 on OpenSSL 3.5.5, measured 2026-11-24 (BL-5929): any salt length and any MGF1
+    // hash verify, so the list revokes what it names and accepts the rest.
+    [TestMethod]
+    [DataRow(222, TestRevocationList.Sha256, "SHA256", DisplayName = "the longest salt")]
+    [DataRow(32, TestRevocationList.Sha1, "SHA1", DisplayName = "MGF1 over another hash")]
+    public void Refusal_WithAnRsaPssListRevokingTheCertificate_IsCertificateRevoked(int saltLength, string maskOid, string maskName)
+    {
+        var list = PssListFromRoot([[7]], saltLength, saltLength, maskOid, new(maskName));
+
+        Assert.AreEqual(OpenSslVerifyResult.CertificateRevoked, Load(list).Refusal(s_leaf, s_root, Now));
+    }
+
+    [TestMethod]
+    [DataRow(222, TestRevocationList.Sha256, "SHA256", DisplayName = "the longest salt")]
+    [DataRow(32, TestRevocationList.Sha1, "SHA1", DisplayName = "MGF1 over another hash")]
+    public void Refusal_WithAnRsaPssListNotNamingTheCertificate_IsNull(int saltLength, string maskOid, string maskName)
+    {
+        var list = PssListFromRoot([], saltLength, saltLength, maskOid, new(maskName));
+
+        Assert.IsNull(Load(list).Refusal(s_leaf, s_root, Now));
+    }
+
+    [TestMethod]
+    public void Refusal_WithAnRsaPssListSaltedOtherThanItNames_IsSignatureFailure()
+    {
+        var list = PssListFromRoot([], 221, 222, TestRevocationList.Sha256, HashAlgorithmName.SHA256);
+
+        Assert.AreEqual(OpenSslVerifyResult.CertificateRevocationListSignatureFailure, Load(list).Refusal(s_leaf, s_root, Now));
+    }
+
+    private static string PssListFromRoot(byte[][] revoked, int namedSaltLength, int saltLength, string maskOid, HashAlgorithmName maskHash) =>
+        TestRevocationList.Pem(TestRevocationList.Write(
+            s_root,
+            nextUpdate: Now.AddHours(1),
+            revokedSerialNumbers: revoked,
+            signatureAlgorithm: TestRevocationList.RsaSsaPss,
+            signatureParameters: TestRevocationList.PssParameters(TestRevocationList.Sha256, maskOid, namedSaltLength),
+            pssSaltLength: saltLength,
+            pssMaskHash: maskHash));
+
     [TestMethod]
     public void FirstRefusal_WithAChainEndingAtAnIntermediateAnchor_IsUnableToGetIssuerCertificate()
     {

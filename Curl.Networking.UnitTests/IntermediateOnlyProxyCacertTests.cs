@@ -186,13 +186,50 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.IsNull(VerifyStubbed(pki, PssList(pki, [])));
     }
 
-    private static byte[] PssList(Pki pki, byte[][] revoked) =>
+    // curl 8.22.0 Schannel, measured 2026-11-24 (BL-5929): a list signed with the longest salt or
+    // none answers as any other; one whose MGF1 hash is not its message hash leaves "unknown".
+    [TestMethod]
+    [DataRow(0, DisplayName = "no salt")]
+    [DataRow(222, DisplayName = "the longest salt")]
+    public void VerifyPeer_RsaPssListWithASaltNotAsLongAsTheHashRevokingTheLeaf_IsRevoked(int saltLength)
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyStubbed(pki, PssList(pki, [pki.LeafSerial], saltLength));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_RsaPssListWithTheLongestSaltWithoutTheLeaf_Succeeds()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        Assert.IsNull(VerifyStubbed(pki, PssList(pki, [], saltLength: 222)));
+    }
+
+    [TestMethod]
+    [DataRow(true, DisplayName = "naming the leaf")]
+    [DataRow(false, DisplayName = "not naming the leaf")]
+    public void VerifyPeer_RsaPssListWithAnotherMaskHash_LeavesTheStatusUnknown(bool revokesTheLeaf)
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var list = PssList(pki, revokesTheLeaf ? [pki.LeafSerial] : [], maskHashOid: TestRevocationList.Sha1);
+
+        var failure = VerifyStubbed(pki, list);
+
+        Assert.AreEqual(TlsFailureMessages.SchannelRevocationStatusUnknown, failure?.Message);
+    }
+
+    private static byte[] PssList(Pki pki, byte[][] revoked, int saltLength = 32, string maskHashOid = TestRevocationList.Sha256) =>
         TestRevocationList.Write(
             pki.Intermediate,
             nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
             revokedSerialNumbers: revoked,
             signatureAlgorithm: TestRevocationList.RsaSsaPss,
-            signatureParameters: TestRevocationList.PssParameters(TestRevocationList.Sha256, TestRevocationList.Sha256, saltLength: 32));
+            signatureParameters: TestRevocationList.PssParameters(TestRevocationList.Sha256, maskHashOid, saltLength),
+            pssSaltLength: saltLength,
+            pssMaskHash: maskHashOid == TestRevocationList.Sha1 ? HashAlgorithmName.SHA1 : HashAlgorithmName.SHA256);
 
     [TestMethod]
     public void VerifyPeer_UnknownRevocationOfALeafWithoutDistributionPoints_IsExit60()

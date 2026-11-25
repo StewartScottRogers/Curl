@@ -111,7 +111,7 @@ internal sealed class CertificateRevocationListFile
 
     private static long? SignatureOrRevocationRefusal(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer)
     {
-        if (!list.IsSignedBy(issuer))
+        if (!list.IsSignedBy(issuer, anotherMaskHashVerifies: true))
         {
             return OpenSslVerifyResult.CertificateRevocationListSignatureFailure;
         }

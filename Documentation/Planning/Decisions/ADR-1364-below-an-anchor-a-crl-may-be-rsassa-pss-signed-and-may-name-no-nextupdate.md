@@ -1,7 +1,8 @@
 # ADR-1364: Below an anchor a CRL may be RSASSA-PSS signed and may name no nextUpdate
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5878). Replaces ADR-1294's
-"a list naming no `nextUpdate` fails closed".
+"a list naming no `nextUpdate` fails closed". Its limits on the PSS salt length and MGF1 hash are
+replaced by ADR-1369.
 
 ## Context
 Below a non-self-signed `--cacert` anchor (ADR-1294) two lists left the status "unknown", which
