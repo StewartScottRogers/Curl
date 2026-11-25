@@ -1,5 +1,5 @@
 ---
-id: BL-5922
+id: BL-5929
 title: Verify RSASSA-PSS CRL signatures whose salt is not as long as the hash or whose MGF1 hash differs
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5922 — Verify RSASSA-PSS CRL signatures whose salt is not as long as the hash or whose MGF1 hash differs
+# BL-5929 — Verify RSASSA-PSS CRL signatures whose salt is not as long as the hash or whose MGF1 hash differs
 
 ## Goal
 

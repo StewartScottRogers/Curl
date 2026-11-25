@@ -52,7 +52,7 @@ The finding, verbatim:
 - Fix: `CertificateRevocationList.IsSignedBy` verifies RSASSA-PSS (new `RsaPssSignatureParameters.cs`), and a base or delta list naming no `nextUpdate` is current (`IsUnexpiredAt`). Decision: ADR-1357, which replaces ADR-1294's "no nextUpdate fails closed" (a status line added there).
 - Measured 2026-11-24 with a temporary C# file-based app (certificates, CRLs on loopback, one TLS server per leaf), Curl's debug build beside Git's curl 8.22.0 Schannel, strict and `--ssl-revoke-best-effort`: all 16 answers match (both revoked leaves exit 60 "has been revoked", both good leaves exit 0). The original did not need a separate reproduction run: the code at claim time rejected both list shapes by inspection.
 - `touches` widened (no other task in Doing names these): `RsaPssSignatureParameters.cs`, and in `Curl.Networking.UnitTests` `RsaPssSignatureParametersTests.cs`, `IntermediateOnlyProxyCacertTests.cs` (two tests pinned the old fail-closed answer) and `Fakes/TestRevocationList.cs`; and ADR-1294.
-- Salt lengths other than the hash length, which the base class library cannot verify, are filed as BL-5922.
+- Salt lengths other than the hash length, which the base class library cannot verify, are filed as BL-5929.
 - Verification: `dotnet build` clean, fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 0 failing members.
 
 ## Log
