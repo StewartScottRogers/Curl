@@ -49,3 +49,4 @@ The finding, verbatim:
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: b956eeec 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Blocked. Stewart: dark factory timed out after 120 min and again after 30 min of overtime; see Z:\repos\Curl.logs\BL-5881-20261124-120053-L13.jsonl
