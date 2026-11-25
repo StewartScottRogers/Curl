@@ -30,3 +30,4 @@ Found by BL-5972 (ADR-1404). Measured, curl 8.18.0 nghttp2 build: `Record-CurlEx
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 6b938ef5 3d836d5e.
