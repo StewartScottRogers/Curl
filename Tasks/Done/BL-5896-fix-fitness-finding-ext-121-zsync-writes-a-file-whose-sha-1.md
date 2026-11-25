@@ -43,7 +43,7 @@ The finding, verbatim:
 ## Notes
 
 - Reproduced in the code: both fallback paths (the second run, and a 200 to a range) wrote unchecked.
-  Decision in ADR-1347: every written body must match the control file's SHA-1, else exit 61 with nothing written.
+  Decision in ADR-1349: every written body must match the control file's SHA-1, else exit 61 with nothing written.
 - Repro run against a PowerShell loopback server: tampered URL exits 61, `--zsync: SHA-1 mismatch: ...`, no `z2.bin`;
   untampered URL exits 0 with a byte-identical file.
 - Added to `touches`: the hook's test file and ADR-1092 (its fallback sentence became false); no other task in Doing
@@ -54,4 +54,4 @@ The finding, verbatim:
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 2b100592 69116afe 3d836d5e.
-- 2026-11-24: Doing -> Done. --zsync writes a body only when its SHA-1 matches the control file; otherwise exit 61 with nothing written (ADR-1347).
+- 2026-11-24: Doing -> Done. --zsync writes a body only when its SHA-1 matches the control file; otherwise exit 61 with nothing written (ADR-1349).

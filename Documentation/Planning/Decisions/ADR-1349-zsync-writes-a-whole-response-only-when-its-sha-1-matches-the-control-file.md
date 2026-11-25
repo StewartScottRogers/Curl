@@ -1,4 +1,4 @@
-# ADR-1347 — `--zsync` writes a whole response only when its SHA-1 matches the control file's, and exits 61 otherwise
+# ADR-1349 — `--zsync` writes a whole response only when its SHA-1 matches the control file's, and exits 61 otherwise
 
 - **Status:** Accepted
 - **Date:** 2026-11-24

@@ -11,7 +11,7 @@ namespace Curl.Extension.DeltaDownload;
 /// differs, runs the transfer again as curl runs it. A failed request fails the transfer with nothing written. A
 /// whole response (a 200 to a range, the server ignoring <c>Range</c>, or the transfer run again) is written only
 /// when its body's SHA-1 equals the control file's; otherwise the transfer fails with exit 61
-/// (<see cref="CurlExitCode.BadContentEncoding" />) and nothing is written (ADR-1347).
+/// (<see cref="CurlExitCode.BadContentEncoding" />) and nothing is written (ADR-1349).
 /// </summary>
 /// <param name="controlPath">The control file's path.</param>
 /// <param name="seedPath">The seed file's path, or <see langword="null" /> for the control file's <c>Filename</c> in the current directory.</param>

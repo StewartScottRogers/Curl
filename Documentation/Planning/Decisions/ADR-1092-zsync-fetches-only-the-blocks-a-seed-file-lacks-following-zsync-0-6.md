@@ -39,7 +39,7 @@ behaviour. Transfer hooks can run curl's handler several times and capture what 
   the first range's headers. A seed holding every block contacts no server (`%{http_code}` is then `000`).
 - **When it cannot be joined.** A 200 to a range (the server ignores `Range`) is the whole file. A failed
   request fails the transfer with nothing written. Any other answer, or a SHA-1 mismatch, runs the transfer
-  again as curl runs it. A whole file is written only when its SHA-1 matches, else exit 61 (ADR-1347), so the
+  again as curl runs it. A whole file is written only when its SHA-1 matches, else exit 61 (ADR-1349), so the
   output is never a wrong file.
 
 ## Left out, and why
