@@ -33,7 +33,7 @@ Command: `curl ftp://127.0.0.1:<port>/ -P 127.0.0.1` against test 251's FTP serv
 - Reproduced on this branch with a loopback FTP server that drips each reply byte by byte and connects the data socket after the `150`: Curl showed `< 2d26 Directory send OK` and ended with exit 28 `FTP response timeout`; Windows' curl.exe finished with exit 0.
 - Cause, in `FtpControlChannel`, not in `FtpActiveCommand`: the read `WaitForBytesAsync` starts while the data connection is accepted stayed pending after its bytes had been taken, so the next fill returned at once and one stale buffer byte entered the reply. A garbage byte at the start of a line loses the `226`; a zero byte is exit 8. The fix forgets that read as soon as a byte is consumed.
 - `touches` widened to `FtpControlChannel.cs`, the new test file and `Fakes/ScriptedConnection.cs` (an `OnRead` hook that moves the fake clock); no other task in Doing named them.
-- Case 251 was already on `PassingUpstreamCases.txt` and passes (`CURL_UPSTREAM_CASE=251`, and in the fast tests): the harness's FTP stand-in ignores `SLOWDOWN`, so it never met the bug. Filed BL-5915 for that.
+- Case 251 was already on `PassingUpstreamCases.txt` and passes (`CURL_UPSTREAM_CASE=251`, and in the fast tests): the harness's FTP stand-in ignores `SLOWDOWN`, so it never met the bug. Filed BL-5924 for that.
 - No ADR: a defect fix, no behaviour decision.
 - Measure-CodeQuality.ps1 for the FTP library: 100% line and branch, 0 failing members. Fast tests green.
 

@@ -1,5 +1,5 @@
 ---
-id: BL-5915
+id: BL-5924
 title: Send the upstream FTP stand-in's replies one byte at a time under SLOWDOWN
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5915 — Send the upstream FTP stand-in's replies one byte at a time under SLOWDOWN
+# BL-5924 — Send the upstream FTP stand-in's replies one byte at a time under SLOWDOWN
 
 ## Goal
 
