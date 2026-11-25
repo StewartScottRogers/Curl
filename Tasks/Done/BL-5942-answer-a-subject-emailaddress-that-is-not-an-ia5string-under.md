@@ -30,7 +30,7 @@ Found during BL-5940 (ADR-1387). OpenSSL's `NAME_CONSTRAINTS_check` (`crypto/x50
 - Measured curl 8.18.0 / OpenSSL 3.5.5 (WSL): any subject emailAddress that is not an IA5String under name constraints is exit 60, verify result 53; the subject directoryName and earlier IA5 emailAddresses are judged first; alternative names are not reached; no constraints, exit 0. Table and decision in ADR-1388. An OCTET STRING emailAddress makes a certificate OpenSSL cannot load at all.
 - Build clean. `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members, its fast tests of the 22 test projects reaching the library all passed.
 - Linux and macOS: the new tests build subjects with `AsnWriter`; the `VerifyPeer` one excludes macOS, as its siblings do.
-- Filed BL-5943: name-by-name and CA order of the OpenSSL check (read from source).
+- Filed BL-5950: name-by-name and CA order of the OpenSSL check (read from source).
 
 ## Log
 

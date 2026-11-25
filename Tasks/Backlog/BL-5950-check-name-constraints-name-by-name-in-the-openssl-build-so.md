@@ -1,5 +1,5 @@
 ---
-id: BL-5943
+id: BL-5950
 title: Check name constraints name by name in the OpenSSL build, so the verify result is the first refused name's
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5943 — Check name constraints name by name in the OpenSSL build, so the verify result is the first refused name's
+# BL-5950 — Check name constraints name by name in the OpenSSL build, so the verify result is the first refused name's
 
 ## Goal
 
