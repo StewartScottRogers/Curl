@@ -30,3 +30,4 @@ Measured in BL-5941, `Record-CurlExchange.ps1 -Response 'HTTP/1.1 200 OK\r\nCont
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 626d8599 3d836d5e.
