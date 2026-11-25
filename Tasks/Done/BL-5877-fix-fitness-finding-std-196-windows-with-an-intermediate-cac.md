@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorOcsp.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs, Curl.Networking.UnitLibrary/RevocationListDownload.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/ServerCertificateVerificationTests.AnchorOcsp.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5877 — Fix fitness finding STD-196: Windows: with an intermediate --cacert / --proxy-cacert anchor, OCSP is never consulted, so an OCSP-revoked certificate is accepted
 
@@ -43,13 +43,20 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] `curl -sS https://localhost:<port of oc_crlclean_ocsprev>/ --cacert intOCSP.pem` exits 60 with "…has been revoked" (also via `--proxy-cacert`); `curl -sS https://localhost:<port of o_good>/ --cacert intOCSP.pem` exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS https://localhost:<port of oc_crlclean_ocsprev>/ --cacert intOCSP.pem` exits 60 with "…has been revoked" (also via `--proxy-cacert`); `curl -sS https://localhost:<port of o_good>/ --cacert intOCSP.pem` exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- OCSP check added in the new `ServerCertificateVerification.AnchorOcsp.cs`, reusing `Curl.Tls`'s `OcspStapleVerifier`; OCSP is asked first and the CRL only when no responder says good or revoked (ADR-1347).
+- `touches` widened to that file, its test file, the fetch adapter's and chain errors' comments and the library's CLAUDE.md; no other task in Doing named any of them.
+- Verified 2026-11-24 with a throwaway C# mock (RSA root and intermediate, TLS servers, OCSP/CRL responder on 127.0.0.1): Curl and curl.exe (Schannel, Git for Windows) both exit 60 "has been revoked" for oc_crlclean_ocsprev direct and via --proxy-cacert and for o_revoked with --ssl-revoke-best-effort, and exit 0 for o_good direct and via proxy.
+- Measure-CodeQuality for Curl.Networking.UnitLibrary: 100% line and branch, 0 failing members. Build clean, fast tests pass.
+
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 2a4f5f42 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. OCSP is consulted below a non-self-signed --cacert/--proxy-cacert anchor and preferred over the CRL

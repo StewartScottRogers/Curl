@@ -3,7 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 namespace Curl.Networking;
 
 /// <summary>
-/// Downloads a certificate revocation list over plain HTTP from a CRL distribution point.
+/// Downloads a revocation answer over plain HTTP: a certificate revocation list from a CRL distribution
+/// point, or an OCSP response from a responder (<see cref="ServerCertificateVerification.FetchOcspResponse" />).
 /// Thin on purpose, like the transport types: it needs a live server, so it is excluded from
 /// coverage and the tests replace <see cref="ServerCertificateVerification.FetchRevocationList" />.
 /// </summary>
@@ -17,8 +18,8 @@ internal static class RevocationListDownload
     /// <returns>A handler with its proxy use switched off.</returns>
     internal static SocketsHttpHandler CreateHandler() => new() { UseProxy = false };
 
-    /// <summary>Gets the list at <paramref name="uri" />; throws when it cannot be fetched, saying why.</summary>
-    /// <param name="uri">The distribution point's http address.</param>
+    /// <summary>Gets the body at <paramref name="uri" />; throws when it cannot be fetched, saying why.</summary>
+    /// <param name="uri">The distribution point's or OCSP request's http address.</param>
     /// <param name="cancellation">Cuts the fetch short: while waiting for headers, and while a body read waits for bytes (cancelling disposes the response, which aborts the blocked read).</param>
     /// <returns>The response body.</returns>
     /// <exception cref="IOException">The server did not answer with success, or the body passed <see cref="MaximumBodyBytes" />.</exception>

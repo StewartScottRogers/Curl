@@ -30,22 +30,22 @@ internal sealed partial class ServerCertificateVerification
     internal Func<Uri, CancellationToken, byte[]> FetchRevocationList { get; init; } = RevocationListDownload.Fetch;
 
     /// <summary>
-    /// The most time all the list fetches of one verification may take together; what is left of
+    /// The most time all the list and OCSP response fetches of one verification may take together; what is left of
     /// it bounds each fetch, and a fetch past it counts as unfetchable. Five seconds unless set.
     /// </summary>
     internal TimeSpan RevocationFetchBudget { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>Where a failed list fetch is written, at <c>warning</c> as <c>tls</c>.</summary>
+    /// <summary>Where a failed list or OCSP response fetch is written, at <c>warning</c> as <c>tls</c>.</summary>
     internal IDiagnosticLog RevocationDiagnosticLog { get; init; } = NoDiagnosticLog.Instance;
 
     /// <summary>
-    /// Ends every list fetch of the verification when it is cancelled; the connect's limit, so a
+    /// Ends every list and OCSP response fetch of the verification when it is cancelled; the connect's limit, so a
     /// stalled fetch does not outlast what is left of the connect (ADR-0117).
     /// </summary>
     internal CancellationToken RevocationLimit { get; init; }
 
     /// <summary>
-    /// Returns a verification with this one's settings and seams whose below-anchor list fetches
+    /// Returns a verification with this one's settings and seams whose below-anchor revocation fetches
     /// write their failures to <paramref name="diagnosticLog" /> and stop at
     /// <paramref name="limit" />, and are bounded by the lesser of this one's budget and what is
     /// left of the connect, which <paramref name="limit" /> cancels at.
@@ -59,6 +59,7 @@ internal sealed partial class ServerCertificateVerification
         {
             IsProxy = isProxy,
             FetchRevocationList = FetchRevocationList,
+            FetchOcspResponse = FetchOcspResponse,
             RevocationFetchBudget = RevocationFetchBudget,
             RevocationDiagnosticLog = diagnosticLog,
             RevocationLimit = limit,
@@ -79,22 +80,22 @@ internal sealed partial class ServerCertificateVerification
 
     private sealed record BelowAnchorRevocationAnswer(BelowAnchorRevocation Value);
 
-    /// <summary>What the CRLs say of the certificates below an anchor.</summary>
+    /// <summary>What OCSP and the CRLs say of the certificates below an anchor.</summary>
     private enum BelowAnchorRevocation
     {
         /// <summary>Nothing is unknown or revoked.</summary>
         Clean,
 
-        /// <summary>A certificate below the anchor is listed as revoked.</summary>
+        /// <summary>A certificate below the anchor is revoked, by OCSP or a list.</summary>
         Revoked,
 
-        /// <summary>A revocation status stays unknown: no usable list was found.</summary>
+        /// <summary>A revocation status stays unknown: no usable OCSP answer or list was found.</summary>
         Unresolved,
     }
 
     // With a chain ending at a non-self-signed anchor the Windows engine reports every element's
-    // revocation status unknown, even with a valid CRL one fetch away, so the lists are read
-    // here: the certificates below the anchor are looked up in the list their issuer signed.
+    // revocation status unknown, even with a valid answer one fetch away, so it is read here:
+    // each certificate below the anchor is asked about by OCSP, else looked up in the list its issuer signed.
     // Worked out once per chain, so once per verification, however many checks ask.
     private BelowAnchorRevocation ReadBelowAnchorRevocation(X509Chain chain) =>
         _belowAnchorAnswers.GetValue(chain, key => new BelowAnchorRevocationAnswer(WorkOutBelowAnchorRevocation(key))).Value;
@@ -115,7 +116,10 @@ internal sealed partial class ServerCertificateVerification
             : outcomes.Contains(BelowAnchorRevocation.Unresolved) ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
     }
 
-    private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget) =>
+        OcspRevocationOf(certificate, issuer, budget) ?? ListRevocationOf(certificate, issuer, budget);
+
+    private BelowAnchorRevocation ListRevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
         // CryptoAPI stops at the first usable list (STD-163): a later point is never asked, so its answer cannot overrule it.
         var first = CrlDistributionPointUris(certificate)
@@ -182,18 +186,20 @@ internal sealed partial class ServerCertificateVerification
         return list is not null && IsCurrentListOf(list, certificate, issuer, uri) ? list : null;
     }
 
-    private byte[]? TryFetchRevocationList(Uri uri, CancellationToken budget)
+    private byte[]? TryFetchRevocationList(Uri uri, CancellationToken budget) => TryFetch(FetchRevocationList, "CRL", uri, budget);
+
+    private byte[]? TryFetch(Func<Uri, CancellationToken, byte[]> fetch, string kind, Uri uri, CancellationToken budget)
     {
         try
         {
             budget.ThrowIfCancellationRequested();
-            return FetchRevocationList(uri, budget);
+            return fetch(uri, budget);
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException or InvalidOperationException)
         {
             if (RevocationDiagnosticLog.IsEnabled(DiagnosticLogLevel.Warning))
             {
-                RevocationDiagnosticLog.Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls, $"CRL {uri} could not be fetched: {exception.Message}");
+                RevocationDiagnosticLog.Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls, $"{kind} {uri} could not be fetched: {exception.Message}");
             }
 
             return null;
@@ -308,6 +314,9 @@ internal sealed partial class ServerCertificateVerification
         }
 
         var text = generalNames.ReadCharacterString(UniversalTagNumber.IA5String, ContextTag6);
-        return Uri.TryCreate(text, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttp ? uri : null;
+        return HttpAddressOrNothing(text);
     }
+
+    private static Uri? HttpAddressOrNothing(string text) =>
+        Uri.TryCreate(text, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttp ? uri : null;
 }

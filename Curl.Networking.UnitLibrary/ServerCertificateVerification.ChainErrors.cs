@@ -148,7 +148,7 @@ internal sealed partial class ServerCertificateVerification
 
     // With revocation checking on, a chain ending at a non-self-signed anchor also carries
     // RevocationStatusUnknown / OfflineRevocation, for the anchor has no issuer to ask (BL-5317):
-    // tolerated only when the CRLs of the certificates below the anchor leave none unknown or revoked.
+    // tolerated only when OCSP and the CRLs of the certificates below the anchor leave none unknown or revoked.
     private bool HasOnlyMissingRootOrAnchorRevocationStatus(X509Chain chain) =>
         HasOnlyMissingRootStatus(ReadChainStatus(chain))
         || (HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
@@ -156,14 +156,14 @@ internal sealed partial class ServerCertificateVerification
             && NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(chain));
 
     // --ssl-revoke-best-effort masks an unknown revocation status, so a certificate below the
-    // anchor with no usable CRL (404, none listed, refused) is tolerated there; a revoked one never is (BL-5437).
+    // anchor with no usable OCSP answer or CRL (404, none listed, refused) is tolerated there; a revoked one never is (BL-5437).
     private bool NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(X509Chain chain) =>
         ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Clean
         || (matchesSchannelBuild && options.RevocationCheckBestEffort && ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Unresolved);
 
-    // The chain ends at a listed, non-self-signed anchor and a CRL revokes a certificate below it:
+    // The chain ends at a listed, non-self-signed anchor and OCSP or a CRL revokes a certificate below it:
     // Schannel's has been revoked, where the engine's own statuses only say unknown (BL-5384).
-    // A revoking CRL is Schannel's has been revoked (BL-5384), no usable CRL its revocation status is unknown (BL-5446).
+    // A revoked answer is Schannel's has been revoked (BL-5384), no usable one its revocation status is unknown (BL-5446).
     private (CurlExitCode ExitCode, string Message)? BelowNonSelfSignedAnchorFailure(X509Chain? chain) =>
         chain is not null && EndsAtListedNonSelfSignedAnchor(chain)
             ? ReadBelowAnchorRevocation(chain) switch
