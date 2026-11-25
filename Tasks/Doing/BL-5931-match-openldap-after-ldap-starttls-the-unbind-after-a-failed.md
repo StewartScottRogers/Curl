@@ -35,3 +35,4 @@ Found by BL-5908, measuring `C:\UpstreamCurl\openldap-curl-8.21.0-linux-x86_64\c
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: dab3070b 0fde7b0a 3d836d5e.
