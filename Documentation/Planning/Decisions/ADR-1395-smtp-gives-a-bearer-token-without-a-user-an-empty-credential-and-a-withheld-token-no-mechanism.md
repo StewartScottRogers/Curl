@@ -1,4 +1,4 @@
-# ADR-1394: Over SMTP a bearer token without a user gives an empty credential, and a withheld token chooses no mechanism
+# ADR-1395: Over SMTP a bearer token without a user gives an empty credential, and a withheld token chooses no mechanism
 
 - Status: Accepted
 - Date: 2026-11-25

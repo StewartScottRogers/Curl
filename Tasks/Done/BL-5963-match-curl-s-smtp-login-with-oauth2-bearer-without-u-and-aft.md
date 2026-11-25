@@ -38,7 +38,7 @@ The stashed change gives an empty credential with `--oauth2-bearer` and no `-u`,
 - Continues the stashed work of BL-5925.
 - The stash also holds the IMAP (BL-5961) and POP3 (BL-5962) changes. Keep only the files this task touches; restore every other stashed file to `HEAD` before committing.
 - Run the quality measurement for this one library only, with `-ReportPath`: one run over all three libraries timed out after 18 minutes with no report while other lanes were building.
-- The IMAP and POP3 files from the stash were restored to `HEAD`. Decision in ADR-1394.
+- The IMAP and POP3 files from the stash were restored to `HEAD`. Decision in ADR-1395.
 - Measured 2026-11-25 against curl 8.22.0 (Schannel build) with `Record-CurlExchange.ps1 -Smtp -SmtpReply 'EHLO=250-localhost\r\n250 AUTH <offered>'`, `-CurlArgs -sv --oauth2-bearer tok [--login-options <options>]`, then `smtp://127.0.0.1:18963/` (no `-u`) or, for a redirect, `-L --proto-redir =smtp http://127.0.0.1:18964/`, a loopback server answering `302` to `smtp://v@127.0.0.1:18963/`. "Nothing" means no command after `EHLO`; `P` is `PLAIN LOGIN CRAM-MD5`.
 
   | Case | Offered | Options | curl sends after `EHLO` | Exit |
@@ -68,4 +68,4 @@ The stashed change gives an empty credential with `--oauth2-bearer` and no `-u`,
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 75eadb9d 9157c065 13f9e547 3d836d5e.
-- 2026-11-25: Doing -> Done. SMTP matches curl 8.22.0 for --oauth2-bearer without -u and after a redirect withholds the token (ADR-1394); the DIGEST-MD5 empty-user difference is BL-5968.
+- 2026-11-25: Doing -> Done. SMTP matches curl 8.22.0 for --oauth2-bearer without -u and after a redirect withholds the token (ADR-1395); the DIGEST-MD5 empty-user difference is BL-5968.

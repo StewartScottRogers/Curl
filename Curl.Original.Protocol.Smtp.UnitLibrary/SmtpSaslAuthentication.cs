@@ -16,7 +16,7 @@ namespace Curl.Original.Protocol.Smtp;
 /// <c>AUTH=EXTERNAL</c> with <c>EXTERNAL</c> offered: no authentication.</item>
 /// <item><c>--oauth2-bearer</c> without <c>-u</c> gives a mechanism <c>AUTH=</c> allows an
 /// empty user and password. After a redirect withheld the token, no mechanism is chosen
-/// unless <c>AUTH=</c> was given (curl 8.22.0, BL-5963, ADR-1394).</item>
+/// unless <c>AUTH=</c> was given (curl 8.22.0, BL-5963, ADR-1395).</item>
 /// <item>No usable mechanism among those offered: exit 67 <c>Login denied</c>, nothing sent,
 /// after the <c>-v</c> <c>SASL:</c> lines curl writes for it (BL-1061, BL-1242).</item>
 /// <item>Under <c>--sasl-ir</c> the initial response goes on the <c>AUTH</c> line while the
