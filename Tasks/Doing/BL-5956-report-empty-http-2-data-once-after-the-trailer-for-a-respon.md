@@ -31,3 +31,4 @@ Measured in BL-5946, curl 8.18.0 (nghttp2, WSL), `Record-CurlExchange.ps1 -Http2
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: bf8d2576 7b589aec 3d836d5e.
