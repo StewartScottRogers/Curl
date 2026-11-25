@@ -38,3 +38,4 @@ The touches list is every file that names the class today. Any lane task that ad
 ## Log
 
 - 2026-11-25: Created on Stewart's request ("rename it") after the "extended protocol" wording sweep.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: fe612d33 f1b9633a ef56b0bc.
