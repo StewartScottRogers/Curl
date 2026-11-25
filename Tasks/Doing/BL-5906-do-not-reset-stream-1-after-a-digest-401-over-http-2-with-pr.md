@@ -33,3 +33,4 @@ Command: `curl -sS -f --http2-prior-knowledge --digest -u tester:secret -w %{htt
 ## Log
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 25.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: ef2a122e eb0dd7e6 3d836d5e.
