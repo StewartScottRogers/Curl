@@ -16,7 +16,7 @@ there were 62 of them, of two kinds: those that add a URL scheme curl does not h
 ## Decision
 
 An extension that serves its own URL scheme - one whose protocol handler is an entry in
-`Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` - is a *protocol extension*, named
+`Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` - is an *extended protocol*, named
 `Curl.Extension.Protocol.<Name>.UnitLibrary` (with `.UnitTests` and, when it has them, `.IntegrationTests`),
 namespace `Curl.Extension.Protocol.<Name>`, in `/Extensions/Protocol/<Name>/` in `Curl.slnx`. Every other
 extension keeps `Curl.Extension.<Name>`, as do `Curl.Extension.Abstractions` and
