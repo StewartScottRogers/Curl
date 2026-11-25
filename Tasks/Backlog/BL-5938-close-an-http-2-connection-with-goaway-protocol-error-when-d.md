@@ -1,5 +1,5 @@
 ---
-id: BL-5935
+id: BL-5938
 title: Close an HTTP/2 connection with GOAWAY PROTOCOL_ERROR when DATA follows the head of a -I request, as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5935 — Close an HTTP/2 connection with GOAWAY PROTOCOL_ERROR when DATA follows the head of a -I request, as curl does
+# BL-5938 — Close an HTTP/2 connection with GOAWAY PROTOCOL_ERROR when DATA follows the head of a -I request, as curl does
 
 ## Goal
 
