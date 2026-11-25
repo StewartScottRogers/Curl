@@ -113,6 +113,11 @@
     1000, RespondAfterBodyBytes 0 holds each answer until curl's one-second wait for
     100 Continue has expired, so curl has begun sending the body before the answer
     comes: a deterministic early answer to an Expect: 100-continue upload (BL-3827).
+    With -Http2Origin, the HTTP/2 request is answered (as -ProxyStatus, -Http2Frames and
+    the like say) once this many DATA bytes have arrived, from 1 up, instead of at its
+    HEADERS, and no WINDOW_UPDATE is sent until then; 65535, the initial window, answers
+    an upload curl has stopped to wait for window, so the DATA recorded after the answer
+    shows whether curl goes on sending (BL-5973).
 
 .PARAMETER RequestReadMilliseconds
     How long each read of an HTTP request waits for its next byte before the request is
@@ -2324,6 +2329,7 @@ public sealed class RecorderHttp2Proxy
     public string Answer { get; set; } = "";
     private readonly string[] _headerFields;
     public string[] Frames { get; set; } = new string[0];
+    public int AnswerAfterDataBytes { get; set; } = -1;
 
     public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode, string[] headerFields)
     {
@@ -2516,6 +2522,9 @@ public sealed class RecorderHttp2Proxy
         int tunnelStream = 0;
         if (upgraded) { tunnelStream = 1; AnswerConnect(stream, 1, false); }
         bool answered = false;
+        // With AnswerAfterDataBytes, the answer and every WINDOW_UPDATE wait for that much DATA.
+        bool answerPending = false;
+        int heldWindow = 0;
         while (true)
         {
             byte[] head = ReadExact(stream, 9);
@@ -2535,7 +2544,19 @@ public sealed class RecorderHttp2Proxy
                     if ((flags & 0x8) != 0) { start = 1; end = length - payload[0]; }
                     Note("> DATA" + frame + " " + (end - start) + " bytes: " + Escape(payload, start, end - start));
                     tunnel.Write(payload, start, end - start);
-                    if (end > start)
+                    if (answerPending)
+                    {
+                        heldWindow += length;
+                        if (tunnel.Length >= AnswerAfterDataBytes)
+                        {
+                            answerPending = false;
+                            AnswerConnect(stream, tunnelStream, false);
+                            WriteFrame(stream, 8, 0, 0, BigEndian32(heldWindow));
+                            WriteFrame(stream, 8, 0, tunnelStream, BigEndian32(heldWindow));
+                            Note("< WINDOW_UPDATE streams 0 and " + tunnelStream + " increment " + heldWindow);
+                        }
+                    }
+                    else if (end > start)
                     {
                         WriteFrame(stream, 8, 0, 0, BigEndian32(length));
                         WriteFrame(stream, 8, 0, streamId, BigEndian32(length));
@@ -2568,7 +2589,8 @@ public sealed class RecorderHttp2Proxy
                         if (tunnelStream == 0)
                         {
                             tunnelStream = streamId;
-                            AnswerConnect(stream, streamId, connect);
+                            if (AnswerAfterDataBytes >= 0 && !connect) { answerPending = true; }
+                            else { AnswerConnect(stream, streamId, connect); }
                         }
                     }
                     break;
@@ -2822,6 +2844,7 @@ public sealed class RecorderHttp2Proxy
     $http2Proxy.OmitSettings = [bool]$Http2NoSettings
     $http2Proxy.Answer = $Http2Answer
     $http2Proxy.Frames = [string[]] $Http2Frames
+    $http2Proxy.AnswerAfterDataBytes = $RespondAfterBodyBytes
 }
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
