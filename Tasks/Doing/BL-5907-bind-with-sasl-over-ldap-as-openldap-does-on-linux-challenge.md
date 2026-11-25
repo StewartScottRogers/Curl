@@ -38,3 +38,4 @@ What decides: curl 8.21.0 manual (`--login-options`, `-u`), RFC 4513 section 5.2
 ## Log
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 26.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 7e74135a ca39b51d 3d836d5e.
