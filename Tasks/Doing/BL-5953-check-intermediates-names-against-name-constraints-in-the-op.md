@@ -33,3 +33,4 @@ Found during BL-5950 (ADR-1391). Two gaps remain:
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: b2112e5a e3771298 403a4f6f.
