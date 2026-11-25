@@ -30,3 +30,4 @@ Found by BL-5886. `HttpProtocolHandler.TargetOf(HttpRequestPlan)` (`Curl.Origina
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: df390bac 3d836d5e.
