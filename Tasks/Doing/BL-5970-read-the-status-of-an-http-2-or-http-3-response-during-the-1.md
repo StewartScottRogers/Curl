@@ -30,3 +30,4 @@ Found by BL-5960. `HttpContinueWaitConnection.StatusCodeOf` parses the first lin
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: fe280dd3 3d836d5e.
