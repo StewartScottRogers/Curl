@@ -1,4 +1,4 @@
-# ADR-1347: A TELNET read that fails during the option negotiation exits 56 (BL-5882)
+# ADR-1352: A TELNET read that fails during the option negotiation exits 56 (BL-5882)
 
 Status: Accepted. Decided by Claude under Stewart's delegation.
 

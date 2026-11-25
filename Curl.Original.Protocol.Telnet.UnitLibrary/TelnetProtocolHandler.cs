@@ -36,7 +36,7 @@ namespace Curl.Original.Protocol.Telnet;
 /// fails, as a reset does, ends the session like a close, with exit 0, unless it strikes
 /// the option negotiation (a reply the connection did not take, or replies sent and no
 /// data written yet): then it ends with exit 56 (<see cref="CurlExitCode.RecvError" />),
-/// so what the server sent is never lost under exit 0 (ADR-1347). A send of the
+/// so what the server sent is never lost under exit 0 (ADR-1352). A send of the
 /// upload it fails ends it with exit 55 (<see cref="CurlExitCode.SendError" />), and an
 /// output that refuses a write with exit 23 (<see cref="CurlExitCode.WriteError" />). Each
 /// negotiation reply is its own write, as curl sends it; one the connection fails with a

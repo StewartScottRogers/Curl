@@ -8,7 +8,7 @@ namespace Curl.Original.Protocol.Telnet;
 
 /// <summary>
 /// Pins how a <c>telnet://</c> session meets a connection read that fails during the option
-/// negotiation: exit 56, never exit 0 with the server's data lost (BL-5882, ADR-1347),
+/// negotiation: exit 56, never exit 0 with the server's data lost (BL-5882, ADR-1352),
 /// against curl 8.23.0 on Windows.
 /// </summary>
 [TestClass]

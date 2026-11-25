@@ -46,7 +46,7 @@ The finding, verbatim:
 - Touches widened with the library CLAUDE.md, the new test file and its fake; the only other Doing task naming Telnet on origin/work/dark-factory was this one.
 - Reproduced on the current branch (debug build): `0/7` with exit 0 after `Sending data failed (10053)`, and `0/18`; no `0/0` in 15 runs, but a read failing before `login: ` is written gave exit 0 with nothing.
 - curl 8.23.0 Windows, same mock: `0/18`, `56/7 Recv failure: Connection was reset`, `55/0`. A reset 300 ms after `login: ` was read (with or without `DO TTYPE`): exit 0.
-- Fix (ADR-1347): a failed read exits 56 when a reply failed to send, or replies went and no data was written yet; otherwise exit 0 as before. curl 55 for a failed upload was already matched.
+- Fix (ADR-1352): a failed read exits 56 when a reply failed to send, or replies went and no data was written yet; otherwise exit 0 as before. curl 55 for a failed upload was already matched.
 - Acceptance loop after the fix, 3 x 8 runs with a PowerShell mock: only `56/7` and `0/18`; never `0/0`.
 - Measure-CodeQuality for the Telnet library: 0 failing members. Full solution build clean, fast tests green. No command-line option changed, so `--ai-help` is untouched.
 - Linux and macOS behaviour is filed as BL-5918; the new tests are platform-neutral.
