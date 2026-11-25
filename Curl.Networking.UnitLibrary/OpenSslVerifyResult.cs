@@ -187,7 +187,7 @@ internal static class OpenSslVerifyResult
     /// <c>internal_verify</c> a signature that does not verify (7) before it checks dates
     /// (BL-5104). .NET reports both 79 and 25 as <see cref="X509ChainStatusFlags.InvalidBasicConstraints" />,
     /// and 53 as <see cref="X509ChainStatusFlags.HasNotSupportedNameConstraint" />, which it also sets for
-    /// OpenSSL's other unsupported-constraint errors; 53 is answered for all of them (ADR-1376).
+    /// OpenSSL's other unsupported-constraint errors; 53 is answered for all of them (ADR-1383).
     /// </summary>
     /// <param name="status">Every status flag of the chain, combined.</param>
     /// <param name="pathLengthExceeded">Whether a CA in the chain has its path length exceeded.</param>

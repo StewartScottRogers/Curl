@@ -18,7 +18,7 @@ In the OpenSSL build, a subject emailAddress inside a multi-valued relative name
 
 ## Context
 
-Left over from BL-5921 (ADR-1376). `CertificateNameConstraints.ListSubjectEmailAddresses` skips an
+Left over from BL-5921 (ADR-1383). `CertificateNameConstraints.ListSubjectEmailAddresses` skips an
 emailAddress in a multi-valued relative name, while OpenSSL's `NAME_CONSTRAINTS_check`
 (`crypto/x509/v3_ncons.c`) reads every emailAddress attribute. The Schannel build's answers must not
 change. Measure OpenSSL curl first, with a leaf whose last CN matches the host, or curl's name check

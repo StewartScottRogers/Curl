@@ -1424,4 +1424,4 @@ Each option and the specific reason it lost.
 | [1380](ADR-1380-openssl-build-reads-x509-certificate-ca-blocks.md) | The OpenSSL build reads X509 CERTIFICATE blocks in --cacert and --capath (BL-5927) | Accepted | 2026-11-24 |
 | [1381](ADR-1381-an-http2-session-resets-unfinished-streams-when-it-shuts-down.md) | An HTTP/2 session resets its unfinished streams when it shuts down (BL-5922) | Accepted | 2026-11-24 |
 | [1382](ADR-1382-a-reset-telnet-session-exits-56-on-linux-and-macos.md) | A reset TELNET session exits 56 on Linux and macOS (BL-5918) | Accepted | 2026-11-25 |
-| [1376](ADR-1376-the-openssl-build-answers-53-for-a-cn-holding-a-nul-and-reads-every-cn.md) | The OpenSSL build answers 53 for a CN holding a NUL, `illegal cert name field` when it is the matched CN, and reads every subject CN (BL-5921) | Accepted | 2026-11-25 |
+| [1383](ADR-1383-the-openssl-build-answers-53-for-a-cn-holding-a-nul-and-reads-every-cn.md) | The OpenSSL build answers 53 for a CN holding a NUL, `illegal cert name field` when it is the matched CN, and reads every subject CN (BL-5921) | Accepted | 2026-11-25 |

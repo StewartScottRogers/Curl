@@ -1,4 +1,4 @@
-# ADR-1376: The OpenSSL build answers 53 for a CN holding a NUL and reads every subject CN (BL-5921)
+# ADR-1383: The OpenSSL build answers 53 for a CN holding a NUL and reads every subject CN (BL-5921)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1354.
 

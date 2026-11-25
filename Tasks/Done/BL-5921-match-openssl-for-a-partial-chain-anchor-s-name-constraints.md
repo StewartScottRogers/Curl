@@ -32,7 +32,7 @@ and `ListCommonNames` skips a CN in a multi-valued relative name in both builds,
 
 ## Notes
 
-- Measured curl 8.18.0 / OpenSSL 3.5.5 in WSL with `openssl s_server` (table in ADR-1376). A NUL in the
+- Measured curl 8.18.0 / OpenSSL 3.5.5 in WSL with `openssl s_server` (table in ADR-1383). A NUL in the
   last CN, the one curl's name check matches, answers `SSL: illegal cert name field` (verify result 1)
   before the chain's result is read; 53 shows when an earlier CN holds the inner NUL and the last CN is
   the host. Both are pinned (`VerifyPeer_OpenSslBuildOnlyCnHoldingANul_IsAnIllegalCertNameField`,
