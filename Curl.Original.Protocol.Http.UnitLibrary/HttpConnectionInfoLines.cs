@@ -213,6 +213,15 @@ internal static class HttpConnectionInfoLines
         string.Create(CultureInfo.InvariantCulture, $"upload completely sent off: {bytesSent} bytes");
 
     /// <summary>
+    /// Formats curl 8.18.0's line for a body sent on an HTTP/2 stream whose response had already
+    /// ended, which that send closes (measured, BL-5972 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream's identifier.</param>
+    /// <returns>The line, such as <c>stream 1 closed</c>.</returns>
+    internal static string StreamClosed(int streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"stream {streamId} closed");
+
+    /// <summary>
     /// Formats the line for a connection left open for another transfer.
     /// </summary>
     /// <param name="connectionNumber">curl's number for the connection.</param>

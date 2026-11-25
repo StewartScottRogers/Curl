@@ -59,6 +59,9 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// </summary>
     internal bool IsMultiplexedStream { get; init; }
 
+    /// <summary>Gets the HTTP/2 stream this stands for, or <see langword="null" /> when it is none.</summary>
+    internal Http2StreamConnection? Http2Stream { get; init; }
+
     /// <summary>Gets or sets what sends a held body once the wait runs out; nothing by default.</summary>
     internal Func<CancellationToken, ValueTask> SendBody { get; set; } = _ => ValueTask.CompletedTask;
 

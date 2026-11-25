@@ -97,7 +97,10 @@ public sealed partial class HttpProtocolHandler
     /// <summary>
     /// Sends a body held until the wait for <c>100 Continue</c> ran out after a final status, with
     /// curl 8.22.0's lines around it (measured, BL-5960 Notes), and keeps a send failure for after
-    /// the response (<see cref="FinishSendingBodyAsync" />).
+    /// the response (<see cref="FinishSendingBodyAsync" />). On an HTTP/2 stream whose response
+    /// has already ended, the body still goes out and then fails with exit 55 after
+    /// <c>stream N closed</c>, the connection staying open, as curl 8.18.0's nghttp2 build does
+    /// (measured, BL-5972 Notes).
     /// </summary>
     private static async ValueTask SendHeldBodyAsync(
         ITransferEvents events,
@@ -107,11 +110,25 @@ public sealed partial class HttpProtocolHandler
         HttpContinueWaitConnection waiting,
         CancellationToken cancellationToken)
     {
+        Http2StreamConnection? answeredStream = waiting.Http2Stream is { IsResponseEnded: true } ended ? ended : null;
+        if (answeredStream is not null)
+        {
+            answeredStream.SendBodyAfterResponseEnd();
+            upload.LeaveSentDataUnreported();
+        }
+
         events.ReportInfo(HttpConnectionInfoLines.DoneWaitingForContinue);
         try
         {
             await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
-            ReportRequestSent(events, framing, upload, bodyLeftUnsent: false);
+            if (answeredStream is null)
+            {
+                ReportRequestSent(events, framing, upload, bodyLeftUnsent: false);
+                return;
+            }
+
+            events.ReportInfo(HttpConnectionInfoLines.StreamClosed(answeredStream.StreamId));
+            waiting.HeldSendFailure = new HttpTransferException(CurlExitCode.SendError, HttpTransferMessages.SendFailed) { LeavesConnectionIntact = true };
         }
         catch (HttpTransferException failure) when (failure.ExitCode == CurlExitCode.SendError)
         {
@@ -137,11 +154,24 @@ public sealed partial class HttpProtocolHandler
 
         if (waiting.HoldsBody)
         {
+            LeaveEndedStreamsEmptyDataUnreported(waiting);
             StopOrKeepHolding(plan, head, retry, upload, waiting);
         }
         else if (waiting.StoppedStreamUpload && retry is null)
         {
             ReportStopBeforeEndOfSend(plan.Context.Events, upload);
+        }
+    }
+
+    /// <summary>
+    /// Leaves unreported the empty data of a stream whose head ended it while the body is held:
+    /// curl writes no <c>{ [0 bytes data]</c> for it (measured, BL-5972 Notes).
+    /// </summary>
+    private static void LeaveEndedStreamsEmptyDataUnreported(HttpContinueWaitConnection waiting)
+    {
+        if (waiting.Http2Stream is { IsResponseEnded: true } ended)
+        {
+            ended.LeavesEmptyDataUnreported = true;
         }
     }
 
@@ -163,7 +193,8 @@ public sealed partial class HttpProtocolHandler
     /// <summary>
     /// Finishes sending the body once the response is read: the rest of one kept sending past an
     /// error; a body still held, which goes out when its wait runs out on a connection that stays
-    /// open, and is given up with curl 8.22.0's lines on one that closes (measured, BL-5960
+    /// open, as an HTTP/2 or HTTP/3 stream's does, and is given up with curl 8.22.0's lines on one
+    /// that closes (measured, BL-5960 Notes); the reset of an HTTP/2 stream whose upload a status stopped (measured, BL-5972
     /// Notes); and then any send failure kept for after the response.
     /// </summary>
     /// <exception cref="HttpTransferException">The send failed and the response does not close the connection (exit 55).</exception>
@@ -178,12 +209,17 @@ public sealed partial class HttpProtocolHandler
         await upload.WriteRestAfterResponseAsync(cancellationToken).ConfigureAwait(false);
         if (responseConnection is HttpContinueWaitConnection waiting)
         {
+            await ResetStoppedStreamUploadAsync(waiting, cancellationToken).ConfigureAwait(false);
             await SettleHeldBodyAfterResponseAsync(plan, head, waiting, cancellationToken).ConfigureAwait(false);
             sendFailedAfter2xx ??= waiting.HeldSendFailure;
         }
 
         ThrowIfSendFailedUnlessClosing(sendFailedAfter2xx, head);
     }
+
+    /// <summary>Resets the HTTP/2 stream whose upload a status stopped, once its response is read.</summary>
+    private static ValueTask ResetStoppedStreamUploadAsync(HttpContinueWaitConnection waiting, CancellationToken cancellationToken) =>
+        waiting is { StoppedStreamUpload: true, Http2Stream: { } stopped } ? stopped.ResetUnendedRequestAsync(cancellationToken) : ValueTask.CompletedTask;
 
     /// <summary>Sends or gives up a body still held once the response is read.</summary>
     private static async ValueTask SettleHeldBodyAfterResponseAsync(HttpRequestPlan plan, HttpResponseHead head, HttpContinueWaitConnection waiting, CancellationToken cancellationToken)
@@ -193,7 +229,8 @@ public sealed partial class HttpProtocolHandler
             return;
         }
 
-        if (KeepsConnectionOpen(plan, head))
+        // A stream's response does not close its connection, whatever its length (measured, BL-5972 Notes).
+        if (waiting.IsMultiplexedStream || KeepsConnectionOpen(plan, head))
         {
             await waiting.SendHeldBodyAsync(cancellationToken).ConfigureAwait(false);
             return;

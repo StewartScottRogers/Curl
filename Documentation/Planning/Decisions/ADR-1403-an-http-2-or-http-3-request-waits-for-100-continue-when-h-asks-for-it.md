@@ -26,7 +26,6 @@ while the body is being sent, still does not stop the body on a stream (unmeasur
 ## Consequences
 
 The read the wait starts can be pending while the body is written; `Http2Session` already
-serialises frame reads and writes for multiplexed streams. Two differences remain: curl 8.18.0
-resets a stream whose upload it stopped (`RST_STREAM STREAM_CLOSED`) even when the response
-has ended it, which Curl does not; and when the response ends the stream before a held body is
-sent, curl fails with exit 55, where Curl sends no DATA, reports the upload sent and exits 0.
+serialises frame reads and writes for multiplexed streams. The two differences this left over
+HTTP/2, the reset of a stopped upload's stream and the exit 55 when the response ends the stream
+before a held body is sent, are closed by ADR-1404.

@@ -12,7 +12,9 @@ namespace Curl.Original.Protocol.Http;
 /// <c>100 Continue</c> decides what happens to the body, as curl's nghttp2 build does (measured
 /// with 8.18.0, <c>--http2-prior-knowledge -v -H "Expect: 100-continue" -d x=1</c>): a 100 sends
 /// it at once, a 200 lets the wait run out and then sends it, and a 500 or a followed redirect
-/// leaves it unsent. The clock is a fake one, advanced only for the 200.
+/// leaves it unsent. A stopped upload resets its stream with STREAM_CLOSED, and a 200 that ends
+/// the stream before the held body goes out fails the send with exit 55 (BL-5972). The clock is
+/// a fake one, advanced only for a 200.
 /// </summary>
 [TestClass]
 public sealed class Http2ContinueWaitStatusTests
@@ -83,6 +85,76 @@ public sealed class Http2ContinueWaitStatusTests
         AssertInOrder(events.Events, "< HTTP/2 301 \r\n", StopSending, AbortUpload, "< \r\n");
     }
 
+    [TestMethod]
+    [DataRow(true, DisplayName = "the response ends at its head")]
+    [DataRow(false, DisplayName = "the response ends with DATA")]
+    public async Task ExecuteAsync_AStoppedUpload_ResetsItsStreamWithStreamClosedOnce(bool endsAtHead)
+    {
+        byte[] response = endsAtHead
+            ? Response(Headers("500", endsStream: true))
+            : Response(Headers("500", endsStream: false), Data("err\n"));
+
+        (TransferResult result, byte[] written, _) = await ExchangeAsync(response);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "1:5" }, await ResetsSentAsync(written));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AFollowedRedirectThatEndsTheStream_ResetsItWithStreamClosedOnce()
+    {
+        byte[] response = Response(Headers("301", endsStream: true, new HeaderField("location", "/y")));
+
+        (_, byte[] written, _) = await ExchangeAsync(response, followsRedirects: true);
+
+        CollectionAssert.AreEqual(new[] { "1:5" }, await ResetsSentAsync(written));
+    }
+
+    [TestMethod]
+    [DataRow(true, DisplayName = "the head ends the stream")]
+    [DataRow(false, DisplayName = "DATA ends the stream")]
+    public async Task ExecuteAsync_A200ThatEndsTheStreamBeforeTheHeldBody_SendsItThenFailsWith55LeavingTheConnectionIntact(bool endsAtHead)
+    {
+        byte[] response = endsAtHead
+            ? Response(Headers("200", endsStream: true))
+            : Response(Headers("200", endsStream: false), Data("ok\n"));
+        ScriptedConnection connection = new(response, 65536);
+        RecordingTransferEvents events = new();
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+
+        Task<TransferResult> transfer = StartAsync(connection, events, time);
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
+        Http2Frame data = (await FramesSentAsync(connection.Written)).Single(frame => frame.Type == Http2FrameType.Data);
+        Assert.AreEqual("x=1", Encoding.Latin1.GetString(data.Payload.Span));
+        Assert.AreEqual(0x01, (byte)data.Flags);
+        Assert.IsEmpty(await ResetsSentAsync(connection.Written));
+        Assert.IsFalse(events.Events.Any(line => line.Contains("sent off", StringComparison.Ordinal)));
+        Assert.IsFalse(events.Events.Any(line => line.StartsWith("} ", StringComparison.Ordinal) || line == "{ "), string.Join('|', events.Events));
+        AssertInOrder(events.Events, "< HTTP/2 200 \r\n", "< \r\n", "* Done waiting for 100-continue", "* stream 1 closed", "* Connection #0 to host h:80 left intact");
+    }
+
+    private static async Task<List<Http2Frame>> FramesSentAsync(byte[] written)
+    {
+        const int PrefaceLength = 24;
+        using MemoryStream stream = new(written, PrefaceLength, written.Length - PrefaceLength);
+        List<Http2Frame> frames = [];
+        while (await Http2FrameCodec.ReadAsync(stream, 16384, CancellationToken.None) is { } frame)
+        {
+            frames.Add(frame);
+        }
+
+        return frames;
+    }
+
+    private static async Task<string[]> ResetsSentAsync(byte[] written) =>
+        [.. (await FramesSentAsync(written))
+            .Where(frame => frame.Type == Http2FrameType.RstStream)
+            .Select(frame => $"{frame.StreamId}:{frame.Payload.Span[3]}")];
+
     private static void AssertInOrder(List<string> events, params string[] expected)
     {
         int[] positions = [.. expected.Select(line => events.IndexOf(line))];
@@ -114,12 +186,21 @@ public sealed class Http2ContinueWaitStatusTests
         byte[] response,
         bool followsRedirects = false)
     {
+        (TransferResult result, byte[] written, RecordingTransferEvents events) = await ExchangeAsync(response, followsRedirects);
+
+        return (result, await BodyBytesSentAsync(written), events);
+    }
+
+    private static async Task<(TransferResult Result, byte[] Written, RecordingTransferEvents Events)> ExchangeAsync(
+        byte[] response,
+        bool followsRedirects = false)
+    {
         ScriptedConnection connection = new(response, 65536);
         RecordingTransferEvents events = new();
 
         TransferResult result = await StartAsync(connection, events, new FakeTimeProvider(DateTimeOffset.UnixEpoch), followsRedirects);
 
-        return (result, await BodyBytesSentAsync(connection.Written), events);
+        return (result, connection.Written, events);
     }
 
     private static Task<TransferResult> StartAsync(
@@ -147,18 +228,8 @@ public sealed class Http2ContinueWaitStatusTests
             .ExecuteAsync(context).AsTask();
     }
 
-    private static async Task<int> BodyBytesSentAsync(byte[] written)
-    {
-        const int PrefaceLength = 24;
-        using MemoryStream frames = new(written, PrefaceLength, written.Length - PrefaceLength);
-        int sent = 0;
-        while (await Http2FrameCodec.ReadAsync(frames, 16384, CancellationToken.None) is { } frame)
-        {
-            sent += frame.Type == Http2FrameType.Data ? frame.Payload.Length : 0;
-        }
-
-        return sent;
-    }
+    private static async Task<int> BodyBytesSentAsync(byte[] written) =>
+        (await FramesSentAsync(written)).Where(frame => frame.Type == Http2FrameType.Data).Sum(frame => frame.Payload.Length);
 
     /// <summary>
     /// A server that answers at once with <paramref name="head" /> and sends

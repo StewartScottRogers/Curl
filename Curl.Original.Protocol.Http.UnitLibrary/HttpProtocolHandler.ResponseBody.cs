@@ -144,11 +144,13 @@ public sealed partial class HttpProtocolHandler
     /// shows as <c>{ [0 bytes data]</c> (<see cref="Http2StreamConnection.EndedWithEmptyData" />):
     /// a response with no body, or one a trailer ends (measured, curl 8.18.0, BL-5946 Notes).
     /// The body reader leaves it to this method (<see cref="HttpResponseBodyReader.Http2Stream" />),
-    /// so it is reported once. A discarded body never comes here.
+    /// so it is reported once. A discarded body never comes here, and nothing is reported for a
+    /// head that ended the stream while the request body was held
+    /// (<see cref="Http2StreamConnection.LeavesEmptyDataUnreported" />).
     /// </summary>
     private static void ReportEmptyStreamData(Http2StreamConnection? http2Stream, ITransferEvents events)
     {
-        if (http2Stream is { EndedWithEmptyData: true })
+        if (http2Stream is { EndedWithEmptyData: true, LeavesEmptyDataUnreported: false })
         {
             events.ReportDataReceived([]);
         }

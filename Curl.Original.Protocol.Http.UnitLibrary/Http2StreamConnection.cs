@@ -57,6 +57,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private bool isRequestEnded;
 
+    /// <summary>Whether DATA still goes out once the response has ended (<see cref="SendBodyAfterResponseEnd" />).</summary>
+    private bool sendsAfterResponseEnd;
+
     private bool isReceiveWindowGrown;
 
     /// <summary>Whether this is the stream an h2c upgrade continues on (<see cref="StartUpgradedAsync" />).</summary>
@@ -81,6 +84,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// frame, which is reported there (<see cref="HttpStreamOpenedLines.UnwantedDataReceived" />).
     /// </summary>
     internal bool EndedWithEmptyData { get; private set; }
+
+    /// <summary>Gets or sets whether curl reports no data of this end, although <see cref="EndedWithEmptyData" />.</summary>
+    internal bool LeavesEmptyDataUnreported { get; set; }
 
     /// <summary>The body length the final head promises (RFC 9113 section 8.1.1), or <see langword="null" /> when it promises none.</summary>
     private long? promisedBodyLength;
@@ -213,13 +219,14 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>
     /// Ends the request with an empty DATA frame carrying END_STREAM, then grows the stream's
     /// receive window, unless it has ended already - it had no body, or the last body write
-    /// ended it - or the response has ended, after which nothing more is sent.
+    /// ended it - or the response has ended, after which nothing more is sent unless
+    /// <see cref="SendBodyAfterResponseEnd" /> asked for it.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the frame is written.</returns>
     public async ValueTask EndRequestAsync(CancellationToken cancellationToken)
     {
-        if (isRequestEnded || isResponseEnded)
+        if (isRequestEnded || StopsSendingData)
         {
             return;
         }
@@ -270,10 +277,11 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>
     /// Gives up a response body curl ignores before a retry or a followed redirect. A stream
     /// whose request has ended is read to its end, its DATA dropped, and is not reset, as curl
-    /// does (measured, BL-5906 Notes). A stream whose request has not ended, and the stream an
-    /// h2c upgrade continues on, is instead reset with STREAM_CLOSED unless its response has
-    /// ended, <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970 Notes), and
-    /// the frames the peer still sends on it are dropped. No data is reported for a body read
+    /// does (measured, BL-5906 Notes). A stream whose request has not ended is instead reset
+    /// with STREAM_CLOSED, whether or not its response has ended (measured, BL-5972 Notes), and
+    /// so is the stream an h2c upgrade continues on unless its response has ended,
+    /// <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970 Notes); the frames
+    /// the peer still sends on a reset stream are dropped. No data is reported for a body read
     /// here (measured, BL-5941 Notes).
     /// </summary>
     /// <param name="cancellationToken">Cancels the reads or the write.</param>
@@ -286,12 +294,28 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             isBodyAbandoned = true;
             await ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         }
-        else if (!isResponseEnded)
+        else if (!isRequestEnded || !isResponseEnded)
         {
-            await ResetAsync(Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
-            isResponseEnded = true;
+            await ResetAsClosedAsync(cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Resets a stream whose request has not ended, as one a status of 300 or above stopped the
+    /// upload of, with STREAM_CLOSED, whether or not its response has ended, as curl does once
+    /// that response is read (measured, BL-5972 Notes); nothing once the request has ended or
+    /// the stream is reset.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when any reset is written.</returns>
+    internal ValueTask ResetUnendedRequestAsync(CancellationToken cancellationToken) =>
+        isRequestEnded ? ValueTask.CompletedTask : ResetAsClosedAsync(cancellationToken);
+
+    /// <summary>
+    /// Lets the request's remaining DATA go out although the response has ended, as curl sends a
+    /// body it held for <c>100 Continue</c> (measured, BL-5972 Notes).
+    /// </summary>
+    internal void SendBodyAfterResponseEnd() => sendsAfterResponseEnd = true;
 
     /// <summary>
     /// Does nothing: the stream's connection is disposed by the handler that opened it.
@@ -344,7 +368,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private async ValueTask SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
-        while (!data.IsEmpty && !isResponseEnded)
+        while (!data.IsEmpty && !StopsSendingData)
         {
             bool isLast = bodyBytesSent + data.Length == bodyLength;
             int sent = await session.WriteDataAsync(streamId, data, isLast, cancellationToken).ConfigureAwait(false);
@@ -365,6 +389,17 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         {
             await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>Whether the response's end has stopped the request's DATA.</summary>
+    private bool StopsSendingData => isResponseEnded && !sendsAfterResponseEnd;
+
+    /// <summary>Resets the stream with STREAM_CLOSED, which ends it both ways.</summary>
+    private async ValueTask ResetAsClosedAsync(CancellationToken cancellationToken)
+    {
+        await ResetAsync(Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
+        isRequestEnded = true;
+        isResponseEnded = true;
     }
 
     /// <summary>
