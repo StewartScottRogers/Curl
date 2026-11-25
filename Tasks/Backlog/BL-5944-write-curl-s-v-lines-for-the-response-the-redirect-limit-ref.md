@@ -1,5 +1,5 @@
 ---
-id: BL-5941
+id: BL-5944
 title: Write curl's -v lines for the response the redirect limit refuses to answer: Ignoring the response-body and left intact before the limit's message
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5941 — Write curl's -v lines for the response the redirect limit refuses to answer: Ignoring the response-body and left intact before the limit's message
+# BL-5944 — Write curl's -v lines for the response the redirect limit refuses to answer: Ignoring the response-body and left intact before the limit's message
 
 ## Goal
 

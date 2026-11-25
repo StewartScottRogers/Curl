@@ -55,7 +55,7 @@ The authenticator is stateless, so the handler has to remember that a side's Typ
   `ProxyNtlmType2` test constant, which SSPI accepts). Auth, NTLM, status and authentication
   header lines of curl and this build: 400 each, no difference; both exit 47.
 - The lines after the last `< Content-Length: 0` still differ (not authentication lines): filed
-  as BL-5941.
+  as BL-5944.
 - No ADR: no design choice, the lines are measured from curl.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary` reported
   0 failing members. `dotnet build` 0 warnings, fast tests exit 0.

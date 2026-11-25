@@ -1,5 +1,5 @@
 ---
-id: BL-5942
+id: BL-5945
 title: Write curl's Server auth using NTLM line for a redirected request sent without a header on an NTLM-authenticated connection
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5942 — Write curl's Server auth using NTLM line for a redirected request sent without a header on an NTLM-authenticated connection
+# BL-5945 — Write curl's Server auth using NTLM line for a redirected request sent without a header on an NTLM-authenticated connection
 
 ## Goal
 
