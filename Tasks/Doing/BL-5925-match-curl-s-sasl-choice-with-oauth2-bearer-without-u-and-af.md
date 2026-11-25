@@ -34,3 +34,4 @@ Found in BL-5880 (ADR-1361). Two cases it left:
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 7b4d1eae caafd3c7 3d836d5e.
