@@ -1,5 +1,5 @@
 ---
-id: BL-5915
+id: BL-5922
 title: Reset each unfinished HTTP/2 stream with STREAM_CLOSED when a transfer is aborted, as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5915 — Reset each unfinished HTTP/2 stream with STREAM_CLOSED when a transfer is aborted, as curl does
+# BL-5922 — Reset each unfinished HTTP/2 stream with STREAM_CLOSED when a transfer is aborted, as curl does
 
 ## Goal
 

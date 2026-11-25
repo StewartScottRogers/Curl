@@ -41,7 +41,7 @@ Command: `curl -sS -f --http2-prior-knowledge --digest -u tester:secret -w %{htt
 - Fix (ADR-1350): `AbandonResponseAsync` reads a stream whose request has ended to its end;
   an upgraded stream, or one whose request has not ended (unmeasured), is still reset.
 - The built Curl against the first case sends the same frame types and streams as curl, except
-  curl's RST_STREAM on the unanswered stream 3 at the timeout: filed as BL-5915.
+  curl's RST_STREAM on the unanswered stream 3 at the timeout: filed as BL-5922.
 - `touches` widened (no other task in Doing names the HTTP library): `HttpProtocolHandler.cs`
   (comment only), the library's `CLAUDE.md`, the two test files (the `Http2Session` test folder
   does not exist), and ADR-0343's status line.
