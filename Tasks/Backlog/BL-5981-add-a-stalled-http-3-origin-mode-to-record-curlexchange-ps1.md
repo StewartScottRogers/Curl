@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-`Record-CurlExchange.ps1 -Http3StalledOrigin` serves a stalled HTTP/3 stream and records the QUIC events, so the measurement in ADR-1409 can be repeated.
+`Record-CurlExchange.ps1 -Http3StalledOrigin` serves a stalled HTTP/3 stream and records the QUIC events, so the measurement in ADR-1410 can be repeated.
 
 ## Context
 
-BL-5978 and ADR-1409. BL-5978 wrote this mode and measured with it, but did not commit it because BL-5973 held the script. The patch is under Notes.
+BL-5978 and ADR-1410. BL-5978 wrote this mode and measured with it, but did not commit it because BL-5973 held the script. The patch is under Notes.
 
 ## Acceptance criteria
 

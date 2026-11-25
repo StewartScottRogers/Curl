@@ -18,7 +18,7 @@ When `-f` fails an HTTP/3 transfer, Curl writes the connection line, ends the st
 
 ## Context
 
-BL-5978 (ADR-1409) matched `-m` over HTTP/3 and left `-f` as it was: Curl writes `closing connection`, sends nothing for the stream and dials again. BL-5977 (ADR-1408) matched `-f` over HTTP/2. The recorder's HTTP/3 origin (BL-5981) answers 200 only; extend it to answer another status.
+BL-5978 (ADR-1410) matched `-m` over HTTP/3 and left `-f` as it was: Curl writes `closing connection`, sends nothing for the stream and dials again. BL-5977 (ADR-1408) matched `-f` over HTTP/2. The recorder's HTTP/3 origin (BL-5981) answers 200 only; extend it to answer another status.
 
 ## Acceptance criteria
 

@@ -46,7 +46,7 @@ for byte.
    stream bytes are taken, and only for insertions no acknowledgement already covers. This
    reproduces appendix B's decoder stream exactly (`84`, `01`, `48`).
 2. **Stream Cancellation** is sent for every cancelled stream, whatever the advertised table
-   capacity (ADR-1409, which measured curl's nghttp3 sending it at capacity 0 and replaced
+   capacity (ADR-1410, which measured curl's nghttp3 sending it at capacity 0 and replaced
    this point's omission at capacity 0).
 3. **Required Insert Count** must equal the largest referenced absolute index plus one;
    a larger one is `QPACK_DECOMPRESSION_FAILED`, which section 2.2.1 permits.

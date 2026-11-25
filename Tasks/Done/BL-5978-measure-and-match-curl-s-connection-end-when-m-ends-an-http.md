@@ -39,7 +39,7 @@ Measured with curl 8.18.0 (ngtcp2, nghttp3, WinGet) against a stalled System.Net
 - sends STOP_SENDING 0x10c on stream 0 and `40` on the QPACK decoder stream (`44` for stream 4).
 
 Curl run against the same origin (`-Curl Curl.Console\bin\Debug\net10.0\curl.exe`) gave the same
-lines, abort codes and decoder bytes. Decision: ADR-1409.
+lines, abort codes and decoder bytes. Decision: ADR-1410.
 
 - Touches widened: `ResponseExchange.cs` calls the new stream end, and the Stream Cancellation
   needed `Curl.Http3.UnitLibrary`. No task in Doing named any of these.

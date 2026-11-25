@@ -18,7 +18,7 @@ Under `--trace-config http/3`, Curl writes `[HTTP/3] [<id>] quic close(app_error
 
 ## Context
 
-ADR-1409 (BL-5978): curl 8.18.0 writes the line during the next transfer on the connection, once QUIC closes the cancelled stream. `Http3StreamConnection.CancelUnlessEndedBothWaysAsync` cancels it; `Http3StreamTrace` writes the other lines. Measure with `Record-CurlExchange.ps1 -Http3StalledOrigin` (BL-5981).
+ADR-1410 (BL-5978): curl 8.18.0 writes the line during the next transfer on the connection, once QUIC closes the cancelled stream. `Http3StreamConnection.CancelUnlessEndedBothWaysAsync` cancels it; `Http3StreamTrace` writes the other lines. Measure with `Record-CurlExchange.ps1 -Http3StalledOrigin` (BL-5981).
 
 ## Acceptance criteria
 

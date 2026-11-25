@@ -1,4 +1,4 @@
-# ADR-1409: A timed-out HTTP/3 transfer cancels its stream and keeps its connection
+# ADR-1410: A timed-out HTTP/3 transfer cancels its stream and keeps its connection
 
 - Status: Accepted. Decided by Claude under Stewart's delegation.
 - Date: 2026-11-25
