@@ -9,7 +9,9 @@ namespace Curl.Extended.Protocol.OciRegistry.Client;
 /// default: without <c>-T</c> it pulls the manifest or blob the path names, a digest the registry holds no blob under as a manifest (ADR-1207), (<see cref="OciPullReference"/>) through
 /// <see cref="OciPullFlow"/> (ADR-1093), refusing content pulled by digest that does not hash to it (ADR-1206); with <c>-T</c> it pushes the upload as that manifest, or as that blob once its
 /// SHA-256 digest matches the URL's, through <see cref="OciPushFlow"/> (ADR-1097). Either way it writes the final
-/// response's body to the output.
+/// response's body to the output. Before any connection it refuses with exit 4 what it cannot send: <c>-I</c> and an
+/// unsendable <c>-X</c> (<see cref="OciRegistryRequestMethod"/>), and <c>-r</c> and <c>-C</c>
+/// (<see cref="OciByteRangeRefusal"/>, ADR-1354).
 /// </summary>
 /// <param name="connector">Opens the connections to the registry, its token endpoint and any redirect target.</param>
 internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtocolHandler
@@ -35,7 +37,7 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (OciRegistryRequestMethod.RefusalOf(context) is { } refusal)
+        if ((OciRegistryRequestMethod.RefusalOf(context) ?? OciByteRangeRefusal.RefusalOf(context)) is { } refusal)
         {
             return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
         }

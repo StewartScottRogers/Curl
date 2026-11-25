@@ -1399,3 +1399,4 @@ Each option and the specific reason it lost.
 | [1355](ADR-1355-ocsp-answers-before-the-crl-below-a-non-self-signed-anchor.md) | OCSP answers before the CRL below a non-self-signed anchor (BL-5877) | Accepted | 2026-11-24 |
 | [1356](ADR-1356-schannel-build-judges-a-cacert-chain-only-up-to-its-anchor.md) | The Schannel build judges a --cacert chain only up to its anchor, by Windows trust error (BL-5885) | Accepted | 2026-11-24 |
 | [1357](ADR-1357-an-ignored-http2-body-is-read-to-its-end-except-on-an-upgraded-or-unsent-stream.md) | An ignored HTTP/2 body is read to its end, except on an upgraded or unsent stream (BL-5906) | Accepted | 2026-11-24 |
+| [1354](ADR-1354-oci-refuses-range-and-resume.md) | oci:// refuses -r and -C with exit 4 (BL-5913) | Accepted | 2026-11-24 |
