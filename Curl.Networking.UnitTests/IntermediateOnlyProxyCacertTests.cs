@@ -152,12 +152,47 @@ public sealed class IntermediateOnlyProxyCacertTests
     }
 
     [TestMethod]
-    public void VerifyPeer_UnknownRevocationWithAListNamingNoNextUpdate_IsExit60()
+    public void VerifyPeer_ListNamingNoNextUpdateWithoutTheLeaf_Succeeds()
     {
         using var pki = new Pki(revokeLeaf: false);
 
-        Assert.AreEqual(CurlExitCode.PeerFailedVerification, VerifyStubbed(pki, pki.BuildCrlWithoutNextUpdate())?.ExitCode);
+        Assert.IsNull(VerifyStubbed(pki, pki.BuildCrlWithoutNextUpdate()));
     }
+
+    [TestMethod]
+    public void VerifyPeer_ListNamingNoNextUpdateAndRevokingTheLeaf_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var revoking = TestRevocationList.Write(pki.Intermediate, revokedSerialNumbers: [pki.LeafSerial]);
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, VerifyStubbed(pki, revoking)?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_RsaPssSignedListRevokingTheLeaf_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyStubbed(pki, PssList(pki, [pki.LeafSerial]));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_RsaPssSignedListWithoutTheLeaf_Succeeds()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        Assert.IsNull(VerifyStubbed(pki, PssList(pki, [])));
+    }
+
+    private static byte[] PssList(Pki pki, byte[][] revoked) =>
+        TestRevocationList.Write(
+            pki.Intermediate,
+            nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
+            revokedSerialNumbers: revoked,
+            signatureAlgorithm: TestRevocationList.RsaSsaPss,
+            signatureParameters: TestRevocationList.PssParameters(TestRevocationList.Sha256, TestRevocationList.Sha256, saltLength: 32));
 
     [TestMethod]
     public void VerifyPeer_UnknownRevocationOfALeafWithoutDistributionPoints_IsExit60()
@@ -442,12 +477,19 @@ public sealed class IntermediateOnlyProxyCacertTests
         var otherIssuer = TestRevocationList.Write(pki.Intermediate, new X500DistinguishedName("CN=Somebody Else"), nextUpdate: DateTimeOffset.UtcNow.AddDays(3), extensions: extensions);
         var otherSigner = TestRevocationList.Write(other.Intermediate, pki.Intermediate.SubjectName, nextUpdate: DateTimeOffset.UtcNow.AddDays(3), extensions: extensions);
 
-        var undated = TestRevocationList.Write(pki.Intermediate, extensions: extensions);
-
-        foreach (var delta in new[] { expired, otherIssuer, otherSigner, undated })
+        foreach (var delta in new[] { expired, otherIssuer, otherSigner })
         {
             Assert.AreEqual(CurlExitCode.PeerFailedVerification, VerifyWithDelta(pki, baseList, delta)?.ExitCode);
         }
+    }
+
+    [TestMethod]
+    public void VerifyPeer_DeltaListNamingNoNextUpdate_IsCurrent()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var undated = TestRevocationList.Write(pki.Intermediate, extensions: [TestRevocationList.Extension("2.5.29.27", true, Number(5))]);
+
+        Assert.IsNull(VerifyWithDelta(pki, BaseListNumbered(pki, 5, FreshestExtension(DeltaAddress)), undated));
     }
 
     [TestMethod]

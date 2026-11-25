@@ -1405,3 +1405,4 @@ Each option and the specific reason it lost.
 | [1361](ADR-1361-a-bearer-token-prefers-only-the-bearer-mechanisms-until-an-auth-option.md) | --oauth2-bearer prefers only the bearer mechanisms until an AUTH= login option (BL-5880) | Accepted | 2026-11-24 |
 | [1362](ADR-1362-openldap-sasl-bind-runs-the-shared-sasl-authenticator.md) | The OpenLDAP SASL bind runs the shared SASL authenticator: every curl mechanism, EXTERNAL without a user, time limit 0 on the mechanism search (BL-5907) | Accepted | 2026-11-24 |
 | [1363](ADR-1363-openssl-build-honours-trusted-certificate-settings-in-capath.md) | The OpenSSL build honours TRUSTED CERTIFICATE settings in --capath (BL-5917) | Accepted | 2026-11-24 |
+| [1357](ADR-1357-below-an-anchor-a-crl-may-be-rsassa-pss-signed-and-may-name-no-nextupdate.md) | Below an anchor a CRL may be RSASSA-PSS signed and may name no nextUpdate (BL-5878) | Accepted | 2026-11-24 |

@@ -25,6 +25,8 @@ internal sealed class CertificateRevocationList
         ["1.2.840.113549.1.1.13"] = HashAlgorithmName.SHA512,
     }.ToFrozenDictionary();
 
+    private const string RsaSsaPssOid = "1.2.840.113549.1.1.10";
+
     // ecdsa-with-SHA1, ecdsa-with-SHA256, ecdsa-with-SHA384, ecdsa-with-SHA512.
     private static readonly FrozenDictionary<string, HashAlgorithmName> EcdsaSignatureAlgorithms = new Dictionary<string, HashAlgorithmName>
     {
@@ -36,6 +38,7 @@ internal sealed class CertificateRevocationList
 
     private readonly byte[] _signedPart;
     private readonly string _signatureAlgorithm;
+    private readonly byte[] _signatureParameters;
     private readonly byte[] _signature;
     private readonly byte[] _issuerName;
     private readonly HashSet<BigInteger> _revokedSerialNumbers;
@@ -44,7 +47,7 @@ internal sealed class CertificateRevocationList
 
     private CertificateRevocationList(
         byte[] signedPart,
-        string signatureAlgorithm,
+        (string Oid, byte[] Parameters) signatureAlgorithm,
         byte[] signature,
         byte[] issuerName,
         DateTimeOffset thisUpdate,
@@ -55,7 +58,7 @@ internal sealed class CertificateRevocationList
     {
         _scope = scope;
         _signedPart = signedPart;
-        _signatureAlgorithm = signatureAlgorithm;
+        (_signatureAlgorithm, _signatureParameters) = signatureAlgorithm;
         _signature = signature;
         _issuerName = issuerName;
         ThisUpdate = thisUpdate;
@@ -69,6 +72,14 @@ internal sealed class CertificateRevocationList
 
     /// <summary>Gets when the list expires, or <see langword="null" /> when it names no such date.</summary>
     public DateTimeOffset? NextUpdate { get; }
+
+    /// <summary>
+    /// Returns whether the list has not expired at <paramref name="now" />: its <c>nextUpdate</c> is
+    /// not past, or it names none, which the Windows build treats as current (STD-197).
+    /// </summary>
+    /// <param name="now">The moment asked about.</param>
+    /// <returns><see langword="true" /> when the list has not expired.</returns>
+    public bool IsUnexpiredAt(DateTimeOffset now) => NextUpdate is not { } expiry || expiry >= now;
 
     /// <summary>
     /// Decodes a DER <c>CertificateList</c>: the signed <c>TBSCertList</c> (its optional
@@ -131,8 +142,9 @@ internal sealed class CertificateRevocationList
 
     /// <summary>
     /// Returns whether <paramref name="issuer" />'s key verifies the list's signature. An RSA
-    /// (PKCS #1 v1.5) or ECDSA signature over SHA-1, SHA-256, SHA-384 or SHA-512 is checked;
-    /// any other algorithm, or a key of the wrong kind, fails.
+    /// (PKCS #1 v1.5, or RSASSA-PSS as <see cref="RsaPssSignatureParameters" /> admits it) or ECDSA
+    /// signature over SHA-1, SHA-256, SHA-384 or SHA-512 is checked; any other algorithm, or a key
+    /// of the wrong kind, fails.
     /// </summary>
     /// <param name="issuer">The certificate whose key signed the list.</param>
     /// <returns><see langword="true" /> when the signature verifies.</returns>
@@ -140,8 +152,13 @@ internal sealed class CertificateRevocationList
     {
         if (RsaSignatureAlgorithms.TryGetValue(_signatureAlgorithm, out var rsaHash))
         {
-            using var rsa = issuer.GetRSAPublicKey();
-            return rsa is not null && rsa.VerifyData(_signedPart, _signature, rsaHash, RSASignaturePadding.Pkcs1);
+            return IsRsaSignedBy(issuer, rsaHash, RSASignaturePadding.Pkcs1);
+        }
+
+        if (_signatureAlgorithm == RsaSsaPssOid)
+        {
+            return RsaPssSignatureParameters.ReadVerifiableHash(_signatureParameters) is { } pssHash
+                && IsRsaSignedBy(issuer, pssHash, RSASignaturePadding.Pss);
         }
 
         if (EcdsaSignatureAlgorithms.TryGetValue(_signatureAlgorithm, out var ecdsaHash))
@@ -151,6 +168,12 @@ internal sealed class CertificateRevocationList
         }
 
         return false;
+    }
+
+    private bool IsRsaSignedBy(X509Certificate2 issuer, HashAlgorithmName hash, RSASignaturePadding padding)
+    {
+        using var rsa = issuer.GetRSAPublicKey();
+        return rsa is not null && rsa.VerifyData(_signedPart, _signature, hash, padding);
     }
 
     /// <summary>Gets the value of the list's <c>freshestCRL</c> extension (where its delta lists are), or <see langword="null" /> when it has none.</summary>
@@ -181,11 +204,12 @@ internal sealed class CertificateRevocationList
     private static BigInteger SerialNumberOf(X509Certificate2 certificate) =>
         new(certificate.SerialNumberBytes.Span, isUnsigned: false, isBigEndian: true);
 
-    // AlgorithmIdentifier: the OID, then parameters, which are read past.
-    private static string ReadAlgorithm(AsnReader reader)
+    // AlgorithmIdentifier: the OID, then its parameters' DER, empty when there are none.
+    private static (string Oid, byte[] Parameters) ReadAlgorithm(AsnReader reader)
     {
         var algorithm = reader.ReadSequence();
-        return algorithm.ReadObjectIdentifier();
+        var oid = algorithm.ReadObjectIdentifier();
+        return (oid, algorithm.HasData ? algorithm.ReadEncodedValue().ToArray() : []);
     }
 
     private static bool IsTime(Asn1Tag tag) =>

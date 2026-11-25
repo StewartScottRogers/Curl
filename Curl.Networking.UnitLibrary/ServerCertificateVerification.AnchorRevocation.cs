@@ -167,7 +167,7 @@ internal sealed partial class ServerCertificateVerification
         CandidateDeltas(pointer, certificate, issuer, budget).Where(delta => IsCurrentDeltaOf(delta, baseList, certificate)).ToArray();
 
     private bool IsCurrentDeltaOf(CertificateRevocationList delta, CertificateRevocationList baseList, X509Certificate2 certificate) =>
-        delta.NextUpdate >= timeProvider.GetUtcNow() && delta.IsDeltaOf(baseList, certificate);
+        delta.IsUnexpiredAt(timeProvider.GetUtcNow()) && delta.IsDeltaOf(baseList, certificate);
 
     private CertificateRevocationList[] CandidateDeltas(byte[] pointer, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
@@ -178,7 +178,8 @@ internal sealed partial class ServerCertificateVerification
             .Where(delta => delta.CoversCertificatesIssuedFor(certificate) && delta.IsSignedBy(issuer))
             .ToArray();
     }
-    // A list is usable when it decodes, is the issuer's, is signed by the issuer and names a next update not yet passed (one naming none fails closed).
+
+    // A list is usable when it decodes, is the issuer's, is signed by the issuer, has not expired and covers the certificate.
     private CertificateRevocationList? UsableRevocationList(Uri uri, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
         var der = TryFetchRevocationList(uri, budget);
@@ -207,7 +208,7 @@ internal sealed partial class ServerCertificateVerification
     }
 
     private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer, Uri uri) =>
-        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.NextUpdate >= timeProvider.GetUtcNow() && list.CoversScopeOf(certificate, uri);
+        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.IsUnexpiredAt(timeProvider.GetUtcNow()) && list.CoversScopeOf(certificate, uri);
 
     // A list served as DER or as PEM text (curl accepts both); PEM armour is stripped before decoding.
     internal static CertificateRevocationList? DecodeOrNothing(byte[] body)
