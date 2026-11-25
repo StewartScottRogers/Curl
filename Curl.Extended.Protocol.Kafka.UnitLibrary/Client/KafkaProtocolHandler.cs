@@ -10,7 +10,7 @@ namespace Curl.Extended.Protocol.Kafka.Client;
 /// from the connector) with the Kafka protocol (ADR-1076): with a body (<c>-d</c>) it produces one record whose value
 /// is the body, otherwise it consumes the partition from the offset to its end. It asks the URL's broker for Metadata
 /// first and, when another broker leads the partition, connects to that leader instead (ADR-1080); a produce whose
-/// leader moves to another broker during its retries connects to the new leader (ADR-1375). With
+/// leader moves to another broker during its retries connects to the new leader (ADR-1377). With
 /// <c>--user</c> it authenticates every connection with SASL before its first request: PLAIN, or SCRAM-SHA-512 or SCRAM-SHA-256 on a new connection when the broker does not enable PLAIN but offers one (ADR-1082, ADR-1317). The exchange
 /// itself is <see cref="KafkaClientFlow"/>.
 /// </summary>

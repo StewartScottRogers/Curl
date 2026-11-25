@@ -1,4 +1,4 @@
-# ADR-1375: A Kafka produce follows a leader that moves to another broker during its retries
+# ADR-1377: A Kafka produce follows a leader that moves to another broker during its retries
 
 - Status: Accepted
 - Date: 2026-11-25

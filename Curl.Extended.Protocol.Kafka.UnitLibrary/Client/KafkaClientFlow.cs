@@ -11,7 +11,7 @@ namespace Curl.Extended.Protocol.Kafka.Client;
 /// Produce v3 of one record and its acknowledgement, or Fetch v4 from an offset, writing each record's value and a line
 /// feed to the output and fetching again until the partition's high watermark. A topic or partition error, a malformed
 /// response or a wrong correlation id ends with exit 8. <c>leaderRetries</c> counts the leader retries the transfer has
-/// used, shared by every connection it opens (ADR-1375).
+/// used, shared by every connection it opens (ADR-1377).
 /// </summary>
 internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITransferProgress progress, TimeProvider timeProvider, CancellationToken cancellationToken, StrongBox<int> leaderRetries, Func<string>? nonceSource = null)
 {
@@ -100,7 +100,7 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     /// When <paramref name="errorCode"/> is UNKNOWN_TOPIC_OR_PARTITION, LEADER_NOT_AVAILABLE or NOT_LEADER_OR_FOLLOWER (a
     /// broker that auto-creates a topic has no leader ready for it yet) and a retry is left, waits 250 ms on the transfer's
     /// time provider, within the transfer's cancellation, and gives <see langword="true"/>. Metadata and Produce share the
-    /// transfer's nine retries, whichever broker they are sent to (ADR-1370, ADR-1375).
+    /// transfer's nine retries, whichever broker they are sent to (ADR-1370, ADR-1377).
     /// </summary>
     private async ValueTask<bool> WaitForLeaderAsync(short errorCode)
     {

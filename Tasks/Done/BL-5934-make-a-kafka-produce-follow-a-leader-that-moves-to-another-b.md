@@ -29,7 +29,7 @@ Follow-up of BL-5902 (ADR-1370). `KafkaClientFlow.ProduceAsync` asks Metadata ag
 ## Notes
 
 - Added the Kafka library's `CLAUDE.md` to `touches`: it describes when the handler reconnects. No task in Doing on `origin/work/dark-factory` names a Kafka file.
-- ADR-1375: the nine retries now belong to the transfer, not a connection; the new leader gets the same record batch without a Metadata request first.
+- ADR-1377: the nine retries now belong to the transfer, not a connection; the new leader gets the same record batch without a Metadata request first.
 - `ProduceAsync` gives the moved leader back to `KafkaProtocolHandler`, which reconnects. Tests: `ExecuteAsync_LeaderMovesDuringRetries_ProducesOverAConnectionToTheNewLeader` and `ExecuteAsync_LeaderKeepsMoving_StopsAfterNineRetriesWithTheBrokerError`.
 - Verified: `dotnet build` clean, fast tests green (Kafka 282 passed), format clean on both Kafka projects, `Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.Kafka.UnitLibrary` 0 failing members. No command-line option changed, so `--ai-help` is unaffected. Tests use scripted connections only, so they are platform-neutral.
 
