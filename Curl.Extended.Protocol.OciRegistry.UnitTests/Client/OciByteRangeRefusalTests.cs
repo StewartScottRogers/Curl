@@ -4,7 +4,7 @@ namespace Curl.Extended.Protocol.OciRegistry.Client;
 
 /// <summary>
 /// Checks that an <c>oci://</c> transfer refuses <c>-r</c> and <c>-C</c> with exit 4 before it connects and without
-/// writing to the output, and lets through a transfer that asks for the whole of what it moves (ADR-1354).
+/// writing to the output, and lets through a transfer that asks for the whole of what it moves (ADR-1358).
 /// </summary>
 [TestClass]
 public sealed class OciByteRangeRefusalTests

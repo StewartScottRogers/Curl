@@ -49,7 +49,7 @@ Authentication Specification).
 
 ## Ranges and resume
 
-`oci://` moves only whole manifests and blobs, so the ranged blob pull and the resumed pull are workflows the client does not use. `-r`/`--range`, and `-C`/`--continue-at` other than offset 0, fail with exit 4 and `oci:// does not support <option>; it transfers only whole manifests and blobs` before any connection, pulls and pushes alike, so `-C -` leaves a partial file as it was instead of appending the whole artifact to it. `-C 0`, and `-C -` with no partial file, ask for the whole transfer and are let through (ADR-1354, `OciByteRangeRefusalTests`).
+`oci://` moves only whole manifests and blobs, so the ranged blob pull and the resumed pull are workflows the client does not use. `-r`/`--range`, and `-C`/`--continue-at` other than offset 0, fail with exit 4 and `oci:// does not support <option>; it transfers only whole manifests and blobs` before any connection, pulls and pushes alike, so `-C -` leaves a partial file as it was instead of appending the whole artifact to it. `-C 0`, and `-C -` with no partial file, ask for the whole transfer and are let through (ADR-1358, `OciByteRangeRefusalTests`).
 
 ## Request methods
 

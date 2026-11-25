@@ -11,7 +11,7 @@ namespace Curl.Extended.Protocol.OciRegistry.Client;
 /// SHA-256 digest matches the URL's, through <see cref="OciPushFlow"/> (ADR-1097). Either way it writes the final
 /// response's body to the output. Before any connection it refuses with exit 4 what it cannot send: <c>-I</c> and an
 /// unsendable <c>-X</c> (<see cref="OciRegistryRequestMethod"/>), and <c>-r</c> and <c>-C</c>
-/// (<see cref="OciByteRangeRefusal"/>, ADR-1354).
+/// (<see cref="OciByteRangeRefusal"/>, ADR-1358).
 /// </summary>
 /// <param name="connector">Opens the connections to the registry, its token endpoint and any redirect target.</param>
 internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtocolHandler

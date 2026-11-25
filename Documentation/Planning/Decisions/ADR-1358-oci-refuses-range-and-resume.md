@@ -1,4 +1,4 @@
-# ADR-1354: oci:// refuses -r and -C with exit 4 (BL-5913)
+# ADR-1358: oci:// refuses -r and -C with exit 4 (BL-5913)
 
 Status: Accepted. Decided by Claude under Stewart's delegation.
 

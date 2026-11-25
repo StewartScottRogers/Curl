@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.OciRegistry.Client;
 
 /// <summary>
-/// Refuses <c>-r</c>/<c>--range</c> and <c>-C</c>/<c>--continue-at</c> on an <c>oci://</c> transfer (ADR-1354), which
+/// Refuses <c>-r</c>/<c>--range</c> and <c>-C</c>/<c>--continue-at</c> on an <c>oci://</c> transfer (ADR-1358), which
 /// moves only whole manifests and blobs, so a resumed pull never appends the whole artifact to the partial file.
 /// </summary>
 internal static class OciByteRangeRefusal
