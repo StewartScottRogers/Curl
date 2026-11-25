@@ -1,4 +1,4 @@
-# ADR-1375: The OpenSSL build reads X509 CERTIFICATE blocks in --cacert and --capath
+# ADR-1380: The OpenSSL build reads X509 CERTIFICATE blocks in --cacert and --capath
 
 - Status: Accepted
 - Date: 2026-11-24

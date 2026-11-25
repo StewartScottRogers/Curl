@@ -31,7 +31,7 @@ Found by BL-5917 (ADR-1363). WSL curl 8.18.0 (OpenSSL 3.5.5) with --capath holdi
 - Measured with WSL curl 8.18.0 (OpenSSL 3.5.5): --cacert and --capath both accept an X509
   CERTIFICATE root (exit 0); an undecodable such block makes --cacert exit 77; trust settings after a
   CERTIFICATE or X509 CERTIFICATE block are ignored from --cacert and honoured from --capath
-  (exit 60, certificate rejected (28)). Decision in ADR-1375; the settings difference is matched too,
+  (exit 60, certificate rejected (28)). Decision in ADR-1380; the settings difference is matched too,
   since it is one flag in the same reader.
 - Added to touches ServerCertificateVerification.CaCertificates.cs (two comments that would have
   become untrue) and Curl.Networking.UnitLibrary/CLAUDE.md; no task in Doing named either.
@@ -45,4 +45,4 @@ Found by BL-5917 (ADR-1363). WSL curl 8.18.0 (OpenSSL 3.5.5) with --capath holdi
 
 - 2026-11-24: Created.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 49d5ed85 a5658766 85214380.
-- 2026-11-25: Doing -> Done. X509 CERTIFICATE blocks read from --cacert and --capath as measured curl does (ADR-1375)
+- 2026-11-25: Doing -> Done. X509 CERTIFICATE blocks read from --cacert and --capath as measured curl does (ADR-1380)
