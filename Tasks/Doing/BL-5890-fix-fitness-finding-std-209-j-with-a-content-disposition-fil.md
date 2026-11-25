@@ -75,3 +75,4 @@ The finding, verbatim:
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: c6a727e1 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waiting on BL-5915 (in Doing), whose touches names Curl.Console.UnitTests, where this fix's unit test goes; cause found in Curl.Console/DeferredOutputFileStream.cs and real curl measured (see Notes)
+- 2026-11-24: Backlog -> Doing. Criteria at claim: c6a727e1 69116afe 3d836d5e.
