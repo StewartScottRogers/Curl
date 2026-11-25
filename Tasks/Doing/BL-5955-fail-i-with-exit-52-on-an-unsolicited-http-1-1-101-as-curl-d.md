@@ -30,3 +30,4 @@ Measured in BL-5948, `Record-CurlExchange.ps1 -Response 'HTTP/1.1 101 Switching 
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 89c36d8e 3d836d5e.
