@@ -31,7 +31,7 @@ Found in BL-5880 (ADR-1361). Two cases it left:
 
 ## Notes
 
-- Overtime run (lane 10): the IMAP, POP3 and SMTP changes in the working tree build and their unit tests pass (Imap 564, Pop3 414, Smtp 439). They give an empty credential with --oauth2-bearer and no -u. When a redirect withheld the token and no AUTH= option is given, they choose no SASL mechanism, and for POP3 no APOP or USER/PASS. A mechanism an AUTH= option names is still used. The changes are left uncommitted for the stash because Measure-CodeQuality.ps1 over the three libraries timed out after 18 minutes with no report: MSBuild child nodes exited while other lanes were building. Left: one quality run with -Library for the three libraries and -ReportPath, fix anything outside a gate, then commit and finish. The case of an HTTP redirect to a mail URL is filed as BL-5934.
+- Overtime run (lane 10): the IMAP, POP3 and SMTP changes in the working tree build and their unit tests pass (Imap 564, Pop3 414, Smtp 439). They give an empty credential with --oauth2-bearer and no -u. When a redirect withheld the token and no AUTH= option is given, they choose no SASL mechanism, and for POP3 no APOP or USER/PASS. A mechanism an AUTH= option names is still used. The changes are left uncommitted for the stash because Measure-CodeQuality.ps1 over the three libraries timed out after 18 minutes with no report: MSBuild child nodes exited while other lanes were building. Left: one quality run with -Library for the three libraries and -ReportPath, fix anything outside a gate, then commit and finish. The case of an HTTP redirect to a mail URL is filed as BL-5936.
 
 ## Log
 

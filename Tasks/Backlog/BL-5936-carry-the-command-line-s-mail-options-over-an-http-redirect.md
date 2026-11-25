@@ -1,5 +1,5 @@
 ---
-id: BL-5934
+id: BL-5936
 title: Carry the command line's mail options over an HTTP redirect to a mail URL
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5934 — Carry the command line's mail options over an HTTP redirect to a mail URL
+# BL-5936 — Carry the command line's mail options over an HTTP redirect to a mail URL
 
 ## Goal
 
