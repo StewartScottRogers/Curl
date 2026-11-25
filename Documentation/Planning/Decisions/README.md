@@ -1410,3 +1410,4 @@ Each option and the specific reason it lost.
 | [1366](ADR-1366-openldap-starttls-and-simple-bind-failures-follow-curl-8-21-0.md) | OpenLDAP StartTLS and simple bind failures follow curl 8.21.0 (BL-5908) | Accepted | 2026-11-24 |
 | [1367](ADR-1367-an-oauth2-flow-binds-its-token-to-the-dpop-key.md) | An --oauth2-* flow binds its token to the --dpop key (BL-5911) | Accepted | 2026-11-24 |
 | [1368](ADR-1368-state-files-are-replaced-by-rename-off-windows.md) | The cookie jar, HSTS and alt-svc files are replaced by rename off Windows (BL-5888) | Accepted | 2026-11-24 |
+| [1369](ADR-1369-d-with-t-stays-refused-for-extended-schemes.md) | `-d` with `-T` stays refused for extended protocol schemes (BL-5901) | Accepted | 2026-11-24 |

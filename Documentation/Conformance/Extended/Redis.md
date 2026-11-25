@@ -53,5 +53,6 @@ the library's own output choice, so the printed text is pinned but not a protoco
 
 `-d` appends its bytes to the command as one more argument. `-T <file>` does the same with the whole file: `curl -T
 up.txt redis://host/SET/kk` with `up.txt` holding `filebody` sends `SET kk filebody`, so an upload is a publish and
-never turns the command into a fetch. When both are given, `-d`'s bytes are the argument. Pinned by
-`RedisUploadTests` (`Curl.Extended.Protocol.Redis.UnitTests/Client/`), a library choice rather than a RESP requirement.
+never turns the command into a fetch. The command line refuses `-d` with `-T` (exit 2) before anything is sent
+(ADR-1369). Pinned by `RedisUploadTests` (`Curl.Extended.Protocol.Redis.UnitTests/Client/`), a library choice rather
+than a RESP requirement.

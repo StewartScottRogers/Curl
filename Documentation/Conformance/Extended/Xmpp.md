@@ -53,7 +53,8 @@ the client logs in in plaintext when STARTTLS is not offered; `xmpps://` is secu
 | Xmpp:XEP0368-1 | MUST | Direct TLS opens the XML stream only after the TLS handshake, with no STARTTLS. | XmppStreamCases.Xmpps_DirectTls_OpensTheStreamBehindTlsWithoutStartTls |
 
 `-T file` publishes like `-d`: the file's bytes become the message `<body/>` sent to the path JID (the upload stream is
-read into memory first when `-d` gave no data). It never receives or consumes; `XmppUploadTests` pins it.
+read into memory first). It never receives or consumes; `XmppUploadTests` pins it. The command line refuses `-d` with
+`-T` (exit 2) before anything is sent (ADR-1369).
 
 A message body from `-d` or `-T` is sent as the text its bytes spell in UTF-8. Bytes that are not valid UTF-8 cannot be
 carried unchanged, so the transfer fails with exit 43, `XMPP message body is not valid UTF-8`, before it connects

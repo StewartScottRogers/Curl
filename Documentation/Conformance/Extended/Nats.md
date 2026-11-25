@@ -48,5 +48,5 @@ Server-only statements and features curl does not use are `n/a`.
 
 `-T file` publishes the file's bytes exactly as `-d` publishes its data: the server receives `PUB <subject> <length>`
 and the file's bytes, never a SUB, so an upload never subscribes, fetches or consumes. With `?request` the file is
-the request's payload. When both are given, `-d`'s data is published and the upload is ignored (BL-4951). Pinned by
-`NatsUploadTests` in `Curl.Extended.Protocol.Nats.UnitTests`.
+the request's payload (BL-4951). The command line refuses `-d` with `-T` (exit 2) before anything is sent
+(ADR-1369). Pinned by `NatsUploadTests` in `Curl.Extended.Protocol.Nats.UnitTests`.
