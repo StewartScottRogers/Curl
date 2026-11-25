@@ -1,4 +1,5 @@
 using System.Net.Security;
+using System.Numerics;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Curl.Networking;
@@ -74,6 +75,9 @@ internal static class OpenSslVerifyResult
     /// <summary><c>X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY</c>.</summary>
     internal const long UnableToGetIssuerCertificateLocally = 20;
 
+    private const X509ChainStatusFlags NameConstraintFlags = X509ChainStatusFlags.HasNotPermittedNameConstraint
+        | X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.HasNotSupportedNameConstraint;
+
     /// <summary>
     /// Returns the code for a certificate <see cref="SslStream" /> checked.
     /// </summary>
@@ -114,7 +118,8 @@ internal static class OpenSslVerifyResult
     /// A chain's combined status as OpenSSL's build sees it: .NET stops a chain at a name-constrained
     /// intermediate the trust store lists (OpenSSL's partial-chain anchor) as partial and never checks
     /// the constraints, so a broken constraint replaces the partial-chain flag (47 or 48, STD-101;
-    /// 53 for a CN holding a NUL, BL-5921).
+    /// 53 for a CN holding a NUL, BL-5921). Of several name-constraint flags only the one OpenSSL
+    /// answers for is kept (<see cref="KeepFirstNameConstraintRefusal" />).
     /// </summary>
     /// <param name="chain">The chain built for the server certificate.</param>
     /// <returns>Every status flag of the chain, combined.</returns>
@@ -126,6 +131,33 @@ internal static class OpenSslVerifyResult
             status |= chainStatus.Status;
         }
 
+        return KeepFirstNameConstraintRefusal(WithPartialChainNameConstraints(status, chain), chain);
+    }
+
+    /// <summary>
+    /// OpenSSL stops at the first name it refuses, but a chain engine that checks every name flags each
+    /// kind of refusal and keeps no order among them. Of several name-constraint flags, only the one for
+    /// the refusal OpenSSL meets first is kept (BL-5953).
+    /// </summary>
+    /// <param name="status">Every status flag of the chain, combined.</param>
+    /// <param name="chain">The chain built for the server certificate.</param>
+    /// <returns>
+    /// The status with one name-constraint flag, or unchanged when it has fewer than two or
+    /// <see cref="CertificateNameConstraints.FindViolation(X509Chain, bool)" /> finds none of them.
+    /// </returns>
+    internal static X509ChainStatusFlags KeepFirstNameConstraintRefusal(X509ChainStatusFlags status, X509Chain chain)
+    {
+        if (BitOperations.PopCount((uint)(status & NameConstraintFlags)) < 2)
+        {
+            return status;
+        }
+
+        var violation = CertificateNameConstraints.FindViolation(chain);
+        return violation == 0 ? status : (status & ~NameConstraintFlags) | (X509ChainStatusFlags)violation;
+    }
+
+    private static X509ChainStatusFlags WithPartialChainNameConstraints(X509ChainStatusFlags status, X509Chain chain)
+    {
         if ((status & (X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) != X509ChainStatusFlags.PartialChain
             || !ListsAChainCertificate(chain))
         {
@@ -251,7 +283,10 @@ internal static class OpenSslVerifyResult
             && intermediates > constraints.PathLengthConstraint;
     }
 
-    private static bool IsSelfIssued(X509Certificate2 certificate) =>
+    /// <summary>Whether a certificate's subject is its issuer, as OpenSSL's <c>EXFLAG_SI</c> marks it.</summary>
+    /// <param name="certificate">The certificate.</param>
+    /// <returns><see langword="true" /> when it is self-issued.</returns>
+    internal static bool IsSelfIssued(X509Certificate2 certificate) =>
         certificate.SubjectName.RawData.AsSpan().SequenceEqual(certificate.IssuerName.RawData);
 
     /// <summary>The certificates of a built chain, the server's own first.</summary>

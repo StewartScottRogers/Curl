@@ -962,6 +962,95 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(expected, CertificateNameConstraints.FindViolation(chain, matchesSchannelBuild));
     }
 
+    // curl 8.18.0's OpenSSL build (BL-5953): the intermediate's own names are checked against the CAs above it,
+    // before the server certificate's, so they decide when the root is trusted. With the intermediate as the
+    // anchor nothing stands above it. The Schannel build checks the server certificate's names only.
+    [TestMethod]
+    [DataRow(false, false, false, CertificateNameConstraints.Excluded)]
+    [DataRow(false, true, false, CertificateNameConstraints.NotPermitted)]
+    [DataRow(true, false, false, CertificateNameConstraints.NotPermitted)]
+    [DataRow(true, true, false, CertificateNameConstraints.Excluded)]
+    [DataRow(false, false, true, CertificateNameConstraints.NotPermitted)]
+    [DataRow(true, false, true, CertificateNameConstraints.Excluded)]
+    public void FindViolation_IntermediateAndLeafBothRefused_FollowsEachBuildsCheckedNames(
+        bool rootPermits, bool intermediateIsAnchor, bool matchesSchannelBuild, int expected)
+    {
+        var rootConstraints = rootPermits
+            ? Constraints(permittedName: GeneralName(1, "good.org"))
+            : Constraints(excludedName: GeneralName(1, "bad.org"));
+        var intermediateConstraints = rootPermits ? Constraints(excluded: Host) : Constraints(permitted: "other.org");
+
+        var violation = FindViolationBelowRoot(
+            rootConstraints, "CN=Named Intermediate, E=ca@bad.org", intermediateConstraints, intermediateIsAnchor, matchesSchannelBuild);
+
+        Assert.AreEqual(expected, violation);
+    }
+
+    // curl 8.18.0's OpenSSL build (BL-5953): a self-issued intermediate's names are not checked.
+    [TestMethod]
+    public void FindViolation_OpenSslBuildSelfIssuedIntermediateWithAnExcludedName_IsNotRefused() =>
+        Assert.AreEqual(
+            0,
+            FindViolationBelowRoot(
+                Constraints(excludedName: GeneralName(1, "bad.org")), "CN=Named Root, E=ca@bad.org", null, false, false,
+                rootSubject: "CN=Named Root, E=ca@bad.org"));
+
+    // curl 8.18.0's OpenSSL build (BL-5953): only the server certificate's CN is checked as a DNS name.
+    [TestMethod]
+    public void FindViolation_OpenSslBuildIntermediateWithAnExcludedCommonName_IsNotRefused() =>
+        Assert.AreEqual(
+            0,
+            FindViolationBelowRoot(Constraints(excluded: "bad.example.com"), "CN=bad.example.com", null, false, false));
+
+    // A leaf for the host under the intermediate, which the root issued; the trusted one is either of them.
+    private static int FindViolationBelowRoot(
+        byte[] rootConstraints, string intermediateSubject, byte[]? intermediateConstraints, bool intermediateIsAnchor, bool matchesSchannelBuild, string rootSubject = "CN=Named Root")
+    {
+        using var root = CreateAuthority(rootSubject, null, rootConstraints);
+        using var intermediate = CreateAuthority(intermediateSubject, root, intermediateConstraints);
+        using var leaf = CreateLeaf(intermediate, Host, false, true, false);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(intermediateIsAnchor ? intermediate : root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.ExtraStore.Add(intermediate);
+        chain.ChainPolicy.ExtraStore.Add(root);
+        chain.Build(leaf);
+        Assert.HasCount(3, chain.ChainElements);
+
+        return CertificateNameConstraints.FindViolation(chain, matchesSchannelBuild);
+    }
+
+    // curl 8.18.0's OpenSSL build with a self-signed root as --cacert (BL-5953): the chain is refused for
+    // both subtrees, and the answer is the one the upper CA's constraint gives the server certificate, or
+    // the intermediate's own name when that is refused first.
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    [DataRow(false, "excluded subtree violation (48)")]
+    [DataRow(true, "permitted subtree violation (47)")]
+    public void VerifyPeer_OpenSslBuildRootAsCaCertificateRefusedForBothSubtrees_ReportsTheRootsRefusal(bool rootPermits, string expected)
+    {
+        var permitting = Constraints(permitted: "other.org");
+        var excluding = Constraints(excluded: Host);
+        using var root = CreateAuthority("CN=Self Signed Anchor Root", null, rootPermits ? permitting : excluding);
+        using var intermediate = CreateAuthority("CN=Self Signed Anchor Intermediate", root, rootPermits ? excluding : permitting);
+        using var leaf = CreateLeaf(intermediate, Host, false, true, false);
+        var caFile = Path.Combine(_directory, "root.pem");
+        File.WriteAllText(caFile, root.ExportCertificatePem());
+        var verification = new ServerCertificateVerification(
+            new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: true), false, TimeProvider.System);
+        var (chainPolicy, _, _) = verification.ReadTrustAnchors();
+        chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
+        chainPolicy.ExtraStore.Add(intermediate);
+        using var chain = new X509Chain { ChainPolicy = chainPolicy };
+        chain.Build(leaf);
+
+        var failure = verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, []);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual($"SSL certificate OpenSSL verify result: {expected}", failure?.Message);
+    }
+
     private static int FindViolationOfCommonName(string commonName, byte[] constraints, bool matchesSchannelBuild = false)
     {
         var subject = new X500DistinguishedNameBuilder();

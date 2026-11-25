@@ -1434,3 +1434,4 @@ Each option and the specific reason it lost.
 | [1390](ADR-1390-a-second-multi-handle-finds-an-engine-transfer-socket-readable-when-its-owner-has-work.md) | A second multi handle finds an engine transfer socket readable while its owner has work for it (BL-5943) | Accepted | 2026-11-25 |
 | [1391](ADR-1391-the-openssl-build-checks-name-constraints-name-by-name-from-the-top-ca-down.md) | The OpenSSL build checks name constraints name by name, from the top CA down (BL-5950) | Accepted | 2026-11-25 |
 | [1392](ADR-1392-httpprotocolhandler-keeps-one-concern-per-partial-file.md) | `HttpProtocolHandler` keeps one concern per partial file (BL-5949) | Accepted | 2026-11-25 |
+| [1393](ADR-1393-the-openssl-build-checks-intermediates-names-and-keeps-the-first-name-constraint-refusal.md) | The OpenSSL build checks intermediates' names, and keeps the first name-constraint refusal (BL-5953) | Accepted | 2026-11-25 |
