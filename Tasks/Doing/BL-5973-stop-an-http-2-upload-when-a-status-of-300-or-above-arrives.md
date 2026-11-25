@@ -30,3 +30,4 @@ Found by BL-5970 (ADR-1403). `HttpContinueWaitConnection.StopsSending` is false 
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: f09fb5ef 3d836d5e.
