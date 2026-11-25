@@ -33,3 +33,4 @@ Measured with `Record-CurlExchange.ps1` (BL-5925): an HTTP server answering `302
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: eed75b13 caafd3c7 3d836d5e.
