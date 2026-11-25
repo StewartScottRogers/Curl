@@ -18,6 +18,9 @@ public sealed class Http2StreamAbortTests
     /// <summary>The closing GOAWAY: NO_ERROR, last stream 0, debug data <c>shutdown</c> and a NUL.</summary>
     private const string ShutdownGoAway = "000011070000000000" + "00000000" + "00000000" + "73687574646F776E00";
 
+    /// <summary>The GOAWAY for a connection error: PROTOCOL_ERROR, last stream 0, no debug data.</summary>
+    private const string ProtocolErrorGoAway = "000008070000000000" + "00000000" + "00000001";
+
     /// <summary>RST_STREAM on stream 1 with STREAM_CLOSED.</summary>
     private const string StreamOneClosedReset = "000004030000000001" + "00000005";
 
@@ -90,7 +93,8 @@ public sealed class Http2StreamAbortTests
     [TestMethod]
     public async Task ExecuteAsync_HeadRequestEndedAtADataFrame_WritesNoReset()
     {
-        // curl -I sends no RST_STREAM when DATA that does not end the stream follows the head (BL-5922 Notes).
+        // curl -I sends no RST_STREAM when DATA that does not end the stream follows the head (BL-5922 Notes),
+        // and closes with GOAWAY PROTOCOL_ERROR, not shutdown (BL-5938 Notes).
         Http2Frame data = new(Http2FrameType.Data, Http2FrameFlags.None, 1, "no\n"u8.ToArray());
         byte[] response = [.. ServerFrames(Head(isEndStream: false)), .. Http2FrameCodec.Serialize(data)];
         RecordingConnection connection = new(new ScriptedConnection(response, 65536));
@@ -104,7 +108,7 @@ public sealed class Http2StreamAbortTests
         Diagnostics.Assert("holds a RST_STREAM on stream 1", false, written.Contains(StreamOneResetHeader, StringComparison.Ordinal));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.DoesNotContain(StreamOneResetHeader, written);
-        StringAssert.EndsWith(written, ShutdownGoAway, StringComparison.Ordinal);
+        StringAssert.EndsWith(written, ProtocolErrorGoAway, StringComparison.Ordinal);
     }
 
     [TestMethod]

@@ -24,8 +24,9 @@ namespace Curl.Original.Protocol.Http;
 /// head is exit 16, and part way through the body exit 18. A response whose length does not add
 /// up (RFC 9113 section 8.1.1: DATA past or short of its <c>content-length</c>, a body on HEAD, 204
 /// or 304, a 1xx head ending the stream, an invalid or second <c>content-length</c>) makes this
-/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0847). Failed reads and writes of the
-/// connection itself pass through as <see cref="IOException" />.
+/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0847), except DATA past it on a body
+/// that is not wanted (<see cref="EndsAtFinalHead" />), which sends the GOAWAY and succeeds
+/// (BL-5938). Failed reads and writes of the connection itself pass through as <see cref="IOException" />.
 /// </remarks>
 /// <param name="session">The connection's HTTP/2 session.</param>
 /// <param name="scheme">The URL's scheme, sent as <c>:scheme</c>.</param>
@@ -637,14 +638,13 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             throw await ResetMalformedAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        bodyBytesReceived += frame.Content.Length;
         if (EndsAtFinalHead)
         {
-            // The body is not wanted (-I): the first DATA ends the response, but a trailer HEADERS right after the head is still read (BL-5468).
-            isResponseEnded = true;
+            await EndAtUnwantedBodyAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        bodyBytesReceived += frame.Content.Length;
         if (bodyBytesReceived > promisedBodyLength)
         {
             await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
@@ -653,6 +653,23 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
         received.Enqueue(frame.Content);
         await EndResponseAsync(frame.IsEndStream, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends the response at the first DATA frame of a body that is not wanted (-I), without failing
+    /// it; a trailer HEADERS right after the head is still read (BL-5468). DATA past the length the
+    /// head promises, which for HEAD is none, still breaks RFC 9113 section 8.1.1: nghttp2 reports
+    /// it as a <c>-v</c> line and shuts the connection down with GOAWAY PROTOCOL_ERROR, and curl
+    /// exits 0 (measured, curl 8.18.0, BL-5938 Notes).
+    /// </summary>
+    private async ValueTask EndAtUnwantedBodyAsync(CancellationToken cancellationToken)
+    {
+        isResponseEnded = true;
+        if (bodyBytesReceived > promisedBodyLength)
+        {
+            openedLines?.ShutsDownConnection(Http2ErrorCode.ProtocolError);
+            await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

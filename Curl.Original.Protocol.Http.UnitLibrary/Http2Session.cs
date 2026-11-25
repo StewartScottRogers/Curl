@@ -132,10 +132,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     public string UsingLine => HttpConnectionInfoLines.UsingHttp2;
 
     /// <summary>
-    /// Gets a value indicating whether the connection can carry another request: the peer has
-    /// sent no GOAWAY and has not closed it.
+    /// Gets a value indicating whether the connection can carry another request: neither side
+    /// has sent a GOAWAY and the peer has not closed it.
     /// </summary>
-    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsClosedByPeer;
+    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsGoAwaySent && !Frames.IsClosedByPeer;
 
     /// <summary>
     /// Gets how many transfers the connection carries at once: the peer's
@@ -156,7 +156,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// The request body's length, 0 when there is none, or <see langword="null" /> when it is
     /// unknown.
     /// </param>
-    /// <param name="ignoresBody">Whether the request wants no body (<c>-I</c>): the stream then ends at the final head, whatever DATA follows (BL-5391).</param>
+    /// <param name="ignoresBody">Whether the request wants no body (<c>-I</c>): the response then ends at the first DATA frame after the final head without failing (BL-5391); DATA past the promised length also shuts the connection down (BL-5938).</param>
     /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
     /// <param name="diagnosticLog">The transfer's diagnostic log, which the stream's frames are written to, or <see langword="null" /> for none.</param>
     /// <param name="traceEvents">Where the <c>--trace-config http/2</c> lines go while the stream is the latest opened, or <see langword="null" /> for none.</param>

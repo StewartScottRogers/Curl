@@ -39,6 +39,14 @@ internal sealed class HttpStreamOpenedLines(ITransferEvents events, string url)
         events.ReportInfo(HttpConnectionInfoLines.GoAwayReceived(goAway));
 
     /// <summary>
+    /// Reports curl's <c>nghttp2 shuts down connection with error N: NAME</c> line for a
+    /// connection shut down without failing the transfer (BL-5938).
+    /// </summary>
+    /// <param name="errorCode">The error code of the GOAWAY sent.</param>
+    internal void ShutsDownConnection(Http2ErrorCode errorCode) =>
+        events.ReportInfo(HttpTransferMessages.Http2ShutsDownConnection(errorCode));
+
+    /// <summary>
     /// Reports the lines for the stream <paramref name="streamId" /> that sent
     /// <paramref name="fields" />.
     /// </summary>
