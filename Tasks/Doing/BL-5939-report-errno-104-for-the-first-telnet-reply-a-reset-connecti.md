@@ -36,3 +36,4 @@ under it, which may need another file in `touches`).
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: e86cae23 681bf664 3d836d5e.
