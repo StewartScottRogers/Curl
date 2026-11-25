@@ -684,7 +684,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         if (isPastPromisedLength)
         {
             openedLines?.ShutsDownConnection(Http2ErrorCode.ProtocolError);
-            await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+            await SendProtocolErrorGoAwayAsync(cancellationToken).ConfigureAwait(false);
         }
 
         if (!isBodyAbandoned)
@@ -726,7 +726,25 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         string shutsDown = HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError);
         string[] infoLines = rejectedFieldMessage is null ? [shutsDown] : [rejectedFieldMessage, shutsDown];
         malformedResponseFailure = new HttpTransferException(exitCode, infoLines[0]) { InfoLines = infoLines };
-        await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        await SendProtocolErrorGoAwayAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends GOAWAY PROTOCOL_ERROR for a response that broke the protocol. A peer that has
+    /// already gone cannot be sent it, which changes nothing about how the transfer ends: the
+    /// session is told the peer has gone, so the connection is shut down all the same.
+    /// </summary>
+    private async ValueTask SendProtocolErrorGoAwayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The transport is already gone; there is no one left to tell.
+            session.MarkPeerGone();
+        }
     }
 
     /// <summary>

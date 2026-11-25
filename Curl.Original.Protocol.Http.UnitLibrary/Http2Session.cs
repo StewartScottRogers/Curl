@@ -79,6 +79,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
     private bool isPrefaceSent;
     private bool isClosingGoAwaySkipped;
+    private bool isPeerGone;
 
     private bool isUpgradeSettingsDue;
     private bool isUpgradedStreamOpened;
@@ -133,9 +134,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
     /// <summary>
     /// Gets a value indicating whether the connection can carry another request: neither side
-    /// has sent a GOAWAY and the peer has not closed it.
+    /// has sent a GOAWAY, the peer has not closed it, and no write found the peer gone
+    /// (<see cref="MarkPeerGone" />).
     /// </summary>
-    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsGoAwaySent && !Frames.IsClosedByPeer;
+    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsGoAwaySent && !Frames.IsClosedByPeer && !isPeerGone;
 
     /// <summary>
     /// Gets how many transfers the connection carries at once: the peer's
@@ -168,6 +170,12 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// Makes <see cref="ShutDownAsync" /> send nothing, as curl closes a connection it gave up on after five refused streams without a GOAWAY (BL-3838).
     /// </summary>
     public void SkipClosingGoAway() => isClosingGoAwaySkipped = true;
+
+    /// <summary>
+    /// Records that the peer has gone: a GOAWAY that was due could not be written, so the
+    /// connection takes no new stream (<see cref="AcceptsNewStreams" />), as if it had been sent.
+    /// </summary>
+    internal void MarkPeerGone() => isPeerGone = true;
 
     /// <summary>
     /// Resets each unfinished stream (<see cref="ResetUnfinishedStreamsAsync" />), then sends

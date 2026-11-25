@@ -9,7 +9,9 @@ namespace Curl.Original.Protocol.Http;
 /// <summary>
 /// Pins BL-5391: an HTTP/2 HEAD response that carries DATA ends at its final head with -I, and still fails without it;
 /// BL-5938: with -I, non-empty DATA also closes the connection with GOAWAY PROTOCOL_ERROR;
-/// and BL-5941: with -I, the DATA frame that ends the response is reported as data received.
+/// BL-5941: with -I, the DATA frame that ends the response is reported as data received;
+/// and BL-5966: a GOAWAY PROTOCOL_ERROR the peer is no longer there to take changes neither the
+/// exit code nor the <c>-v</c> lines.
 /// </summary>
 [TestClass]
 public sealed class Http2HeadResponseWithDataTests
@@ -93,6 +95,42 @@ public sealed class Http2HeadResponseWithDataTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_HeadRequestWithDataAfterTheHeadAndAGoAwayThatCannotBeSent_ExitsZeroWithTheSameLines()
+    {
+        GoAwayRefusingConnection connection = new(new ScriptedConnection(HeadThenData("no\n"u8.ToArray()), 65536));
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await TransferAsync(connection, events);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsGreaterThan(0, connection.RefusedGoAwayCount);
+        int shutsDown = events.Events.IndexOf("* nghttp2 shuts down connection with error 1: PROTOCOL_ERROR");
+        CollectionAssert.AreEqual(
+            new[] { "* nghttp2 shuts down connection with error 1: PROTOCOL_ERROR", "{ ", "* shutting down connection #0" },
+            events.Events.Skip(shutsDown).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ReadToEndAsync_DataPastTheLengthAndAGoAwayThatCannotBeSent_FailsWithExit16()
+    {
+        GoAwayRefusingConnection connection = new(new ScriptedConnection(HeadThenData("hello"u8.ToArray()), 65536));
+        Http2Session session = new(connection);
+        Http2StreamConnection stream = (Http2StreamConnection)session.CreateStream("http", 0, false);
+        await stream.WriteAsync(Encoding.Latin1.GetBytes(HeadRequest), CancellationToken.None);
+        _ = await stream.ReadAsync(new byte[256], CancellationToken.None);
+
+        HttpTransferException failure = await Assert.ThrowsAsync<HttpTransferException>(async () =>
+        {
+            await stream.ReadToEndAsync(CancellationToken.None);
+            _ = await stream.ReadAsync(new byte[256], CancellationToken.None);
+        });
+
+        Assert.AreEqual(CurlExitCode.Http2, failure.ExitCode);
+        Assert.AreEqual(1, connection.RefusedGoAwayCount);
+        Assert.IsFalse(session.AcceptsNewStreams);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_HeadRequestWithEmptyDataAfterTheHead_ClosesWithTheShutDownGoAway()
     {
         (TransferResult result, List<Http2Frame> sent, RecordingTransferEvents events) = await TransferHeadAsync([]);
@@ -157,15 +195,27 @@ public sealed class Http2HeadResponseWithDataTests
 
     private static async Task<(TransferResult Result, List<Http2Frame> Sent, RecordingTransferEvents Events)> TransferHeadAsync(byte[] data, string? customMethod = null)
     {
+        ScriptedConnection connection = new(HeadThenData(data), 65536);
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await TransferAsync(connection, events, customMethod);
+
+        return (result, await FramesAfterThePrefaceAsync(connection.Written), events);
+    }
+
+    private static byte[] HeadThenData(byte[] data)
+    {
         HpackEncoder server = new();
-        byte[] scripted =
+        return
         [
             .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings([])),
             .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("content-length", "3")]), isEndStream: false, isEndHeaders: true)),
             .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateData(1, data, isEndStream: true)),
         ];
-        ScriptedConnection connection = new(scripted, 65536);
-        RecordingTransferEvents events = new();
+    }
+
+    private static async Task<TransferResult> TransferAsync(IConnection connection, RecordingTransferEvents events, string? customMethod = null)
+    {
         TransferContext context = new()
         {
             Url = CurlUrl.Parse("http://h/headbody"),
@@ -175,9 +225,7 @@ public sealed class Http2HeadResponseWithDataTests
             Http = new HttpRequestOptions { Version = HttpVersionPreference.Http2PriorKnowledge, CustomMethod = customMethod },
         };
 
-        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()).ExecuteAsync(context);
-
-        return (result, await FramesAfterThePrefaceAsync(connection.Written), events);
+        return await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()).ExecuteAsync(context);
     }
 
     private static async Task<List<Http2Frame>> FramesAfterThePrefaceAsync(byte[] written)
