@@ -106,7 +106,8 @@ namespace Curl.Original.Protocol.Http;
 /// <c>Proxy-Authenticate</c> challenges for the proxy's credential with the scheme set the
 /// handler was given (the <c>--proxy-*</c> auth switches' pick). Each retry keeps the other
 /// header as it was, so a 407 and a 401 can each be answered in the same transfer, in either
-/// order. Measured on curl 8.21.0 (BL-603 Notes, ADR-0239).
+/// order. Measured on curl 8.21.0 (BL-603 Notes, ADR-0239). The exception is an NTLM Type 3
+/// message, sent once: neither retry sends it again (BL-2030, BL-5892).
 /// </para>
 /// <para>
 /// A 417 that arrives while the body waits for <c>100 Continue</c> is answered, unless
@@ -3045,7 +3046,7 @@ public sealed class HttpProtocolHandler(
         {
             ThrowIfRedirectLimitReached(plan);
             RewindForResend(plan, upload);
-            return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan)).DowngradedAfter(head).FailingUploadRewind(upload.RewindFailure);
+            return plan.WithProxyAuthorization(proxyAuthorization, KeptAuthorizationForProxyRetry(plan)).DowngradedAfter(head).FailingUploadRewind(upload.RewindFailure);
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
@@ -3350,13 +3351,22 @@ public sealed class HttpProtocolHandler(
             || (sentNtlmAuthorization && challenges.Any(challenge => challenge.Trim().Equals("NTLM", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>
-    /// Makes the <c>Authorization</c> value a retry that answers a 407 keeps: the one
-    /// <paramref name="plan" /> sent, as <see cref="IHttpAuthenticator.RepeatAuthorization" />
-    /// sends it again, so a Digest answer counts its nonce on as in curl 8.21.0 (BL-869);
-    /// <see langword="null" /> when it sent none.
+    /// Makes the <c>Authorization</c> value <paramref name="plan" /> sent as
+    /// <see cref="IHttpAuthenticator.RepeatAuthorization" /> sends it again, so a Digest answer
+    /// counts its nonce on as in curl 8.21.0 (BL-869); <see langword="null" /> when it sent none.
     /// </summary>
     private string? RepeatAuthorization(HttpRequestPlan plan) =>
         plan.Authorization is { } sent ? Authenticator.RepeatAuthorization(plan.AuthRequest, sent) : null;
+
+    /// <summary>
+    /// Makes the <c>Authorization</c> value a retry that answers a 407 keeps:
+    /// <see cref="RepeatAuthorization" />'s, but none after an NTLM Type 3 message, which curl
+    /// 8.22.0 sends once. The resend that answers the proxy carries no <c>Authorization</c>, so a
+    /// server that did not accept the handshake is asked to start another, until the redirect
+    /// limit ends the transfer (measured, BL-5892).
+    /// </summary>
+    private string? KeptAuthorizationForProxyRetry(HttpRequestPlan plan) =>
+        plan.Authorization is { } sent && IsNtlmType3(sent) ? null : RepeatAuthorization(plan);
 
     /// <summary>
     /// Makes the <c>Proxy-Authorization</c> value a retry that answers a 401 keeps, as
