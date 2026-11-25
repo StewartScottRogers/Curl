@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.Sigstore.UnitLibrary/SigningCertificateIdentity.cs]
+touches: [Curl.Extension.Sigstore.UnitLibrary/SigningCertificateIdentity.cs, Curl.Extension.Sigstore.UnitTests/SigningCertificateIdentityTests.cs, Curl.Extension.Sigstore.UnitTests/SigstoreFixture.cs, Curl.Extension.Sigstore.UnitTests/SigstoreVerificationTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5900 — Fix fitness finding EXT-125: a sigstore certificate whose OIDC-issuer extension (1.3.6.1.4.1.57264.1.8) is not DER exits 2 with a raw .NET ASN.1 exception
 
@@ -36,13 +36,31 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits 60 with a `--sigstore-bundle:` message about the issuer (or 26 naming the bundle) and no .NET exception text.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro exits 60 with a `--sigstore-bundle:` message about the issuer (or 26 naming the bundle) and no .NET exception text.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced on this branch by the new tests: all seven failed before the fix.
+- Choice (within ADR-1101, so no new ADR): a `1.3.6.1.4.1.57264.1.8` value that is not exactly one DER
+  `UTF8String` names no issuer, so with `--sigstore-issuer` the transfer exits 60 with
+  `--sigstore-bundle: the bundle's certificate does not name the issuer <url>`. It does not fall back to the
+  deprecated 1.1 extension: the 1.8 one is present and takes precedence. Without `--sigstore-issuer` the issuer
+  is not read, as before.
+- The same uncaught `AsnContentException` was reachable through the subject alternative name in the same file;
+  a value that is not DER now names nothing (exit 60, "does not name the identity"). Tested on the raw bytes,
+  not through a loaded certificate, because a platform's loader may refuse such a certificate.
+- The exit 60 criterion is checked by unit test, not by running the command line: `FailureOf` gives the issuer
+  message for a raw-bytes issuer, and `SigstoreTransferHook` turns any failure into exit 60 with the prefix.
+- `touches` widened to the three test files in `Curl.Extension.Sigstore.UnitTests`; no task in Doing named them.
+- Test files were first edited with a throwaway PowerShell script; a second such run was denied, and the
+  remaining edits used the Edit tool.
+- `Measure-CodeQuality.ps1 -Library Curl.Extension.Sigstore.UnitLibrary`: 100% line, 100% branch, 0 failing
+  members, worst CRAP 10.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 692aca4d 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. A sigstore certificate whose issuer or subject alternative name extension is not DER fails the check with exit 60, not a .NET exception
