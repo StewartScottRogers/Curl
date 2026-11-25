@@ -33,3 +33,4 @@ A resumable upload over `--http3` whose request stream is reset or closed before
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 34a2aa6b 4e0de294 e2643ee5.
