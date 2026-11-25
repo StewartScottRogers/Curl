@@ -51,7 +51,7 @@ The finding, verbatim:
   platform terms: `PhysicalFileSystemReplaceTests` pins the umasked mode, the replaced symbolic
   link with an empty target and the in-place `/dev/null` in tests that exclude Windows, so CI on
   Linux and macOS is their first run. New inodes follow from the rename and are not asserted.
-- Windows keeps writing in place, unmeasured: BL-5923.
+- Windows keeps writing in place, unmeasured: BL-5933.
 - `touches` widened: the rename needs the real file system (Core), a mode on the contract
   (Abstractions) and the Cookies test fake. No other task in Doing named any of them when checked
   (BL-5915, which held `Curl.Protocol.Abstractions.UnitTests`, is left untouched).

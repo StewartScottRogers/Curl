@@ -1,5 +1,5 @@
 ---
-id: BL-5923
+id: BL-5933
 title: Measure whether Windows curl replaces the -c, --hsts and --alt-svc files by rename and match it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5923 — Measure whether Windows curl replaces the -c, --hsts and --alt-svc files by rename and match it
+# BL-5933 — Measure whether Windows curl replaces the -c, --hsts and --alt-svc files by rename and match it
 
 ## Goal
 
