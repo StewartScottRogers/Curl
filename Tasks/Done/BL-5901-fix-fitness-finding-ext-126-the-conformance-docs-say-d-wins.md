@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineWarning.cs, Documentation/Conformance/Extended]
+touches: [Curl.Cli.UnitLibrary/CommandLineWarning.cs, Documentation/Conformance/Extended, Curl.Cli.UnitTests/CommandLineUploadRequestMethodTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5901 — Fix fitness finding EXT-126: the conformance docs say "-d wins when both are given" with -T, but the CLI refuses -d with -T (exit 2) for grpc and kafka
 
@@ -37,13 +37,29 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] `curl -sS -d dwins -T somefile kafka://localhost:38092/dw/0` exits 0 and consuming `kafka://localhost:38092/dw/0` prints `dwins`; or the five docs no longer claim `-d` wins.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS -d dwins -T somefile kafka://localhost:38092/dw/0` exits 0 and consuming `kafka://localhost:38092/dw/0` prints `dwins`; or the five docs no longer claim `-d` wins.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision (ADR-1369): the docs were wrong, not the CLI. Real curl 8.22.0 (Schannel, Windows,
+  2026-11-24) refuses `-d` with `-T` with exit 2 for `kafka://` and `mqtt://` too (silent under
+  `-s`), and an extension never changes curl's behaviour. So the second branch of criterion 1.
+- Corrected the five documents the finding names (Kafka, Grpc, Stomp, SignalR, WebTransport) and
+  the others with the same claim (Amqp0, Mqtt5, Nats, Redis, SocketIo, Xmpp). A Grep of
+  `Documentation/Conformance/Extended` for `wins`, `when both` and `-d` absent/gave now finds only
+  Plugin.md's unrelated search-directory row.
+- Handler code and its tests are unchanged: they order `-d` before the upload for a request that
+  carries both, which the command line never builds.
+- Test: `PutRequestedWith_DataAndUploadToAnExtendedScheme_IsRefusedAsForHttp` in
+  `Curl.Cli.UnitTests`; added that file to `touches` (no other task in Doing names it).
+  `CommandLineWarning.cs` needed no change, and no production code changed, so no quality run.
+- 2026-11-24: `dotnet build` 0 warnings, 0 errors; fast tests 57991 passed, 0 failed, 353 skipped.
+  The test is platform-neutral.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 393602a3 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Extended conformance docs and ADR-1369 now say the command line refuses -d with -T (exit 2), as curl does; pinned by a Curl.Cli unit test
