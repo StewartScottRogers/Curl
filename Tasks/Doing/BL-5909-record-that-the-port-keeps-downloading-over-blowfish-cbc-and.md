@@ -34,3 +34,4 @@ Decided by Claude under Stewart's delegation (2026-11-24, while filing): keep th
 ## Log
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 28.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: b2ec7a2b 6ec06177.
