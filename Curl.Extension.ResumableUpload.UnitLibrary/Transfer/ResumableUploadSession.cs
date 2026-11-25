@@ -6,7 +6,7 @@ namespace Curl.Extension.ResumableUpload.Transfer;
 /// <summary>
 /// Sends a resumable upload's requests through the rest of curl's transfer (the later hooks and curl's handler), so
 /// <c>-v</c>, <c>--trace</c>, <c>--har</c>, <c>--record</c>, authentication, TLS and the proxy see each one as they see
-/// any other request (EXT-119, ADR-1377).
+/// any other request (EXT-119, ADR-1379).
 /// </summary>
 /// <param name="context">The transfer.</param>
 /// <param name="next">The rest of curl's transfer.</param>

@@ -1,4 +1,4 @@
-# ADR-1377: Resumable upload sends its requests through curl's transfer
+# ADR-1379: Resumable upload sends its requests through curl's transfer
 
 - Status: Accepted
 - Date: 2026-11-25

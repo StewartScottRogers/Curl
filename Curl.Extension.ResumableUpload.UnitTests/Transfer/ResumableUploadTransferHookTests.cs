@@ -10,7 +10,7 @@ namespace Curl.Extension.ResumableUpload.Transfer;
 /// Pins the resumable upload flows over a scripted rest of curl's transfer: tus 1.0 ("Creation", "Core Protocol") and
 /// draft-ietf-httpbis-resumable-upload (upload creation, upload append, offset retrieval), with resumption after a
 /// broken connection, the last response as the transfer's, and every request sent through <c>next</c> so
-/// <c>-v</c>, <c>--trace</c>, <c>--har</c> and <c>--record</c> see it (EXT-119, ADR-1377).
+/// <c>-v</c>, <c>--trace</c>, <c>--har</c> and <c>--record</c> see it (EXT-119, ADR-1379).
 /// </summary>
 [TestClass]
 public sealed class ResumableUploadTransferHookTests
