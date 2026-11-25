@@ -14,6 +14,9 @@ namespace Curl.Original.Protocol.Smtp;
 /// (in any case) on every line of the <c>EHLO</c> reply. No such line: no authentication.</item>
 /// <item>Nothing to authenticate with - no <c>-u</c>, no <c>--oauth2-bearer</c>, and not
 /// <c>AUTH=EXTERNAL</c> with <c>EXTERNAL</c> offered: no authentication.</item>
+/// <item><c>--oauth2-bearer</c> without <c>-u</c> gives a mechanism <c>AUTH=</c> allows an
+/// empty user and password. After a redirect withheld the token, no mechanism is chosen
+/// unless <c>AUTH=</c> was given (curl 8.22.0, BL-5963, ADR-1394).</item>
 /// <item>No usable mechanism among those offered: exit 67 <c>Login denied</c>, nothing sent,
 /// after the <c>-v</c> <c>SASL:</c> lines curl writes for it (BL-1061, BL-1242).</item>
 /// <item>Under <c>--sasl-ir</c> the initial response goes on the <c>AUTH</c> line while the
@@ -153,9 +156,25 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
 
     private static bool CanAuthenticate(SaslRequest request, List<string> offered) =>
         request.Credential is not null
-        || request.BearerToken is not null
         || (External.Equals(request.RequiredMechanism, StringComparison.OrdinalIgnoreCase)
             && offered.Contains(External, StringComparer.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Whether a redirect withheld the <c>--oauth2-bearer</c> token and no <c>AUTH=</c> option
+    /// was given: curl still prefers the bearer mechanisms alone, which it cannot use without
+    /// the token, so it chooses none (measured with curl 8.22.0, BL-5963).
+    /// </summary>
+    private bool WithholdsEveryMechanism(SaslRequest request) =>
+        request.RequiredMechanism is null && context.Mail is { BearerTokenWithheld: true };
+
+    /// <summary>
+    /// The offered mechanisms curl 8.22.0's <c>-v</c> may give a reason for: only the bearer
+    /// ones when <see cref="WithholdsEveryMechanism" />, otherwise every one offered.
+    /// </summary>
+    private List<string> OfferedAndPreferred(SaslRequest request, List<string> offered) =>
+        WithholdsEveryMechanism(request)
+            ? [.. offered.Where(offer => BearerTokenMechanisms.Contains(offer, StringComparer.OrdinalIgnoreCase))]
+            : offered;
 
     private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
 
@@ -208,8 +227,10 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     private SaslRequest CreateRequest()
     {
         MailRequestOptions mail = context.Mail ?? new MailRequestOptions();
+        // With --oauth2-bearer and no user, curl 8.22.0 sends an empty user and password to a
+        // mechanism an AUTH= option allows (measured, BL-5963).
         return new SaslRequest(
-            context.Credentials,
+            context.Credentials ?? (mail.BearerToken is null ? null : new NetworkCredential()),
             mail.SaslAuthorizationIdentity,
             mail.BearerToken,
             RequiredMechanism(mail.LoginOptions ?? context.Url.Options),
@@ -269,7 +290,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     private async ValueTask<TransferResult?> TryMechanismsAsync(SaslRequest request, List<string> offered)
     {
         string denial = SmtpSessionMessages.LoginDenied;
-        while (authenticator.ChooseMechanism(request, offered) is { } mechanism)
+        while (!WithholdsEveryMechanism(request) && authenticator.ChooseMechanism(request, offered) is { } mechanism)
         {
             ExchangeOutcome outcome = await ExchangeAsync(authenticator.Begin(mechanism, request)).ConfigureAwait(false);
             if (outcome != ExchangeOutcome.Cancelled)
@@ -299,11 +320,13 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// mechanism can be used (BL-1061, BL-1242): when a user was given and a mechanism the
     /// login options allow was offered but not chosen, that none could be selected and why
     /// each was not; otherwise <c>no overlap</c> once a mechanism curl knows was offered, and
-    /// <c>no auth mechanism was offered or recognized</c> when none was.
+    /// <c>no auth mechanism was offered or recognized</c> when none was. After a redirect
+    /// withheld the token and without <c>AUTH=</c>, only a bearer mechanism has a reason, so
+    /// any other known one offered alone is <c>no overlap</c> (BL-5963).
     /// </summary>
     private void ReportNoWayToLogIn(SaslRequest request, List<string> offered)
     {
-        List<string> reasons = ReasonsNoneWasChosen(request, offered);
+        List<string> reasons = ReasonsNoneWasChosen(request, OfferedAndPreferred(request, offered));
         if (reasons.Count > 0)
         {
             context.Events.ReportInfo(SmtpConnectionInfoLines.NoSaslMechanismSelectable);
