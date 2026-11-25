@@ -69,13 +69,36 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
     }
 
     [TestMethod]
-    public void VerifyChain_RejectedRootAndAnotherHostName_ReportsTheRejectionFirst()
+    [DataRow("other.test", "hostname")]
+    [DataRow("127.0.0.1", "ipv4 address")]
+    public void VerifyChain_RejectedRootAndANameTheLeafLacks_ReportsTheNameMismatch(string host, string kind)
     {
         using var chain = IssuedChain.Create();
 
-        var verdict = Verify(Trusted(chain.Root, null, ServerAuthentication), chain, "other.test");
+        var verdict = Verify(Trusted(chain.Root, null, ServerAuthentication), chain, host);
 
-        AssertVerdict(false, verdict);
+        AssertNameMismatch(host, kind, verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_RejectedLeafAndAnotherHostName_ReportsTheNameMismatch()
+    {
+        using var chain = IssuedChain.Create();
+
+        var verdict = Verify(Trusted(chain.Leaf, null, ServerAuthentication), chain, "other.test");
+
+        AssertNameMismatch("other.test", "hostname", verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_RejectedCaDirectoryRootAndAnotherHostName_ReportsTheNameMismatch()
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, Trusted(chain.Root, null, ServerAuthentication));
+
+        var verdict = VerifyDirectory(directory, chain, host: "other.test");
+
+        AssertNameMismatch("other.test", "hostname", verdict);
     }
 
     [TestMethod]
@@ -136,6 +159,22 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
 
         Assert.AreEqual(28L, observed.VerifyResult);
         Assert.AreEqual((CurlExitCode.PeerFailedVerification, Rejected), failure);
+    }
+
+    [TestMethod]
+    public void Judge_RejectedRootAndAnotherHostName_ReportsVerifyResult1()
+    {
+        using var chain = IssuedChain.Create();
+        var verification = Verification(Trusted(chain.Root, null, ServerAuthentication), matchesSchannelBuild: false);
+        var (chainPolicy, anchors, _) = verification.ReadTrustAnchors();
+        using var built = new X509Chain { ChainPolicy = chainPolicy! };
+        built.ChainPolicy.ExtraStore.Add(chain.Intermediate);
+        built.Build(chain.Leaf);
+
+        var (observed, failure) = verification.Judge(SslPolicyErrors.RemoteCertificateNameMismatch, built, "other.test", anchors, null, chain.Sent);
+
+        Assert.AreEqual(1L, observed.VerifyResult);
+        Assert.AreEqual(NameMismatch("other.test", "hostname"), failure?.Message);
     }
 
     [TestMethod]
@@ -309,12 +348,21 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
     [TestCleanup]
     public void DeleteDirectories() => _directories.ForEach(directory => System.IO.Directory.Delete(directory, recursive: true));
 
-    private static ServerCertificateChainVerdict VerifyDirectory(string directory, IssuedChain chain, string? caFile = null)
+    private static ServerCertificateChainVerdict VerifyDirectory(string directory, IssuedChain chain, string? caFile = null, string host = Host)
     {
         var options = new TlsClientOptions(
             CaCertificateBlob: caFile is null ? null : (ReadOnlyMemory<byte>?)Encoding.ASCII.GetBytes(caFile),
             CaCertificateDirectory: directory);
-        return new ServerCertificateVerification(options, matchesSchannelBuild: false, TimeProvider.System).VerifyChain(chain.Sent, Host);
+        return new ServerCertificateVerification(options, matchesSchannelBuild: false, TimeProvider.System).VerifyChain(chain.Sent, host);
+    }
+
+    private static string NameMismatch(string host, string kind) =>
+        $"SSL: no alternative certificate subject name matches target {kind} '{host}'";
+
+    private static void AssertNameMismatch(string host, string kind, ServerCertificateChainVerdict verdict)
+    {
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, verdict.ExitCode, verdict.ErrorMessage);
+        Assert.AreEqual(NameMismatch(host, kind), verdict.ErrorMessage);
     }
 
     private static ServerCertificateVerification Verification(string pem, bool matchesSchannelBuild) =>

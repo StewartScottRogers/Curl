@@ -415,7 +415,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             ? null
             : (CurlExitCode.PeerFailedVerification, OpenSslUnsuitablePurposeRefusal);
 
-    // The first refusal: a rejected --cacert or --capath certificate, a revoked staple, the chain or name, then a --crlfile list. A list's
+    // The first refusal: a rejected --cacert or --capath certificate unless the name is refused too, a revoked staple, the chain or name, then a --crlfile list. A list's
     // refusal is OpenSSL's verify result too, so %{ssl_verify_result} reports its code, 23 for
     // a revoked certificate and 12 for an expired list (measured with curl 8.18.0, CGR-168).
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) Refusal(
@@ -429,7 +429,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         X509Chain? reasonChain)
     {
         var purposeRefusal = PurposeRefusal(anchoredErrors, chain, anchorsBesideSystemStore);
-        var refusal = RejectedCaCertificateOrRevokedStapleRefusal(chain, stapled, anchorsBesideSystemStore) ?? purposeRefusal ?? VerifyPeer(anchoredErrors, chain, targetHost, [], reasonChain);
+        var refusal = RejectedCaCertificateOrRevokedStapleRefusal(anchoredErrors, chain, stapled, anchorsBesideSystemStore) ?? purposeRefusal ?? VerifyPeer(anchoredErrors, chain, targetHost, [], reasonChain);
         if (refusal is not null)
         {
             return (WithRefusalVerifyResult(observed, refusal.Value.Message), refusal);
@@ -438,8 +438,10 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         return RevocationListVerdict(observed, chain, revocationLists);
     }
 
-    private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateOrRevokedStapleRefusal(X509Chain? chain, OcspStapleStatus? stapled, X509Certificate2Collection anchorsBesideSystemStore) =>
-        RejectedCaCertificateRefusal(chain, anchorsBesideSystemStore) ?? RevokedStapleRefusal(stapled);
+    // curl checks the name before OpenSSL's verify result, so a refused name outranks a
+    // rejected --cacert or --capath certificate (curl 8.18.0 on OpenSSL 3.5.5, BL-5926).
+    private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateOrRevokedStapleRefusal(SslPolicyErrors anchoredErrors, X509Chain? chain, OcspStapleStatus? stapled, X509Certificate2Collection anchorsBesideSystemStore) =>
+        (RefusesTheName(anchoredErrors) ? null : RejectedCaCertificateRefusal(chain, anchorsBesideSystemStore)) ?? RevokedStapleRefusal(stapled);
 
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) RevocationListVerdict(
         PeerVerification observed,
