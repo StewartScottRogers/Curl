@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpConnectionInfoLines.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.RedirectLimitVerbose.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.UploadReports.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.Retry.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpConnectionInfoLines.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.RedirectLimitVerbose.cs]
 requirement: none
 created: 2026-11-25
 completed:
@@ -18,7 +18,7 @@ A 417 that arrives while the request body waits for `100 Continue` is followed i
 
 ## Context
 
-Found by BL-5944. `Record-CurlExchange.ps1 -HoldOpenMilliseconds 1500` for `curl -sS -v --max-redirs 0 -d x=1 -H "Expect: 100-continue" --expect100-timeout 5 http://127.0.0.1:PORT/` against a 417 with `Content-Length: 4`: curl 8.22.0 writes `* Got HTTP failure 417 while waiting for a 100`, `* abort upload`, `* Ignoring the response-body`; Curl omits `* abort upload`. Measure the case without `--max-redirs` too. See `ReportUploadAbandoned` in `HttpProtocolHandler.cs`, whose summary says nothing follows such a 417 (BL-1446 Notes).
+Found by BL-5944. `Record-CurlExchange.ps1 -HoldOpenMilliseconds 1500` for `curl -sS -v --max-redirs 0 -d x=1 -H "Expect: 100-continue" --expect100-timeout 5 http://127.0.0.1:PORT/` against a 417 with `Content-Length: 4`: curl 8.22.0 writes `* Got HTTP failure 417 while waiting for a 100`, `* abort upload`, `* Ignoring the response-body`; Curl omits `* abort upload`. Measure the case without `--max-redirs` too. See `ReportUploadAbandoned` in `HttpProtocolHandler.UploadReports.cs`, whose summary says nothing follows such a 417 (BL-1446 Notes).
 
 ## Acceptance criteria
 

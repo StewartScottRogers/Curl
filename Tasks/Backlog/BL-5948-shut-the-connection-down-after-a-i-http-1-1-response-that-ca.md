@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Original.Protocol.Http.UnitTests/HeadResponseWithBodyBytesTests.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.ConnectionReuse.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.ConnectionEnd.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Original.Protocol.Http.UnitTests/HeadResponseWithBodyBytesTests.cs]
 requirement: none
 created: 2026-11-25
 completed:

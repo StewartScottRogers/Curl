@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.NtlmAuthenticatedConnection.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.NtlmNegotiation.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.AuthReports.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.NtlmAuthenticatedConnection.cs]
 requirement: none
 created: 2026-11-25
 completed:
@@ -19,7 +19,7 @@ same `auth using` line as curl 8.22.0.
 
 ## Context
 
-Found by BL-5932. `OnNtlmAuthenticatedConnection` in `HttpProtocolHandler.cs` drops the Type 1
+Found by BL-5932. `OnNtlmAuthenticatedConnection` in `HttpProtocolHandler.NtlmNegotiation.cs` drops the Type 1
 from such a request (BL-3003), and the handler then writes no `* Server auth using NTLM with
 user '...'` line. libcurl's `output_auth_headers` writes it whenever NTLM is picked, header or
 not (measured for the retry case in BL-5932). Not measured for a redirect: measure real curl
