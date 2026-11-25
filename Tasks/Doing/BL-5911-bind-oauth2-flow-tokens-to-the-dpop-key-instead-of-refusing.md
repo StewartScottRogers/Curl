@@ -32,3 +32,4 @@ BL-5898 (fitness finding EXT-123) made the combination fail closed: ADR-1347, `O
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: c013d3b8 a66d0330 0ff5c1a5 0fba324b.
