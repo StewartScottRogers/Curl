@@ -32,3 +32,4 @@ Found by BL-5874, which fixed the same gap in `Transport/Tcp/DnsTcpTransport.cs`
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: fa936731 8150d799 36a6d25e 3d836d5e.
