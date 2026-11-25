@@ -1,5 +1,4 @@
 using System.Net.Security;
-using System.Numerics;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Curl.Networking;
@@ -78,6 +77,9 @@ internal static class OpenSslVerifyResult
     private const X509ChainStatusFlags NameConstraintFlags = X509ChainStatusFlags.HasNotPermittedNameConstraint
         | X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.HasNotSupportedNameConstraint;
 
+    private const X509ChainStatusFlags RefusedSubtreeFlags =
+        X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint;
+
     /// <summary>
     /// Returns the code for a certificate <see cref="SslStream" /> checked.
     /// </summary>
@@ -118,11 +120,12 @@ internal static class OpenSslVerifyResult
     /// A chain's combined status as OpenSSL's build sees it: .NET stops a chain at a name-constrained
     /// intermediate the trust store lists (OpenSSL's partial-chain anchor) as partial and never checks
     /// the constraints, so a broken constraint replaces the partial-chain flag (47 or 48, STD-101;
-    /// 53 for a CN holding a NUL, BL-5921). Of several name-constraint flags only the one OpenSSL
-    /// answers for is kept (<see cref="KeepFirstNameConstraintRefusal" />).
+    /// 53 for a CN holding a NUL, BL-5921). A platform engine that does check them may flag several CAs'
+    /// refusals, or another CA's than the one OpenSSL stops at, so OpenSSL's one refusal replaces the
+    /// platform's name-constraint flags (<see cref="KeepFirstNameConstraintRefusal" />, BL-5953, BL-5954).
     /// </summary>
     /// <param name="chain">The chain built for the server certificate.</param>
-    /// <returns>Every status flag of the chain, combined.</returns>
+    /// <returns>Every status flag of the chain, combined, with at most OpenSSL's one name-constraint refusal.</returns>
     internal static X509ChainStatusFlags StatusOf(X509Chain chain)
     {
         var status = X509ChainStatusFlags.NoError;
@@ -131,45 +134,52 @@ internal static class OpenSslVerifyResult
             status |= chainStatus.Status;
         }
 
-        return KeepFirstNameConstraintRefusal(WithPartialChainNameConstraints(status, chain), chain);
+        var isPartialAtListedCertificate =
+            (status & (X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) == X509ChainStatusFlags.PartialChain
+            && ListsAChainCertificate(chain);
+        return isPartialAtListedCertificate
+            ? WithNameConstraintViolation(status, CertificateNameConstraints.FindViolation(chain), replacesPartialChain: true)
+            : KeepFirstNameConstraintRefusal(status, chain);
     }
 
     /// <summary>
-    /// OpenSSL stops at the first name it refuses, but a chain engine that checks every name flags each
-    /// kind of refusal and keeps no order among them. Of several name-constraint flags, only the one for
-    /// the refusal OpenSSL meets first is kept (BL-5953).
+    /// OpenSSL stops at the first name it refuses, but a platform chain engine keeps no order among the
+    /// refusals it flags and may flag another one than OpenSSL's. A chain flagged with a subtree refusal
+    /// (47 or 48) is given the flag for the refusal OpenSSL meets first in place of every
+    /// name-constraint flag (BL-5953, BL-5954).
     /// </summary>
     /// <param name="status">Every status flag of the chain, combined.</param>
     /// <param name="chain">The chain built for the server certificate.</param>
     /// <returns>
-    /// The status with one name-constraint flag, or unchanged when it has fewer than two or
-    /// <see cref="CertificateNameConstraints.FindViolation(X509Chain, bool)" /> finds none of them.
+    /// The status with one name-constraint flag, or unchanged when no subtree refusal is flagged or
+    /// <see cref="CertificateNameConstraints.FindViolation(X509Chain, bool)" /> finds no violation.
     /// </returns>
-    internal static X509ChainStatusFlags KeepFirstNameConstraintRefusal(X509ChainStatusFlags status, X509Chain chain)
+    internal static X509ChainStatusFlags KeepFirstNameConstraintRefusal(X509ChainStatusFlags status, X509Chain chain) =>
+        (status & RefusedSubtreeFlags) == 0
+            ? status
+            : WithNameConstraintViolation(status, CertificateNameConstraints.FindViolation(chain), replacesPartialChain: false);
+
+    /// <summary>
+    /// Replaces a chain's name-constraint flags with the one violation OpenSSL reports.
+    /// </summary>
+    /// <param name="status">Every status flag the platform's chain engine gave, combined.</param>
+    /// <param name="violation">
+    /// What <see cref="CertificateNameConstraints.FindViolation(X509Chain, bool)" /> found: its value is its
+    /// <see cref="X509ChainStatusFlags" /> value, for both are Windows' <c>CERT_TRUST_</c> error bits.
+    /// </param>
+    /// <param name="replacesPartialChain">Whether the violation also stands in for the partial-chain flag.</param>
+    /// <returns>The new status; <paramref name="status" /> unchanged when <paramref name="violation" /> is 0.</returns>
+    internal static X509ChainStatusFlags WithNameConstraintViolation(X509ChainStatusFlags status, int violation, bool replacesPartialChain)
     {
-        if (BitOperations.PopCount((uint)(status & NameConstraintFlags)) < 2)
+        if (violation == 0)
         {
             return status;
         }
 
-        var violation = CertificateNameConstraints.FindViolation(chain);
-        return violation == 0 ? status : (status & ~NameConstraintFlags) | (X509ChainStatusFlags)violation;
+        var replaced = NameConstraintFlags
+            | (replacesPartialChain ? X509ChainStatusFlags.PartialChain : X509ChainStatusFlags.NoError);
+        return (status & ~replaced) | (X509ChainStatusFlags)violation;
     }
-
-    private static X509ChainStatusFlags WithPartialChainNameConstraints(X509ChainStatusFlags status, X509Chain chain)
-    {
-        if ((status & (X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) != X509ChainStatusFlags.PartialChain
-            || !ListsAChainCertificate(chain))
-        {
-            return status;
-        }
-
-        return WithNameConstraintViolation(status, CertificateNameConstraints.FindViolation(chain));
-    }
-
-    // A violation's value is its X509ChainStatusFlags value: both are Windows' CERT_TRUST_ error bits.
-    private static X509ChainStatusFlags WithNameConstraintViolation(X509ChainStatusFlags status, int violation) =>
-        violation == 0 ? status : (status & ~X509ChainStatusFlags.PartialChain) | (X509ChainStatusFlags)violation;
 
     private static bool ListsAChainCertificate(X509Chain chain) =>
         chain.ChainElements.Cast<X509ChainElement>().Any(element =>

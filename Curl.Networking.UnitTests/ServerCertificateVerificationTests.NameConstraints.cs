@@ -1051,6 +1051,42 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual($"SSL certificate OpenSSL verify result: {expected}", failure?.Message);
     }
 
+    // The Linux chain engine flags the lower CA's refusal beside, or instead of, the upper one's (BL-5954).
+    [TestMethod]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint, CertificateNameConstraints.Excluded, false, X509ChainStatusFlags.HasExcludedNameConstraint)]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint, CertificateNameConstraints.NotPermitted, false, X509ChainStatusFlags.HasNotPermittedNameConstraint)]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.PartialChain, CertificateNameConstraints.Excluded, true, X509ChainStatusFlags.HasExcludedNameConstraint)]
+    [DataRow(X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.PartialChain, CertificateNameConstraints.UnsupportedNameSyntax, false, X509ChainStatusFlags.HasNotSupportedNameConstraint | X509ChainStatusFlags.PartialChain)]
+    [DataRow(X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.PartialChain, 0, true, X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.PartialChain)]
+    public void WithNameConstraintViolation_PlatformFlags_KeepsOnlyTheViolationFound(
+        X509ChainStatusFlags platform, int violation, bool replacesPartialChain, X509ChainStatusFlags expected) =>
+        Assert.AreEqual(expected, OpenSslVerifyResult.WithNameConstraintViolation(platform, violation, replacesPartialChain));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The name-constraint flags are the platform chain engine's, pinned on the Windows and Linux ones.
+    [DataRow(true, X509ChainStatusFlags.HasNotPermittedNameConstraint)]
+    [DataRow(false, X509ChainStatusFlags.HasExcludedNameConstraint)]
+    public void StatusOf_TwoAuthoritiesUnderATrustedRootRefusingDifferently_KeepsTheUpperRefusalOnly(bool upperPermits, X509ChainStatusFlags expected)
+    {
+        var permitting = Constraints(permitted: "other.org");
+        var excluding = Constraints(excluded: Host);
+        using var root = CreateAuthority("CN=Two Refusals Root", null, null);
+        using var upper = CreateAuthority("CN=Two Refusals Upper", root, upperPermits ? permitting : excluding);
+        using var lower = CreateAuthority("CN=Two Refusals Lower", upper, upperPermits ? excluding : permitting);
+        using var leaf = CreateLeaf(lower, Host, false, true, false);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.ExtraStore.Add(upper);
+        chain.ChainPolicy.ExtraStore.Add(lower);
+        chain.Build(leaf);
+
+        var status = OpenSslVerifyResult.StatusOf(chain);
+
+        Assert.AreEqual(expected, status & (X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint));
+    }
+
     private static int FindViolationOfCommonName(string commonName, byte[] constraints, bool matchesSchannelBuild = false)
     {
         var subject = new X500DistinguishedNameBuilder();

@@ -56,16 +56,29 @@ public sealed class NameConstraintVerifyResultTests
         Assert.AreEqual(flagged, OpenSslVerifyResult.KeepFirstNameConstraintRefusal(flagged, chain));
     }
 
+    // The platform engine may flag another CA's refusal than the one OpenSSL stops at (BL-5954).
     [TestMethod]
-    public void KeepFirstNameConstraintRefusal_OneNameConstraintFlag_TrustsTheChainEngine()
+    public void KeepFirstNameConstraintRefusal_OneSubtreeFlagForAnotherRefusal_ReportsTheOneFound()
     {
         using var root = CreateCertificate("CN=One Flag Root", null, NameConstraints(subtreesTag: 1, "localhost"));
         using var intermediate = CreateCertificate("CN=One Flag Intermediate", root, null);
         using var chain = BuildChain(root, intermediate);
 
         Assert.AreEqual(
-            X509ChainStatusFlags.HasNotPermittedNameConstraint,
+            X509ChainStatusFlags.HasExcludedNameConstraint,
             OpenSslVerifyResult.KeepFirstNameConstraintRefusal(X509ChainStatusFlags.HasNotPermittedNameConstraint, chain));
+    }
+
+    [TestMethod]
+    public void KeepFirstNameConstraintRefusal_NoSubtreeRefusalFlagged_TrustsTheChainEngine()
+    {
+        using var root = CreateCertificate("CN=Unsupported Flag Root", null, NameConstraints(subtreesTag: 1, "localhost"));
+        using var intermediate = CreateCertificate("CN=Unsupported Flag Intermediate", root, null);
+        using var chain = BuildChain(root, intermediate);
+
+        Assert.AreEqual(
+            X509ChainStatusFlags.HasNotSupportedNameConstraint,
+            OpenSslVerifyResult.KeepFirstNameConstraintRefusal(X509ChainStatusFlags.HasNotSupportedNameConstraint, chain));
     }
 
     // A chain of the server certificate (DNS localhost), the intermediate and the trusted root.

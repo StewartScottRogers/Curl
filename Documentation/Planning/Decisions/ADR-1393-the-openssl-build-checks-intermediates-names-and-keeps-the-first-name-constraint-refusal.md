@@ -25,7 +25,9 @@ with SAN `DNS:localhost`). Each refusal was exit 60.
   skipping a self-issued one unless it is the server's own, each against the CAs above it from the
   top down, as OpenSSL's `check_name_constraints` does. An intermediate's names are taken in the
   order ADR-1391 gives the leaf's; subject CNs are checked for the server certificate only.
-- When the chain's status holds two or more name-constraint flags, the OpenSSL build evaluates the
-  chain itself and keeps only the flag for the first refusal. A single flag, or a chain in which
-  that evaluation finds nothing (a constraint kind it does not read), keeps the engine's flags.
+- When the chain's status flags a subtree refusal (47 or 48), alone or beside other name-constraint
+  flags, the OpenSSL build evaluates the chain itself and keeps only the flag for the first refusal
+  (amended by BL-5954: the Linux chain engine may flag another CA's refusal than the one OpenSSL
+  stops at, so even a single subtree flag is not trusted). A chain with no subtree flag, or one in
+  which that evaluation finds nothing (a constraint kind it does not read), keeps the engine's flags.
 - The Schannel build's answers do not change: it checks the server certificate's names only.
