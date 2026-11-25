@@ -581,7 +581,8 @@ milliseconds after a peer's RST WSAECONNABORTED where curl's prompt `recv` sees 
 ADR-0708 (BL-2821) not when the last write found unread bytes on the socket (`HasUnreadBytesOrEndBeforeWrite`),
 as test1802's proxy leaves after its CONNECT reply before closing, where curl prints the abort,
 nor per ADR-0878 (BL-3304) when it found the peer's unread FIN, as on a kept connection the server
-closed and curl reused. `UdpDatagramConnector` opens channels
+closed and curl reused. Off Windows a write checks nothing first (ADR-1383, BL-5939): on Linux
+the peek would take a reset socket's pending error. `UdpDatagramConnector` opens channels
 through an internal seam, so its tests need no socket. `UdpDatagramChannelTests` opens,
 cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over

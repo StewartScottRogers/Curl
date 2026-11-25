@@ -53,7 +53,8 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     internal bool ReportsAbortedReadAsReset { get; init; } = OperatingSystem.IsWindows();
 
     /// <summary>
-    /// Gets the check run before a write once the connection has read a byte: whether the peer had
+    /// Gets the check run before a write once the connection has read a byte, under
+    /// <see cref="ReportsAbortedReadAsReset" />: whether the peer had
     /// already sent bytes, or its FIN, that the stream has not read yet. Before the first byte is read
     /// <see cref="HasUnreadBytesBeforeFirstRead" /> runs instead. Production asks the socket under a
     /// <see cref="NetworkStream" />; tests set it (ADR-0708, BL-2821, BL-3304).
@@ -61,7 +62,8 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     internal Func<Stream, bool> HasUnreadBytesOrEndBeforeWrite { get; init; } = HasSocketUnderUnreadBytesOrEnd;
 
     /// <summary>
-    /// Gets the check run before each write on a connection that has not yet read a byte: whether the
+    /// Gets the check run before each write on a connection that has not yet read a byte, under
+    /// <see cref="ReportsAbortedReadAsReset" />: whether the
     /// peer had already sent bytes the stream has not read. A FIN seen there is not counted: a peer
     /// that resets right after accepting looks like one until the request is written (BL-5259).
     /// </summary>
@@ -138,9 +140,19 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
         failure.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionAborted };
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The checks before the write run only under <see cref="ReportsAbortedReadAsReset" />, which
+    /// alone uses their answer. On Linux a peek at a reset connection takes the socket's pending
+    /// error, so the write would fail with EPIPE where curl's <c>send</c> fails with ECONNRESET
+    /// (ADR-1383, BL-5939).
+    /// </remarks>
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        _hadUnreadBytesOrEndAtLastWrite = _hasReadBytes ? HasUnreadBytesOrEndBeforeWrite(_stream) : HasUnreadBytesBeforeFirstRead(_stream);
+        if (ReportsAbortedReadAsReset)
+        {
+            _hadUnreadBytesOrEndAtLastWrite = _hasReadBytes ? HasUnreadBytesOrEndBeforeWrite(_stream) : HasUnreadBytesBeforeFirstRead(_stream);
+        }
+
         return _stream.WriteAsync(buffer, cancellationToken);
     }
 

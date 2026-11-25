@@ -172,6 +172,38 @@ public sealed class StreamConnectionTests
     }
 
     [TestMethod]
+    [DataRow(false, false, 0, DisplayName = "no rewrite, nothing read yet")]
+    [DataRow(false, true, 0, DisplayName = "no rewrite, after a read")]
+    [DataRow(true, false, 1, DisplayName = "rewrite, nothing read yet")]
+    [DataRow(true, true, 1, DisplayName = "rewrite, after a read")]
+    public async Task WriteAsync_ChecksTheSocketBeforeWritingOnlyWhenAbortsAreReportedAsResets(bool reportsAbortAsReset, bool readFirst, int expectedChecks)
+    {
+        // BL-5939: on Linux the check's peek takes a reset socket's pending error, so the write
+        // would report EPIPE (32) where curl reports ECONNRESET (104).
+        int checks = 0;
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadOnceThenFailingStream(aborted), null)
+        {
+            ReportsAbortedReadAsReset = reportsAbortAsReset,
+            HasUnreadBytesOrEndBeforeWrite = _ => ++checks > 0,
+            HasUnreadBytesBeforeFirstRead = _ => ++checks > 0,
+        };
+        if (readFirst)
+        {
+            await connection.ReadAsync(new byte[8], CancellationToken.None);
+        }
+
+        Diagnostics.Arrange("reports abort as reset, read first", $"{reportsAbortAsReset}, {readFirst}");
+
+        await connection.WriteAsync(new byte[] { 0x47 }, CancellationToken.None);
+
+        Diagnostics.Act("checks run", checks);
+        Diagnostics.Assert("checks run", expectedChecks, checks);
+
+        Assert.AreEqual(expectedChecks, checks);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_WhenThePeerHadSentUnreadBytesBeforeTheWriteAndTheReadIsAborted_FailsWithTheAbort()
     {
         var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
