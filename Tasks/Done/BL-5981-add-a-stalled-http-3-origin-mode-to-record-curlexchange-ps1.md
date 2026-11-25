@@ -8,7 +8,7 @@ depends-on: [BL-5973]
 touches: [Record-CurlExchange.ps1]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5981 — Add a stalled HTTP/3 origin mode to Record-CurlExchange.ps1
 
@@ -22,10 +22,18 @@ BL-5978 and ADR-1410. BL-5978 wrote this mode and measured with it, but did not 
 
 ## Acceptance criteria
 
-- [ ] `-Http3StalledOrigin` records an HTTP/3 curl's `-m` run: `transcript.txt` shows the STOP_SENDING error code and the decoder stream bytes.
-- [ ] The switch has a `.PARAMETER` help entry and is refused with the other server modes.
+- [x] `-Http3StalledOrigin` records an HTTP/3 curl's `-m` run: `transcript.txt` shows the STOP_SENDING error code and the decoder stream bytes.
+- [x] The switch has a `.PARAMETER` help entry and is refused with the other server modes.
 
 ## Notes
+
+Done on 2026-11-25: the patch below applied cleanly with `git apply --3way`; only the help
+entry was then reworded to match the transcript's wording. Measured with the WinGet curl
+8.18.0 (ngtcp2 1.21.0, nghttp3 1.15.0), `--http3-only -k -v -m 2 <url>/x <url>/y`, exit 28:
+`transcript.txt` showed `StreamAborted 0x10c` on streams 0 and 4 and decoder stream 10
+bytes `40` and `44`, as ADR-1410 records. Each of the other server modes was refused, and
+Windows PowerShell 5.1 got the "needs PowerShell 7" refusal. `dotnet build` clean, fast
+tests 58368 passed, 0 failed, 363 skipped. `dotnet format` not run: no C# file changed.
 
 The block below is BL-5978's `git diff` of the script. Save it to a file and `git apply` it, resolving by hand where BL-5973's edits moved the lines.
 
@@ -309,3 +317,4 @@ index 7587629f52..dcf5ebb0b6 100644
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 9fb27cdc 25665222.
+- 2026-11-25: Doing -> Done. Record-CurlExchange.ps1 -Http3StalledOrigin records a stalled HTTP/3 run's STOP_SENDING code and decoder stream bytes
