@@ -8,7 +8,7 @@ namespace Curl.Networking;
 /// <summary>
 /// Pins which RSASSA-PSS parameters verify a revocation list's signature (STD-197), and when a
 /// list counts as unexpired. Measured with lists <c>openssl ca -gencrl</c> signed, 2026-11-24
-/// (BL-5929, ADR-1369): curl 8.22.0 Schannel and curl 8.18.0 on OpenSSL 3.5.5 verify any salt
+/// (BL-5929, ADR-1376): curl 8.22.0 Schannel and curl 8.18.0 on OpenSSL 3.5.5 verify any salt
 /// length the parameters name and fail a signature whose salt is another length; MGF1 over
 /// another hash than the message's verifies in the OpenSSL build alone.
 /// </summary>

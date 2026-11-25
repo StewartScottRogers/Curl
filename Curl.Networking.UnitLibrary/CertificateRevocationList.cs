@@ -151,7 +151,7 @@ internal sealed class CertificateRevocationList
     /// <param name="issuer">The certificate whose key signed the list.</param>
     /// <param name="anotherMaskHashVerifies">
     /// Whether an RSASSA-PSS signature whose MGF1 hash is not its message hash can verify, as in
-    /// curl's OpenSSL build; the Schannel build leaves such a list unverified (ADR-1369).
+    /// curl's OpenSSL build; the Schannel build leaves such a list unverified (ADR-1376).
     /// </param>
     /// <returns><see langword="true" /> when the signature verifies.</returns>
     public bool IsSignedBy(X509Certificate2 issuer, bool anotherMaskHashVerifies = false)

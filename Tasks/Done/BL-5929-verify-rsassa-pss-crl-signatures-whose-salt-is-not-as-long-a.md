@@ -28,7 +28,7 @@ BL-5878 (ADR-1364) verifies RSASSA-PSS lists through `RSASignaturePadding.Pss`, 
 ## Notes
 
 - Measured 2026-11-24, lists signed by `openssl ca -gencrl` (SHA-256, RSA 2048), each against a certificate the list names and one it does not. curl 8.22.0 Schannel (intermediate `--cacert` anchor, loopback distribution point): salt 222 or 0 answers revoked / accepted; MGF1 over SHA-1 or SHA-384, a salt other than the one named, and a corrupt signature all leave "revocation status is unknown" (best effort accepts). curl 8.18.0 OpenSSL 3.5.5 (`--crlfile`, WSL): salt 222 or 0 and another MGF1 hash verify; a salt other than the one named and a corrupt signature are `CRL signature failure (8)`.
-- Plan and result (ADR-1369): hand-built `Curl.Cryptography.RsaPssVerification` (exact salt length, separate MGF1 hash); `RsaPssSignatureParameters` is now a record read from the DER; `IsSignedBy` admits another MGF1 hash only for `--crlfile`. No project reference added: Networking already uses Curl.Cryptography through Curl.Tls.
+- Plan and result (ADR-1376): hand-built `Curl.Cryptography.RsaPssVerification` (exact salt length, separate MGF1 hash); `RsaPssSignatureParameters` is now a record read from the DER; `IsSignedBy` admits another MGF1 hash only for `--crlfile`. No project reference added: Networking already uses Curl.Cryptography through Curl.Tls.
 - Curl debug build beside the Schannel measurement: all 24 answers (6 lists, 2 certificates, strict and `--ssl-revoke-best-effort`) match. The OpenSSL answers are pinned by unit tests (Curl on Windows ignores `--crlfile`).
 - `touches` widened (no other task in Doing names these): the new Cryptography files and its CLAUDE.md, `CertificateRevocationListFile.cs`, and the Networking test files listed.
 - Verification: `dotnet build` clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary,Curl.Networking.UnitLibrary` reports 0 failing members.
@@ -37,4 +37,4 @@ BL-5878 (ADR-1364) verifies RSASSA-PSS lists through `RSASignaturePadding.Pss`, 
 
 - 2026-11-24: Created.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: f5c9856a 3d836d5e.
-- 2026-11-24: Doing -> Done. RSASSA-PSS CRLs with any named salt length verify as curl does; another MGF1 hash verifies only for --crlfile (ADR-1369)
+- 2026-11-24: Doing -> Done. RSASSA-PSS CRLs with any named salt length verify as curl does; another MGF1 hash verifies only for --crlfile (ADR-1376)

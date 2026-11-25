@@ -1,4 +1,4 @@
-# ADR-1369: RSASSA-PSS CRL signatures verify with any salt length they name
+# ADR-1376: RSASSA-PSS CRL signatures verify with any salt length they name
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5929). Replaces ADR-1364's
 "a salt as long as the hash" and, for the OpenSSL build, its "MGF1 over the same hash".

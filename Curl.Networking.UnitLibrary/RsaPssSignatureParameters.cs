@@ -7,7 +7,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The <c>RSASSA-PSS-params</c> of a signature algorithm (RFC 4055, section 3.1), in the shapes
-/// <see cref="Curl.Cryptography.RsaPssVerification" /> checks a signature with (STD-197, ADR-1369).
+/// <see cref="Curl.Cryptography.RsaPssVerification" /> checks a signature with (STD-197, ADR-1376).
 /// </summary>
 /// <param name="Hash">The hash of the message.</param>
 /// <param name="MaskHash">The hash MGF1 uses.</param>
