@@ -1396,4 +1396,4 @@ Each option and the specific reason it lost.
 | [1352](ADR-1352-telnet-read-failing-during-option-negotiation-exits-56.md) | A TELNET read that fails during the option negotiation exits 56 (BL-5882) | Accepted | 2026-11-24 |
 | [1353](ADR-1353-dns-over-tls-verifies-the-server-certificate-with-the-transfers-cacert-capath-and-k.md) | --dns-over-tls verifies the server certificate with the transfer's --cacert, --capath and -k (BL-5872) | Accepted | 2026-11-24 |
 | [1354](ADR-1354-the-openssl-build-checks-only-a-host-name-like-cn-against-dns-name-constraints.md) | The OpenSSL build checks only a host-name-like CN against DNS name constraints (BL-5829) | Accepted | 2026-11-24 |
-| [1347](ADR-1347-ocsp-answers-before-the-crl-below-a-non-self-signed-anchor.md) | OCSP answers before the CRL below a non-self-signed anchor (BL-5877) | Accepted | 2026-11-24 |
+| [1355](ADR-1355-ocsp-answers-before-the-crl-below-a-non-self-signed-anchor.md) | OCSP answers before the CRL below a non-self-signed anchor (BL-5877) | Accepted | 2026-11-24 |

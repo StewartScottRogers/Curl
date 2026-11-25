@@ -1,4 +1,4 @@
-# ADR-1347: OCSP answers before the CRL below a non-self-signed anchor
+# ADR-1355: OCSP answers before the CRL below a non-self-signed anchor
 
 - Status: Accepted
 - Date: 2026-11-24

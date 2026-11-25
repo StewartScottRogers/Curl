@@ -49,7 +49,7 @@ The finding, verbatim:
 
 ## Notes
 
-- OCSP check added in the new `ServerCertificateVerification.AnchorOcsp.cs`, reusing `Curl.Tls`'s `OcspStapleVerifier`; OCSP is asked first and the CRL only when no responder says good or revoked (ADR-1347).
+- OCSP check added in the new `ServerCertificateVerification.AnchorOcsp.cs`, reusing `Curl.Tls`'s `OcspStapleVerifier`; OCSP is asked first and the CRL only when no responder says good or revoked (ADR-1355).
 - `touches` widened to that file, its test file, the fetch adapter's and chain errors' comments and the library's CLAUDE.md; no other task in Doing named any of them.
 - Verified 2026-11-24 with a throwaway C# mock (RSA root and intermediate, TLS servers, OCSP/CRL responder on 127.0.0.1): Curl and curl.exe (Schannel, Git for Windows) both exit 60 "has been revoked" for oc_crlclean_ocsprev direct and via --proxy-cacert and for o_revoked with --ssl-revoke-best-effort, and exit 0 for o_good direct and via proxy.
 - Measure-CodeQuality for Curl.Networking.UnitLibrary: 100% line and branch, 0 failing members. Build clean, fast tests pass.
