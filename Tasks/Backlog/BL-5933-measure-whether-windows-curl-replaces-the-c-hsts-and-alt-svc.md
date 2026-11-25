@@ -18,7 +18,7 @@ On Windows, saving the `-c` jar, the `--hsts` file and the `--alt-svc` file leav
 
 ## Context
 
-BL-5888 made the three files be replaced by rename off Windows and left Windows writing in place, unmeasured (ADR-1358). Measure the reference curl on Windows over an existing file, a read-only file, a hard-linked file and a file another process holds open (compare the NTFS file ID, attributes and content before and after), then match it in `Curl.Core.UnitLibrary/FileSystem/PhysicalFileSystem.cs` or record that it writes in place.
+BL-5888 made the three files be replaced by rename off Windows and left Windows writing in place, unmeasured (ADR-1368). Measure the reference curl on Windows over an existing file, a read-only file, a hard-linked file and a file another process holds open (compare the NTFS file ID, attributes and content before and after), then match it in `Curl.Core.UnitLibrary/FileSystem/PhysicalFileSystem.cs` or record that it writes in place.
 
 ## Acceptance criteria
 

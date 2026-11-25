@@ -54,7 +54,7 @@ namespace Curl.Core.FileSystem;
 /// naming nothing yet, opens and closes the path as a truncating open does, then writes a
 /// temporary file beside it, created with the old file's mode and its owner's read and write
 /// bits, narrowed by the umask, which a <see cref="ReplacementFileStream" /> renames over the
-/// path when it closes: libcurl's <c>Curl_fopen</c> (ADR-1358). A device or pipe is written in
+/// path when it closes: libcurl's <c>Curl_fopen</c> (ADR-1368). A device or pipe is written in
 /// place, and on Windows every <see cref="FileWriteMode.Replace" /> open truncates.
 /// </para>
 /// <para>

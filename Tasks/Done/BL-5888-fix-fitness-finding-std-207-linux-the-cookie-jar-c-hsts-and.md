@@ -44,7 +44,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Fix (ADR-1358): new `FileWriteMode.Replace`; `PhysicalFileSystem` off Windows writes a temporary
+- Fix (ADR-1368): new `FileWriteMode.Replace`; `PhysicalFileSystem` off Windows writes a temporary
   file beside the target and renames it over it, as libcurl's `Curl_fopen` does; the cookie jar,
   HSTS and alt-svc savers use it through `FileSystemReplacement.TryReplaceFileAsync`.
 - First criterion: **not run on Linux** (lanes run on Windows only). It is met on the lane rules'

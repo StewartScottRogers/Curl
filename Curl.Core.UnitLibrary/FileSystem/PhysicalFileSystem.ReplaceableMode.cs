@@ -37,7 +37,7 @@ public sealed partial class PhysicalFileSystem
     /// <summary>Reads the mode of an opened handle with the runtime's <c>fstat</c>.</summary>
     /// <param name="handle">The opened file.</param>
     /// <returns>As <see cref="ReplaceableModeIn(int)" />; <see langword="null" /> when <c>fstat</c> fails.</returns>
-    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-1358: a thin adapter over an fstat only Linux and macOS have.")]
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-1368: a thin adapter over an fstat only Linux and macOS have.")]
     private static unsafe UnixFileMode? ReadReplaceableMode(SafeFileHandle handle)
     {
         // The runtime's FileStatus starts with two 32-bit fields, Flags and Mode, and is under
