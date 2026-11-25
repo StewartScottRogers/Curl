@@ -47,7 +47,7 @@ The finding, verbatim:
 ## Notes
 
 - Done without pipeline subagents, to stay inside the run's cost cap.
-- Reproduced rules measured with `openssl verify -partial_chain -purpose sslserver` 3.5; recorded in ADR-1347.
+- Reproduced rules measured with `openssl verify -partial_chain -purpose sslserver` 3.5; recorded in ADR-1351.
 - Acceptance check run in WSL Ubuntu: a self-contained linux-x64 publish of this change and curl 8.18.0 (OpenSSL 3.5.5)
   against `openssl s_server` on 31950 gave identical stderr, `%{ssl_verify_result}` and exit code for
   `roottrustout.pem` (0), `rejectplusroot.pem` (60, `certificate rejected (28)`) and `rootreject.pem` (60).

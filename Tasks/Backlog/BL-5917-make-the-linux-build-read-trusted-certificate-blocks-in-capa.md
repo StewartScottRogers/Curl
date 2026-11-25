@@ -18,7 +18,7 @@ The OpenSSL build trusts, or rejects with exit 60 `certificate rejected (28)`, a
 
 ## Context
 
-Follow-up from BL-5879 (ADR-1347), which honours these settings in `--cacert` only. `ImportHashedCertificates` in `ServerCertificateVerification.CaCertificates.cs` imports `CERTIFICATE` blocks alone, so a `<hash>.0` file in the trusted format adds nothing; OpenSSL's `by_dir` reads it with `PEM_read_bio_X509_AUX`. `OpenSslCaFile` already parses the format. Measure real curl (WSL, curl 8.18 OpenSSL) before pinning behaviour, a rejected `--capath` certificate beside a `--cacert` file included.
+Follow-up from BL-5879 (ADR-1351), which honours these settings in `--cacert` only. `ImportHashedCertificates` in `ServerCertificateVerification.CaCertificates.cs` imports `CERTIFICATE` blocks alone, so a `<hash>.0` file in the trusted format adds nothing; OpenSSL's `by_dir` reads it with `PEM_read_bio_X509_AUX`. `OpenSslCaFile` already parses the format. Measure real curl (WSL, curl 8.18 OpenSSL) before pinning behaviour, a rejected `--capath` certificate beside a `--cacert` file included.
 
 ## Acceptance criteria
 

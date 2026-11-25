@@ -103,7 +103,7 @@ The builds differ in message text, in which `--cacert` files are exit 77, and in
 (`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts the certificates of its `<subject hash>.<n>` files, as OpenSSL's hashed directory lookup reads them (`OpenSslSubjectNameHash`, ADR-0836, CGR-111), the
 Schannel build ignores it and reports its one warning, unwrapped, in `SslStreamTlsProvider.Warnings`
 for the console to print wrapped at the terminal width (two lines at curl's default 79 columns).
-The OpenSSL build also reads `TRUSTED CERTIFICATE` blocks of a `--cacert` file (`OpenSslCaFile`, ADR-1347):
+The OpenSSL build also reads `TRUSTED CERTIFICATE` blocks of a `--cacert` file (`OpenSslCaFile`, ADR-1351):
 when the settings of the lowest listed certificate above the server's own (else the server's own) refuse
 server authentication, the first copy of a certificate winning, the chain is exit 60 `certificate rejected (28)`. With `--cert` (`TlsClientOptions.ClientCertificate`, split into
 file and passphrase by `ClientCertificateArgument` as curl splits it) it presents a client

@@ -1,4 +1,4 @@
-# ADR-1347: The OpenSSL build honours TRUSTED CERTIFICATE settings in --cacert
+# ADR-1351: The OpenSSL build honours TRUSTED CERTIFICATE settings in --cacert
 
 - Status: Accepted
 - Date: 2026-11-24
