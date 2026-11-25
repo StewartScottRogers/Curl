@@ -1,4 +1,4 @@
-# ADR-1388: The OpenSSL build refuses a subject emailAddress that is not an IA5String under name constraints (BL-5942)
+# ADR-1389: The OpenSSL build refuses a subject emailAddress that is not an IA5String under name constraints (BL-5942)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1387.
 

@@ -18,7 +18,7 @@ In the OpenSSL build, a leaf breaking more than one name constraint reports the 
 
 ## Context
 
-Found during BL-5942 (ADR-1388). `CertificateNameConstraints.FindViolation` checks every name against the permitted subtrees and only then every name against the excluded ones; it reads the CAs from the leaf upwards. OpenSSL's `NAME_CONSTRAINTS_check` (`crypto/x509/v3_ncons.c`) takes the names one at a time (permitted, then excluded, for each), and `check_name_constraints` (`crypto/x509/x509_vfy.c`) takes the constraining CAs from the top of the chain down. So a subject directoryName that is excluded beside an emailAddress outside the permitted domain is 48 in OpenSSL and 47 here. Read from the source, not measured: measure OpenSSL curl first. The Schannel build's answers must not change.
+Found during BL-5942 (ADR-1389). `CertificateNameConstraints.FindViolation` checks every name against the permitted subtrees and only then every name against the excluded ones; it reads the CAs from the leaf upwards. OpenSSL's `NAME_CONSTRAINTS_check` (`crypto/x509/v3_ncons.c`) takes the names one at a time (permitted, then excluded, for each), and `check_name_constraints` (`crypto/x509/x509_vfy.c`) takes the constraining CAs from the top of the chain down. So a subject directoryName that is excluded beside an emailAddress outside the permitted domain is 48 in OpenSSL and 47 here. Read from the source, not measured: measure OpenSSL curl first. The Schannel build's answers must not change.
 
 ## Acceptance criteria
 
