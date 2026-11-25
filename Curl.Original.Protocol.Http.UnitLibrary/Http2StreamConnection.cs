@@ -338,15 +338,16 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
-    /// Resets the stream of a transfer that timed out with STREAM_CLOSED, unless it has ended
-    /// both ways, as curl does before it sends the next transfer on the connection (measured,
-    /// BL-5976 Notes). Nothing is sent before the stream is open, or on a connection that takes
-    /// no new stream, whose closing resets it
+    /// Resets the stream of a transfer that timed out, or that <c>-f</c> failed, with
+    /// STREAM_CLOSED, unless it has ended both ways, as curl does before it sends the next
+    /// transfer on the connection (measured, BL-5976 and BL-5977 Notes). Nothing is sent before
+    /// the stream is open, or on a connection that takes no new stream, whose closing resets it
     /// (<see cref="Http2Session.ShutDownAsync" />); a connection that fails the write takes none
     /// from then on.
     /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when any reset is sent.</returns>
-    internal async ValueTask ResetTimedOutAsync()
+    internal async ValueTask ResetUnlessEndedBothWaysAsync(CancellationToken cancellationToken)
     {
         if (streamId == 0 || (isRequestEnded && isResponseEnded) || !session.AcceptsNewStreams)
         {
@@ -355,8 +356,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
         try
         {
-            // The transfer's own token is cancelled: its time limit is what brought it here.
-            await ResetAsClosedAsync(CancellationToken.None).ConfigureAwait(false);
+            await ResetAsClosedAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {

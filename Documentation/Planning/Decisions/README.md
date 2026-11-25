@@ -1449,3 +1449,4 @@ Each option and the specific reason it lost.
 | [1405](ADR-1405-a-timed-out-http-2-transfer-reports-its-connection-left-intact.md) | A timed-out HTTP/2 transfer reports its connection left intact (BL-5974) | Accepted | 2026-11-25 |
 | [1406](ADR-1406-a-red-only-an-interactive-session-can-fix-gets-a-revert-a-lane-can-make.md) | A red CI that only an interactive session can fix gets a revert a lane can make (BL-5175) | Accepted | 2026-11-25 |
 | [1407](ADR-1407-a-timed-out-http-2-transfers-connection-carries-the-next-transfer.md) | A timed-out HTTP/2 transfer's connection carries the next transfer (BL-5976) | Accepted | 2026-11-25 |
+| [1408](ADR-1408-a-transfer-f-fails-over-http-2-keeps-its-connection.md) | A transfer `-f` fails over HTTP/2 keeps its connection (BL-5977) | Accepted | 2026-11-25 |

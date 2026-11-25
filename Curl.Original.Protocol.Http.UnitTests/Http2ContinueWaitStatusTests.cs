@@ -153,6 +153,19 @@ public sealed class Http2ContinueWaitStatusTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_FailOnAStatusDuringTheWait_ReportsTheConnectionLeftIntact()
+    {
+        ScriptedConnection connection = new(Response(Headers("500", endsStream: true)), 65536);
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await StartAsync(connection, events, new FakeTimeProvider(DateTimeOffset.UnixEpoch), fail: HttpFailMode.Fail);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode, result.ErrorMessage);
+        AssertInOrder(events.Events, "< HTTP/2 500 \r\n", "* The requested URL returned error: 500", "< \r\n", "* Connection #0 to host h:80 left intact");
+        CollectionAssert.DoesNotContain(events.Info, "closing connection #0");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TheResetOfAFailedUploadCannotBeWritten_StillFailsWith22()
     {
         FailsTheResetConnection connection = new(new ScriptedConnection(Response(Headers("500", endsStream: true)), 65536));

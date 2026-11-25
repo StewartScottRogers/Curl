@@ -87,21 +87,38 @@ public sealed partial class HttpProtocolHandler
     /// <summary>
     /// Tells whether the connection can carry the next transfer: its response is reported left
     /// intact over HTTP/1.x or HTTP/2, or over HTTP/3 while the session takes new streams; or
-    /// the transfer timed out on a stream of an HTTP/2 session that still takes new ones, as
-    /// curl ends only the stream then (BL-5976).
+    /// the transfer timed out, or <c>-f</c> failed it, on a stream of an HTTP/2 session that
+    /// still takes new ones, as curl ends only the stream then (BL-5976, BL-5977).
     /// </summary>
     private static bool CarriesNextTransfer(IHttpStreamSession? streams, HttpAttemptOutcome outcome) =>
-        outcome.TimedOutOnHttp2Stream
+        outcome.EndedOnlyItsHttp2Stream
             ? ((Http2Session)streams!).AcceptsNewStreams
             : outcome.ReportsLeftIntact && streams is not Http3Session { AcceptsNewStreams: false };
 
     /// <summary>
-    /// Resets a timed-out exchange's HTTP/2 stream
-    /// (<see cref="Http2StreamConnection.ResetTimedOutAsync" />); nothing on any other
-    /// connection.
+    /// Resets the HTTP/2 stream of an exchange that timed out or that <c>-f</c> failed
+    /// (<see cref="Http2StreamConnection.ResetUnlessEndedBothWaysAsync" />); nothing on any
+    /// other connection.
     /// </summary>
-    private static ValueTask ResetTimedOutStreamAsync(IHttpStreamConnection? stream) =>
-        stream is Http2StreamConnection http2 ? http2.ResetTimedOutAsync() : ValueTask.CompletedTask;
+    private static ValueTask ResetGivenUpStreamAsync(IHttpStreamConnection? stream, CancellationToken cancellationToken) =>
+        stream is Http2StreamConnection http2 ? http2.ResetUnlessEndedBothWaysAsync(cancellationToken) : ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Resets what a failed exchange leaves open of its HTTP/2 stream: when <c>-f</c> failed it,
+    /// the stream unless it has ended both ways (<see cref="ResetGivenUpStreamAsync" />); and
+    /// after any failure, one whose response ended it with the upload unsent
+    /// (<see cref="ResetFailedStreamUploadAsync" />), even on a connection that takes no new
+    /// stream.
+    /// </summary>
+    private static async ValueTask ResetFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, IConnection connection, CancellationToken cancellationToken)
+    {
+        if (failure.ExitCode == CurlExitCode.HttpReturnedError)
+        {
+            await ResetGivenUpStreamAsync(TrailerStreamOf(requestStream, connection), cancellationToken).ConfigureAwait(false);
+        }
+
+        await ResetFailedStreamUploadAsync(requestStream, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,

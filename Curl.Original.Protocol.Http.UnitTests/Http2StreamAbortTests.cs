@@ -12,7 +12,8 @@ namespace Curl.Original.Protocol.Http;
 /// The frames an HTTP/2 connection closes with: curl 8.18.0 resets the stream of a transfer
 /// that <c>-m</c> aborts with STREAM_CLOSED before its GOAWAY (measured, BL-5906 Notes), and
 /// reports the connection left intact (measured, BL-5974 Notes) and sends the next transfer on
-/// it (measured, BL-5976 Notes).
+/// it (measured, BL-5976 Notes). A transfer <c>-f</c> fails does the same, its stream reset
+/// only when it has not ended (measured, BL-5977 Notes).
 /// </summary>
 [TestClass]
 public sealed class Http2StreamAbortTests
@@ -248,7 +249,7 @@ public sealed class Http2StreamAbortTests
     }
 
     [TestMethod]
-    public async Task ResetTimedOutAsync_AWriteWasCancelled_TakesNoNewStreamAndSendsNothing()
+    public async Task ResetUnlessEndedBothWaysAsync_AWriteWasCancelled_TakesNoNewStreamAndSendsNothing()
     {
         RecordingConnection connection = new(new ScriptedConnection([], 65536)) { WriteFailure = new OperationCanceledException() };
         Http2Session session = new(connection);
@@ -257,7 +258,7 @@ public sealed class Http2StreamAbortTests
         connection.WriteFailure = null;
         Diagnostics.Arrange("session", "the write opening it was cancelled");
 
-        await stream.ResetTimedOutAsync();
+        await stream.ResetUnlessEndedBothWaysAsync(CancellationToken.None);
 
         Diagnostics.Act("accepts new streams, bytes written (hex)", $"{session.AcceptsNewStreams}, {connection.WrittenHex}");
         Diagnostics.Assert("accepts new streams", false, session.AcceptsNewStreams);
@@ -268,7 +269,7 @@ public sealed class Http2StreamAbortTests
     [TestMethod]
     [DataRow(5L, DisplayName = "the request body is unsent")]
     [DataRow(0L, DisplayName = "the response is unfinished")]
-    public async Task ResetTimedOutAsync_TheStreamHasNotEndedBothWays_ResetsItOnce(long bodyLength)
+    public async Task ResetUnlessEndedBothWaysAsync_TheStreamHasNotEndedBothWays_ResetsItOnce(long bodyLength)
     {
         RecordingConnection connection = new(new ScriptedConnection([], 65536));
         Http2Session session = new(connection);
@@ -276,8 +277,8 @@ public sealed class Http2StreamAbortTests
         await stream.WriteAsync(Request, CancellationToken.None);
         Diagnostics.Arrange("request body length", bodyLength);
 
-        await stream.ResetTimedOutAsync();
-        await stream.ResetTimedOutAsync();
+        await stream.ResetUnlessEndedBothWaysAsync(CancellationToken.None);
+        await stream.ResetUnlessEndedBothWaysAsync(CancellationToken.None);
 
         string written = connection.WrittenHex;
         Diagnostics.Act("bytes written (hex)", written);
@@ -288,29 +289,67 @@ public sealed class Http2StreamAbortTests
     }
 
     [TestMethod]
-    public async Task ResetTimedOutAsync_TheStreamNeverOpened_SendsNothing()
+    public async Task ResetUnlessEndedBothWaysAsync_TheStreamNeverOpened_SendsNothing()
     {
         RecordingConnection connection = new(new ScriptedConnection([], 65536));
         Http2StreamConnection stream = (Http2StreamConnection)new Http2Session(connection).CreateStream("http", 0, ignoresBody: false);
         Diagnostics.Arrange("stream", "no head written");
 
-        await stream.ResetTimedOutAsync();
+        await stream.ResetUnlessEndedBothWaysAsync(CancellationToken.None);
 
         Diagnostics.Act("bytes written (hex)", connection.WrittenHex);
         Diagnostics.Assert("bytes written (hex)", string.Empty, connection.WrittenHex);
         Assert.AreEqual(string.Empty, connection.WrittenHex);
     }
 
+    [TestMethod]
+    [DataRow(true, false, false, DisplayName = "the head ends the stream")]
+    [DataRow(false, false, true, DisplayName = "the response is unfinished")]
+    [DataRow(false, true, true, DisplayName = "unread DATA ends the stream")]
+    public async Task ExecuteAsync_NextTransferAfterFFailsOne_GoesOutOnTheSameConnectionWhichIsLeftIntact(bool headEndsStream, bool dataFollows, bool resets)
+    {
+        byte[] data = dataFollows ? Http2FrameCodec.Serialize(Data(1, "err\n", isEndStream: true)) : [];
+        PushedBytesConnection pushed = new();
+        SessionHoldingConnection connection = new(pushed);
+        HttpProtocolHandler handler = new(QueueConnector.For(connection, connection), new SilentAuthenticator());
+        RecordingTransferEvents events = new();
+        MemoryStream second = new();
+        pushed.Push([.. ServerFrames(Head(headEndsStream, "500")), .. data]);
+        Diagnostics.Arrange("server", $"answers stream 1 with 500 (head ends the stream: {headEndsStream}, DATA follows: {dataFollows}), then stream 3 with 200");
+
+        TransferResult failed = await handler.ExecuteAsync(Context(HttpVersionPreference.Http2PriorKnowledge, events: events, fail: HttpFailMode.Fail));
+        pushed.Push([.. Http2FrameCodec.Serialize(Head(isEndStream: false, streamId: 3)), .. Http2FrameCodec.Serialize(Data(3, "again\n", isEndStream: true))]);
+        TransferResult next = await handler.ExecuteAsync(Context(HttpVersionPreference.Http2PriorKnowledge, output: second));
+
+        string written = Convert.ToHexString(pushed.Written);
+        int reset = written.IndexOf(StreamOneResetHeader, StringComparison.Ordinal);
+        int nextHeaders = written.IndexOf(StreamThreeHeadersHeader, StringComparison.Ordinal);
+        Diagnostics.Act("exit codes, -v lines, bytes written (hex)", $"{failed.ExitCode} then {next.ExitCode}, {string.Join('|', events.Info)}, {written}");
+        Diagnostics.Assert("second body", "again\n", Encoding.Latin1.GetString(second.ToArray()));
+        Diagnostics.Assert("stream 1 is reset", resets, reset >= 0);
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, failed.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, next.ExitCode, next.ErrorMessage);
+        Assert.AreEqual("again\n", Encoding.Latin1.GetString(second.ToArray()));
+        CollectionAssert.Contains(events.Info, "Connection #0 to host example.com:80 left intact");
+        CollectionAssert.DoesNotContain(events.Info, "closing connection #0");
+        Assert.AreEqual(resets, reset >= 0, written);
+        Assert.AreEqual(resets, written.Contains(StreamOneClosedReset, StringComparison.Ordinal), written);
+        Assert.IsGreaterThan(reset, nextHeaders, written);
+        Assert.AreEqual(reset, written.LastIndexOf(StreamOneResetHeader, StringComparison.Ordinal), written);
+        Assert.DoesNotContain(ShutdownGoAway, written);
+        Assert.AreEqual(2, connection.ReturnedReusableCount);
+    }
+
     private static byte[] Request => "GET / HTTP/1.1\r\nHost: h\r\n\r\n"u8.ToArray();
 
     private static HttpProtocolHandler Handler(IConnection connection) => new(QueueConnector.For(connection), new SilentAuthenticator());
 
-    private static TransferContext Context(HttpVersionPreference version, TimeProvider? time = null, TimeSpan? maxTime = null, bool noBody = false, RecordingTransferEvents? events = null, Stream? output = null) =>
+    private static TransferContext Context(HttpVersionPreference version, TimeProvider? time = null, TimeSpan? maxTime = null, bool noBody = false, RecordingTransferEvents? events = null, Stream? output = null, HttpFailMode fail = HttpFailMode.None) =>
         new()
         {
             Url = CurlUrl.Parse("http://example.com/"),
             Output = output ?? new MemoryStream(),
-            Http = new HttpRequestOptions { Version = version },
+            Http = new HttpRequestOptions { Version = version, Fail = fail },
             TimeProvider = time ?? TimeProvider.System,
             MaxTime = maxTime,
             NoBody = noBody,
