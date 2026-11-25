@@ -79,3 +79,4 @@ and moves the task to Blocked with that question; it must not make the port exit
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 29.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 8c155b65 fcdae5ab 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waits on BL-5915, which holds Curl.Console.UnitTests: the fix is in Curl.Console/StandardInputUploadStream.cs and its tests (see Notes)
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 8c155b65 fcdae5ab 3d836d5e.
