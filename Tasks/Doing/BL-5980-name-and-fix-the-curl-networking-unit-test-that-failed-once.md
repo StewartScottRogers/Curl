@@ -30,3 +30,4 @@ BL-5978's full fast-test run, made while other lanes were working, reported `Cur
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: e4f18111 77784d6a.
