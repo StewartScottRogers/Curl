@@ -1,5 +1,5 @@
 ---
-id: BL-5926
+id: BL-5931
 title: Match OpenLDAP after ldap:// StartTLS: the unbind after a failed handshake, no bind without -u, and a non-ExtendedResponse reply
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5926 — Match OpenLDAP after ldap:// StartTLS: the unbind after a failed handshake, no bind without -u, and a non-ExtendedResponse reply
+# BL-5931 — Match OpenLDAP after ldap:// StartTLS: the unbind after a failed handshake, no bind without -u, and a non-ExtendedResponse reply
 
 ## Goal
 
