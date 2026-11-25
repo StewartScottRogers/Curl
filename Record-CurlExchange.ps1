@@ -899,8 +899,8 @@ $serveConnections = {
             break  # The listener was stopped: curl exited without opening this connection.
         }
         if ($ResetConnections) {
-            # A zero linger time makes Close send RST instead of FIN.
-            $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0)
+            # Close(0) on the socket sends RST alone; TcpClient.Close shuts down first, sending FIN.
+            $client.Client.Close(0)
             $client.Close()
             $requests.Add([byte[]] @())
             continue
@@ -981,8 +981,8 @@ $serveConnections = {
                 try { $stream.ShutdownAsync().Wait() } catch { }  # curl may have hung up already.
             }
         } finally {
-            # A zero linger time makes Close send RST instead of FIN.
-            if ($ResetAfterAnswer) { $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0) }
+            # Close(0) on the socket sends RST alone; TcpClient.Close shuts down first, sending FIN.
+            if ($ResetAfterAnswer) { $client.Client.Close(0) }
             $client.Close()
         }
     }
@@ -1981,8 +1981,8 @@ $serveScriptedSession = {
                 Start-Sleep -Milliseconds $step.Milliseconds
                 [void] $Transcript.Append("= paused $($step.Milliseconds) ms`r`n")
             } elseif ($step.Kind -eq 'reset') {
-                # A zero linger time makes Close send RST instead of FIN.
-                $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0)
+                # Close(0) on the socket sends RST alone; TcpClient.Close shuts down first, sending FIN.
+                $client.Client.Close(0)
                 $client.Close()
                 [void] $Transcript.Append("= server reset the connection`r`n")
                 $ended = $true
