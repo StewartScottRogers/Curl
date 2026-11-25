@@ -40,6 +40,34 @@ public sealed class CommandLineUploadRequestMethodTests
     }
 
     [TestMethod]
+    [DataRow("amqp://127.0.0.1:1/q", DisplayName = "amqp")]
+    [DataRow("grpc://127.0.0.1:1/demo.Greeter/Echo", DisplayName = "grpc")]
+    [DataRow("kafka://127.0.0.1:1/dw/0", DisplayName = "kafka")]
+    [DataRow("mqtt5://127.0.0.1:1/t", DisplayName = "mqtt5")]
+    [DataRow("nats://127.0.0.1:1/s", DisplayName = "nats")]
+    [DataRow("redis://127.0.0.1:1/SET/k", DisplayName = "redis")]
+    [DataRow("signalr://127.0.0.1:1/hub", DisplayName = "signalr")]
+    [DataRow("socketio://127.0.0.1:1/", DisplayName = "socketio")]
+    [DataRow("stomp://127.0.0.1:1/q", DisplayName = "stomp")]
+    [DataRow("webtransport://127.0.0.1:1/p", DisplayName = "webtransport")]
+    [DataRow("xmpp://127.0.0.1:1/a@b", DisplayName = "xmpp")]
+    public void PutRequestedWith_DataAndUploadToAnExtendedScheme_IsRefusedAsForHttp(string url)
+    {
+        string[] arguments = ["-d", "dwins", "-T", "f", url];
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        Assert.IsTrue(result.IsAccepted);
+
+        IReadOnlyList<string>? lines = CommandLineWarning.PutRequestedWith(result.Options.HttpMethodBeforeUpload);
+
+        string[] expected = [WarningStart + "POST (-d, --data)."];
+        Diagnostics.Assert("lines", expected, lines);
+        Assert.IsNotNull(lines);
+        CollectionAssert.AreEqual(expected, lines.ToArray());
+    }
+
+    [TestMethod]
     [DataRow(SelectedHttpMethod.None, DisplayName = "None")]
     [DataRow(SelectedHttpMethod.Put, DisplayName = "Put")]
     public void PutRequestedWith_NoOtherMethod_IsNull(SelectedHttpMethod selected)
