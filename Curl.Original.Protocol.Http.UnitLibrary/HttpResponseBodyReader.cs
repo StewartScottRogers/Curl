@@ -163,9 +163,17 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// <see cref="ITransferEvents.ReportDataReceived" />, then one per read, a chunked body's
     /// framing and trailers included, as curl 8.21.0's <c>--trace</c> shows them (measured,
     /// BL-407 Notes), and one empty event for a read-to-close body that closed without a byte
-    /// (BL-1763).
+    /// (BL-1763), unless <see cref="Http2Stream" /> ended with empty data.
     /// </summary>
     internal ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Gets or sets the HTTP/2 stream the body is read from, or <see langword="null" /> for any
+    /// other body. The empty data of a response such a stream ended with
+    /// (<see cref="Http2StreamConnection.EndedWithEmptyData" />) is not reported here: the handler
+    /// reports it after the trailers (BL-5956).
+    /// </summary>
+    internal Http2StreamConnection? Http2Stream { get; set; }
 
     /// <summary>
     /// Determines whether a response carries a body: not for <c>-I</c>, and not for a
@@ -666,7 +674,8 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// Ends the body where the peer closed: cleanly for a read-to-close body, and with exit
     /// 18 for a Content-Length body still short. A read-to-close body that ended without a
     /// byte reports its closing read as one empty data event, which <c>-v</c> shows as
-    /// <c>{ [0 bytes data]</c>, as curl 8.21.0 does (measured, BL-1763 Notes).
+    /// <c>{ [0 bytes data]</c>, as curl 8.21.0 does (measured, BL-1763 Notes). An
+    /// <see cref="Http2Stream" /> that ended with empty data has that event left to the handler.
     /// </summary>
     private void EndAtClose(bool isReadToClose, long remaining)
     {
@@ -675,7 +684,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             throw new HttpTransferException(CurlExitCode.PartialFile, HttpTransferMessages.BodyBytesMissing(remaining));
         }
 
-        if (remaining == long.MaxValue)
+        if (remaining == long.MaxValue && Http2Stream is not { EndedWithEmptyData: true })
         {
             Events.ReportDataReceived([]);
         }

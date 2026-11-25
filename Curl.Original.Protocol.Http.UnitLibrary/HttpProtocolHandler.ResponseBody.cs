@@ -82,6 +82,7 @@ public sealed partial class HttpProtocolHandler
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
         SetBodyLimitAndSinks(plan, body, discardsBody, ReportsIgnoredBodyProgress(plan, head));
+        body.Http2Stream = requestStream as Http2StreamConnection;
         HttpTransferException? failedTransfer = null;
         try
         {
@@ -105,7 +106,7 @@ public sealed partial class HttpProtocolHandler
         int storedLength = StoredLengthOf(trailers.Span, requestStream is null ? int.MaxValue : HttpResponseHeadReader.MaximumHeaderCount - body.HeadersStored);
         await WriteHeadersAsync(context.HeaderOutput, trailers[..storedLength], cancellationToken).ConfigureAwait(false);
         ReportStreamTrailers(body, requestStream, context.Events, trailers.Span[..storedLength]);
-        ReportEmptyStreamData(head, body, requestStream, context);
+        ReportEmptyStreamData(body.Http2Stream, context.Events);
         if (storedLength < trailers.Length)
         {
             throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders)
@@ -142,15 +143,14 @@ public sealed partial class HttpProtocolHandler
     /// Reports the empty data that ends an HTTP/2 response, after its trailers, which <c>-v</c>
     /// shows as <c>{ [0 bytes data]</c> (<see cref="Http2StreamConnection.EndedWithEmptyData" />):
     /// a response with no body, or one a trailer ends (measured, curl 8.18.0, BL-5946 Notes).
-    /// Nothing for a body without a length that ended without a byte, whose empty data the body
-    /// reader has reported already. A discarded body never comes here.
+    /// The body reader leaves it to this method (<see cref="HttpResponseBodyReader.Http2Stream" />),
+    /// so it is reported once. A discarded body never comes here.
     /// </summary>
-    private static void ReportEmptyStreamData(HttpResponseHead head, HttpResponseBodyReader body, IHttpStreamConnection? requestStream, ITransferContext context)
+    private static void ReportEmptyStreamData(Http2StreamConnection? http2Stream, ITransferEvents events)
     {
-        bool isReportedByReader = HttpResponseBodyReader.HasBody(head, context.NoBody) && body.ExpectedLength is null && body.BytesWritten == 0;
-        if (requestStream is Http2StreamConnection { EndedWithEmptyData: true } && !isReportedByReader)
+        if (http2Stream is { EndedWithEmptyData: true })
         {
-            context.Events.ReportDataReceived([]);
+            events.ReportDataReceived([]);
         }
     }
 

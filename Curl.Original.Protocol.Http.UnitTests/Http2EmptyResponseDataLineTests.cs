@@ -86,6 +86,40 @@ public sealed class Http2EmptyResponseDataLineTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ResponseWithoutALengthOrABodyATrailerEnds_ReportsOneEmptyDataEventAfterTheTrailer()
+    {
+        List<string> events = await EventsOfAsync(
+            noBody: false,
+            Headers(isEndStream: false, new HeaderField(":status", "200")),
+            Headers(isEndStream: true, new HeaderField("x-t", "v")));
+
+        CollectionAssert.AreEqual(new[] { EmptyData }, DataEventsOf(events));
+        Assert.AreEqual("< x-t: v\r\n", events[events.IndexOf(EmptyData) - 1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResponseWithoutALengthEndingOnEmptyData_ReportsOneEmptyDataEvent()
+    {
+        List<string> events = await EventsOfAsync(
+            noBody: false,
+            Headers(isEndStream: false, new HeaderField(":status", "200")),
+            Data(string.Empty, isEndStream: true));
+
+        CollectionAssert.AreEqual(new[] { EmptyData }, DataEventsOf(events));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResponseWithoutALengthEndedByACleanReset_ReportsOneEmptyDataEvent()
+    {
+        List<string> events = await EventsOfAsync(
+            noBody: false,
+            Headers(isEndStream: false, new HeaderField(":status", "200")),
+            Http2FrameFactory.CreateRstStream(1, Http2ErrorCode.NoError));
+
+        CollectionAssert.AreEqual(new[] { EmptyData }, DataEventsOf(events));
+    }
+
+    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public async Task ExecuteAsync_BodyEndedByData_ReportsNoEmptyData(bool endsOnAnEmptyFrame)
