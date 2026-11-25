@@ -1,5 +1,5 @@
 ---
-id: BL-5941
+id: BL-5942
 title: Answer a subject emailAddress that is not an IA5String under name constraints as the OpenSSL build
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5941 — Answer a subject emailAddress that is not an IA5String under name constraints as the OpenSSL build
+# BL-5942 — Answer a subject emailAddress that is not an IA5String under name constraints as the OpenSSL build
 
 ## Goal
 

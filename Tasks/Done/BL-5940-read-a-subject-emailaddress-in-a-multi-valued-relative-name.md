@@ -33,7 +33,7 @@ answers before the verify result.
 - Measured curl 8.18.0 / OpenSSL 3.5.5 (WSL): a multi-valued subject emailAddress answers 48 when excluded, 47 outside the permitted domain, 0 inside it; two emails in one relative name are both read. Table in ADR-1384.
 - `ListEveryCommonName` now sits on a shared `ListEveryAttribute`; the Schannel build still reads single-valued relative names only.
 - Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members. Fast tests green, build clean. Linux and macOS: the new tests build subjects with AsnWriter and the `VerifyPeer` one excludes OSX, as its siblings do.
-- Filed BL-5941: a subject emailAddress that is not an IA5String (OpenSSL answers 53, read from source).
+- Filed BL-5942: a subject emailAddress that is not an IA5String (OpenSSL answers 53, read from source).
 
 ## Log
 
