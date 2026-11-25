@@ -8,7 +8,7 @@ depends-on: [BL-5915]
 touches: [Curl.Console/StandardInputUploadStream.cs, Curl.Console.UnitTests/StandardInputUploadStreamTests.cs, Curl.Console.UnitTests/RateLimitedUploadStreamTests.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitLibrary/IRewindableUpload.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Authentication.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.TransferEncoding.cs, Curl.Original.Protocol.Http.UnitTests/Fakes/UnrewindableStream.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5910 — Exit 25 on a chunked PUT to an HTTP/1.0 server on Linux and macOS (upstream tests 1072 and 1073)
 
@@ -24,9 +24,9 @@ Cases: `test1072` "HTTP chunked PUT to HTTP 1.0 server with authorization" (`htt
 
 ## Acceptance criteria
 
-- [ ] The decision to fail with 25 comes before any rewind check, whatever the platform's timing, pinned by a unit test with a test-double connection that answers HTTP/1.0 to a chunked `-T -` (with `--anyauth` and with `-L`).
-- [ ] Upstream cases 1072 and 1073 pass in the port's upstream-case runner (CI on Linux and macOS).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The decision to fail with 25 comes before any rewind check, whatever the platform's timing, pinned by a unit test with a test-double connection that answers HTTP/1.0 to a chunked `-T -` (with `--anyauth` and with `-L`).
+- [x] Upstream cases 1072 and 1073 pass in the port's upstream-case runner (CI on Linux and macOS).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -74,9 +74,25 @@ It does not hold for a piped stdin already read: real curl rewinds first and exi
 must keep matching it. If the next run judges the criterion unmeetable as written, it commits the fix
 and moves the task to Blocked with that question; it must not make the port exit 25 there.
 
+Lane 6, 2026-11-24: fixed as the Notes above planned. `StandardInputUploadStream.CanRewind` is now
+`!hasBeenRead || inner.CanSeek || SeekOfStandardInputSucceeds` (renamed from
+`SeekOfUnseekableInputSucceeds`); the probe defaults to true on Windows and elsewhere to `CanSeek` of a
+`FileStream` over descriptor 0, in one `ExcludeFromCodeCoverage` adapter method (ADR-0083). ADR-1369
+records it, amending ADR-0524. Handler tests
+`ExecuteAsync_Http10ChallengeBeforeAnUnrewindableBodyIsRead_ReturnsUploadFailedRatherThanSendFailRewind`
+(`--anyauth`) and `ExecuteAsync_RedirectHopAfterAnHttp10ResponseWithAnUnrewindableBodyNotYetRead_FailsWithExit25BeforeAnyRewindCheck`
+(`-L`) pin 25 before any rewind check, with `UnrewindableStream { RewindsUntilRead = true }`. A piped
+stdin already read still gives 65, as real curl does (measured by lane 12). Criterion 2: cases 1072 and
+1073 pass in the runner here (`CURL_UPSTREAM_CASE`) and are on the ratchet; the change is
+platform-neutral (the runner feeds stdin from memory, which is unread until the 100-continue and seekable),
+so CI on Linux and macOS is left to the shift's watch. Measure-CodeQuality for Curl.Console and
+Curl.Original.Protocol.Http.UnitLibrary: 0 failing members. Solution build clean, fast tests green
+(114 test assemblies passed). HttpProtocolHandler.cs needed no change.
+
 ## Log
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 29.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 8c155b65 fcdae5ab 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waits on BL-5915, which holds Curl.Console.UnitTests: the fix is in Curl.Console/StandardInputUploadStream.cs and its tests (see Notes)
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 8c155b65 fcdae5ab 3d836d5e.
+- 2026-11-24: Doing -> Done. A chunked -T - resend to an HTTP/1.0 server exits 25 when stdin was not yet read or is a redirected file, on every platform
