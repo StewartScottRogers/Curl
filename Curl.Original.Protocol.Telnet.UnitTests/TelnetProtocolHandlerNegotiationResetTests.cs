@@ -9,7 +9,9 @@ namespace Curl.Original.Protocol.Telnet;
 /// <summary>
 /// Pins how a <c>telnet://</c> session meets a connection read that fails during the option
 /// negotiation: exit 56, never exit 0 with the server's data lost (BL-5882, ADR-1352),
-/// against curl 8.23.0 on Windows.
+/// against curl 8.23.0 on Windows. The Windows rule runs on every platform here, beside
+/// the Linux and macOS rule (BL-5918, ADR-1376); each platform's own answer is pinned in
+/// <c>TelnetProtocolHandlerResetByPlatformTests</c>.
 /// </summary>
 [TestClass]
 public sealed class TelnetProtocolHandlerNegotiationResetTests
@@ -83,12 +85,31 @@ public sealed class TelnetProtocolHandlerNegotiationResetTests
         Assert.AreEqual("login: ", output);
     }
 
-    private async Task<(TransferResult Result, string Output)> RunAsync(FaultingConnection connection)
+    [TestMethod]
+    public async Task ExecuteAsync_LinuxRuleReadFailsAfterRepliesWentAndDataWasWritten_ExitsWith56KeepingTheData()
+    {
+        var connection = new FaultingConnection([0xFF, 0xFD, 0x18, .. "login: "u8]) { ReadFailsAfterReads = true };
+
+        (TransferResult result, string output) = await RunAsync(connection, runsOnWindows: false);
+
+        Diagnostics.AssertExitCode(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Diff("output", "login: ", output);
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
+        Assert.AreEqual(7, result.BytesTransferred);
+        Assert.AreEqual("login: ", output);
+    }
+
+    private async Task<(TransferResult Result, string Output)> RunAsync(FaultingConnection connection, bool runsOnWindows = true)
     {
         Diagnostics.Arrange("connection", "reads fail after the scripted ones");
+        Diagnostics.Arrange("Windows rule", runsOnWindows);
         var output = new MemoryStream();
-        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
-            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = output });
+        var handler = new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+        {
+            RunsOnWindows = runsOnWindows,
+        };
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = output });
         Diagnostics.ActResult(result);
         Diagnostics.ActOutput(output.ToArray());
         return (result, Encoding.Latin1.GetString(output.ToArray()));

@@ -32,12 +32,13 @@ namespace Curl.Original.Protocol.Telnet;
 /// subnegotiation with exit 56 (<see cref="CurlExitCode.RecvError" />).
 /// </para>
 /// <para>
-/// A connection failure is met as curl on Windows meets it. A read the connection
-/// fails, as a reset does, ends the session like a close, with exit 0, unless it strikes
-/// the option negotiation (a reply the connection did not take, or replies sent and no
-/// data written yet): then it ends with exit 56 (<see cref="CurlExitCode.RecvError" />),
-/// so what the server sent is never lost under exit 0 (ADR-1352). A send of the
-/// upload it fails ends it with exit 55 (<see cref="CurlExitCode.SendError" />), and an
+/// A connection failure is met as the platform's curl meets it. On Linux and macOS a
+/// read the connection fails, as a reset does, ends the session with exit 56
+/// (<see cref="CurlExitCode.RecvError" />) (ADR-1376). On Windows it ends the session like
+/// a close, with exit 0, unless it strikes the option negotiation (a reply the connection
+/// did not take, or replies sent and no data written yet): then it ends with exit 56, so
+/// what the server sent is never lost under exit 0 (ADR-1352). A send of the
+/// upload the connection fails ends it with exit 55 (<see cref="CurlExitCode.SendError" />), and an
 /// output that refuses a write with exit 23 (<see cref="CurlExitCode.WriteError" />). Each
 /// negotiation reply is its own write, as curl sends it; one the connection fails with a
 /// socket error is reported as curl's <c>Sending data failed (N)</c> line and the session
@@ -68,6 +69,12 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 {
     /// <summary>The port a <c>telnet</c> URL without one connects to.</summary>
     private const int DefaultPort = 23;
+
+    /// <summary>
+    /// Whether a failed read is met as curl on Windows meets it rather than as curl on
+    /// Linux and macOS does: the platform this process runs on, unless a test says otherwise.
+    /// </summary>
+    internal bool RunsOnWindows { get; init; } = OperatingSystem.IsWindows();
 
     /// <summary>The most bytes read from the upload at once.</summary>
     private const int BufferSize = 16384;
@@ -165,7 +172,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         log.SessionStarted(target.Host, target.Port);
         context.Progress.ReportTransferStarted();
         long requestStarted = context.TimeProvider.GetTimestamp();
-        var outbox = new TelnetOutbox(context.Events);
+        var outbox = new TelnetOutbox(context.Events, RunsOnWindows);
         var trace = new TelnetTraceReporter(outbox);
         await using (connection.ConfigureAwait(false))
         {
@@ -375,14 +382,16 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     }
 
     /// <summary>
-    /// The result for a read the connection fails. A reset during the option negotiation
-    /// (<see cref="TelnetOutbox.ReadFailureLosesData" />) is exit 56, with the socket
-    /// filter's <c>Recv failure:</c> text for a socket error, as curl 8.23.0 on Windows
-    /// ends it (measured, BL-5882). Any other ends the session like a close, with exit 0:
-    /// curl on Windows sees a reset of an idle session as the socket's close event.
+    /// The result for a read the connection fails. A receive failure
+    /// (<see cref="TelnetOutbox.FailedReadIsReceiveError" />) is exit 56, with the socket
+    /// filter's <c>Recv failure:</c> text for a socket error: every reset as curl 8.18.0 on
+    /// Linux ends it (measured, BL-5918), and a reset during the option negotiation as curl
+    /// 8.23.0 on Windows ends it (measured, BL-5882). Any other ends the session like a
+    /// close, with exit 0: curl on Windows sees a reset of an idle session as the socket's
+    /// close event.
     /// </summary>
     private static TransferResult FailedReadResult(IOException failure, TelnetOutbox outbox, long bytesWritten) =>
-        outbox.ReadFailureLosesData(bytesWritten)
+        outbox.FailedReadIsReceiveError(bytesWritten)
             ? new TransferResult(CurlExitCode.RecvError, bytesWritten, CurlSocketErrorText.ReceiveFailure(failure) ?? ReceiveFailedMessage)
             : TransferResult.Success(bytesWritten);
 
