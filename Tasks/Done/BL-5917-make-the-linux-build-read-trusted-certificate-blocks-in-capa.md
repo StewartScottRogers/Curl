@@ -28,7 +28,7 @@ Follow-up from BL-5879 (ADR-1351), which honours these settings in `--cacert` on
 
 ## Notes
 
-- Done; ADR-1359 records the behaviour. Added `OpenSslCaFile.cs`, `ServerCertificateVerification.cs` and the library's `CLAUDE.md` to `touches`: the parser, the anchor reading and the refusal live there, and no task in Doing named them.
+- Done; ADR-1363 records the behaviour. Added `OpenSslCaFile.cs`, `ServerCertificateVerification.cs` and the library's `CLAUDE.md` to `touches`: the parser, the anchor reading and the refusal live there, and no task in Doing named them.
 - Measured (WSL curl 8.18.0, OpenSSL 3.5.5): rejected root in `--capath` exit 60 (28), trusted exit 0; first copy wins (`.0` before `.1`, earlier directory first); the `--cacert` copy wins over the `--capath` one; rejected `--capath` root beside an unrelated `--cacert` still (28); undecodable first block adds nothing.
 - Choice: without `--cacert`, a rejected certificate that roots a fault-free system store chain is not refused, as curl's default CA file copy would win.
 - Quality: the full `-Library` run found two methods over the complexity gate; both split, then rescored with `-SkipTestRun` over a fresh Networking.UnitTests coverage run, where none of the changed members fail.

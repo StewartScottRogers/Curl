@@ -18,7 +18,7 @@ A rejected --cacert or --capath certificate with a host name the leaf does not c
 
 ## Context
 
-Found by BL-5917 (ADR-1359). ADR-1351 and VerifyChain_RejectedRootAndAnotherHostName_ReportsTheRejectionFirst pin certificate rejected (28) first, but WSL curl 8.18.0 (OpenSSL 3.5.5) with --cacert rejected.pem, or --capath, against https://other.test (via --resolve) or an IP address the certificate lacks printed "SSL: no alternative certificate subject name matches target ..." with %{ssl_verify_result} 1. Re-measure, then fix the order in ServerCertificateVerification.Refusal and the CLAUDE.md sentence if it says otherwise; record the correction to ADR-1351 in a new ADR.
+Found by BL-5917 (ADR-1363). ADR-1351 and VerifyChain_RejectedRootAndAnotherHostName_ReportsTheRejectionFirst pin certificate rejected (28) first, but WSL curl 8.18.0 (OpenSSL 3.5.5) with --cacert rejected.pem, or --capath, against https://other.test (via --resolve) or an IP address the certificate lacks printed "SSL: no alternative certificate subject name matches target ..." with %{ssl_verify_result} 1. Re-measure, then fix the order in ServerCertificateVerification.Refusal and the CLAUDE.md sentence if it says otherwise; record the correction to ADR-1351 in a new ADR.
 
 ## Acceptance criteria
 

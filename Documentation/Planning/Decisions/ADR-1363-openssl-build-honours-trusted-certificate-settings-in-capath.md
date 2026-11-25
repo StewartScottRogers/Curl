@@ -1,4 +1,4 @@
-# ADR-1359: The OpenSSL build honours TRUSTED CERTIFICATE settings in --capath
+# ADR-1363: The OpenSSL build honours TRUSTED CERTIFICATE settings in --capath
 
 - Status: Accepted
 - Date: 2026-11-24

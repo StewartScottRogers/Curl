@@ -18,7 +18,7 @@ The OpenSSL build trusts a certificate held as an X509 CERTIFICATE block in a --
 
 ## Context
 
-Found by BL-5917 (ADR-1359). WSL curl 8.18.0 (OpenSSL 3.5.5) with --capath holding the root as an "X509 CERTIFICATE" block exits 0; OpenSslCaFile skips that label. Measure --cacert before pinning it.
+Found by BL-5917 (ADR-1363). WSL curl 8.18.0 (OpenSSL 3.5.5) with --capath holding the root as an "X509 CERTIFICATE" block exits 0; OpenSslCaFile skips that label. Measure --cacert before pinning it.
 
 ## Acceptance criteria
 

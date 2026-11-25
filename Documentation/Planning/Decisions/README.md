@@ -1404,4 +1404,4 @@ Each option and the specific reason it lost.
 | [1360](ADR-1360-xmpp-gets-typed-d-text-as-utf-8.md) | xmpp gets typed -d text as UTF-8 (BL-5915) | Accepted | 2026-11-24 |
 | [1361](ADR-1361-a-bearer-token-prefers-only-the-bearer-mechanisms-until-an-auth-option.md) | --oauth2-bearer prefers only the bearer mechanisms until an AUTH= login option (BL-5880) | Accepted | 2026-11-24 |
 | [1362](ADR-1362-openldap-sasl-bind-runs-the-shared-sasl-authenticator.md) | The OpenLDAP SASL bind runs the shared SASL authenticator: every curl mechanism, EXTERNAL without a user, time limit 0 on the mechanism search (BL-5907) | Accepted | 2026-11-24 |
-| [1359](ADR-1359-openssl-build-honours-trusted-certificate-settings-in-capath.md) | The OpenSSL build honours TRUSTED CERTIFICATE settings in --capath (BL-5917) | Accepted | 2026-11-24 |
+| [1363](ADR-1363-openssl-build-honours-trusted-certificate-settings-in-capath.md) | The OpenSSL build honours TRUSTED CERTIFICATE settings in --capath (BL-5917) | Accepted | 2026-11-24 |
