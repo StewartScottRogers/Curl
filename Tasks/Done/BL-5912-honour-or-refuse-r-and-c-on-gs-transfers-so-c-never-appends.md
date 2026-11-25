@@ -28,7 +28,7 @@ Left by BL-5897 (fitness finding EXT-122, which says gs:// probably shares the g
 
 ## Notes
 
-- Chose to honour, not refuse (ADR-1354): an object download sends `Range` for `-r` and `-C`, as `s3://` does; an upload or a listing refuses both with exit 4 before any request, since a resumed listing would append the whole listing.
+- Chose to honour, not refuse (ADR-1359): an object download sends `Range` for `-r` and `-C`, as `s3://` does; an upload or a listing refuses both with exit 4 before any request, since a resumed listing would append the whole listing.
 - Replies as over https (copied from the `s3://` code, BL-5873; not re-measured here): 206 body written; resume with 416, or 200 whose Content-Length equals the offset, writes nothing; other 200 to a resume is exit 33. `-r 10-19` writes exactly 10 bytes from a 206, which Cloud Storage sends for GET Object; a server that ignores the header and answers 200 hands over the whole object, as over https.
 - Checked end to end with Record-CurlExchange.ps1 and the built curl.exe: `-C -` onto 10 bytes sent `range: bytes=10-`, appended the 206 body, and `-w` printed `206 10 0`.
 - Added the library CLAUDE.md to touches (no other Doing task names it).

@@ -1,4 +1,4 @@
-# ADR-1354: gs:// downloads send a Range header for -r and -C; uploads and listings refuse them (BL-5912)
+# ADR-1359: gs:// downloads send a Range header for -r and -C; uploads and listings refuse them (BL-5912)
 
 Status: Accepted. Decided by Claude under Stewart's delegation.
 

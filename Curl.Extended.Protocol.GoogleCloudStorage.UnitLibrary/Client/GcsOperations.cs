@@ -20,7 +20,7 @@ internal sealed class GcsOperations(GcsClient client, string bucket, Cancellatio
     /// Writes the object <paramref name="objectName"/> to <paramref name="output"/> (GET Object), or only the part
     /// <paramref name="resumeFrom"/> or <paramref name="rangeText"/> asks for, sent as a <c>Range</c> header and treated
     /// as over https: a resume answered 416, or answered whole when the object is exactly the size already held, writes
-    /// nothing, and a resume answered whole otherwise fails with exit 33 (ADR-1354).
+    /// nothing, and a resume answered whole otherwise fails with exit 33 (ADR-1359).
     /// </summary>
     /// <param name="objectName">The object name.</param>
     /// <param name="output">Where the object's bytes go.</param>

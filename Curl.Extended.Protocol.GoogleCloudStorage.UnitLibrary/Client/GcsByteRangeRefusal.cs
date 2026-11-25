@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 
 /// <summary>
-/// Refuses <c>-r</c>/<c>--range</c> and <c>-C</c>/<c>--continue-at</c> on a <c>gs://</c> upload or listing (ADR-1354):
+/// Refuses <c>-r</c>/<c>--range</c> and <c>-C</c>/<c>--continue-at</c> on a <c>gs://</c> upload or listing (ADR-1359):
 /// only an object download sends a <c>Range</c> header, so a resumed listing never appends the whole listing to the
 /// partial file.
 /// </summary>

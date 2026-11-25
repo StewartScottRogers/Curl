@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 
 /// <summary>
-/// <c>-r</c> and <c>-C</c> on <c>gs://</c> (ADR-1354): an object download sends a <c>Range</c> header, as Cloud
+/// <c>-r</c> and <c>-C</c> on <c>gs://</c> (ADR-1359): an object download sends a <c>Range</c> header, as Cloud
 /// Storage's "GET Object" takes it, and an upload or a listing refuses them before any request.
 /// </summary>
 [TestClass]

@@ -30,7 +30,7 @@ locator naming the XML API reference page.
 
 ## Byte ranges
 
-An object download sends `-C <offset>` above 0 as `Range: bytes=<offset>-` and otherwise `-r <text>` as `Range: bytes=<text>`, signed with an HMAC key, and treats 200, 206 and 416 as `https://` does. An upload or a listing with `-r`, or with `-C` other than offset 0, fails with exit 4 before any connection (ADR-1354, `GcsByteRangeTests`).
+An object download sends `-C <offset>` above 0 as `Range: bytes=<offset>-` and otherwise `-r <text>` as `Range: bytes=<text>`, signed with an HMAC key, and treats 200, 206 and 416 as `https://` does. An upload or a listing with `-r`, or with `-C` other than offset 0, fails with exit 4 before any connection (ADR-1359, `GcsByteRangeTests`).
 
 ## Request methods
 

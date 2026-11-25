@@ -7,7 +7,7 @@ namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 /// <summary>
 /// Serves <c>gs://bucket/object</c> (ADR-1099): with <c>-T</c> it uploads the object, with an empty name or one ending in
 /// <c>/</c> it lists the names under it, otherwise it downloads the object, sending <c>-r</c> and <c>-C</c> as a
-/// <c>Range</c> header; an upload or a listing refuses both (ADR-1354). <c>--oauth2-bearer</c> sends an OAuth 2.0
+/// <c>Range</c> header; an upload or a listing refuses both (ADR-1359). <c>--oauth2-bearer</c> sends an OAuth 2.0
 /// access token; otherwise <c>--user ACCESS_ID:SECRET</c> signs with an HMAC key; with neither the requests go
 /// unauthenticated, for public objects. A region other than <c>auto</c> is named in curl's own
 /// <c>--aws-sigv4 provider1:provider2:region:service</c> form (ADR-1191). The server is <see cref="GcsEndpoint"/>; the requests are <see cref="GcsOperations"/>.
