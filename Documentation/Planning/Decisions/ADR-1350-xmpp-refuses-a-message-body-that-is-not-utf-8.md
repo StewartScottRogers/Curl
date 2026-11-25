@@ -1,4 +1,4 @@
-# ADR-1347: xmpp refuses a message body that is not valid UTF-8
+# ADR-1350: xmpp refuses a message body that is not valid UTF-8
 
 - Status: Accepted
 - Date: 2026-11-24

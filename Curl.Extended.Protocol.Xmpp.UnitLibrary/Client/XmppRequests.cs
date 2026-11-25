@@ -21,7 +21,7 @@ internal static class XmppRequests
 
     /// <summary>Gives the stanza for <paramref name="target"/>, the URL's query (without <c>?</c>) and the body.</summary>
     /// <exception cref="XmppClientException">The query names a type or request the client does not provide (exit 3),
-    /// or a message's body is not valid UTF-8 (exit 43, ADR-1347).</exception>
+    /// or a message's body is not valid UTF-8 (exit 43, ADR-1350).</exception>
     internal static XElement For(string target, string? query, ReadOnlyMemory<byte>? body)
     {
         string[] parts = (query ?? string.Empty).Split(';');

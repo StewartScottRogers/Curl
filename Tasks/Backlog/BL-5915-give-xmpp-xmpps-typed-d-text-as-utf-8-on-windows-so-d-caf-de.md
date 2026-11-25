@@ -19,7 +19,7 @@ On Windows, `curl -d café xmpp://...` delivers the message body `café`.
 ## Context
 
 Found by BL-5899 (EXT-124), measured 2026-11-24 on Windows (ANSI code page 1252): `curl -sS -d 'café' xmpp://127.0.0.1:1/carol@localhost`
-exits 43, `XMPP message body is not valid UTF-8` (ADR-1347), while `-d @utf8file` goes on to connect. A typed argument
+exits 43, `XMPP message body is not valid UTF-8` (ADR-1350), while `-d @utf8file` goes on to connect. A typed argument
 becomes bytes in the ANSI code page (`CommandLineOptions.CommandLineTextBytes`, ADR-0838), which is right for curl's own
 protocols and must not change for them. Before BL-5899 the same command silently delivered `caf` plus U+FFFD.
 

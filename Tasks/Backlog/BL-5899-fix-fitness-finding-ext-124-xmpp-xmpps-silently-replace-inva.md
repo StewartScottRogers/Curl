@@ -47,7 +47,7 @@ The finding, verbatim:
 
 - Done and committed with this requeue (`fix(xmpp): refuse a message body that is not valid UTF-8`): `XmppRequests`
   decodes the body strictly and fails with exit 43, `XMPP message body is not valid UTF-8`, before it connects
-  (ADR-1347). `XmppUploadTests` pins it for `-T` and post data, and that valid UTF-8 `café` is sent unchanged.
+  (ADR-1350). `XmppUploadTests` pins it for `-T` and post data, and that valid UTF-8 `café` is sent unchanged.
   Reproduced first: the five invalid-byte rows failed on the old code. XMPP tests, the whole fast run and the build are
   green; `Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.Xmpp.UnitLibrary` reports 0 failing members.
 - Measured with the built curl.exe on Windows (ACP 1252): the `-T` Latin-1 repro exits 43 with that message; `-d @file`
