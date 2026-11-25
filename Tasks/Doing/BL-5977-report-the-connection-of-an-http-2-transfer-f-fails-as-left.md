@@ -31,3 +31,4 @@ Found by BL-5975. curl 8.18.0 nghttp2 build: `Record-CurlExchange.ps1 -Http2Orig
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 286d6895 dcf128c7 3d836d5e.
