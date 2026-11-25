@@ -35,3 +35,4 @@ and `ListCommonNames` skips a CN in a multi-valued relative name in both builds,
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: b5bb68c9 79a47cd0 3d836d5e.
