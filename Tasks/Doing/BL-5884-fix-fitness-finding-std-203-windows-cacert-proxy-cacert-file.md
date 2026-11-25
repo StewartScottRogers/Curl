@@ -94,3 +94,4 @@ Design (record it in an ADR, decided by Claude under Stewart's delegation):
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 9e20ff72 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waiting on BL-5926, which holds Curl.Networking.UnitLibrary/ServerCertificateVerification.cs (TrustAnchorsUnusable must change); curl measured and design recorded in Notes, no code changed
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 9e20ff72 69116afe 3d836d5e.
