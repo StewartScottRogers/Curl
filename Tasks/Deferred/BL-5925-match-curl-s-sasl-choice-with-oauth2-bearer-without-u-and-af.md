@@ -40,3 +40,4 @@ Found in BL-5880 (ADR-1361). Two cases it left:
 - 2026-11-24: Doing -> Backlog. Lane 4 claimed it after the shift's time was up and never started it.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 7b4d1eae caafd3c7 3d836d5e.
 - 2026-11-25: Doing -> Backlog. Code done and tested in the working tree; left: Measure-CodeQuality.ps1 for the Imap, Pop3 and Smtp libraries (timed out), then commit
+- 2026-11-25: Backlog -> Deferred. Over its cost cap: split by protocol into BL-5961 (IMAP), BL-5962 (POP3) and BL-5963 (SMTP), which together meet its criteria; nothing is left to do here.
