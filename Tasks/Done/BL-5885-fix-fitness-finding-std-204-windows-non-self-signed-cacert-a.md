@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.AnchoredChainFaults.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5885 — Fix fitness finding STD-204: Windows, non-self-signed --cacert anchor: chain errors are reported as "the certificate chain is incomplete", and two valid chains are refused
 
@@ -48,13 +48,29 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the `noBC` and `pl0sub` commands exit 0, and the `noCertSign` command prints `schannel: error 0x00000010`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the `noBC` and `pl0sub` commands exit 0, and the `noCertSign` command prints `schannel: error 0x00000010`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-11-24: Added the new test file to `touches` (ADR-0482 needs it; no task in Doing names it).
+- Done directly rather than through the /feature stages, to keep within the run's cost cap.
+- Reproduced with a probe of `X509Chain` and fixed in `ChainErrors.cs`; decision in ADR-1347.
+- Measured with `openssl s_server` against Schannel curl 8.23.0 (System32) and 8.21.0 (Git) and Curl:
+  `noCertSign` 0x00000010, `caFalse` and `pl0` 0x00000400, `intReqPol` 0x02000000, `ekuclient`
+  0x00000010, `unkcrit` 0x08000100, `noBC` and `pl0sub` (root sent or not) exit 0, all with
+  `--ssl-no-revoke`; without it all report the revocation status unknown. Curl matched every one
+  (the 8.23.0 `caFalse` run raced the server's start; 8.21.0 gave its answer).
+- The reviewer's `intInhAny.pem` was not available: with the one built here both curls and Curl exit 0.
+  Whatever fault .NET reports for theirs is now named by its value.
+- Quality: the one failing member Measure-CodeQuality.ps1 reported (`WithBelowAnchorRevocation`, one
+  of four branches, the revoked one) got `VerifyPeer_FaultAndTheLeafOnTheAnchorsList_IsTrustRevoked`,
+  whose answer only that branch gives; the 31-minute measurement was not run again.
+- The tests that read the platform's own chain statuses are Windows-only; the rest stub them.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 9b4a630b 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Windows: a non-self-signed --cacert anchor names chain faults by Schannel's trust error and accepts noBC and pl0sub chains
