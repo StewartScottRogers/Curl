@@ -110,7 +110,8 @@ internal sealed partial class ManagedMultiTransfer
     /// (<see cref="ManagedEasyTransfer.ConnectOnlyReadyEvents" />, upstream test677, BL-2633), else what
     /// <see cref="IWaitSocketPoller" /> answers for the operating system socket. Any other number of the
     /// engine's own, from <see cref="ResolverWakeupSocket" /> up (a multi handle's transfer sockets, which
-    /// <c>curl_multi_waitfds</c> gives, upstream test2405), is no descriptor and never has an event.
+    /// <c>curl_multi_waitfds</c> gives, upstream test2405), is no descriptor the poller can be asked about
+    /// (<see cref="EngineSocketEvents" />).
     /// </summary>
     private CurlWaitEvents PollWaitSocket(CurlSocket socket, CurlWaitEvents events)
     {
@@ -122,8 +123,20 @@ internal sealed partial class ManagedMultiTransfer
             }
         }
 
-        return socket.Handle >= ResolverWakeupSocket ? CurlWaitEvents.None : socketPoller.Poll(socket, events);
+        return socket.Handle >= ResolverWakeupSocket ? EngineSocketEvents(socket, events) : socketPoller.Poll(socket, events);
     }
+
+    /// <summary>
+    /// A transfer socket another multi handle's <c>curl_multi_waitfds</c> gave is readable while that handle
+    /// has work for its transfer's next perform, as a real descriptor is once data has arrived, so an
+    /// application polling it here is woken at once rather than at its timeout (upstream test2407, ADR-1390).
+    /// This handle's own transfers are counted by <see cref="CountReady" /> already.
+    /// </summary>
+    private CurlWaitEvents EngineSocketEvents(CurlSocket socket, CurlWaitEvents events) =>
+        owners.Any(owner => owner.Value != this && IsReadableOn(owner.Key, socket.Handle)) ? events & CurlWaitEvents.PollIn : CurlWaitEvents.None;
+
+    private static bool IsReadableOn(IEasyTransfer transfer, nint socket) =>
+        transfer.PerformingTransfer is ManagedEasyTransfer { SocketWait: { } wait } && wait.IsReadableOn(socket);
 
     private bool WaitEnds(TimeSpan left, int extraSocketCount, bool poll)
     {

@@ -1,5 +1,5 @@
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http.Fakes;
+using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Original.Protocol.Http;
@@ -77,13 +77,50 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.Contains("Authorization: " + NtlmType1 + "\r\n", connection.Written);
     }
 
+    /// <summary>
+    /// The <c>*</c> lines about authentication curl 8.22.0 wrote for the redirected request of an
+    /// <c>--ntlm -L -v</c> run on one connection that a bare <c>NTLM</c> 401 answered
+    /// (<c>Record-CurlExchange.ps1</c>, BL-5945): <c>Server auth using NTLM</c> before the
+    /// request that sends no header, and <c>NTLM auth restarted</c> before the challenge.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmPickedOnAReusedConnectionAnsweredByABareChallengeVerbose_WritesAuthUsingAndAuthRestarted()
+    {
+        const string bareHead = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: NTLM\r\nContent-Length: 0\r\n\r\n";
+        TurnTakingConnection connection = new(65536, bareHead, OkHead + "ok");
+        RecordingTransferEvents events = new();
+        Diagnostics.Arrange("earlier hop picked, connection, responses", "NTLM, reused, 401 bare, 200 ok");
+
+        TransferResult result = await new HttpProtocolHandler(ReusedConnector(connection, isReused: true), new ScriptedAuthenticator(NtlmType1, NtlmType1))
+            .ExecuteAsync(NtlmPickedContext(null, events: events));
+
+        const string serverUsing = "* Server auth using NTLM with user 'u'";
+        string[] expected =
+        [
+            serverUsing, "< HTTP/1.1 401 Unauthorized", "* NTLM auth restarted", "< WWW-Authenticate: NTLM",
+            serverUsing, "< HTTP/1.1 200 OK",
+        ];
+        string[] actual =
+        [
+            .. FirstLinesOf(events)
+                .Where(line => !line.StartsWith("> ", StringComparison.Ordinal))
+                .Where(line => line.Contains("auth using", StringComparison.Ordinal) || line.Contains("NTLM", StringComparison.Ordinal) || line.StartsWith("< HTTP", StringComparison.Ordinal)),
+        ];
+        WriteResult(result);
+        WriteEvents("events", actual);
+        Diagnostics.Diff("authentication lines", OneLine(string.Join(" | ", expected)), OneLine(string.Join(" | ", actual)));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
     private static QueueConnector ReusedConnector(TurnTakingConnection connection, bool isReused) =>
         new(ConnectResult.Connected(connection, null, isReused: isReused));
 
-    private static TransferContext NtlmPickedContext(BytesBody? body, int redirectsFollowed = 1) => new()
+    private static TransferContext NtlmPickedContext(BytesBody? body, int redirectsFollowed = 1, RecordingTransferEvents? events = null) => new()
     {
         Url = CurlUrl.Parse(AuthUrl),
         Output = new MemoryStream(),
+        Events = events ?? new RecordingTransferEvents(),
         Credentials = new System.Net.NetworkCredential("u", "p"),
         Http = new HttpRequestOptions { Body = body, AuthSchemes = HttpAuthSchemes.Ntlm, AuthSchemePicked = HttpAuthSchemes.Ntlm, RedirectsFollowed = redirectsFollowed },
     };

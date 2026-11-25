@@ -39,7 +39,7 @@ internal static class TestRevocationList
     /// <param name="maskFunction">The OID of the mask generation function.</param>
     /// <returns>The parameters' DER.</returns>
     internal static byte[] PssParameters(
-        string? hash = null, string? maskHash = null, int? saltLength = null, int? trailerField = null, string maskFunction = Mgf1)
+        string? hash = null, string? maskHash = null, long? saltLength = null, int? trailerField = null, string maskFunction = Mgf1)
     {
         var writer = new AsnWriter(AsnEncodingRules.DER);
         using (writer.PushSequence())
@@ -71,7 +71,7 @@ internal static class TestRevocationList
 
     private static Asn1Tag Explicit(int number) => new(TagClass.ContextSpecific, number, isConstructed: true);
 
-    private static void WriteExplicitInteger(AsnWriter writer, int number, int? value)
+    private static void WriteExplicitInteger(AsnWriter writer, int number, long? value)
     {
         if (value is { } integer)
         {
@@ -95,6 +95,8 @@ internal static class TestRevocationList
     /// <param name="entryExtensions">DER <c>Extension</c> values written on every revoked entry; none when <see langword="null" />.</param>
     /// <param name="signatureParameters">The DER of the outer signature algorithm's parameters; none when <see langword="null" />.</param>
     /// <param name="signatureHash">The hash signed over; SHA-256 when <see langword="null" />.</param>
+    /// <param name="pssSaltLength">The salt length of an RSASSA-PSS signature; the hash's length when <see langword="null" />.</param>
+    /// <param name="pssMaskHash">The hash an RSASSA-PSS signature's MGF1 uses; the signed hash when <see langword="null" />.</param>
     /// <returns>The list's DER.</returns>
     internal static byte[] Write(
         X509Certificate2 signer,
@@ -108,7 +110,9 @@ internal static class TestRevocationList
         IReadOnlyList<byte[]>? extensions = null,
         IReadOnlyList<byte[]>? entryExtensions = null,
         byte[]? signatureParameters = null,
-        HashAlgorithmName? signatureHash = null)
+        HashAlgorithmName? signatureHash = null,
+        int? pssSaltLength = null,
+        HashAlgorithmName? pssMaskHash = null)
     {
         using var rsa = signer.GetRSAPrivateKey();
         using var ecdsa = signer.GetECDsaPrivateKey();
@@ -151,9 +155,11 @@ internal static class TestRevocationList
 
         var signedPart = signed.Encode();
         var digest = signatureHash ?? HashAlgorithmName.SHA256;
-        var signature = rsa is not null
-            ? rsa.SignData(signedPart, digest, algorithm == RsaSsaPss ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1)
-            : ecdsa!.SignData(signedPart, digest, DSASignatureFormat.Rfc3279DerSequence);
+        var signature = rsa is null
+            ? ecdsa!.SignData(signedPart, digest, DSASignatureFormat.Rfc3279DerSequence)
+            : algorithm == RsaSsaPss
+                ? TestRsaPssSignature.Sign(rsa, signedPart, digest, pssMaskHash ?? digest, pssSaltLength ?? CryptographicOperations.HashData(digest, []).Length)
+                : rsa.SignData(signedPart, digest, RSASignaturePadding.Pkcs1);
 
         var list = new AsnWriter(AsnEncodingRules.DER);
         using (list.PushSequence())

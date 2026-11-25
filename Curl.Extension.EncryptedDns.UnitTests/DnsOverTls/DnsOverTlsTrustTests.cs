@@ -10,11 +10,11 @@ public sealed class DnsOverTlsTrustTests
         new(new Dictionary<string, string> { ["dns-over-tls"] = "dot.example" }, trust);
 
     [TestMethod]
-    public void ActivateDnsOverTls_CaCertificateAndPath_VerifiesWithThem()
+    public void ActivateDnsOverTls_CaCertificatePathAndSslNoRevoke_VerifiesWithThem()
     {
-        var hook = (DnsOverTlsResolverHook)EncryptedDnsExtension.ActivateDnsOverTls(ValuesWith(new ExtensionTlsTrust(false, "ca.pem", "capath")))!;
+        var hook = (DnsOverTlsResolverHook)EncryptedDnsExtension.ActivateDnsOverTls(ValuesWith(new ExtensionTlsTrust(false, "ca.pem", "capath", SkipRevocationCheck: true)))!;
 
-        Assert.AreEqual(new TlsClientOptions(false, CaCertificateFile: "ca.pem", CaCertificateDirectory: "capath"), hook.TlsOptions);
+        Assert.AreEqual(new TlsClientOptions(false, CaCertificateFile: "ca.pem", CaCertificateDirectory: "capath", SkipRevocationCheck: true), hook.TlsOptions);
     }
 
     [TestMethod]

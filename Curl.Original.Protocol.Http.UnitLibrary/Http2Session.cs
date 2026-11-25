@@ -17,7 +17,7 @@ namespace Curl.Original.Protocol.Http;
 /// next transfer to the origin continues it - the next odd stream, the same HPACK tables, no
 /// second preface. It keeps reading and writing through the connection it was created on,
 /// whose later leases reach the same socket. Whoever closes the connection first calls
-/// <see cref="ShutDownAsync" />, which sends curl's closing GOAWAY.
+/// <see cref="ShutDownAsync" />, which resets each unfinished stream and sends curl's closing GOAWAY.
 /// </para>
 /// <para>
 /// Several transfers may run on it at once, each on a stream of its own, as curl multiplexes
@@ -132,10 +132,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     public string UsingLine => HttpConnectionInfoLines.UsingHttp2;
 
     /// <summary>
-    /// Gets a value indicating whether the connection can carry another request: the peer has
-    /// sent no GOAWAY and has not closed it.
+    /// Gets a value indicating whether the connection can carry another request: neither side
+    /// has sent a GOAWAY and the peer has not closed it.
     /// </summary>
-    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsClosedByPeer;
+    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsGoAwaySent && !Frames.IsClosedByPeer;
 
     /// <summary>
     /// Gets how many transfers the connection carries at once: the peer's
@@ -156,7 +156,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// The request body's length, 0 when there is none, or <see langword="null" /> when it is
     /// unknown.
     /// </param>
-    /// <param name="ignoresBody">Whether the request wants no body (<c>-I</c>): the stream then ends at the final head, whatever DATA follows (BL-5391).</param>
+    /// <param name="ignoresBody">Whether the request wants no body (<c>-I</c>): the response then ends at the first DATA frame after the final head without failing (BL-5391); DATA past the promised length also shuts the connection down (BL-5938).</param>
     /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
     /// <param name="diagnosticLog">The transfer's diagnostic log, which the stream's frames are written to, or <see langword="null" /> for none.</param>
     /// <param name="traceEvents">Where the <c>--trace-config http/2</c> lines go while the stream is the latest opened, or <see langword="null" /> for none.</param>
@@ -170,13 +170,14 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     public void SkipClosingGoAway() => isClosingGoAwaySkipped = true;
 
     /// <summary>
-    /// Sends GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
-    /// curl 8.18.0 does when it closes an HTTP/2 connection (measured, BL-817 Notes); nothing
+    /// Resets each unfinished stream (<see cref="ResetUnfinishedStreamsAsync" />), then sends
+    /// GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
+    /// curl 8.18.0 does when it closes an HTTP/2 connection (measured, BL-817 and BL-5906 Notes); nothing
     /// when no preface went out, when a GOAWAY already has, after <see cref="SkipClosingGoAway" />, or when the peer closed the
     /// connection. A connection that fails the write is closing anyway, so that is not an error.
     /// </summary>
-    /// <param name="cancellationToken">Cancels the write.</param>
-    /// <returns>A task that completes when the frame is written, or at once when none is due.</returns>
+    /// <param name="cancellationToken">Cancels the writes.</param>
+    /// <returns>A task that completes when the frames are written, or at once when none is due.</returns>
     public async ValueTask ShutDownAsync(CancellationToken cancellationToken)
     {
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -189,6 +190,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
             // curl writes no trace line for the GOAWAY it closes with: its transfer is over (BL-1167 Notes).
             Frames.FrameObserver = null;
+            await ResetUnfinishedStreamsAsync(cancellationToken).ConfigureAwait(false);
             await Frames.SendGoAwayAsync(Http2ErrorCode.NoError, ShutdownDebugData, cancellationToken).ConfigureAwait(false);
             await Connection.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -199,6 +201,21 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         finally
         {
             frameLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Resets every stream whose response is unfinished with STREAM_CLOSED, lowest first, as curl
+    /// resets the stream of a transfer that ends before it does, such as one <c>-m</c> aborts
+    /// (measured, BL-5906 Notes). A response <c>-I</c> ended at a DATA frame is not reset, as curl
+    /// sends no RST_STREAM then (measured, BL-5922 Notes). The frame lock is held here.
+    /// </summary>
+    private async ValueTask ResetUnfinishedStreamsAsync(CancellationToken cancellationToken)
+    {
+        foreach ((int streamId, Http2StreamConnection owner) in openStreams.Where(stream => !stream.Value.IsResponseEnded).OrderBy(stream => stream.Key))
+        {
+            await Frames.ResetStreamAsync(streamId, Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
+            owner.FrameLog.FrameSent("RST_STREAM", streamId, Http2StreamConnection.ResetPayloadLength);
         }
     }
 
@@ -440,6 +457,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         }
         catch (Http2StreamResetException reset)
         {
+            _ = openStreams.Remove(reset.StreamId);
             receiver!.FrameLog.ResetReceived(reset);
             throw;
         }

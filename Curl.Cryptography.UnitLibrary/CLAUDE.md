@@ -105,6 +105,10 @@ Namespace `Curl.Cryptography`. It holds:
   values - `ApplyPrivateExponent`, with and without the blinding bytes, blinded by r^e
   and r^-1 (by Fermat), and checked against e before the result is written. TLS 1.0 and
   1.1's MD5 + SHA-1 RSA signature uses it (ADR-0195). Constant-time.
+- `RsaPssVerification` (public, static): RFC 8017 sections 8.1.2 and 9.1.2's RSASSA-PSS
+  verification with any exact salt length and an MGF1 hash that may differ from the
+  message's, which `RSASignaturePadding.Pss` cannot check; revocation list signatures use
+  it (ADR-1376). Public key only, so not constant-time.
 - `FiniteFieldDiffieHellmanGroup` (public): p and g - `Group1`, `Group2` (RFC 2409),
   `Group14`, `Group16`, `Group18` (RFC 3526), `Ffdhe2048` to `Ffdhe8192` (RFC 7919), and
   `TryCreate` for an SSH group-exchange group, `false` for an even p, p below 2^8, or g

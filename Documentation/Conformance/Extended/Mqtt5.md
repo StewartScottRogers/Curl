@@ -143,5 +143,5 @@ and WebSocket and TLS in [Mqtt5-Transports.md](Mqtt5-Transports.md) (BL-4486).
 ## `-T` (upload)
 
 `curl -T up.txt mqtt5://host/topic` (and `mqtt5+ws://`) publishes the file's bytes as the PUBLISH payload, exactly as `-d` does
-(BL-4954): it never subscribes, fetches or consumes. When both `-d` and `-T` are given, the `-d` body is published. Covered by
-`Mqtt5UploadTests`.
+(BL-4954): it never subscribes, fetches or consumes. The command line refuses `-d` with `-T` (exit 2) before anything is sent
+(ADR-1369). Covered by `Mqtt5UploadTests`.

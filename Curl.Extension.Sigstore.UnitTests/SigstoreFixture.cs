@@ -34,7 +34,7 @@ internal sealed class SigstoreFixture : IDisposable
         string.Concat(certificates.Select(certificate => certificate.ExportCertificatePem() + "\n"));
 
     /// <summary>Issues a signing certificate for <paramref name="key" />.</summary>
-    public X509Certificate2 Issue(AsymmetricAlgorithm key, Action<SubjectAlternativeNameBuilder>? names = null, string? issuerV2 = Issuer, string? issuerV1 = null, bool withSubjectAlternativeName = true)
+    public X509Certificate2 Issue(AsymmetricAlgorithm key, Action<SubjectAlternativeNameBuilder>? names = null, string? issuerV2 = Issuer, string? issuerV1 = null, bool withSubjectAlternativeName = true, byte[]? undecodedIssuerV2 = null)
     {
         var request = key is ECDsa ecdsa
             ? new CertificateRequest("", ecdsa, HashAlgorithmName.SHA256)
@@ -53,6 +53,11 @@ internal sealed class SigstoreFixture : IDisposable
             AsnWriter writer = new(AsnEncodingRules.DER);
             writer.WriteCharacterString(UniversalTagNumber.UTF8String, issuerV2);
             request.CertificateExtensions.Add(new X509Extension("1.3.6.1.4.1.57264.1.8", writer.Encode(), false));
+        }
+
+        if (undecodedIssuerV2 is not null)
+        {
+            request.CertificateExtensions.Add(new X509Extension("1.3.6.1.4.1.57264.1.8", undecodedIssuerV2, false));
         }
 
         if (issuerV1 is not null)

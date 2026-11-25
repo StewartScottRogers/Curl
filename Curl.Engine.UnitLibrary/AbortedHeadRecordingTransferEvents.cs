@@ -52,9 +52,16 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     /// <inheritdoc />
     public void ReportInfo(string text) => inner.ReportInfo(text);
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Counts the connection and keeps the first one's end points, and forgets the status of any head reported before
+    /// it: that is a proxy's reply to the CONNECT that opened the tunnel, <c>%{http_connect}</c>'s and never
+    /// <c>%{response_code}</c>'s, though its bytes stay counted in the header size (BL-5893).
+    /// </summary>
+    /// <param name="opened">The connection opened.</param>
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
     {
+        responseCode = 0;
+        httpVersion = null;
         connectionCount++;
         if (connectionCount == 1)
         {

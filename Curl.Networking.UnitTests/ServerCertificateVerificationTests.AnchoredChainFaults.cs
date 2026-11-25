@@ -2,6 +2,7 @@ using System.Net.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
+using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
@@ -98,6 +99,33 @@ public sealed class ServerCertificateVerificationAnchoredChainFaultsTests
         Assert.AreEqual((CurlExitCode.PeerFailedVerification, TlsFailureMessages.SchannelChainRevoked), failure);
     }
 
+    // HttpClient follows a list's redirect to a file or opaque address and then throws these (STD-205).
+    [TestMethod]
+    [DataRow(false, false, DisplayName = "no host to connect to")]
+    [DataRow(true, false, DisplayName = "no port to connect to")]
+    [DataRow(false, true, DisplayName = "no host to connect to, best effort")]
+    [DataRow(true, true, DisplayName = "no port to connect to, best effort")]
+    public void VerifyPeer_ListFetchRedirectedToAnAddressHttpCannotOpen_LeavesTheStatusUnknown(bool hasHost, bool bestEffort)
+    {
+        using var root = Create("CN=Faults Root", null);
+        using var anchor = Create("CN=Faults Anchor", root);
+        using var leaf = CreateLeaf(anchor, "http://lists.test/anchor.crl");
+        Exception thrown = hasHost
+            ? new ArgumentOutOfRangeException("port")
+            : new UriFormatException("Invalid URI: The hostname could not be parsed.");
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Warning);
+
+        var failure = Verify(
+            leaf, anchor, false, PartialChainWith(X509ChainStatusFlags.RevocationStatusUnknown), X509ChainStatusFlags.RevocationStatusUnknown,
+            fetch: (_, _) => throw thrown, bestEffort: bestEffort, log: log);
+
+        (CurlExitCode, string)? expected = bestEffort
+            ? null
+            : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.SchannelRevocationStatusUnknown);
+        Assert.AreEqual(expected, failure);
+        Assert.AreEqual($"CRL http://lists.test/anchor.crl could not be fetched: {thrown.Message}", log.Lines.Single().Message);
+    }
+
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void VerifyPeer_AnchorWithoutBasicConstraints_Accepts()
@@ -142,21 +170,23 @@ public sealed class ServerCertificateVerificationAnchoredChainFaultsTests
         [new() { Status = X509ChainStatusFlags.PartialChain }, new() { Status = fault }];
 
     // A null chainStatus reads the platform's own; sent is a certificate the server sends beside its own;
-    // list answers every revocation list fetch.
+    // list answers every revocation list fetch, unless fetch is given to answer them.
     private (CurlExitCode ExitCode, string Message)? Verify(
         X509Certificate2 leaf, X509Certificate2 listed, bool skipRevocationCheck, X509ChainStatus[]? chainStatus,
-        X509ChainStatusFlags belowAnchor = X509ChainStatusFlags.NoError, X509Certificate2? sent = null, byte[]? list = null)
+        X509ChainStatusFlags belowAnchor = X509ChainStatusFlags.NoError, X509Certificate2? sent = null, byte[]? list = null,
+        Func<Uri, CancellationToken, byte[]>? fetch = null, bool bestEffort = false, IDiagnosticLog? log = null)
     {
         var caFile = Path.Combine(_directory, "anchor.pem");
         File.WriteAllText(caFile, listed.ExportCertificatePem());
-        var options = new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: skipRevocationCheck);
+        var options = new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: skipRevocationCheck, RevocationCheckBestEffort: bestEffort);
         var verification = chainStatus is null
             ? new ServerCertificateVerification(options, true, TimeProvider.System)
             : new ServerCertificateVerification(options, true, TimeProvider.System)
             {
                 ReadChainStatus = _ => chainStatus,
                 ReadCertificatesBelowAnchorStatus = _ => [new() { Status = belowAnchor }],
-                FetchRevocationList = (_, _) => list ?? throw new IOException("no list"),
+                FetchRevocationList = fetch ?? ((_, _) => list ?? throw new IOException("no list")),
+                RevocationDiagnosticLog = log ?? NoDiagnosticLog.Instance,
             };
         var (chainPolicy, _, _) = verification.ReadTrustAnchors();
         chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;

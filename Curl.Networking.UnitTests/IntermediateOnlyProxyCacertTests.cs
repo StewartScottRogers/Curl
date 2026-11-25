@@ -186,13 +186,50 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.IsNull(VerifyStubbed(pki, PssList(pki, [])));
     }
 
-    private static byte[] PssList(Pki pki, byte[][] revoked) =>
+    // curl 8.22.0 Schannel, measured 2026-11-24 (BL-5929): a list signed with the longest salt or
+    // none answers as any other; one whose MGF1 hash is not its message hash leaves "unknown".
+    [TestMethod]
+    [DataRow(0, DisplayName = "no salt")]
+    [DataRow(222, DisplayName = "the longest salt")]
+    public void VerifyPeer_RsaPssListWithASaltNotAsLongAsTheHashRevokingTheLeaf_IsRevoked(int saltLength)
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyStubbed(pki, PssList(pki, [pki.LeafSerial], saltLength));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_RsaPssListWithTheLongestSaltWithoutTheLeaf_Succeeds()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        Assert.IsNull(VerifyStubbed(pki, PssList(pki, [], saltLength: 222)));
+    }
+
+    [TestMethod]
+    [DataRow(true, DisplayName = "naming the leaf")]
+    [DataRow(false, DisplayName = "not naming the leaf")]
+    public void VerifyPeer_RsaPssListWithAnotherMaskHash_LeavesTheStatusUnknown(bool revokesTheLeaf)
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var list = PssList(pki, revokesTheLeaf ? [pki.LeafSerial] : [], maskHashOid: TestRevocationList.Sha1);
+
+        var failure = VerifyStubbed(pki, list);
+
+        Assert.AreEqual(TlsFailureMessages.SchannelRevocationStatusUnknown, failure?.Message);
+    }
+
+    private static byte[] PssList(Pki pki, byte[][] revoked, int saltLength = 32, string maskHashOid = TestRevocationList.Sha256) =>
         TestRevocationList.Write(
             pki.Intermediate,
             nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
             revokedSerialNumbers: revoked,
             signatureAlgorithm: TestRevocationList.RsaSsaPss,
-            signatureParameters: TestRevocationList.PssParameters(TestRevocationList.Sha256, TestRevocationList.Sha256, saltLength: 32));
+            signatureParameters: TestRevocationList.PssParameters(TestRevocationList.Sha256, maskHashOid, saltLength),
+            pssSaltLength: saltLength,
+            pssMaskHash: maskHashOid == TestRevocationList.Sha1 ? HashAlgorithmName.SHA1 : HashAlgorithmName.SHA256);
 
     [TestMethod]
     public void VerifyPeer_UnknownRevocationOfALeafWithoutDistributionPoints_IsExit60()
@@ -318,6 +355,22 @@ public sealed class IntermediateOnlyProxyCacertTests
             pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? pki.CrlBytes : throw new IOException("404"), NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
 
         Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    // The addresses of one point are alternatives for one list, so a revoking list at the second is never asked for (STD-206).
+    [TestMethod]
+    public void VerifyPeer_OnePointNamingACleanListThenARevokingList_AcceptsWithoutFetchingTheSecond()
+    {
+        using var pki = new Pki(revokeLeaf: false, secondDistributionPoint: SecondPointAddress, bothAddressesInOnePoint: true);
+        var revoking = pki.BuildCrlOfIssuer([pki.LeafSerial], DateTimeOffset.UtcNow.AddDays(3));
+        var fetched = new List<string>();
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => { fetched.Add(uri.AbsoluteUri); return uri.AbsoluteUri == SecondPointAddress ? revoking : pki.CrlBytes; }, NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.IsNull(failure);
+        Assert.Contains(UnreachableCrlAddress, fetched);
+        Assert.DoesNotContain(SecondPointAddress, fetched);
     }
 
     private const string DeltaAddress = "http://127.0.0.1:1/delta.crl";
@@ -641,13 +694,17 @@ public sealed class IntermediateOnlyProxyCacertTests
 
         private readonly RSA _intermediateKey;
 
-        public Pki(bool revokeLeaf, bool withDistributionPoint = true, string? freshestCrlAddress = null, string? secondDistributionPoint = null)
+        public Pki(bool revokeLeaf, bool withDistributionPoint = true, string? freshestCrlAddress = null, string? secondDistributionPoint = null, bool bothAddressesInOnePoint = false)
         {
             _root = CreateAuthority("CN=Proxy Root", null, out _);
             using var intermediate = CreateAuthority("CN=Proxy Intermediate", _root, out _intermediateKey);
             Intermediate = intermediate.CopyWithPrivateKey(_intermediateKey);
             LeafSerial = [0x42, 0x17];
-            Leaf = CreateLeaf(Intermediate, LeafSerial, withDistributionPoint, freshestCrlAddress, secondDistributionPoint);
+            string[] addresses = secondDistributionPoint is null ? [UnreachableCrlAddress] : [UnreachableCrlAddress, secondDistributionPoint];
+            var distributionPoints = bothAddressesInOnePoint
+                ? OnePointNaming(addresses)
+                : CertificateRevocationListBuilder.BuildCrlDistributionPointExtension(addresses);
+            Leaf = CreateLeaf(Intermediate, LeafSerial, withDistributionPoint ? distributionPoints : null, freshestCrlAddress);
             CrlBytes = BuildCrlOfIssuer(revokeLeaf ? [LeafSerial] : [], DateTimeOffset.UtcNow.AddDays(3));
         }
 
@@ -722,7 +779,27 @@ public sealed class IntermediateOnlyProxyCacertTests
             return request.Create(issuer, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(20), [1, 2, 3]);
         }
 
-        private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, byte[] serial, bool withDistributionPoint, string? freshestCrlAddress, string? secondDistributionPoint)
+        // A cRLDistributionPoints extension of one DistributionPoint whose fullName lists every address;
+        // CertificateRevocationListBuilder writes one point per address instead.
+        private static X509Extension OnePointNaming(string[] addresses)
+        {
+            var writer = new AsnWriter(AsnEncodingRules.DER);
+            var context0 = new Asn1Tag(TagClass.ContextSpecific, 0);
+            using (writer.PushSequence())
+            using (writer.PushSequence())
+            using (writer.PushSequence(context0))
+            using (writer.PushSequence(context0))
+            {
+                foreach (var address in addresses)
+                {
+                    writer.WriteCharacterString(UniversalTagNumber.IA5String, address, new Asn1Tag(TagClass.ContextSpecific, 6));
+                }
+            }
+
+            return new X509Extension(new Oid("2.5.29.31"), writer.Encode(), false);
+        }
+
+        private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, byte[] serial, X509Extension? distributionPoints, string? freshestCrlAddress)
         {
             using var key = RSA.Create(2048);
             var request = new CertificateRequest($"CN={Host}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -731,9 +808,9 @@ public sealed class IntermediateOnlyProxyCacertTests
             request.CertificateExtensions.Add(names.Build());
             request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], false));
             request.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
-            if (withDistributionPoint)
+            if (distributionPoints is not null)
             {
-                request.CertificateExtensions.Add(CertificateRevocationListBuilder.BuildCrlDistributionPointExtension(secondDistributionPoint is null ? [UnreachableCrlAddress] : [UnreachableCrlAddress, secondDistributionPoint]));
+                request.CertificateExtensions.Add(distributionPoints);
             }
 
             if (freshestCrlAddress is not null)

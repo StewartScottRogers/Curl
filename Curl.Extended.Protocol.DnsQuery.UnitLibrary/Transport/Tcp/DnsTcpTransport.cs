@@ -62,9 +62,30 @@ internal sealed class DnsTcpTransport(IConnector connector) : IDnsQueryTransport
         }
         catch (IOException failure)
         {
-            throw new DnsQueryException(CurlExitCode.SendError, CurlSocketErrorText.SendFailure(failure) ?? "Failed sending data to the peer");
+            throw SendFailureOf(failure);
         }
     }
+
+    /// <summary>
+    /// How a query ends when sending it failed: exit 55 with curl's <c>Send failure:</c> words for a socket error, and
+    /// otherwise curl_easy_strerror's text for exit 55, never .NET's.
+    /// </summary>
+    /// <param name="failure">The failed write or flush.</param>
+    /// <returns>The failure to throw.</returns>
+    public static DnsQueryException SendFailureOf(IOException failure) =>
+        new(CurlExitCode.SendError, CurlSocketErrorText.SendFailure(failure) ?? "Failed sending data to the peer");
+
+    /// <summary>
+    /// How a query ends when reading its answer failed: exit 56, keeping the words a TLS connection ended without
+    /// close_notify already carries, with curl's <c>Recv failure:</c> words for a socket error, and otherwise
+    /// curl_easy_strerror's text for exit 56, never .NET's.
+    /// </summary>
+    /// <param name="failure">The failed read.</param>
+    /// <returns>The failure to throw.</returns>
+    public static DnsQueryException ReceiveFailureOf(IOException failure) =>
+        new(CurlExitCode.RecvError, failure is MissingCloseNotifyException
+            ? failure.Message
+            : CurlSocketErrorText.ReceiveFailure(failure) ?? "Failure when receiving data from the peer");
 
     private static async ValueTask<byte[]> ReadExactlyAsync(IConnection connection, int length, CancellationToken cancellationToken)
     {
@@ -83,21 +104,15 @@ internal sealed class DnsTcpTransport(IConnector connector) : IDnsQueryTransport
         return buffer;
     }
 
-    // A TLS connection ended without close_notify already carries curl's words; a socket error gets curl's
-    // "Recv failure: " words; anything else gets curl_easy_strerror's text for exit 56, never .NET's.
     private static async ValueTask<int> ReadAsync(IConnection connection, Memory<byte> buffer, CancellationToken cancellationToken)
     {
         try
         {
             return await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
-        catch (MissingCloseNotifyException failure)
-        {
-            throw new DnsQueryException(CurlExitCode.RecvError, failure.Message);
-        }
         catch (IOException failure)
         {
-            throw new DnsQueryException(CurlExitCode.RecvError, CurlSocketErrorText.ReceiveFailure(failure) ?? "Failure when receiving data from the peer");
+            throw ReceiveFailureOf(failure);
         }
     }
 }

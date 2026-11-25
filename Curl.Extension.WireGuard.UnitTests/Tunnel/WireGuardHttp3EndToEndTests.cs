@@ -47,7 +47,9 @@ public sealed class WireGuardHttp3EndToEndTests
                 parsesAsQuicBuild: true,
                 extensionConnectionHookActivators: [values => WireGuardExtension.Activate(values, _ => TunnelTestPeer.ConfigurationText(), peer, TimeProvider.System, random)],
                 extensionResolverHookActivators: [values => WireGuardExtension.ActivateResolver(values, _ => TunnelTestPeer.ConfigurationText(), peer, TimeProvider.System, random)])
-            .RunAsync(["-s", "-S", "--wireguard", "wg0.conf", "--http3-only", "-k", "https://10.0.0.1/"]);
+            // The tunnel handshake runs inside curl's QUIC handshake (the channel opens on the first send), whose
+            // default limit is 10 s of the real clock; a loaded runner can stall longer, so the test sets its own.
+            .RunAsync(["-s", "-S", "--wireguard", "wg0.conf", "--http3-only", "--connect-timeout", "600", "-k", "https://10.0.0.1/"]);
         await relayStop.CancelAsync();
         int relayedDatagrams = await relaying;
 
@@ -58,13 +60,13 @@ public sealed class WireGuardHttp3EndToEndTests
     }
 
     /// <summary>
-    /// Plays the peer: answers the handshake, then opens each transport data message, relays the UDP payload inside it
+    /// Plays the peer: answers each handshake initiation, opens each transport data message, relays the UDP payload inside it
     /// to <paramref name="http3Server" />, and seals every reply back as UDP from 10.0.0.1:443, until <paramref name="stop" />.
+    /// It waits for curl with no time limit and answers the initiation curl sends again when a response is late.
     /// </summary>
     /// <returns>The number of UDP datagrams relayed to the server.</returns>
     private static async Task<int> RelayThroughThePeerAsync(TunnelTestPeer peer, IDatagramConnector http3Server, CancellationToken stop)
     {
-        await peer.AcceptHandshakeAsync();
         IDatagramChannel server = (await http3Server.OpenAsync("10.0.0.1", 443, stop)).Channel!;
         TaskCompletionSource<IPEndPoint> curlEndPoint = new(TaskCreationOptions.RunContinuationsAsynchronously);
         Task replying = ReplyThroughThePeerAsync(peer, server, curlEndPoint.Task, stop);
@@ -73,7 +75,14 @@ public sealed class WireGuardHttp3EndToEndTests
         {
             while (true)
             {
-                byte[]? opened = peer.Responder.OpenTransport(await peer.NextSentAsync(stop));
+                byte[] sent = await peer.NextSentAsync(stop);
+                if (sent[0] == 1)
+                {
+                    peer.AnswerInitiation(sent);
+                    continue;
+                }
+
+                byte[]? opened = peer.Responder.OpenTransport(sent);
                 if (opened is { Length: > 0 } && IpPacketCodec.TryParse(opened, out IpPacket? packet) && UdpDatagramCodec.TryParse(packet!, out UdpDatagram? datagram))
                 {
                     Assert.AreEqual(IPAddress.Parse("10.0.0.1"), packet!.Destination);

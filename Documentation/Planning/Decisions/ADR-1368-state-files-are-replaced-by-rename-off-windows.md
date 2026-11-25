@@ -1,6 +1,6 @@
 # ADR-1368: The cookie jar, HSTS and alt-svc files are replaced by rename off Windows
 
-- Status: Accepted
+- Status: Accepted; its Windows decision is superseded by ADR-1385
 - Date: 2026-11-24
 - Task: BL-5888 (fitness finding STD-207)
 - Decided by Claude under Stewart's delegation.

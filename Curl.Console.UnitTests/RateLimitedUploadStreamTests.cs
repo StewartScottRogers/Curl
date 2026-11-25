@@ -128,8 +128,9 @@ public sealed class RateLimitedUploadStreamTests
     public void CanRewind_StandardInputThatCannotRewind_IsFalse()
     {
         StandardInputUploadStream unseekable = new(new MemoryStream(Body));
-        StandardInputUploadStream standardInput = new(unseekable) { SeekOfUnseekableInputSucceeds = false };
+        StandardInputUploadStream standardInput = new(unseekable) { SeekOfStandardInputSucceeds = false };
         using RateLimitedUploadStream upload = new(standardInput, 10, clock);
+        _ = standardInput.Read(new byte[1], 0, 1);
 
         Diagnostics.Act("standard input can rewind", standardInput.CanRewind);
         Assert.IsFalse(standardInput.CanRewind);

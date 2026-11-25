@@ -319,8 +319,9 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// before the body was whole (exit 18), the output failed a write (exit 23), a read
     /// failed or the chunked framing is malformed (exit 56), the Transfer-Encoding names a
     /// coding curl does not decode or a decoded Content-Encoding is unrecognized or corrupt
-    /// (exit 61), the body grew past <see cref="MaximumBodySize" /> (exit 63), or a trailer line
-    /// is too long (exit 100).
+    /// (exit 61), the body grew past <see cref="MaximumBodySize" /> (exit 63), a trailer line
+    /// is too long (exit 100), or a <c>101 Switching Protocols</c> carried no body or answered
+    /// <c>-I</c> (exit 52).
     /// </exception>
     internal async ValueTask CopyAsync(
         HttpResponseHead head,
@@ -334,6 +335,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         {
             ReportUnreadBody(head, noBody);
             ReportBytesAfterBodilessHead(head, noBody);
+            await ThrowIfBodilessSwitchingProtocolsAsync(head, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -634,6 +636,30 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         {
             throw new HttpTransferException(exception.ExitCode, HttpTransferMessages.ChunkedStreamReadFailed);
         }
+    }
+
+    /// <summary>
+    /// Fails a <c>101 Switching Protocols</c> answering <c>-I</c>, the one bodiless response
+    /// curl 8.22.0 ends with exit 52, <c>Empty reply from server</c>: when no byte came with the
+    /// head it first reads once, waiting for bytes or the close, and reports what that read
+    /// gave as one data event, empty for the close (measured, BL-5955 Notes). Does nothing for
+    /// any other status.
+    /// </summary>
+    private async ValueTask ThrowIfBodilessSwitchingProtocolsAsync(HttpResponseHead head, CancellationToken cancellationToken)
+    {
+        if (head.StatusLine.StatusCode != 101)
+        {
+            return;
+        }
+
+        if (head.BodyPrefix.IsEmpty)
+        {
+            byte[] buffer = new byte[ReceiveSize];
+            int read = await ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            Events.ReportDataReceived(buffer.AsSpan(0, read));
+        }
+
+        throw new HttpTransferException(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply);
     }
 
     /// <summary>

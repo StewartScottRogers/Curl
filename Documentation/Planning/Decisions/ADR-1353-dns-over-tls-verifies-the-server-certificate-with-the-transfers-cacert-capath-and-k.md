@@ -8,7 +8,7 @@ Status: Accepted. Decided by Claude under Stewart's delegation (BL-5872).
 
 ## Decision
 
-`ExtensionOptionValues` carries an `ExtensionTlsTrust` (`Insecure`, `CaCertificateFile`, `CaCertificateDirectory`) that `CurlComposition.ExtensionOptionValuesOf` fills from `-k`, `--cacert` and `--capath`. `EncryptedDnsExtension.ActivateDnsOverTls` turns it into the `TlsClientOptions` of `DnsOverTlsResolverHook`. There is no `--dns-over-tls-insecure` override, so the transfer's options are the only ones. `--dns-over-quic` is unchanged (it judges the certificate through the connector's verifier).
+`ExtensionOptionValues` carries an `ExtensionTlsTrust` (`Insecure`, `CaCertificateFile`, `CaCertificateDirectory`, `SkipRevocationCheck`) that `CurlComposition.ExtensionOptionValuesOf` fills from `-k`, `--cacert`, `--capath` and `--ssl-no-revoke`. `--ssl-no-revoke` is carried too because the Schannel build checks revocation under `--cacert` as Windows curl does, so a private CA that publishes no revocation list (a test server's) is refused without it, and curl's `--doh-url` copies `--ssl-no-revoke` to its DoH transfers as well (BL-5872's second claim). `EncryptedDnsExtension.ActivateDnsOverTls` turns it into the `TlsClientOptions` of `DnsOverTlsResolverHook`. There is no `--dns-over-tls-insecure` override, so the transfer's options are the only ones. `--dns-over-quic` is unchanged (it judges the certificate through the connector's verifier).
 
 ## Consequences
 

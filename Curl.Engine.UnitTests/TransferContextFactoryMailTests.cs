@@ -105,7 +105,6 @@ public sealed class TransferContextFactoryMailTests
     }
 
     [TestMethod]
-    [DataRow("http://example.com/")]
     [DataRow("ftp://example.com/")]
     [DataRow("file:///x.txt")]
     public void Create_OtherScheme_CarriesNoMailOptions(string url)

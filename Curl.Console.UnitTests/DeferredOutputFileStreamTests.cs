@@ -325,4 +325,64 @@ public sealed class DeferredOutputFileStreamTests
         Assert.IsTrue(fileSystem.Written.ContainsKey("a.txt"));
         Assert.IsTrue(stream.CreatedEmptyAfterTransfer);
     }
+
+    [TestMethod]
+    public async Task CompleteAsync_JNamedFileClosedByAFailedFlush_ReportsTheCloseFailure()
+    {
+        using DeferredOutputFileStream stream = OverFileClosedByItsFirstFlush();
+        Diagnostics.Arrange("file", "-J name whose first flush fails and closes it, as conin$ does on Windows (STD-209)");
+        Diagnostics.Arrange("writes", "5 bytes, then 5 bytes, then Flush and FlushAsync");
+
+        Assert.IsTrue(await stream.TryOpenUnderNameAsync("conin\uDC80", 40, CancellationToken.None));
+        await stream.WriteAsync(new byte[5].AsMemory());
+        await stream.WriteAsync(new byte[5].AsMemory());
+        stream.Flush();
+        await stream.FlushAsync();
+        TransferResult result = await stream.CompleteAsync(TransferResult.Success(10));
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+
+        Diagnostics.Assert("exit code", CurlExitCode.WriteError, result.ExitCode);
+        Diagnostics.Assert("error message", DeferredOutputFileStream.CloseFailureMessage, result.ErrorMessage);
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreSame(DeferredOutputFileStream.CloseFailureMessage, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_FileClosedByAFailedFlush_FailsAWriteTheStdioBufferCannotHold()
+    {
+        using DeferredOutputFileStream stream = OverFileClosedByItsFirstFlush();
+        Diagnostics.Arrange("file", "-J name whose first flush fails and closes it");
+        Diagnostics.Arrange("writes", $"5 bytes, then {DeferredOutputFileStream.StdioBufferSize} bytes");
+
+        Assert.IsTrue(await stream.TryOpenUnderNameAsync("conin\uDC80", 40, CancellationToken.None));
+        await stream.WriteAsync(new byte[5].AsMemory());
+        ValueTask write = stream.WriteAsync(new byte[DeferredOutputFileStream.StdioBufferSize].AsMemory());
+        Diagnostics.Act("task faulted", write.IsFaulted);
+
+        Diagnostics.Assert("task faulted", true, write.IsFaulted);
+        Assert.IsTrue(write.IsFaulted);
+        await Assert.ThrowsExactlyAsync<IOException>(() => write.AsTask());
+    }
+
+    /// <summary>
+    /// Builds a stream whose raw-byte name opens a <see cref="ClosedByFailedFlushStream" />.
+    /// </summary>
+    private DeferredOutputFileStream OverFileClosedByItsFirstFlush() =>
+        new(fileSystem, "x", FileWriteMode.Truncate, openUnderRawBytes: (_, _, _) => FileOpenResult.Opened(new ClosedByFailedFlushStream(), 0, null));
+
+    /// <summary>
+    /// A file whose first flush fails with an <see cref="IOException" /> and closes it, as .NET's
+    /// <see cref="FileStream" /> does over Windows' <c>conin$</c>; any later use throws
+    /// <see cref="ObjectDisposedException" />.
+    /// </summary>
+    private sealed class ClosedByFailedFlushStream : MemoryStream
+    {
+        public override void Flush()
+        {
+            ObjectDisposedException.ThrowIf(!CanWrite, this);
+            Dispose();
+            throw new IOException("The handle is invalid.");
+        }
+    }
 }

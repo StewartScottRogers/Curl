@@ -24,8 +24,11 @@ namespace Curl.Original.Protocol.Http;
 /// head is exit 16, and part way through the body exit 18. A response whose length does not add
 /// up (RFC 9113 section 8.1.1: DATA past or short of its <c>content-length</c>, a body on HEAD, 204
 /// or 304, a 1xx head ending the stream, an invalid or second <c>content-length</c>) makes this
-/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0847). Failed reads and writes of the
-/// connection itself pass through as <see cref="IOException" />.
+/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0847), except DATA past it on a body
+/// that is not wanted (<see cref="EndsAtFinalHead" />), which sends the GOAWAY and succeeds
+/// (BL-5938). A head that ends the stream is refused the same way when its length is short,
+/// whether or not the body is wanted (BL-5947).
+/// Failed reads and writes of the connection itself pass through as <see cref="IOException" />.
 /// </remarks>
 /// <param name="session">The connection's HTTP/2 session.</param>
 /// <param name="scheme">The URL's scheme, sent as <c>:scheme</c>.</param>
@@ -36,7 +39,7 @@ namespace Curl.Original.Protocol.Http;
 internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength, HttpStreamOpenedLines? openedLines = null, HttpFrameLog? frameLog = null, Http2FrameTrace? frameTrace = null) : IHttpStreamConnection
 {
     /// <summary>The length of an RST_STREAM frame's payload: its error code.</summary>
-    private const int ResetPayloadLength = 4;
+    internal const int ResetPayloadLength = 4;
 
     private readonly Queue<ReadOnlyMemory<byte>> received = new();
 
@@ -60,12 +63,23 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private bool isResponseEnded;
 
+    /// <summary>Whether the response is being given up (<see cref="AbandonResponseAsync" />), whose body curl reports no data of.</summary>
+    private bool isBodyAbandoned;
+
     private bool isFinalHeadReceived;
 
     private bool isHeadRequest;
 
     /// <summary>Gets or sets whether the body is not wanted, as with <c>-I</c>: the response then ends at the first DATA frame after the final head, or when the peer closes after it, while a trailer HEADERS right after the head is still read (BL-5391, BL-5468).</summary>
     internal bool EndsAtFinalHead { get; init; }
+
+    /// <summary>
+    /// Gets whether the response ended in a way curl reports empty data for: END_STREAM came on a
+    /// HEADERS frame, the final head or a trailer, or on a DATA frame of a response with no body
+    /// bytes (measured, curl 8.18.0, BL-5946 Notes). Not so for one <c>-I</c> ends at a DATA
+    /// frame, which is reported there (<see cref="HttpStreamOpenedLines.UnwantedDataReceived" />).
+    /// </summary>
+    internal bool EndedWithEmptyData { get; private set; }
 
     /// <summary>The body length the final head promises (RFC 9113 section 8.1.1), or <see langword="null" /> when it promises none.</summary>
     private long? promisedBodyLength;
@@ -92,6 +106,12 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// it has not yet taken.
     /// </summary>
     internal bool HasReceived => !inbox.IsEmpty;
+
+    /// <summary>
+    /// Gets a value indicating whether the stream is done with its response: it has read the end,
+    /// or ended it here as <c>-I</c> does at the first DATA frame (<see cref="EndsAtFinalHead" />).
+    /// </summary>
+    internal bool IsResponseEnded => isResponseEnded;
 
     /// <summary>Gets the stream's identifier, 0 until its head is written.</summary>
     internal int StreamId => streamId;
@@ -249,7 +269,8 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// does (measured, BL-5906 Notes). A stream whose request has not ended, and the stream an
     /// h2c upgrade continues on, is instead reset with STREAM_CLOSED unless its response has
     /// ended, <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970 Notes), and
-    /// the frames the peer still sends on it are dropped.
+    /// the frames the peer still sends on it are dropped. No data is reported for a body read
+    /// here (measured, BL-5941 Notes).
     /// </summary>
     /// <param name="cancellationToken">Cancels the reads or the write.</param>
     /// <returns>A task that completes when the stream has ended or the reset is written.</returns>
@@ -258,6 +279,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         if (isRequestEnded && !isUpgraded)
         {
+            isBodyAbandoned = true;
             await ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         }
         else if (!isResponseEnded)
@@ -561,6 +583,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             }
         }
 
+        EndedWithEmptyData = frame.IsEndStream;
         await EndResponseAsync(IsEndedBy(frame), cancellationToken).ConfigureAwait(false);
     }
 
@@ -585,9 +608,10 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
-    /// Takes a response head as nghttp2 checks it (measured, BL-3667 Notes): a 1xx head that
-    /// ends the stream is a protocol error; curl has written the lines but not the empty line,
-    /// and nghttp2 shuts the connection down.
+    /// Takes a response head as nghttp2 checks it (measured, BL-3667 and BL-5947 Notes): a 1xx
+    /// head that ends the stream, or a final head that ends it although its
+    /// <c>content-length</c> promises a body, <c>-I -X GET</c> included, is a protocol error;
+    /// curl has written the lines but not the empty line, and nghttp2 shuts the connection down.
     /// </summary>
     /// <returns><see langword="true" /> for a head taken, <see langword="false" /> for one the connection was shut down for.</returns>
     private async ValueTask<bool> IsHeadTakenAsync(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream, CancellationToken cancellationToken)
@@ -595,7 +619,8 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         if (MalformedHeadOf(statusCode, fields, isEndStream) is { } malformed)
         {
             received.Enqueue(malformed.Written);
-            await ShutDownMalformedAsync(CurlExitCode.Http2, malformed.Message, cancellationToken).ConfigureAwait(false);
+            // The message is also a -v line, after the head lines (measured, BL-5947 Notes).
+            await ShutDownMalformedAsync(new HttpTransferException(CurlExitCode.Http2, malformed.Message) { InfoLines = [malformed.Message] }, cancellationToken).ConfigureAwait(false);
             return false;
         }
 
@@ -617,7 +642,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <see langword="null" /> for a head it takes (<see cref="IsHeadTakenAsync" />).
     /// </summary>
     private (byte[] Written, string Message)? MalformedHeadOf(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream) =>
-        statusCode < 200 && isEndStream
+        isEndStream && (statusCode < 200 || PromisedBodyLengthOf(statusCode, fields) > 0)
             ? (HeadWithoutEmptyLine(statusCode, fields), HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError))
             : null;
 
@@ -631,14 +656,13 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             throw await ResetMalformedAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        bodyBytesReceived += frame.Content.Length;
         if (EndsAtFinalHead)
         {
-            // The body is not wanted (-I): the first DATA ends the response, but a trailer HEADERS right after the head is still read (BL-5468).
-            isResponseEnded = true;
+            await EndAtUnwantedBodyAsync(frame.Content, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        bodyBytesReceived += frame.Content.Length;
         if (bodyBytesReceived > promisedBodyLength)
         {
             await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
@@ -646,12 +670,39 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         }
 
         received.Enqueue(frame.Content);
+        EndedWithEmptyData = frame.IsEndStream && bodyBytesReceived == 0;
         await EndResponseAsync(frame.IsEndStream, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Ends the response when its last frame came, unless its body is shorter than its
+    /// Ends the response at the first DATA frame of a body that is not wanted (-I), without failing
+    /// it; a trailer HEADERS right after the head is still read (BL-5468). DATA past the length the
+    /// head promises, which for HEAD is none, still breaks RFC 9113 section 8.1.1: nghttp2 reports
+    /// it as a <c>-v</c> line and shuts the connection down with GOAWAY PROTOCOL_ERROR, and curl
+    /// exits 0 (measured, curl 8.18.0, BL-5938 Notes). curl then reports the frame's data, as
+    /// <c>-v</c>'s <c>{ [N bytes data]</c> line: <paramref name="data" />, or none of it when it is
+    /// past that length, unless the response is abandoned (measured, BL-5941 Notes).
+    /// </summary>
+    private async ValueTask EndAtUnwantedBodyAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+    {
+        isResponseEnded = true;
+        bool isPastPromisedLength = bodyBytesReceived > promisedBodyLength;
+        if (isPastPromisedLength)
+        {
+            openedLines?.ShutsDownConnection(Http2ErrorCode.ProtocolError);
+            await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!isBodyAbandoned)
+        {
+            openedLines?.UnwantedDataReceived(isPastPromisedLength ? ReadOnlyMemory<byte>.Empty : data);
+        }
+    }
+
+    /// <summary>
+    /// Ends the response when its last frame came, unless its body is wanted and shorter than its
     /// <c>content-length</c>, which nghttp2 shuts the connection down for (RFC 9113 section 8.1.1).
+    /// A head that itself ends the stream short is refused before this (<see cref="IsHeadTakenAsync" />).
     /// </summary>
     private async ValueTask EndResponseAsync(bool isEndStream, CancellationToken cancellationToken)
     {
@@ -670,9 +721,13 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <paramref name="exitCode" /> with <paramref name="message" />, is thrown by the stream's
     /// next read, after the bytes curl wrote before it.
     /// </summary>
-    private async ValueTask ShutDownMalformedAsync(CurlExitCode exitCode, string message, CancellationToken cancellationToken)
+    private ValueTask ShutDownMalformedAsync(CurlExitCode exitCode, string message, CancellationToken cancellationToken) =>
+        ShutDownMalformedAsync(new HttpTransferException(exitCode, message), cancellationToken);
+
+    /// <summary>Shuts the connection down for a malformed response, keeping <paramref name="failure" /> for the stream's next read to throw.</summary>
+    private async ValueTask ShutDownMalformedAsync(HttpTransferException failure, CancellationToken cancellationToken)
     {
-        malformedResponseFailure = new HttpTransferException(exitCode, message);
+        malformedResponseFailure = failure;
         await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
     }
 

@@ -99,6 +99,12 @@ internal sealed class TunnelTestPeer : IWireGuardUdpOpener, IWireGuardUdpChannel
         }
         while (initiation[0] != 1);
 
+        AnswerInitiation(initiation);
+    }
+
+    /// <summary>Answers <paramref name="initiation" /> with a response, so the session it starts is the one the responder holds.</summary>
+    public void AnswerInitiation(byte[] initiation)
+    {
         Assert.IsTrue(Responder.TryConsumeInitiation(initiation));
         Assert.IsTrue(HandshakeInitiationMessage.TryDecode(initiation, out var message));
         initiatorIndex = message.SenderIndex;

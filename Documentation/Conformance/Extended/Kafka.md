@@ -40,4 +40,5 @@ broker closes the connection on an API it does not serve (exit 56).
 ## Upload with `-T`
 
 `curl -T up.txt kafka://host/topic/partition` publishes the file's whole content as the record value of one Produce
-request, exactly as `-d` does; it never subscribes or fetches (BL-4955). `-d` wins when both are given.
+request, exactly as `-d` does; it never subscribes or fetches (BL-4955). The command line refuses `-d` with `-T`
+(exit 2, curl's `You can only select one HTTP request method!` warning) before anything is sent (ADR-1369).

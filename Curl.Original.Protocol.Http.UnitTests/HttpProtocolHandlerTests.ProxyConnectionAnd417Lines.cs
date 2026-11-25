@@ -1,5 +1,5 @@
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http.Fakes;
+using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Original.Protocol.Http;
@@ -136,8 +136,8 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ExpectingHead + ResentHead + BigBody, connection.Written, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(
-                new[] { "< Content-Length: 0\r\n", "* Got HTTP failure 417 while waiting for a 100", "* Ignoring the response-body", "* setting size while ignoring", "< \r\n" },
-                EventsFrom(events, "< HTTP/1.1 417 Expectation Failed\r\n", 6).Skip(1).ToArray(),
+                new[] { "< Content-Length: 0\r\n", "* Got HTTP failure 417 while waiting for a 100", "* abort upload", "* Ignoring the response-body", "* setting size while ignoring", "< \r\n" },
+                EventsFrom(events, "< HTTP/1.1 417 Expectation Failed\r\n", 7).Skip(1).ToArray(),
                 $"Chunk size {chunkSize}");
             CollectionAssert.DoesNotContain(events.Info.ToList(), "Got HTTP failure 417 while sending data", $"Chunk size {chunkSize}");
         }

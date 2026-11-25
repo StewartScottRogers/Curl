@@ -197,7 +197,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
             }
             catch (OperationCanceledException) when (TimedOut(context))
             {
-                result = WithRequestSize(new TransferResult(CurlExitCode.OperationTimedOut, session.BytesWritten, TimedOutMessage(context, started, session.BytesWritten, session.ExpectedTotal)), session.BytesSent);
+                result = WithRequestSize(new TransferResult(CurlExitCode.OperationTimedOut, session.BytesWritten, TimedOutMessage(context, started, session.PublishBytesWritten, session.ExpectedTotal)), session.BytesSent);
             }
         }
 

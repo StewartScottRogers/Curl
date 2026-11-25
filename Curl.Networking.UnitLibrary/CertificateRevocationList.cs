@@ -4,6 +4,8 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
+using Curl.Cryptography;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -142,23 +144,26 @@ internal sealed class CertificateRevocationList
 
     /// <summary>
     /// Returns whether <paramref name="issuer" />'s key verifies the list's signature. An RSA
-    /// (PKCS #1 v1.5, or RSASSA-PSS as <see cref="RsaPssSignatureParameters" /> admits it) or ECDSA
-    /// signature over SHA-1, SHA-256, SHA-384 or SHA-512 is checked; any other algorithm, or a key
-    /// of the wrong kind, fails.
+    /// (PKCS #1 v1.5, or RSASSA-PSS as <see cref="RsaPssSignatureParameters" /> reads it, with
+    /// exactly the salt length it names) or ECDSA signature over SHA-1, SHA-256, SHA-384 or
+    /// SHA-512 is checked; any other algorithm, or a key of the wrong kind, fails.
     /// </summary>
     /// <param name="issuer">The certificate whose key signed the list.</param>
+    /// <param name="anotherMaskHashVerifies">
+    /// Whether an RSASSA-PSS signature whose MGF1 hash is not its message hash can verify, as in
+    /// curl's OpenSSL build; the Schannel build leaves such a list unverified (ADR-1376).
+    /// </param>
     /// <returns><see langword="true" /> when the signature verifies.</returns>
-    public bool IsSignedBy(X509Certificate2 issuer)
+    public bool IsSignedBy(X509Certificate2 issuer, bool anotherMaskHashVerifies = false)
     {
         if (RsaSignatureAlgorithms.TryGetValue(_signatureAlgorithm, out var rsaHash))
         {
-            return IsRsaSignedBy(issuer, rsaHash, RSASignaturePadding.Pkcs1);
+            return IsRsaPkcs1SignedBy(issuer, rsaHash);
         }
 
         if (_signatureAlgorithm == RsaSsaPssOid)
         {
-            return RsaPssSignatureParameters.ReadVerifiableHash(_signatureParameters) is { } pssHash
-                && IsRsaSignedBy(issuer, pssHash, RSASignaturePadding.Pss);
+            return IsRsaPssSignedBy(issuer, anotherMaskHashVerifies);
         }
 
         if (EcdsaSignatureAlgorithms.TryGetValue(_signatureAlgorithm, out var ecdsaHash))
@@ -170,10 +175,22 @@ internal sealed class CertificateRevocationList
         return false;
     }
 
-    private bool IsRsaSignedBy(X509Certificate2 issuer, HashAlgorithmName hash, RSASignaturePadding padding)
+    private bool IsRsaPkcs1SignedBy(X509Certificate2 issuer, HashAlgorithmName hash)
     {
         using var rsa = issuer.GetRSAPublicKey();
-        return rsa is not null && rsa.VerifyData(_signedPart, _signature, hash, padding);
+        return rsa is not null && rsa.VerifyData(_signedPart, _signature, hash, RSASignaturePadding.Pkcs1);
+    }
+
+    private bool IsRsaPssSignedBy(X509Certificate2 issuer, bool anotherMaskHashVerifies)
+    {
+        if (RsaPssSignatureParameters.Read(_signatureParameters) is not { } pss || (pss.MaskHash != pss.Hash && !anotherMaskHashVerifies))
+        {
+            return false;
+        }
+
+        using var rsa = issuer.GetRSAPublicKey();
+        return rsa is not null && RsaPssVerification.Verify(
+            rsa.ExportParameters(includePrivateParameters: false), _signedPart, _signature, pss.Hash, pss.MaskHash, pss.SaltLength);
     }
 
     /// <summary>Gets the value of the list's <c>freshestCRL</c> extension (where its delta lists are), or <see langword="null" /> when it has none.</summary>

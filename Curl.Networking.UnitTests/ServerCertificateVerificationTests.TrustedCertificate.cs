@@ -14,7 +14,8 @@ namespace Curl.Networking;
 /// Pins how the OpenSSL build reads <c>TRUSTED CERTIFICATE</c> blocks of a <c>--cacert</c> file
 /// and their trust and reject settings, each verdict as <c>openssl verify -partial_chain
 /// -purpose sslserver</c> 3.5 gives it (BL-5879, STD-198), and of <c>--capath</c> hashed files,
-/// as curl 8.18.0 on OpenSSL 3.5.5 gives it (BL-5917).
+/// as curl 8.18.0 on OpenSSL 3.5.5 gives it (BL-5917), and how it reads <c>X509 CERTIFICATE</c>
+/// blocks of both, and settings after a plain label, as the same curl does (BL-5927).
 /// </summary>
 [TestClass]
 public sealed class ServerCertificateVerificationTrustedCertificateTests
@@ -69,13 +70,36 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
     }
 
     [TestMethod]
-    public void VerifyChain_RejectedRootAndAnotherHostName_ReportsTheRejectionFirst()
+    [DataRow("other.test", "hostname")]
+    [DataRow("127.0.0.1", "ipv4 address")]
+    public void VerifyChain_RejectedRootAndANameTheLeafLacks_ReportsTheNameMismatch(string host, string kind)
     {
         using var chain = IssuedChain.Create();
 
-        var verdict = Verify(Trusted(chain.Root, null, ServerAuthentication), chain, "other.test");
+        var verdict = Verify(Trusted(chain.Root, null, ServerAuthentication), chain, host);
 
-        AssertVerdict(false, verdict);
+        AssertNameMismatch(host, kind, verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_RejectedLeafAndAnotherHostName_ReportsTheNameMismatch()
+    {
+        using var chain = IssuedChain.Create();
+
+        var verdict = Verify(Trusted(chain.Leaf, null, ServerAuthentication), chain, "other.test");
+
+        AssertNameMismatch("other.test", "hostname", verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_RejectedCaDirectoryRootAndAnotherHostName_ReportsTheNameMismatch()
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, Trusted(chain.Root, null, ServerAuthentication));
+
+        var verdict = VerifyDirectory(directory, chain, host: "other.test");
+
+        AssertNameMismatch("other.test", "hostname", verdict);
     }
 
     [TestMethod]
@@ -136,6 +160,22 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
 
         Assert.AreEqual(28L, observed.VerifyResult);
         Assert.AreEqual((CurlExitCode.PeerFailedVerification, Rejected), failure);
+    }
+
+    [TestMethod]
+    public void Judge_RejectedRootAndAnotherHostName_ReportsVerifyResult1()
+    {
+        using var chain = IssuedChain.Create();
+        var verification = Verification(Trusted(chain.Root, null, ServerAuthentication), matchesSchannelBuild: false);
+        var (chainPolicy, anchors, _) = verification.ReadTrustAnchors();
+        using var built = new X509Chain { ChainPolicy = chainPolicy! };
+        built.ChainPolicy.ExtraStore.Add(chain.Intermediate);
+        built.Build(chain.Leaf);
+
+        var (observed, failure) = verification.Judge(SslPolicyErrors.RemoteCertificateNameMismatch, built, "other.test", anchors, null, chain.Sent);
+
+        Assert.AreEqual(1L, observed.VerifyResult);
+        Assert.AreEqual(NameMismatch("other.test", "hostname"), failure?.Message);
     }
 
     [TestMethod]
@@ -285,6 +325,73 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
         Assert.AreNotEqual(Rejected, failure?.Message);
     }
 
+    [TestMethod]
+    public void VerifyChain_X509CertificateBlockInACaFile_Verifies()
+    {
+        using var chain = IssuedChain.Create();
+
+        var verdict = Verify(OldLabel(chain.Root), chain);
+
+        AssertVerdict(true, verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_X509CertificateBlockInACaDirectoryFile_Verifies()
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, OldLabel(chain.Root));
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        AssertVerdict(true, verdict);
+    }
+
+    [TestMethod]
+    [DataRow("MAA=")]
+    [DataRow("!!!!")]
+    public void VerifyChain_UndecodableX509CertificateBlockInACaFile_RefusesTheFile(string body)
+    {
+        using var chain = IssuedChain.Create();
+        var pem = Plain(chain.Root) + $"-----BEGIN X509 CERTIFICATE-----\n{body}\n-----END X509 CERTIFICATE-----\n";
+
+        var verdict = Verify(pem, chain);
+
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, verdict.ExitCode, verdict.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("CERTIFICATE")]
+    [DataRow("X509 CERTIFICATE")]
+    public void VerifyChain_RejectSettingsAfterAPlainLabelInACaFile_AreIgnored(string label)
+    {
+        using var chain = IssuedChain.Create();
+        var pem = Relabelled(Trusted(chain.Root, null, ServerAuthentication), label);
+
+        var verdict = Verify(pem, chain);
+
+        AssertVerdict(true, verdict);
+    }
+
+    [TestMethod]
+    [DataRow("CERTIFICATE")]
+    [DataRow("X509 CERTIFICATE")]
+    public void VerifyChain_RejectSettingsAfterAPlainLabelInACaDirectoryFile_AreHonoured(string label)
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, Relabelled(Trusted(chain.Root, null, ServerAuthentication), label));
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        AssertVerdict(false, verdict);
+    }
+
+    private static string OldLabel(X509Certificate2 certificate) => Relabelled(Plain(certificate), "X509 CERTIFICATE");
+
+    // The PEM block under another label, whichever certificate label it had.
+    private static string Relabelled(string pem, string label) =>
+        pem.Replace("TRUSTED CERTIFICATE-", "CERTIFICATE-", StringComparison.Ordinal)
+            .Replace(" CERTIFICATE-", $" {label}-", StringComparison.Ordinal);
+
     private const string Undecodable = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
 
     // A new CA directory holding the certificate's hashed files, one per content, <hash>.0 first.
@@ -309,12 +416,21 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
     [TestCleanup]
     public void DeleteDirectories() => _directories.ForEach(directory => System.IO.Directory.Delete(directory, recursive: true));
 
-    private static ServerCertificateChainVerdict VerifyDirectory(string directory, IssuedChain chain, string? caFile = null)
+    private static ServerCertificateChainVerdict VerifyDirectory(string directory, IssuedChain chain, string? caFile = null, string host = Host)
     {
         var options = new TlsClientOptions(
             CaCertificateBlob: caFile is null ? null : (ReadOnlyMemory<byte>?)Encoding.ASCII.GetBytes(caFile),
             CaCertificateDirectory: directory);
-        return new ServerCertificateVerification(options, matchesSchannelBuild: false, TimeProvider.System).VerifyChain(chain.Sent, Host);
+        return new ServerCertificateVerification(options, matchesSchannelBuild: false, TimeProvider.System).VerifyChain(chain.Sent, host);
+    }
+
+    private static string NameMismatch(string host, string kind) =>
+        $"SSL: no alternative certificate subject name matches target {kind} '{host}'";
+
+    private static void AssertNameMismatch(string host, string kind, ServerCertificateChainVerdict verdict)
+    {
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, verdict.ExitCode, verdict.ErrorMessage);
+        Assert.AreEqual(NameMismatch(host, kind), verdict.ErrorMessage);
     }
 
     private static ServerCertificateVerification Verification(string pem, bool matchesSchannelBuild) =>

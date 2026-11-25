@@ -92,6 +92,20 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// </summary>
     internal nint? Socket { get; private set; }
 
+    /// <summary>
+    /// Gets or sets what answers whether the transfer's multi handle has work for its next perform: a queued
+    /// callback, or this transfer's perform finished and not yet reported. Outside a multi handle it answers no.
+    /// </summary>
+    internal Func<bool> HasWorkForNextPerform { get; set; } = static () => false;
+
+    /// <summary>
+    /// Whether <paramref name="socket" /> is this transfer's <see cref="Socket" /> and
+    /// <see cref="HasWorkForNextPerform" />, so another multi handle polling it finds it readable.
+    /// </summary>
+    /// <param name="socket">The socket number polled.</param>
+    /// <returns>Whether the socket is readable.</returns>
+    internal bool IsReadableOn(nint socket) => Socket == socket && HasWorkForNextPerform();
+
     /// <summary>Gets whether a dial is in progress (<see cref="BeginConnect" /> until <see cref="EndConnect" />).</summary>
     internal bool IsConnecting
     {

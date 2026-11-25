@@ -6,7 +6,8 @@ namespace Curl.Extended.Protocol.S3.Client;
 /// <summary>
 /// Serves <c>s3://bucket/key</c> (ADR-1090): with <c>-T</c> it uploads to the key, with an empty key or one ending in
 /// <c>/</c> it lists the keys under it, otherwise it downloads the object. Where it connects and how it signs come from
-/// <see cref="S3Configuration"/> and <see cref="S3Endpoint"/>; the requests are <see cref="S3Operations"/>.
+/// <see cref="S3Configuration"/> and <see cref="S3Endpoint"/>; the requests are <see cref="S3Operations"/>. What it cannot
+/// send it refuses with exit 4 before any connection (<see cref="S3RequestMethod"/>, <see cref="S3ByteRangeRefusal"/>).
 /// </summary>
 /// <param name="connector">Opens each connection.</param>
 /// <param name="environment">Gives an environment variable's value, or <see langword="null"/> when it is unset.</param>
@@ -20,7 +21,7 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (S3RequestMethod.RefusalOf(context) is { } refusal)
+        if ((S3RequestMethod.RefusalOf(context) ?? S3ByteRangeRefusal.RefusalOf(context, IsPrefix(KeyOf(context.Url)))) is { } refusal)
         {
             return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
         }

@@ -20,7 +20,8 @@ internal sealed partial class ServerCertificateVerification
             : WithNameMismatchOpenSslFinds(errors, chain, targetHost);
 
     // curl's OpenSSL build never matches a host name by the common name of a certificate
-    // whose subjectAltName holds only IP addresses, which .NET on Windows does (BL-460).
+    // whose subjectAltName holds only IP addresses, which .NET on Windows does (BL-460), nor
+    // accepts a matched common name holding a NUL (BL-5921).
     private static SslPolicyErrors WithNameMismatchOpenSslFinds(SslPolicyErrors errors, X509Chain? chain, string targetHost)
     {
         if (chain is not { ChainElements.Count: > 0 })
@@ -34,13 +35,13 @@ internal sealed partial class ServerCertificateVerification
             errors |= SslPolicyErrors.RemoteCertificateChainErrors;
         }
 
-        if (OpenSslCommonNameRefusal.RefusesHostName(leaf, targetHost))
-        {
-            return errors | SslPolicyErrors.RemoteCertificateNameMismatch;
-        }
-
-        return WithoutNameMismatchOpenSslTrailingDotAccepts(errors, leaf, targetHost);
+        return OpenSslRefusesTheCommonName(leaf, targetHost)
+            ? errors | SslPolicyErrors.RemoteCertificateNameMismatch
+            : WithoutNameMismatchOpenSslTrailingDotAccepts(errors, leaf, targetHost);
     }
+
+    private static bool OpenSslRefusesTheCommonName(X509Certificate2 leaf, string targetHost) =>
+        OpenSslCommonNameRefusal.RefusesHostName(leaf, targetHost) || OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(leaf);
 
     // OpenSSL's check ignores one trailing dot on each side, .NET's on Linux does not
     // (BL-5855, STD-187).

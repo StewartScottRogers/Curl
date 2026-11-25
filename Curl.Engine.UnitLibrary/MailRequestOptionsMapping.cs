@@ -13,10 +13,14 @@ namespace Curl.Engine;
 /// </summary>
 internal static class MailRequestOptionsMapping
 {
-    /// <summary>The schemes whose transfers carry <see cref="MailRequestOptions" />, matched without case.</summary>
-    private static readonly HashSet<string> MailSchemes = new(StringComparer.OrdinalIgnoreCase)
+    /// <summary>
+    /// The schemes whose transfers carry <see cref="MailRequestOptions" />, matched without case: the mail
+    /// and LDAP schemes, whose handlers read them, and <c>http</c> and <c>https</c>, so that a redirect
+    /// followed to a mail URL still has them (ADR-1388).
+    /// </summary>
+    private static readonly HashSet<string> SchemesCarryingMailOptions = new(StringComparer.OrdinalIgnoreCase)
     {
-        "smtp", "smtps", "pop3", "pop3s", "imap", "imaps", "ldap", "ldaps",
+        "smtp", "smtps", "pop3", "pop3s", "imap", "imaps", "ldap", "ldaps", "http", "https",
     };
 
     /// <summary>
@@ -55,7 +59,7 @@ internal static class MailRequestOptionsMapping
     /// </param>
     /// <returns>
     /// <see langword="null" /> for every scheme but <c>smtp</c>, <c>smtps</c>, <c>pop3</c>,
-    /// <c>pop3s</c>, <c>imap</c> and <c>imaps</c>; for those, every mail option verbatim, the
+    /// <c>pop3s</c>, <c>imap</c>, <c>imaps</c>, <c>ldap</c>, <c>ldaps</c>, <c>http</c> and <c>https</c>; for those, every mail option verbatim, the
     /// sender, recipients (in command-line order), <c>AUTH</c> and allow-fails from <paramref name="smtp" />, and <see cref="EngineTransferSettings.UploadFlags" /> as
     /// the names of its set flags in curl's order. <see cref="MailRequestOptions.CustomCommand" /> is
     /// <see cref="EasyTransferOptions.CustomRequest" />; <see cref="MailRequestOptions.LoginOptions" />,
@@ -65,7 +69,7 @@ internal static class MailRequestOptionsMapping
     /// is <see cref="EasyAuthenticationOptions.ServiceName" />, <see langword="null" /> for the scheme's default (ADR-0188).
     /// </returns>
     internal static MailRequestOptions? FromCommandLine(EngineTransferSettings settings, EasyTransferOptions transfer, EasySmtpOptions smtp, EasyAuthenticationOptions authentication, string scheme, EngineFeatureMask featureMask = EngineFeatureMask.None) =>
-        !MailSchemes.Contains(scheme)
+        !SchemesCarryingMailOptions.Contains(scheme)
             ? null
             : new MailRequestOptions
             {

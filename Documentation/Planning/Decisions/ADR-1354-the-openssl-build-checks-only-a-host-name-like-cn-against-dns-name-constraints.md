@@ -1,6 +1,6 @@
 # ADR-1354: The OpenSSL build checks only a host-name-like CN against DNS name constraints (BL-5829)
 
-Status: Accepted. Decided by Claude under Stewart's delegation.
+Status: Accepted. Decided by Claude under Stewart's delegation. Amended by ADR-1383.
 
 ## Context
 `CertificateNameConstraints` evaluates the constraints the platform's chain engine skips under a non-self-signed anchor. It checked every subject CN of a leaf with no dNSName as a DNS name in both builds, which is CryptoAPI's rule (BL-5432). OpenSSL curl 8.18.0 accepts `CN=localhost` under `excluded;DNS:localhost` or `permitted;DNS:example.com` (STD-179): OpenSSL's `cn2dnsid` (`crypto/x509/v3_ncons.c`) reads a CN as a DNS name only when it looks like one.

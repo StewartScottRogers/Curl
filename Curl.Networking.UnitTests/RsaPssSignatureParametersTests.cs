@@ -7,7 +7,10 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins which RSASSA-PSS parameters verify a revocation list's signature (STD-197), and when a
-/// list counts as unexpired.
+/// list counts as unexpired. Measured with lists <c>openssl ca -gencrl</c> signed, 2026-11-24
+/// (BL-5929, ADR-1376): curl 8.22.0 Schannel and curl 8.18.0 on OpenSSL 3.5.5 verify any salt
+/// length the parameters name and fail a signature whose salt is another length; MGF1 over
+/// another hash than the message's verifies in the OpenSSL build alone.
 /// </summary>
 [TestClass]
 public sealed class RsaPssSignatureParametersTests
@@ -52,34 +55,87 @@ public sealed class RsaPssSignatureParametersTests
     }
 
     [TestMethod]
-    public void ReadVerifiableHash_ExplicitTrailerFieldOne_IsTheHash()
+    [DataRow(0, DisplayName = "no salt")]
+    [DataRow(20, DisplayName = "shorter than the hash")]
+    [DataRow(222, DisplayName = "the longest an RSA 2048 key admits")]
+    public void IsSignedBy_PssWithASaltNotAsLongAsTheHash_IsTrueInBothBuilds(int saltLength)
     {
-        var parameters = TestRevocationList.PssParameters(TestRevocationList.Sha256, TestRevocationList.Sha256, 32, trailerField: 1);
+        var parameters = TestRevocationList.PssParameters(TestRevocationList.Sha256, TestRevocationList.Sha256, saltLength);
 
-        Assert.AreEqual(HashAlgorithmName.SHA256, RsaPssSignatureParameters.ReadVerifiableHash(parameters));
+        var list = CertificateRevocationList.Decode(PssList(parameters, HashAlgorithmName.SHA256, saltLength));
+
+        Assert.IsTrue(list.IsSignedBy(Authority));
+        Assert.IsTrue(list.IsSignedBy(Authority, anotherMaskHashVerifies: true));
     }
 
     [TestMethod]
-    [DataRow("1.2.840.113549.2.5", "1.2.840.113549.2.5", 16, 1, TestRevocationList.Mgf1, DisplayName = "MD5")]
-    [DataRow(TestRevocationList.Sha256, TestRevocationList.Sha1, 32, 1, TestRevocationList.Mgf1, DisplayName = "MGF1 over another hash")]
-    [DataRow(TestRevocationList.Sha256, TestRevocationList.Sha256, 20, 1, TestRevocationList.Mgf1, DisplayName = "salt not hash long")]
-    [DataRow(TestRevocationList.Sha256, TestRevocationList.Sha256, 32, 2, TestRevocationList.Mgf1, DisplayName = "trailer field 2")]
-    [DataRow(TestRevocationList.Sha256, TestRevocationList.Sha256, 32, 1, "1.2.3", DisplayName = "not MGF1")]
-    public void ReadVerifiableHash_ParametersTheBaseClassLibraryCannotVerify_IsNull(
-        string hash, string maskHash, int saltLength, int trailerField, string maskFunction)
+    public void IsSignedBy_PssWithASaltOtherThanTheOneNamed_IsFalseInBothBuilds()
+    {
+        var parameters = TestRevocationList.PssParameters(TestRevocationList.Sha256, TestRevocationList.Sha256, 221);
+
+        var list = CertificateRevocationList.Decode(PssList(parameters, HashAlgorithmName.SHA256, 222));
+
+        Assert.IsFalse(list.IsSignedBy(Authority));
+        Assert.IsFalse(list.IsSignedBy(Authority, anotherMaskHashVerifies: true));
+    }
+
+    [TestMethod]
+    [DataRow(TestRevocationList.Sha1, "SHA1", 32)]
+    [DataRow(TestRevocationList.Sha384, "SHA384", 20)]
+    public void IsSignedBy_PssWithAnotherMaskHash_IsTrueInTheOpenSslBuildAlone(string maskOid, string maskName, int saltLength)
+    {
+        var parameters = TestRevocationList.PssParameters(TestRevocationList.Sha256, maskOid, saltLength);
+
+        var list = CertificateRevocationList.Decode(PssList(parameters, HashAlgorithmName.SHA256, saltLength, new(maskName)));
+
+        Assert.IsFalse(list.IsSignedBy(Authority));
+        Assert.IsTrue(list.IsSignedBy(Authority, anotherMaskHashVerifies: true));
+    }
+
+    [TestMethod]
+    public void IsSignedBy_PssListUnderAKeyThatIsNotRsa_IsFalse()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var other = new CertificateRequest("CN=PSS List Authority", key, HashAlgorithmName.SHA256)
+            .CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+
+        var list = CertificateRevocationList.Decode(PssList(TestRevocationList.PssParameters(), HashAlgorithmName.SHA1));
+
+        Assert.IsFalse(list.IsSignedBy(other));
+    }
+
+    [TestMethod]
+    public void Read_ExplicitTrailerFieldOne_IsTheParameters()
+    {
+        var parameters = TestRevocationList.PssParameters(TestRevocationList.Sha256, TestRevocationList.Sha1, 222, trailerField: 1);
+
+        Assert.AreEqual(
+            new RsaPssSignatureParameters(HashAlgorithmName.SHA256, HashAlgorithmName.SHA1, 222),
+            RsaPssSignatureParameters.Read(parameters));
+    }
+
+    [TestMethod]
+    [DataRow("1.2.840.113549.2.5", TestRevocationList.Sha256, 16L, 1, TestRevocationList.Mgf1, DisplayName = "MD5")]
+    [DataRow(TestRevocationList.Sha256, "1.2.840.113549.2.5", 32L, 1, TestRevocationList.Mgf1, DisplayName = "MGF1 over MD5")]
+    [DataRow(TestRevocationList.Sha256, TestRevocationList.Sha256, -1L, 1, TestRevocationList.Mgf1, DisplayName = "negative salt length")]
+    [DataRow(TestRevocationList.Sha256, TestRevocationList.Sha256, 2147483648L, 1, TestRevocationList.Mgf1, DisplayName = "salt length past int")]
+    [DataRow(TestRevocationList.Sha256, TestRevocationList.Sha256, 32L, 2, TestRevocationList.Mgf1, DisplayName = "trailer field 2")]
+    [DataRow(TestRevocationList.Sha256, TestRevocationList.Sha256, 32L, 1, "1.2.3", DisplayName = "not MGF1")]
+    public void Read_ParametersNoBuildVerifies_IsNull(
+        string hash, string maskHash, long saltLength, int trailerField, string maskFunction)
     {
         var parameters = TestRevocationList.PssParameters(hash, maskHash, saltLength, trailerField, maskFunction);
 
-        Assert.IsNull(RsaPssSignatureParameters.ReadVerifiableHash(parameters));
+        Assert.IsNull(RsaPssSignatureParameters.Read(parameters));
     }
 
     [TestMethod]
     [DataRow(new byte[0], DisplayName = "empty")]
     [DataRow(new byte[] { 0x05, 0x00 }, DisplayName = "NULL")]
     [DataRow(new byte[] { 0x30, 0x02, 0x05, 0x00 }, DisplayName = "an unknown field")]
-    public void ReadVerifiableHash_MalformedParameters_IsNull(byte[] parameters)
+    public void Read_MalformedParameters_IsNull(byte[] parameters)
     {
-        Assert.IsNull(RsaPssSignatureParameters.ReadVerifiableHash(parameters));
+        Assert.IsNull(RsaPssSignatureParameters.Read(parameters));
     }
 
     [TestMethod]
@@ -103,9 +159,14 @@ public sealed class RsaPssSignatureParametersTests
         Assert.IsTrue(list.IsUnexpiredAt(DateTimeOffset.MaxValue));
     }
 
-    private static byte[] PssList(byte[]? parameters, HashAlgorithmName hash) =>
+    private static byte[] PssList(byte[]? parameters, HashAlgorithmName hash, int? saltLength = null, HashAlgorithmName? maskHash = null) =>
         TestRevocationList.Write(
-            Authority, signatureAlgorithm: TestRevocationList.RsaSsaPss, signatureParameters: parameters, signatureHash: hash);
+            Authority,
+            signatureAlgorithm: TestRevocationList.RsaSsaPss,
+            signatureParameters: parameters,
+            signatureHash: hash,
+            pssSaltLength: saltLength,
+            pssMaskHash: maskHash);
 
     private static X509Certificate2 CreateAuthority()
     {

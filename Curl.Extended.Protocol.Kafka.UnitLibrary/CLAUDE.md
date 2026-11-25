@@ -12,7 +12,7 @@ it `Curl.Protocol.Abstractions`) and the base class library. The handler is regi
 - `KafkaProtocolHandler` serves `kafka://` (port 9092) and `kafkas://` (port 9093, TLS); `KafkaAddress` reads the
   topic, partition and `?offset=N` from the URL.
 - `KafkaClientFlow` authenticates with SASL PLAIN, or SCRAM-SHA-512 or SCRAM-SHA-256 when the broker enables no PLAIN (ADR-1082, ADR-1317), when the transfer has `--user` (the handler does so on every connection), then finds the partition's leader with Metadata (ADR-1080; the handler reconnects to it when it is
-  another broker), then produces one record with a body, or fetches from the offset to the high watermark and writes each
+  another broker, and again when it moves to another broker during a produce's retries, ADR-1377), then produces one record with a body, or fetches from the offset to the high watermark and writes each
   record value and a line feed. `KafkaClientMessages` holds the error texts and `KafkaClientException` carries the exit
   code.
 

@@ -505,9 +505,190 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     [TestMethod]
     [DataRow("www.other.org")]
     [DataRow("a_b-1.other.org")]
-    [DataRow("www\0.example.com")]
-    public void FindViolation_OpenSslBuildHostNameCnOrOneHoldingANul_IsNotPermitted(string commonName) =>
+    public void FindViolation_OpenSslBuildHostNameCnOutsideThePermittedSubtree_IsNotPermitted(string commonName) =>
         Assert.AreEqual(CertificateNameConstraints.NotPermitted, FindViolationOfCommonName(commonName, Constraints(permitted: "example.com")));
+
+    [TestMethod]
+    [DataRow("www\0.example.com")]
+    [DataRow("a\0b")]
+    public void FindViolation_OpenSslBuildCnHoldingAnInnerNul_IsUnsupportedNameSyntax(string commonName) =>
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedNameSyntax, FindViolationOfCommonName(commonName, Constraints(permitted: "example.com")));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildCnHoldingANulUnderADirectoryNameConstraintOnly_IsUnsupportedNameSyntax() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.UnsupportedNameSyntax,
+            FindViolationOfCommonName("a\0b", Constraints(excludedName: DirectoryName("O=Nobody"))));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildCnHoldingANulBesideAnExcludedEmail_ReportsTheOtherNameFirst() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(
+                Subject([(CommonName, "a\0b")]), Constraints(excludedName: GeneralName(1, "other.org")), alternativeNames: AlternativeNames(GeneralName(1, "evil@other.org"))));
+
+    // curl 8.18.0's OpenSSL build (BL-5921): the CNs are checked in order, multi-valued relative names included.
+    [TestMethod]
+    [DataRow("www.example.com", "a\0b", CertificateNameConstraints.Excluded)]
+    [DataRow("a\0b", "www.example.com", CertificateNameConstraints.UnsupportedNameSyntax)]
+    [DataRow("a.safe.org", "a\0b", CertificateNameConstraints.UnsupportedNameSyntax)]
+    public void FindViolation_OpenSslBuildTwoCns_StopsAtTheFirstRefused(string first, string second, int expected) =>
+        Assert.AreEqual(expected, FindViolationOfSubject(Subject([(CommonName, first)], [(CommonName, second)]), Constraints(excluded: "example.com")));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildDottedCnInAMultiValuedRelativeNameInsideTheExcludedSubtree_IsExcluded() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(Subject([(CommonName, "www.example.com"), (OrganizationalUnit, "Unit")]), Constraints(excluded: "example.com")));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildDottedCnInAMultiValuedRelativeNameOutsideThePermittedSubtree_IsNotPermitted() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.NotPermitted,
+            FindViolationOfSubject(Subject([(CommonName, "www.example.com"), (OrganizationalUnit, "Unit")]), Constraints(permitted: "other.org")));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildCnHoldingAnInnerNulBeforeTheHostCn_IsUnsupportedNameSyntax()
+    {
+        var failure = Verify(
+            Constraints(permitted: "example.com"), "www.example.com", true, withNames: false, matchesSchannelBuild: false,
+            subjectName: Subject([(CommonName, "a\0b")], [(CommonName, "www.example.com")]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: unsupported or invalid name syntax (53)", failure?.Message);
+    }
+
+    // ossl_verifyhost runs before the verify result is read, so a NUL in the matched CN is reported first.
+    [TestMethod]
+    [DataRow("www\0.example.com")]
+    [DataRow("www.example.com\0")]
+    public void VerifyPeer_OpenSslBuildOnlyCnHoldingANul_IsAnIllegalCertNameField(string commonName)
+    {
+        var failure = Verify(
+            Constraints(permitted: "example.com"), "www.example.com", true, withNames: false, matchesSchannelBuild: false,
+            subjectName: Subject([(CommonName, commonName)]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL: illegal cert name field", failure?.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildDottedCnInAMultiValuedRelativeNameInsideTheExcludedSubtree_IsExcludedSubtreeViolation()
+    {
+        var failure = Verify(
+            Constraints(excluded: "example.com"), "www.example.com", true, withNames: false, matchesSchannelBuild: false,
+            subjectName: Subject([(CommonName, "www.example.com"), (OrganizationalUnit, "Unit")]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    [TestMethod]
+    public void MatchedCommonNameHoldsANul_NulInAnEarlierCnOnly_IsFalse()
+    {
+        using var certificate = CreateSelfSigned(Subject([(CommonName, "a\0b")], [(CommonName, "www.example.com")]), null);
+
+        Assert.IsFalse(OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(certificate));
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void MatchedCommonNameHoldsANul_DnsOrIpAlternativeName_IsFalse(bool ipAddress)
+    {
+        var names = new SubjectAlternativeNameBuilder();
+        if (ipAddress)
+        {
+            names.AddIpAddress(System.Net.IPAddress.Loopback);
+        }
+        else
+        {
+            names.AddDnsName(Host);
+        }
+
+        using var certificate = CreateSelfSigned(Subject([(CommonName, "a\0b")]), names.Build());
+
+        Assert.IsFalse(OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(certificate));
+    }
+
+    [TestMethod]
+    public void MatchedCommonNameHoldsANul_NoCn_IsFalse()
+    {
+        using var certificate = CreateSelfSigned(Subject([(OrganizationalUnit, "Unit")]), null);
+
+        Assert.IsFalse(OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(certificate));
+    }
+
+    [TestMethod]
+    [DataRow(UniversalTagNumber.UTF8String)]
+    [DataRow(UniversalTagNumber.BMPString)]
+    public void DecodeCharacterString_CharacterString_IsItsText(UniversalTagNumber stringType)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        writer.WriteCharacterString(stringType, "a.org");
+
+        CollectionAssert.AreEqual(new[] { "a.org" }, CertificateNameConstraints.DecodeCharacterString(writer.Encode()));
+    }
+
+    [TestMethod]
+    public void DecodeCharacterString_UniversalString_IsItsText() =>
+        CollectionAssert.AreEqual(new[] { "a" }, CertificateNameConstraints.DecodeCharacterString([0x1C, 0x04, 0, 0, 0, 0x61]));
+
+    [TestMethod]
+    [DataRow(new byte[] { 0x04, 0x01, 0x61 })]
+    [DataRow(new byte[] { 0x8C, 0x01, 0x61 })]
+    public void DecodeCharacterString_AnotherType_IsNothing(byte[] encoded) =>
+        Assert.IsEmpty(CertificateNameConstraints.DecodeCharacterString(encoded));
+
+    private const string CommonName = "2.5.4.3";
+
+    private const string OrganizationalUnit = "2.5.4.11";
+
+    private const string Organization = "2.5.4.10";
+
+    private const string EmailAddress = "1.2.840.113549.1.9.1";
+
+    // A subject of UTF8String attributes (IA5String emailAddresses, as OpenSSL requires), each array one relative name.
+    private static X500DistinguishedName Subject(params (string Type, string Value)[][] relativeNames) =>
+        SubjectWithEmailType(UniversalTagNumber.IA5String, relativeNames);
+
+    private static X500DistinguishedName SubjectWithEmailType(UniversalTagNumber emailType, params (string Type, string Value)[][] relativeNames)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            foreach (var relativeName in relativeNames)
+            {
+                using (writer.PushSetOf())
+                {
+                    foreach (var (type, value) in relativeName)
+                    {
+                        using (writer.PushSequence())
+                        {
+                            writer.WriteObjectIdentifier(type);
+                            writer.WriteCharacterString(type == EmailAddress ? emailType : UniversalTagNumber.UTF8String, value);
+                        }
+                    }
+                }
+            }
+        }
+
+        return new X500DistinguishedName(writer.Encode());
+    }
+
+    private static X509Certificate2 CreateSelfSigned(X500DistinguishedName subject, X509Extension? alternativeNames)
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        if (alternativeNames is not null)
+        {
+            request.CertificateExtensions.Add(alternativeNames);
+        }
+
+        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(10));
+    }
 
     [TestMethod]
     public void FindViolation_SchannelBuildDotlessCnInsideTheExcludedSubtree_IsExcluded() =>
@@ -549,13 +730,375 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.IsNull(verdict.ErrorMessage);
     }
 
+    // STD-191: the OpenSSL build reported "unable to get local issuer certificate (20)" for these.
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildUniversalStringSubjectInsideTheExcludedDirectoryName_IsExcludedSubtreeViolation()
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteEncodedValue(UniversalStringOrganizationName("Evil"));
+        }
+
+        var failure = Verify(Constraints(excludedName: DirectoryName("O=Evil")), Host, true, subjectName: new X500DistinguishedName(writer.Encode()), matchesSchannelBuild: false);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildSubjectEmailAddressInTheExcludedEmailDomain_IsExcludedSubtreeViolation()
+    {
+        var failure = Verify(Constraints(excludedName: GeneralName(1, "other.org")), Host, true, subject: "E=evil@other.org, CN=localhost", matchesSchannelBuild: false);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    // curl 8.18.0's OpenSSL build (BL-5940): every subject emailAddress is checked, multi-valued relative names included.
+    [TestMethod]
+    [DataRow(true, "other.org", CertificateNameConstraints.Excluded)]
+    [DataRow(false, "example.com", CertificateNameConstraints.NotPermitted)]
+    [DataRow(false, "other.org", 0)]
+    public void FindViolation_OpenSslBuildSubjectEmailAddressInAMultiValuedRelativeName_FollowsTheConstraint(bool excluded, string constraint, int expected)
+    {
+        var email = GeneralName(1, constraint);
+        var constraints = excluded ? Constraints(excludedName: email) : Constraints(permittedName: email);
+
+        Assert.AreEqual(expected, FindViolationOfSubject(Subject([(EmailAddress, "evil@other.org"), (OrganizationalUnit, "Unit")]), constraints));
+    }
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildSecondEmailAddressOfOneRelativeNameInTheExcludedDomain_IsExcluded() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(Subject([(EmailAddress, "a@example.com"), (EmailAddress, "evil@other.org")]), Constraints(excludedName: GeneralName(1, "other.org"))));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildSubjectEmailAddressInAMultiValuedRelativeNameInTheExcludedEmailDomain_IsExcludedSubtreeViolation()
+    {
+        var failure = Verify(
+            Constraints(excludedName: GeneralName(1, "other.org")), Host, true, matchesSchannelBuild: false,
+            subjectName: Subject([(EmailAddress, "evil@other.org"), (OrganizationalUnit, "Unit")], [(CommonName, Host)]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    // curl 8.18.0's OpenSSL build (BL-5942): a subject emailAddress that is not an IA5String answers 53, whatever the constraints' kinds.
+    [TestMethod]
+    [DataRow(UniversalTagNumber.UTF8String)]
+    [DataRow(UniversalTagNumber.BMPString)]
+    [DataRow(UniversalTagNumber.PrintableString)]
+    public void FindViolation_OpenSslBuildSubjectEmailAddressThatIsNoIa5String_IsUnsupportedNameSyntax(UniversalTagNumber stringType) =>
+        Assert.AreEqual(
+            CertificateNameConstraints.UnsupportedNameSyntax,
+            FindViolationOfSubject(SubjectWithEmailType(stringType, [(EmailAddress, "example.com")]), Constraints(excluded: "other.org")));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildUtf8StringEmailAddressUnderAnExcludedDirectoryName_ReportsTheDirectoryNameFirst() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(
+                SubjectWithEmailType(UniversalTagNumber.UTF8String, [(Organization, "Evil")], [(EmailAddress, "a@example.com")]),
+                Constraints(excludedName: DirectoryName("O=Evil"))));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildUtf8StringEmailAddressBesideAnExcludedDnsName_IsUnsupportedNameSyntax() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.UnsupportedNameSyntax,
+            FindViolationOfSubject(
+                SubjectWithEmailType(UniversalTagNumber.UTF8String, [(EmailAddress, "a@example.com")]),
+                Constraints(excluded: "example.com"),
+                alternativeNames: AlternativeNames(GeneralName(2, "www.example.com"))));
+
+    [TestMethod]
+    [DataRow(true, CertificateNameConstraints.Excluded)]
+    [DataRow(false, CertificateNameConstraints.UnsupportedNameSyntax)]
+    public void FindViolation_OpenSslBuildTwoEmailAddresses_StopsAtTheFirstRefused(bool ia5First, int expected)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            (UniversalTagNumber Type, string Value)[] emailAddresses =
+                [(UniversalTagNumber.IA5String, "evil@other.org"), (UniversalTagNumber.UTF8String, "a@example.com")];
+            foreach (var (type, value) in ia5First ? emailAddresses : emailAddresses.Reverse())
+            {
+                using (writer.PushSetOf())
+                using (writer.PushSequence())
+                {
+                    writer.WriteObjectIdentifier(EmailAddress);
+                    writer.WriteCharacterString(type, value);
+                }
+            }
+        }
+
+        Assert.AreEqual(
+            expected,
+            FindViolationOfSubject(new X500DistinguishedName(writer.Encode()), Constraints(excludedName: GeneralName(1, "other.org"))));
+    }
+
+    [TestMethod]
+    public void FindViolation_SchannelBuildUtf8StringEmailAddressInsideThePermittedDomain_IsNotRefused() =>
+        Assert.AreEqual(
+            0,
+            FindViolationOfSubject(
+                SubjectWithEmailType(UniversalTagNumber.UTF8String, [(EmailAddress, "a@example.com")]),
+                Constraints(permittedName: GeneralName(1, "example.com")),
+                matchesSchannelBuild: true));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildUtf8StringEmailAddressUnderNameConstraints_IsUnsupportedNameSyntax()
+    {
+        var failure = Verify(
+            Constraints(permittedName: GeneralName(1, "example.com")), Host, true, matchesSchannelBuild: false,
+            subjectName: SubjectWithEmailType(UniversalTagNumber.UTF8String, [(EmailAddress, "a@example.com")], [(CommonName, Host)]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: unsupported or invalid name syntax (53)", failure?.Message);
+    }
+
+    // curl 8.18.0's OpenSSL build (BL-5950): names are taken one at a time, so the first refused name decides the verify result.
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildExcludedSubjectBeforeAnEmailAddressNotPermitted_IsExcludedSubtreeViolation()
+    {
+        var failure = Verify(
+            Constraints(permittedName: GeneralName(1, "good.org"), excludedName: DirectoryName("O=Evil")), Host, true, matchesSchannelBuild: false,
+            subjectName: Subject([(Organization, "Evil")], [(EmailAddress, "a@bad.org")], [(CommonName, Host)]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    [TestMethod]
+    [DataRow(true, false, CertificateNameConstraints.Excluded)]
+    [DataRow(false, false, CertificateNameConstraints.NotPermitted)]
+    [DataRow(true, true, CertificateNameConstraints.NotPermitted)]
+    public void FindViolation_ExcludedEmailAndDnsNameNotPermitted_FollowsEachBuildsNameOrder(bool emailFirst, bool matchesSchannelBuild, int expected)
+    {
+        var email = GeneralName(1, "a@bad.org");
+        var dnsName = GeneralName(2, Host);
+
+        var violation = FindViolationOfSubject(
+            Subject([(CommonName, Host)]), Constraints(permitted: "other.org", excludedName: GeneralName(1, "bad.org")), matchesSchannelBuild,
+            AlternativeNames(emailFirst ? [email, dnsName] : [dnsName, email]));
+
+        Assert.AreEqual(expected, violation);
+    }
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildExcludedIpAddressBeforeADnsNameNotPermitted_IsExcluded() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(
+                Subject([(CommonName, Host)]), Constraints(permitted: "other.org", excludedIp: [10, 0, 0, 0, 255, 0, 0, 0]),
+                alternativeNames: AlternativeNames([0x87, 0x04, 10, 1, 1, 1], GeneralName(2, Host))));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildExcludedSubjectEmailAddressBeforeADnsNameNotPermitted_IsExcluded() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(
+                Subject([(EmailAddress, "a@bad.org")], [(CommonName, Host)]), Constraints(permitted: "other.org", excludedName: GeneralName(1, "bad.org")),
+                alternativeNames: AlternativeNames(GeneralName(2, Host))));
+
+    // curl 8.18.0's OpenSSL build (BL-5950): the constraining CAs are read from the top of the chain down.
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    [DataRow(true, "permitted subtree violation (47)")]
+    [DataRow(false, "excluded subtree violation (48)")]
+    public void VerifyPeer_OpenSslBuildTwoConstrainingAuthoritiesRefusingDifferently_ReportsTheUpperOnes(bool upperPermits, string expected)
+    {
+        var permitting = Constraints(permitted: "other.org");
+        var excluding = Constraints(excluded: Host);
+        using var root = CreateAuthority("CN=Two Constraints Root", null, null);
+        using var anchor = CreateAuthority("CN=Two Constraints Anchor", root, upperPermits ? permitting : excluding);
+        using var lower = CreateAuthority("CN=Two Constraints Lower", anchor, upperPermits ? excluding : permitting);
+        using var leaf = CreateLeaf(lower, Host, false, true, false);
+        var caFile = Path.Combine(_directory, "anchor.pem");
+        File.WriteAllText(caFile, anchor.ExportCertificatePem());
+        var verification = new ServerCertificateVerification(
+            new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: true), false, TimeProvider.System)
+        {
+            ReadChainStatus = _ => PartialChainStatus,
+            ReadCertificatesBelowAnchorStatus = _ => [],
+        };
+        var (chainPolicy, _, _) = verification.ReadTrustAnchors();
+        chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
+        chainPolicy.ExtraStore.Add(lower);
+        using var chain = new X509Chain { ChainPolicy = chainPolicy };
+        chain.Build(leaf);
+
+        var failure = verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, []);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual($"SSL certificate OpenSSL verify result: {expected}", failure?.Message);
+    }
+
+    [TestMethod]
+    [DataRow(true, false, CertificateNameConstraints.NotPermitted)]
+    [DataRow(false, false, CertificateNameConstraints.Excluded)]
+    [DataRow(true, true, CertificateNameConstraints.Excluded)]
+    [DataRow(false, true, CertificateNameConstraints.NotPermitted)]
+    public void FindViolation_TwoConstrainingAuthoritiesRefusingDifferently_FollowsEachBuildsAuthorityOrder(bool upperPermits, bool matchesSchannelBuild, int expected)
+    {
+        var permitting = Constraints(permitted: "other.org");
+        var excluding = Constraints(excluded: Host);
+        using var root = CreateAuthority("CN=Two Constraints Root", null, upperPermits ? permitting : excluding);
+        using var intermediate = CreateAuthority("CN=Two Constraints Intermediate", root, upperPermits ? excluding : permitting);
+        using var leaf = CreateLeaf(intermediate, Host, false, true, false);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.ExtraStore.Add(intermediate);
+        chain.Build(leaf);
+
+        Assert.AreEqual(expected, CertificateNameConstraints.FindViolation(chain, matchesSchannelBuild));
+    }
+
+    // curl 8.18.0's OpenSSL build (BL-5953): the intermediate's own names are checked against the CAs above it,
+    // before the server certificate's, so they decide when the root is trusted. With the intermediate as the
+    // anchor nothing stands above it. The Schannel build checks the server certificate's names only.
+    [TestMethod]
+    [DataRow(false, false, false, CertificateNameConstraints.Excluded)]
+    [DataRow(false, true, false, CertificateNameConstraints.NotPermitted)]
+    [DataRow(true, false, false, CertificateNameConstraints.NotPermitted)]
+    [DataRow(true, true, false, CertificateNameConstraints.Excluded)]
+    [DataRow(false, false, true, CertificateNameConstraints.NotPermitted)]
+    [DataRow(true, false, true, CertificateNameConstraints.Excluded)]
+    public void FindViolation_IntermediateAndLeafBothRefused_FollowsEachBuildsCheckedNames(
+        bool rootPermits, bool intermediateIsAnchor, bool matchesSchannelBuild, int expected)
+    {
+        var rootConstraints = rootPermits
+            ? Constraints(permittedName: GeneralName(1, "good.org"))
+            : Constraints(excludedName: GeneralName(1, "bad.org"));
+        var intermediateConstraints = rootPermits ? Constraints(excluded: Host) : Constraints(permitted: "other.org");
+
+        var violation = FindViolationBelowRoot(
+            rootConstraints, "CN=Named Intermediate, E=ca@bad.org", intermediateConstraints, intermediateIsAnchor, matchesSchannelBuild);
+
+        Assert.AreEqual(expected, violation);
+    }
+
+    // curl 8.18.0's OpenSSL build (BL-5953): a self-issued intermediate's names are not checked.
+    [TestMethod]
+    public void FindViolation_OpenSslBuildSelfIssuedIntermediateWithAnExcludedName_IsNotRefused() =>
+        Assert.AreEqual(
+            0,
+            FindViolationBelowRoot(
+                Constraints(excludedName: GeneralName(1, "bad.org")), "CN=Named Root, E=ca@bad.org", null, false, false,
+                rootSubject: "CN=Named Root, E=ca@bad.org"));
+
+    // curl 8.18.0's OpenSSL build (BL-5953): only the server certificate's CN is checked as a DNS name.
+    [TestMethod]
+    public void FindViolation_OpenSslBuildIntermediateWithAnExcludedCommonName_IsNotRefused() =>
+        Assert.AreEqual(
+            0,
+            FindViolationBelowRoot(Constraints(excluded: "bad.example.com"), "CN=bad.example.com", null, false, false));
+
+    // A leaf for the host under the intermediate, which the root issued; the trusted one is either of them.
+    private static int FindViolationBelowRoot(
+        byte[] rootConstraints, string intermediateSubject, byte[]? intermediateConstraints, bool intermediateIsAnchor, bool matchesSchannelBuild, string rootSubject = "CN=Named Root")
+    {
+        using var root = CreateAuthority(rootSubject, null, rootConstraints);
+        using var intermediate = CreateAuthority(intermediateSubject, root, intermediateConstraints);
+        using var leaf = CreateLeaf(intermediate, Host, false, true, false);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(intermediateIsAnchor ? intermediate : root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.ExtraStore.Add(intermediate);
+        chain.ChainPolicy.ExtraStore.Add(root);
+        chain.Build(leaf);
+        Assert.HasCount(3, chain.ChainElements);
+
+        return CertificateNameConstraints.FindViolation(chain, matchesSchannelBuild);
+    }
+
+    // curl 8.18.0's OpenSSL build with a self-signed root as --cacert (BL-5953): the chain is refused for
+    // both subtrees, and the answer is the one the upper CA's constraint gives the server certificate, or
+    // the intermediate's own name when that is refused first.
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    [DataRow(false, "excluded subtree violation (48)")]
+    [DataRow(true, "permitted subtree violation (47)")]
+    public void VerifyPeer_OpenSslBuildRootAsCaCertificateRefusedForBothSubtrees_ReportsTheRootsRefusal(bool rootPermits, string expected)
+    {
+        var permitting = Constraints(permitted: "other.org");
+        var excluding = Constraints(excluded: Host);
+        using var root = CreateAuthority("CN=Self Signed Anchor Root", null, rootPermits ? permitting : excluding);
+        using var intermediate = CreateAuthority("CN=Self Signed Anchor Intermediate", root, rootPermits ? excluding : permitting);
+        using var leaf = CreateLeaf(intermediate, Host, false, true, false);
+        var caFile = Path.Combine(_directory, "root.pem");
+        File.WriteAllText(caFile, root.ExportCertificatePem());
+        var verification = new ServerCertificateVerification(
+            new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: true), false, TimeProvider.System);
+        var (chainPolicy, _, _) = verification.ReadTrustAnchors();
+        chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
+        chainPolicy.ExtraStore.Add(intermediate);
+        using var chain = new X509Chain { ChainPolicy = chainPolicy };
+        chain.Build(leaf);
+
+        var failure = verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, []);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual($"SSL certificate OpenSSL verify result: {expected}", failure?.Message);
+    }
+
+    // The Linux chain engine flags the lower CA's refusal beside, or instead of, the upper one's (BL-5954).
+    [TestMethod]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint, CertificateNameConstraints.Excluded, false, X509ChainStatusFlags.HasExcludedNameConstraint)]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint, CertificateNameConstraints.NotPermitted, false, X509ChainStatusFlags.HasNotPermittedNameConstraint)]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.PartialChain, CertificateNameConstraints.Excluded, true, X509ChainStatusFlags.HasExcludedNameConstraint)]
+    [DataRow(X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.PartialChain, CertificateNameConstraints.UnsupportedNameSyntax, false, X509ChainStatusFlags.HasNotSupportedNameConstraint | X509ChainStatusFlags.PartialChain)]
+    [DataRow(X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.PartialChain, 0, true, X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.PartialChain)]
+    public void WithNameConstraintViolation_PlatformFlags_KeepsOnlyTheViolationFound(
+        X509ChainStatusFlags platform, int violation, bool replacesPartialChain, X509ChainStatusFlags expected) =>
+        Assert.AreEqual(expected, OpenSslVerifyResult.WithNameConstraintViolation(platform, violation, replacesPartialChain));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The name-constraint flags are the platform chain engine's, pinned on the Windows and Linux ones.
+    [DataRow(true, X509ChainStatusFlags.HasNotPermittedNameConstraint)]
+    [DataRow(false, X509ChainStatusFlags.HasExcludedNameConstraint)]
+    public void StatusOf_TwoAuthoritiesUnderATrustedRootRefusingDifferently_KeepsTheUpperRefusalOnly(bool upperPermits, X509ChainStatusFlags expected)
+    {
+        var permitting = Constraints(permitted: "other.org");
+        var excluding = Constraints(excluded: Host);
+        using var root = CreateAuthority("CN=Two Refusals Root", null, null);
+        using var upper = CreateAuthority("CN=Two Refusals Upper", root, upperPermits ? permitting : excluding);
+        using var lower = CreateAuthority("CN=Two Refusals Lower", upper, upperPermits ? excluding : permitting);
+        using var leaf = CreateLeaf(lower, Host, false, true, false);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.ExtraStore.Add(upper);
+        chain.ChainPolicy.ExtraStore.Add(lower);
+        chain.Build(leaf);
+
+        var status = OpenSslVerifyResult.StatusOf(chain);
+
+        Assert.AreEqual(expected, status & (X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint));
+    }
+
     private static int FindViolationOfCommonName(string commonName, byte[] constraints, bool matchesSchannelBuild = false)
     {
         var subject = new X500DistinguishedNameBuilder();
         subject.AddCommonName(commonName);
+        return FindViolationOfSubject(subject.Build(), constraints, matchesSchannelBuild);
+    }
+
+    private static int FindViolationOfSubject(X500DistinguishedName subject, byte[] constraints, bool matchesSchannelBuild = false, byte[]? alternativeNames = null)
+    {
         using var root = CreateAuthority("CN=Common Name Root", null, null);
         using var intermediate = CreateAuthority("CN=Common Name Intermediate", root, constraints);
-        using var leaf = CreateLeaf(intermediate, Host, false, false, false, subjectName: subject.Build());
+        using var leaf = CreateLeaf(intermediate, Host, false, false, false, alternativeNames: alternativeNames, subjectName: subject);
         using var chain = new X509Chain();
         chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
         chain.ChainPolicy.CustomTrustStore.Add(root);
@@ -567,11 +1110,11 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     }
 
     private (CurlExitCode ExitCode, string Message)? Verify(
-        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null, X509ChainStatus[]? chainStatus = null, bool bestEffort = false, X509ChainStatus[]? belowAnchorStatus = null, bool matchesSchannelBuild = true)
+        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null, X509ChainStatus[]? chainStatus = null, bool bestEffort = false, X509ChainStatus[]? belowAnchorStatus = null, bool matchesSchannelBuild = true, X500DistinguishedName? subjectName = null)
     {
         using var root = CreateAuthority("CN=Constraint Root", null, null);
         using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, constraints);
-        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames, subject, alternativeNames);
+        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames, subject, alternativeNames, subjectName);
         var caFile = Path.Combine(_directory, "anchor.pem");
         File.WriteAllText(caFile, intermediate.ExportCertificatePem());
         var verification = new ServerCertificateVerification(

@@ -224,6 +224,7 @@ internal static class TlsFailureMessages
         [OpenSslVerifyResult.PathLengthExceeded] = "path length constraint exceeded",
         [OpenSslVerifyResult.PermittedSubtreeViolation] = "permitted subtree violation",
         [OpenSslVerifyResult.ExcludedSubtreeViolation] = "excluded subtree violation",
+        [OpenSslVerifyResult.UnsupportedNameSyntax] = "unsupported or invalid name syntax",
         [OpenSslVerifyResult.InvalidCaCertificate] = "invalid CA certificate",
     }.ToFrozenDictionary();
 
@@ -432,7 +433,7 @@ internal static class TlsFailureMessages
     /// curl checks the name first, so a name mismatch is reported even when the chain also
     /// failed (BL-150, measured). A certificate with DNS or IP subjectAltName entries is
     /// matched against those alone, and the message names the kind of target; one without
-    /// is matched against its common name.
+    /// is matched against its common name, and refused outright when that name holds a NUL.
     /// </remarks>
     public static string OpenSslPeerFailedVerification(SslPolicyErrors errors, X509Chain? chain, string targetHost)
     {
@@ -442,6 +443,11 @@ internal static class TlsFailureMessages
         }
 
         var certificate = chain!.ChainElements[0].Certificate;
+        if (OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(certificate))
+        {
+            return "SSL: illegal cert name field";
+        }
+
         var shownHost = IsBracketedByCurl(targetHost) ? $"[{targetHost}]" : targetHost;
         if (HasDnsOrIpAlternativeNames(certificate))
         {

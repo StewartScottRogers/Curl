@@ -8,7 +8,8 @@ namespace Curl.Extended.Protocol.DnsQuery.Transport.Https;
 /// Sends a query over DNS over HTTPS (RFC 8484, ADR-1148): opens a TCP connection to the server, port 443 by default,
 /// runs the TLS handshake through curl's TLS provider checking the certificate against the server's host (section 5),
 /// POSTs the query to <c>/dns-query</c> as <c>application/dns-message</c> over HTTP/1.1 with DNS ID 0 (section 4.1) and reads the
-/// 200 answer's body (section 4.2).
+/// 200 answer's body (section 4.2). A connection that fails while the request is sent ends the query with exit 55, and
+/// while the answer is read with exit 56, worded as curl words it (<see cref="DohFailureWordingConnection" />).
 /// </summary>
 /// <param name="connector">Opens the plaintext TCP connection.</param>
 /// <param name="tlsProvider">Runs the TLS handshake over it.</param>
@@ -45,14 +46,26 @@ internal sealed class DnsHttpsTransport(IConnector connector, ITlsProvider tlsPr
 
         await using (secure.ConfigureAwait(false))
         {
-            if (tls.ApplicationProtocol == DohHttp2Exchange.Protocol)
+            try
             {
-                return await DohHttp2Exchange.ExchangeAsync(secure, host, port, padded, context.CancellationToken).ConfigureAwait(false);
+                return await ExchangeOverAsync(new DohFailureWordingConnection(secure), tls.ApplicationProtocol, host, port, padded, context.CancellationToken).ConfigureAwait(false);
             }
-
-            await secure.WriteAsync(DohRequest.Encode(host, port, padded), context.CancellationToken).ConfigureAwait(false);
-            await secure.FlushAsync(context.CancellationToken).ConfigureAwait(false);
-            return await DohResponseReader.ReadAnswerAsync(secure, context.CancellationToken).ConfigureAwait(false);
+            catch (DohConnectionException lost)
+            {
+                throw lost.Failure;
+            }
         }
+    }
+
+    private static async ValueTask<byte[]> ExchangeOverAsync(IConnection connection, string? applicationProtocol, string host, int port, byte[] query, CancellationToken cancellationToken)
+    {
+        if (applicationProtocol == DohHttp2Exchange.Protocol)
+        {
+            return await DohHttp2Exchange.ExchangeAsync(connection, host, port, query, cancellationToken).ConfigureAwait(false);
+        }
+
+        await connection.WriteAsync(DohRequest.Encode(host, port, query), cancellationToken).ConfigureAwait(false);
+        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        return await DohResponseReader.ReadAnswerAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 }

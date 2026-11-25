@@ -83,6 +83,39 @@ internal static class HttpRedirectLocation
     }
 
     /// <summary>
+    /// Gives the target of a request sent again to its own URL, which curl 8.22.0 writes as
+    /// <c>%{redirect_url}</c> when <c>--max-redirs</c> refuses an authentication retry or a resend
+    /// after a 417 (measured, BL-5951 Notes): the request URL rebuilt from its parts, with the
+    /// scheme in lower case, the user information as typed, the host as curl holds it with any zone
+    /// id, a port that was typed even when it is the default, the path without dot segments even
+    /// under <c>--path-as-is</c>, and no empty query or fragment.
+    /// </summary>
+    /// <param name="requestUrl">The URL the request was sent to.</param>
+    /// <returns>The URL the resend would go to.</returns>
+    internal static string OfResend(CurlUrl requestUrl)
+    {
+        string origin = HttpUrlText.Origin(requestUrl);
+        if (requestUrl.ZoneId is { } zone)
+        {
+            origin = origin.Replace("]", "%25" + zone + "]", StringComparison.Ordinal);
+        }
+
+        if (requestUrl.PortWasWritten && requestUrl.IsDefaultPort)
+        {
+            origin = string.Create(CultureInfo.InvariantCulture, $"{origin}:{requestUrl.Port}");
+        }
+
+        return origin + RemoveDotSegments(requestUrl.AbsolutePath) + NonEmptyPart('?', requestUrl.Query) + NonEmptyPart('#', requestUrl.Fragment);
+    }
+
+    /// <summary>
+    /// A query or fragment with the <paramref name="mark" /> before it, or the empty string when
+    /// the URL has none or an empty one.
+    /// </summary>
+    private static string NonEmptyPart(char mark, string? part) =>
+        string.IsNullOrEmpty(part) ? string.Empty : mark + part;
+
+    /// <summary>
     /// Resolves a <c>Location</c> value against the request URL.
     /// </summary>
     /// <param name="requestUrl">The URL the request was sent to.</param>

@@ -548,3 +548,11 @@ Once an `http` or `https` request has been sent and the transfer is neither an u
 ## Telnet standard input in Windows text mode (BL-3641)
 
 `TransferContextFactory` gives a `telnet` transfer without `-T` its standard input through a `WindowsTextModeReadStream` while `ReadsTelnetStandardInputInTextMode` is set (by default on Windows), so a Ctrl-Z ends it and CR LF goes as LF, as curl 8.22.0's Windows build reads `stdin` in text mode; a `-T` source is sent unchanged, and the library handle's factory, whose standard input is `Stream.Null`, turns it off (CGR-112, ADR-0848). Its tests are `Cgr112Tests`.
+
+## A second multi handle polling the first's wait sockets (BL-5943)
+
+A wait or poll answers `PollIn` for an engine socket number of another multi handle's transfer
+while that handle has a callback queued or the transfer's perform has finished and is not yet
+reported (`TransferSocketWait.IsReadableOn`), so `curl_multi_waitfds` sockets polled on a second
+handle wake it at once, as real descriptors do (upstream test2407, ADR-1390). Its tests are
+`ManagedMultiTransferTests.SecondHandlePoll.cs`.

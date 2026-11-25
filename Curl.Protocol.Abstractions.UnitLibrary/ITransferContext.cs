@@ -513,13 +513,15 @@ public interface ITransferContext
     HttpRequestOptions? Http { get; }
 
     /// <summary>
-    /// Gets the mail-only options, or <see langword="null" /> for every scheme but
-    /// <c>smtp</c>, <c>smtps</c>, <c>pop3</c>, <c>pop3s</c>, <c>imap</c> and <c>imaps</c>.
+    /// Gets the mail options, or <see langword="null" /> when none were given. The engine sets them for
+    /// <c>smtp</c>, <c>smtps</c>, <c>pop3</c>, <c>pop3s</c>, <c>imap</c>, <c>imaps</c>, <c>ldap</c> and
+    /// <c>ldaps</c>, and for <c>http</c> and <c>https</c> so that a redirect followed to a mail URL still
+    /// has them (ADR-1388).
     /// </summary>
     /// <remarks>
     /// A mail handler treats <see langword="null" /> exactly as
-    /// <c>new MailRequestOptions()</c>, every member at its default; every other handler
-    /// ignores it (ADR-0121).
+    /// <c>new MailRequestOptions()</c>, every member at its default. The LDAP handler reads the
+    /// login members; the HTTP handler ignores them all (ADR-0121).
     /// </remarks>
     MailRequestOptions? Mail { get; }
 

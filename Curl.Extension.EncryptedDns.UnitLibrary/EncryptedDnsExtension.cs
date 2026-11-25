@@ -15,7 +15,7 @@ namespace Curl.Extension.EncryptedDns;
 public static class EncryptedDnsExtension
 {
     /// <summary>Gets <c>--dns-over-tls &lt;host[:port]&gt;</c>.</summary>
-    public static ExtensionOption DnsOverTlsOption { get; } = new("dns-over-tls", ExtensionOptionArgument.Value, "Look host names up on this DNS-over-TLS server, host[:port] (port 853 by default); its certificate is verified with --cacert/--capath, or not under -k");
+    public static ExtensionOption DnsOverTlsOption { get; } = new("dns-over-tls", ExtensionOptionArgument.Value, "Look host names up on this DNS-over-TLS server, host[:port] (port 853 by default); its certificate is verified with --cacert/--capath (and --ssl-no-revoke), or not under -k");
 
     /// <summary>Gets <c>--dns-over-quic &lt;host[:port]&gt;</c>.</summary>
     public static ExtensionOption DnsOverQuicOption { get; } = new("dns-over-quic", ExtensionOptionArgument.Value, "Look host names up on this DNS-over-QUIC server, host[:port] (port 853 by default)");
@@ -43,7 +43,7 @@ public static class EncryptedDnsExtension
 
         (string host, int port) = EncryptedDnsServerAddress.Parse(value, DnsOverTlsOption, DnsOverTlsServer.DefaultPort);
         ExtensionTlsTrust trust = values.TlsTrust;
-        return new DnsOverTlsResolverHook(new DnsOverTlsServer(host, port), new TlsClientOptions(trust.Insecure, CaCertificateFile: trust.CaCertificateFile, CaCertificateDirectory: trust.CaCertificateDirectory));
+        return new DnsOverTlsResolverHook(new DnsOverTlsServer(host, port), new TlsClientOptions(trust.Insecure, CaCertificateFile: trust.CaCertificateFile, CaCertificateDirectory: trust.CaCertificateDirectory, SkipRevocationCheck: trust.SkipRevocationCheck));
     }
 
     /// <summary>Gives the DNS-over-QUIC resolver hook for <paramref name="values" />.</summary>

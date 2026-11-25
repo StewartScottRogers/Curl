@@ -61,6 +61,42 @@ public sealed class SmtpServerConnectorTests
         Assert.AreEqual(0, connector.UploadedMessage.Length);
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_SlowDownServer_GivesEachReplyOneBytePerReadAfterAWaitOnTheClock()
+    {
+        ManualTimeProvider clock = new();
+        SmtpServerConnector connector = new(
+            ParsedTestCase.From("<reply>\n<servercmd>\nSLOWDOWN\nREPLY welcome 220 hi\nREPLY NOOP 250 no\n</servercmd>\n</reply>\n"),
+            new NoListenPortConnector(new SwsHttpServerConnector(ParsedTestCase.From(string.Empty), TimeProvider.System)),
+            clock);
+        await using IConnection connection = (await connector.ConnectAsync(new ConnectTarget("127.0.0.1", SmtpServerConnector.SmtpPort, false), TestContext.CancellationToken)).Connection!;
+
+        string greeting = await ReadByteByByteAsync(connection, clock, "220 hi\r\n".Length);
+        await connection.WriteAsync(Encoding.Latin1.GetBytes("NOOP\r\n"), TestContext.CancellationToken);
+        string reply = await ReadByteByByteAsync(connection, clock, "250 no\r\n".Length);
+
+        Assert.AreEqual("220 hi\r\n", greeting);
+        Assert.AreEqual("250 no\r\n", reply);
+        Assert.AreEqual(16 * LineProtocolServerConnector.SlowReplyByteDelay, clock.Now);
+    }
+
+    // Each read is pending until the clock moves on by the byte delay, then holds exactly one byte.
+    private async Task<string> ReadByteByByteAsync(IConnection connection, ManualTimeProvider clock, int count)
+    {
+        StringBuilder text = new();
+        byte[] buffer = new byte[256];
+        for (int index = 0; index < count; index++)
+        {
+            Task<int> read = connection.ReadAsync(buffer, TestContext.CancellationToken).AsTask();
+            Assert.IsFalse(read.IsCompleted);
+            clock.Advance(LineProtocolServerConnector.SlowReplyByteDelay);
+            Assert.AreEqual(1, await read);
+            text.Append((char)buffer[0]);
+        }
+
+        return text.ToString();
+    }
+
     private async Task<string> ReadTextAsync(IConnection connection)
     {
         byte[] buffer = new byte[4096];

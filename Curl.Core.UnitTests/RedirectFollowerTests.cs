@@ -1033,6 +1033,20 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_HttpFirstUrlWithMailOptions_HopToAnotherHostKeepsAllButTheBearerToken()
+    {
+        // curl 8.22.0 sends AUTH PLAIN, MAIL FROM and RCPT TO after a 302 to smtp://v@host (BL-5936).
+        ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/next"), Ok(200, 0));
+        MailRequestOptions mail = new() { LoginOptions = "AUTH=PLAIN", From = "a@b", Recipients = ["c@d"], BearerToken = "s3cr3t" };
+
+        await Follow(handler, MailContext(mail));
+
+        MailRequestOptions? hop = handler.Contexts[1].Mail;
+        Diagnostics.Assert("hop mail", "login options, sender and recipients kept", hop?.ToString() ?? "null");
+        Assert.AreEqual(mail with { BearerToken = null, BearerTokenWithheld = true }, hop);
+    }
+
+    [TestMethod]
     [DataRow("http://localhost:18203/next", true, DisplayName = "other-host")]
     [DataRow("http://127.0.0.1:18203/next", false, DisplayName = "same-origin")]
     public async Task FollowAsync_HttpBearerTokenWithoutMailOptions_MarksTheMailTokenWithheldOnAnotherHost(string target, bool withheld)

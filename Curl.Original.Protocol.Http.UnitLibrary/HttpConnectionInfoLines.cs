@@ -160,13 +160,19 @@ internal static class HttpConnectionInfoLines
     internal const string NeedToRewindUpload = "Need to rewind upload for next request";
 
     /// <summary>
-    /// Formats the line written when a request body is abandoned part-way because a response
-    /// arrived first, as after a <c>417</c> that is answered with a resend (measured, BL-1446 Notes).
+    /// Formats the line written when a request body is abandoned because a response arrived
+    /// first, as after a <c>417</c> that is answered with a resend: with the bytes sent when some
+    /// were (measured, BL-1446 Notes), and bare when none were (measured, BL-5952 Notes).
     /// </summary>
     /// <param name="bytesSent">The body bytes sent before sending stopped.</param>
-    /// <returns>The line, such as <c>abort upload after having sent 524288 bytes</c>.</returns>
+    /// <returns>
+    /// The line: <c>abort upload</c> for no bytes, else such as
+    /// <c>abort upload after having sent 524288 bytes</c>.
+    /// </returns>
     internal static string AbortUpload(long bytesSent) =>
-        string.Create(CultureInfo.InvariantCulture, $"abort upload after having sent {bytesSent} bytes");
+        bytesSent == 0
+            ? "abort upload"
+            : string.Create(CultureInfo.InvariantCulture, $"abort upload after having sent {bytesSent} bytes");
 
     /// <summary>
     /// The line written before a head's empty line when a final status of <c>300</c> or above

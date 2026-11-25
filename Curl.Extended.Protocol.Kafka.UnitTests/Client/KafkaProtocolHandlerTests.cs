@@ -29,10 +29,10 @@ public sealed class KafkaProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_ProduceRefused_EndsWithWeirdServerReplyNamingTheError()
     {
-        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.ProduceResponse(2, 3)), "kafka://broker/orders", new MemoryStream(), "hi");
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.ProduceResponse(2, 29)), "kafka://broker/orders", new MemoryStream(), "hi");
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-        Assert.AreEqual("Kafka broker answered error 3 (UNKNOWN_TOPIC_OR_PARTITION) for topic orders partition 0", result.ErrorMessage);
+        Assert.AreEqual("Kafka broker answered error 29 (TOPIC_AUTHORIZATION_FAILED) for topic orders partition 0", result.ErrorMessage);
     }
 
     [TestMethod]

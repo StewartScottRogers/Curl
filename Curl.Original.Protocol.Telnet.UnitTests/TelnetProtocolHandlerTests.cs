@@ -433,6 +433,7 @@ public sealed class TelnetProtocolHandlerTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_ConnectionReadIsReset_EndsWithExit0AndKeepsWhatWasWritten()
     {
         var connection = new FaultingConnection(Hex("68 69 0D 0A")) { ReadFailsAfterReads = true };
