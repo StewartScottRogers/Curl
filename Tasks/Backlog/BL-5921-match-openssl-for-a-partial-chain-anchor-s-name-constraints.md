@@ -18,7 +18,7 @@ In the OpenSSL build, a leaf with no dNSName under a partial-chain anchor's name
 
 ## Context
 
-Left over from BL-5829 (ADR-1349). `CertificateNameConstraints` refuses a CN with a NUL inside it as
+Left over from BL-5829 (ADR-1354). `CertificateNameConstraints` refuses a CN with a NUL inside it as
 `permitted subtree violation (47)`, where OpenSSL's `cn2dnsid` gives `X509_V_ERR_UNSUPPORTED_NAME_SYNTAX` (53);
 and `ListCommonNames` skips a CN in a multi-valued relative name in both builds, where OpenSSL's
 `NAME_CONSTRAINTS_check_CN` reads every CN attribute. The Schannel build's answers must not change

@@ -48,7 +48,7 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Notes
 
-- Lane run 2026-11-24 (ADR-1349): reproduced in code (`ListNames` applied the CryptoAPI CN rule in both builds).
+- Lane run 2026-11-24 (ADR-1354): reproduced in code (`ListNames` applied the CryptoAPI CN rule in both builds).
   `FindViolation` now takes `matchesSchannelBuild`; the OpenSSL rule (a CN counts only when it looks like a
   dotted host name) is the default, so `ServerCertificateVerification.CaCertificates.cs`, held by BL-5879,
   needed no edit (its call serves `--capath`, which only the OpenSSL build reads).

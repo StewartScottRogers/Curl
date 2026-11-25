@@ -1,4 +1,4 @@
-# ADR-1349: The OpenSSL build checks only a host-name-like CN against DNS name constraints (BL-5829)
+# ADR-1354: The OpenSSL build checks only a host-name-like CN against DNS name constraints (BL-5829)
 
 Status: Accepted. Decided by Claude under Stewart's delegation.
 
