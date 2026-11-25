@@ -1,5 +1,5 @@
 ---
-id: BL-5956
+id: BL-5960
 title: Write curl's -v lines for a final response that arrives while the body waits for 100 Continue without a resend
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5956 — Write curl's -v lines for a final response that arrives while the body waits for 100 Continue without a resend
+# BL-5960 — Write curl's -v lines for a final response that arrives while the body waits for 100 Continue without a resend
 
 ## Goal
 

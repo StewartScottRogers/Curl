@@ -41,7 +41,7 @@ Found by BL-5944. `Record-CurlExchange.ps1 -HoldOpenMilliseconds 1500` for `curl
   pinned the old lines; no task in Doing named it.
 - No ADR: matching curl's bytes leaves nothing to decide.
 - Measure-CodeQuality for `Curl.Original.Protocol.Http.UnitLibrary`: 0 failing members.
-- Filed BL-5956 for the other responses that arrive during the wait (500, closing 417, 200).
+- Filed BL-5960 for the other responses that arrive during the wait (500, closing 417, 200).
 
 ## Log
 
