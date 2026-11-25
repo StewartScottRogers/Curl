@@ -48,3 +48,4 @@ The authenticator is stateless, so the handler has to remember that a side's Typ
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: c4f7fe93 164d3fb1 3d836d5e.
