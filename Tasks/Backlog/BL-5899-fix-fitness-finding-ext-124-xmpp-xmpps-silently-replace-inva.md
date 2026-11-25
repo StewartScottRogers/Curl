@@ -4,8 +4,8 @@ title: Fix fitness finding EXT-124: xmpp / xmpps silently replace invalid UTF-8 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppRequests.cs]
+depends-on: [BL-5903]
+touches: [Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppRequests.cs, Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppClientMessages.cs, Curl.Extended.Protocol.Xmpp.UnitTests/XmppUploadTests.cs, Documentation/Conformance/Extended/Xmpp.md]
 requirement: none
 created: 2026-11-24
 completed:
@@ -40,12 +40,28 @@ The finding, verbatim:
 ## Acceptance criteria
 
 - [ ] the repro exits 43 with a message naming invalid UTF-8 and nothing is stored for carol; `-d 'café'` (valid UTF-8) still delivers `café`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Done and committed with this requeue (`fix(xmpp): refuse a message body that is not valid UTF-8`): `XmppRequests`
+  decodes the body strictly and fails with exit 43, `XMPP message body is not valid UTF-8`, before it connects
+  (ADR-1347). `XmppUploadTests` pins it for `-T` and post data, and that valid UTF-8 `café` is sent unchanged.
+  Reproduced first: the five invalid-byte rows failed on the old code. XMPP tests, the whole fast run and the build are
+  green; `Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.Xmpp.UnitLibrary` reports 0 failing members.
+- Measured with the built curl.exe on Windows (ACP 1252): the `-T` Latin-1 repro exits 43 with that message; `-d @file`
+  holding UTF-8 `café` goes on to connect; typed `-d 'café'` also exits 43, because a typed argument is bytes in the ANSI
+  code page (ADR-0838). So the first criterion's second half does not hold on Windows (it did not before either: the body
+  arrived with U+FFFD). It needs the command line, context and handler changed: BL-5903. Once BL-5903 is Done, run the
+  first criterion's two commands and tick it. No Prosody was used: the refusal happens before any connection, so nothing
+  can be stored.
+- `touches` widened to `XmppClientMessages.cs`, `XmppUploadTests.cs` and `Xmpp.md` (the message, the test and the
+  document of this change); no other task in Doing named them.
+- Also filed BL-5904: CR and CR LF in a body look to be changed to LF by the stanza serialiser.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 3cabc559 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Backlog. Waits on BL-5903: typed -d café on Windows reaches xmpp as ANSI bytes; the invalid-UTF-8 refusal is committed
