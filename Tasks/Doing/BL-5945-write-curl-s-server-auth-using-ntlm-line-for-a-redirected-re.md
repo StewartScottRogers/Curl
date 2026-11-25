@@ -37,3 +37,4 @@ with `Record-CurlExchange.ps1` first, including a bare `NTLM` 401 answering that
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 8ba15c70 164d3fb1 3d836d5e.
