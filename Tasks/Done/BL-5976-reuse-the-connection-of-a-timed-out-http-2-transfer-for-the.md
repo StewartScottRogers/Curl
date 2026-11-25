@@ -28,7 +28,7 @@ Left by BL-5974 (ADR-1405), which writes `Connection #0 to host ... left intact`
 
 ## Notes
 
-- Decision and reasons: ADR-1406. A frame is read only once `ReadAheadConnectionStream` holds it whole; the timed-out stream is reset and the connection marked reusable; a connection with a cancelled write (maybe part of a frame on the wire) takes no new stream and is closed.
+- Decision and reasons: ADR-1407. A frame is read only once `ReadAheadConnectionStream` holds it whole; the timed-out stream is reset and the connection marked reusable; a connection with a cancelled write (maybe part of a frame on the wire) takes no new stream and is closed.
 - Both pinned by `Http2StreamAbortTests.ExecuteAsync_NextTransferAfterATimeout_GoesOutOnTheSameConnectionAfterTheReset` (cut between frames, in a header, in a payload).
 - `touches` widened to the other files changed; no other task was in Doing on `origin/work/dark-factory`.
 - `Http2Session.ReceiveAsync` now returns after a read that leaves the next frame partial (its callers already loop); `Http2SessionTests.ReceiveAsync_CancelledPartWayThroughAFrame_...` updated for it.

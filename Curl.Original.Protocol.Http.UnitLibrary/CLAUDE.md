@@ -29,7 +29,7 @@ stream to the HTTP/1.1 head and body readers as the bytes curl's own HTTP/2 laye
 writes - `HTTP/2 200 \r\n`, the headers as received, the empty line, then the DATA - so
 output, `-i`/`-D`, `-f`, redirects, authentication, cookies and progress are shared.
 A transfer `-m` ends resets only its stream, and its connection carries the next transfer
-(ADR-1406); `ReadAheadConnectionStream` hands the frame layer a frame only once it is
+(ADR-1407); `ReadAheadConnectionStream` hands the frame layer a frame only once it is
 buffered whole, so a cancelled wait loses none of it.
 
 For `--http2` (`HttpVersionPreference.Http2`) over cleartext (BL-716), the HTTP/1.1

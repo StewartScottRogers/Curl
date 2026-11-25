@@ -18,7 +18,7 @@ When `-m` ends an HTTP/3 transfer, Curl writes the connection line, ends the str
 
 ## Context
 
-BL-5974 (ADR-1405) and BL-5976 (ADR-1406) matched curl for HTTP/2: the stream is reset, `-v` says `left intact` and the next URL reuses the connection. HTTP/3 was left unchanged because its timeout was never measured; Curl still writes `closing connection`. curl treats HTTP/3 as multiplexed too. Measure with an HTTP/3 curl build and `Record-CurlExchange.ps1`, extending it if it cannot serve a stalled HTTP/3 stream.
+BL-5974 (ADR-1405) and BL-5976 (ADR-1407) matched curl for HTTP/2: the stream is reset, `-v` says `left intact` and the next URL reuses the connection. HTTP/3 was left unchanged because its timeout was never measured; Curl still writes `closing connection`. curl treats HTTP/3 as multiplexed too. Measure with an HTTP/3 curl build and `Record-CurlExchange.ps1`, extending it if it cannot serve a stalled HTTP/3 stream.
 
 ## Acceptance criteria
 

@@ -1,4 +1,4 @@
-# ADR-1406: A timed-out HTTP/2 transfer's connection carries the next transfer
+# ADR-1407: A timed-out HTTP/2 transfer's connection carries the next transfer
 
 - Status: Accepted. Decided by Claude under Stewart's delegation.
 - Date: 2026-11-25
