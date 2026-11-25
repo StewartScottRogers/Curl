@@ -31,3 +31,4 @@ Left by BL-5897 (fitness finding EXT-122, which says oci:// probably shares the 
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: aefa5959 aa739c66 3d836d5e.
