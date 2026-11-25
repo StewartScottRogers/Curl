@@ -16,7 +16,10 @@ another extension.
   `ResumableUploadRequestContext`), so `-v`, `--trace`, `--har` and `--record` see it (ADR-1379); a request's content is
   an `UploadRemainderStream`, a read-only window over the upload from its offset, so nothing of it is copied into memory.
   `ResumableUploadOutcome` makes
-  the last response the transfer's. Its constructor takes how many resumptions to allow.
+  the last response the transfer's. `RereadableUpload` gives the upload as a stream that can be sent again: a window over
+  a seekable one, otherwise a copy in memory up to a limit and in a delete-on-close temporary file past it, ending with
+  exit 26 when the upload cannot be read and 23 when the file cannot be written (ADR-1400). The hook's constructor takes
+  how many resumptions to allow, the memory limit and what creates the spool file.
 
 - `Fields/` holds one type per header field: `Ietf*Field` for draft-ietf-httpbis-resumable-upload's
   Structured Fields and `Tus*Field` for tus 1.0's, each with `Name`, `Format` and `TryParse`.

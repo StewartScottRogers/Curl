@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-10-29
+- Amended by ADR-1400: a non-seekable upload past a memory limit is spooled to a temporary file, and one already
+  read part way is not copied. This replaces what "Seekable body" and the consequences below say about memory.
 - Task: BL-4307 (split from BL-4129)
 
 Decided by Claude under Stewart's delegation.

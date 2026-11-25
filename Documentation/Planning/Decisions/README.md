@@ -1442,3 +1442,4 @@ Each option and the specific reason it lost.
 | [1398](ADR-1398-resumable-upload-also-resumes-after-exit-16-18-and-92.md) | Resumable upload also resumes after exit 16, 18 and 92 (BL-5965) | Accepted | 2026-11-25 |
 | [1399](ADR-1399-resumable-upload-also-resumes-after-exit-95.md) | Resumable upload also resumes after exit 95 (BL-5969) | Accepted | 2026-11-25 |
 | [1400](ADR-1400-the-sspi-behaviour-refuses-sasl-digest-md5-with-an-empty-user-with-exit-67.md) | Under the SSPI behaviour SASL DIGEST-MD5 with an empty user gives no answer and exits 67, as curl 8.22.0's Schannel build does, without trying the logged-on account (BL-5968) | Accepted | 2026-11-25 |
+| [1400](ADR-1400-resumable-upload-spools-a-long-non-seekable-upload-to-a-temporary-file.md) | Resumable upload spools a long non-seekable upload to a temporary file (BL-5967) | Accepted | 2026-11-25 |
