@@ -153,7 +153,7 @@ internal static class LdapAuthenticatedBind
     /// </summary>
     internal static async ValueTask<LdapBindReply> DigestAsync(LdapExchange exchange, NetworkCredential credentials, string host, CancellationToken cancellationToken, bool acceptsQopAuth = false, bool overTls = false)
     {
-        LdapBindReply initial = await exchange.BindWithRequestAsync(messageId => LdapDigestMd5Bind.InitialRequest(exchange.Writer, messageId), cancellationToken).ConfigureAwait(false);
+        LdapBindReply initial = await exchange.BindWithRequestAsync(messageId => InitialDigestRequest(exchange.Writer, messageId, acceptsQopAuth), cancellationToken).ConfigureAwait(false);
         if (FailureWithoutChallenge(initial) is { } failure)
         {
             return failure;
@@ -187,6 +187,12 @@ internal static class LdapAuthenticatedBind
         initial.Status == LdapBindReplyStatus.Answered && initial.ResultCode == LdapBindReply.SaslBindInProgress ? null
             : initial.IsSuccess ? new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.ProtocolError)
             : initial;
+
+    // The first DIGEST-MD5 bind: the OpenLDAP dialect sends no credentials field (BL-5907), WinLDAP an empty one.
+    private static byte[] InitialDigestRequest(LdapBerWriter writer, int messageId, bool acceptsQopAuth) =>
+        acceptsQopAuth
+            ? LdapRequests.SaslBindWithoutCredentials(writer, messageId, LdapDigestMd5Bind.Mechanism)
+            : LdapDigestMd5Bind.InitialRequest(writer, messageId);
 
     // A challenge with no answer: WinLDAP's Operations Error, the OpenLDAP dialect's Local Error (ADR-1302).
     private static LdapBindReply UnanswerableChallenge(bool acceptsQopAuth) =>

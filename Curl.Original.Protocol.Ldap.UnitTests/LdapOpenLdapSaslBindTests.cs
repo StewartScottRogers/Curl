@@ -154,10 +154,9 @@ public sealed class LdapOpenLdapSaslBindTests
     [TestMethod]
     [DataRow(HttpAuthSchemes.Ntlm, null)]
     [DataRow(HttpAuthSchemes.Basic, "AUTH=NTLM")]
-    public async Task ExecuteAsync_ServerOffersNtlm_FailsWith67LikeCurlsOpenLdapBuild(HttpAuthSchemes schemes, string? loginOptions)
+    public async Task ExecuteAsync_ServerOffersNtlmToAHandlerWithoutAnAuthenticator_FailsWith67(HttpAuthSchemes schemes, string? loginOptions)
     {
-        // Measured with curl 8.18.0 (OpenLDAP 2.6.10, Linux) against a server whose supportedSASLMechanisms is NTLM:
-        // "curl: (67) Login denied". Its OpenLDAP backend never does an NTLM bind.
+        // Only a handler given the shared authenticator binds with NTLM (LdapOpenLdapSaslBindMechanismTests).
         (TransferResult result, byte[] sent) = await RunAsync(schemes, loginOptions, MechanismsEntry(1, "NTLM"), RootDseDone1);
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);

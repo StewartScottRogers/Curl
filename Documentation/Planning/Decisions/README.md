@@ -1403,3 +1403,4 @@ Each option and the specific reason it lost.
 | [1359](ADR-1359-gs-downloads-send-a-range-header-for-r-and-c-and-uploads-and-lists-refuse-them.md) | gs:// downloads send a Range header for -r and -C; uploads and listings refuse them (BL-5912) | Accepted | 2026-11-24 |
 | [1360](ADR-1360-xmpp-gets-typed-d-text-as-utf-8.md) | xmpp gets typed -d text as UTF-8 (BL-5915) | Accepted | 2026-11-24 |
 | [1361](ADR-1361-a-bearer-token-prefers-only-the-bearer-mechanisms-until-an-auth-option.md) | --oauth2-bearer prefers only the bearer mechanisms until an AUTH= login option (BL-5880) | Accepted | 2026-11-24 |
+| [1359](ADR-1359-openldap-sasl-bind-runs-the-shared-sasl-authenticator.md) | The OpenLDAP SASL bind runs the shared SASL authenticator: every curl mechanism, EXTERNAL without a user, time limit 0 on the mechanism search (BL-5907) | Accepted | 2026-11-24 |
