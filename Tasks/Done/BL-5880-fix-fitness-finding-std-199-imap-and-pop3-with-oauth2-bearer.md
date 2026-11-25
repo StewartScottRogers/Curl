@@ -46,7 +46,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Measured curl 8.22.0 (Schannel) with `Record-CurlExchange.ps1`; the table is in ADR-1347. Curl now sends the same commands in every case measured except one, no `-u` with `AUTH=PLAIN` (older behaviour, filed as BL-5903 with the withheld-token cases). The `-v` `no overlap` line and `curl: (67) Login denied` match for IMAP and POP3.
+- Measured curl 8.22.0 (Schannel) with `Record-CurlExchange.ps1`; the table is in ADR-1347. Curl now sends the same commands in every case measured except one, no `-u` with `AUTH=PLAIN` (older behaviour, filed as BL-5925 with the withheld-token cases). The `-v` `no overlap` line and `curl: (67) Login denied` match for IMAP and POP3.
 - The three repros, run against the recorder with Curl: 1 exits 67 after `A001 CAPABILITY` only; 2 exits 67 after `CAPA` only; 3 sends `AUTHENTICATE PLAIN` and exits 0.
 - Done directly, without the feature pipeline's subagents, to stay inside the lane's cost cap.
 - `touches` widened: refusing `AUTH=PLAIN` came from `SaslMechanismRanking` (never a password mechanism with a token), which also affected SMTP, and POP3 could not tell `AUTH=*` from no option (`Pop3LoginOptions`). No other task in Doing named any added file. SMTP needed no code change: it already passed the `AUTH=` value as the required mechanism, and its measured answers now match.

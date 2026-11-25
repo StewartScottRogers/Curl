@@ -1,5 +1,5 @@
 ---
-id: BL-5903
+id: BL-5925
 title: Match curl's SASL choice with --oauth2-bearer without -u, and after a redirect withholds the token
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5903 — Match curl's SASL choice with --oauth2-bearer without -u, and after a redirect withholds the token
+# BL-5925 — Match curl's SASL choice with --oauth2-bearer without -u, and after a redirect withholds the token
 
 ## Goal
 
