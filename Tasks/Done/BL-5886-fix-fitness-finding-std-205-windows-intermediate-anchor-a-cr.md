@@ -48,7 +48,7 @@ The finding, verbatim:
 - Cause: `HttpClient` follows the redirect and then throws `UriFormatException` (address naming no host: `file:///x`, `foo:bar`) or `ArgumentOutOfRangeException` (`file://127.0.0.1/x`, port -1), neither in `TryFetch`'s catch filter. Fix: the filter takes `UriFormatException` and `ArgumentException`. Chosen over following redirects by hand in `RevocationListDownload`, which is excluded from coverage and kept thin; the OCSP fetch shares the filter.
 - `touches` widened by the one test file; no other task in Doing named it.
 - `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members. Fast tests: all projects passed. No CLAUDE.md or ADR change: behaviour now matches the platform's curl.
-- Filed BL-5934: the HTTP handler never passes the diagnostic log on its `ConnectTarget`, which is why no `could not be fetched` line shows under `--log-level` for HTTP.
+- Filed BL-5935: the HTTP handler never passes the diagnostic log on its `ConnectTarget`, which is why no `could not be fetched` line shows under `--log-level` for HTTP.
 
 ## Log
 

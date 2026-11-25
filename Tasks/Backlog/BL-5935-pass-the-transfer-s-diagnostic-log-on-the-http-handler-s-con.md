@@ -1,5 +1,5 @@
 ---
-id: BL-5934
+id: BL-5935
 title: Pass the transfer's diagnostic log on the HTTP handler's ConnectTarget so --log-level shows dns, connect and tls lines
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5934 — Pass the transfer's diagnostic log on the HTTP handler's ConnectTarget so --log-level shows dns, connect and tls lines
+# BL-5935 — Pass the transfer's diagnostic log on the HTTP handler's ConnectTarget so --log-level shows dns, connect and tls lines
 
 ## Goal
 
