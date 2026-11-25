@@ -18,7 +18,7 @@ Curl answers a revocation list signed with RSASSA-PSS whose salt length is not t
 
 ## Context
 
-BL-5878 (ADR-1357) verifies RSASSA-PSS lists through `RSASignaturePadding.Pss`, so `RsaPssSignatureParameters` admits only a salt as long as the hash and MGF1 over the same hash; any other list leaves the status "unknown", which `--ssl-revoke-best-effort` tolerates. `openssl ca -gencrl` signs PSS with the longest salt unless told otherwise, so such lists exist. Measure curl 8.22.0 Schannel below an intermediate `--cacert` anchor, and the OpenSSL build with `--crlfile`, with a long-salt list that names and one that does not name the server's certificate. The base class library has no other salt length, so verification needs a hand-built EMSA-PSS check (RFC 8017, 9.1.2); widen `touches` if it goes in a cryptography library.
+BL-5878 (ADR-1364) verifies RSASSA-PSS lists through `RSASignaturePadding.Pss`, so `RsaPssSignatureParameters` admits only a salt as long as the hash and MGF1 over the same hash; any other list leaves the status "unknown", which `--ssl-revoke-best-effort` tolerates. `openssl ca -gencrl` signs PSS with the longest salt unless told otherwise, so such lists exist. Measure curl 8.22.0 Schannel below an intermediate `--cacert` anchor, and the OpenSSL build with `--crlfile`, with a long-salt list that names and one that does not name the server's certificate. The base class library has no other salt length, so verification needs a hand-built EMSA-PSS check (RFC 8017, 9.1.2); widen `touches` if it goes in a cryptography library.
 
 ## Acceptance criteria
 

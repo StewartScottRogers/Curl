@@ -1,7 +1,7 @@
 # ADR-1294: Revocation below an intermediate-only --cacert anchor is read from the CRL
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5384).
-ADR-1357 (BL-5878) replaces "a list naming no `nextUpdate` fails closed": such a list is current.
+ADR-1364 (BL-5878) replaces "a list naming no `nextUpdate` fails closed": such a list is current.
 
 ## Context
 With `--proxy-cacert` (or `--cacert`) holding only an issuing intermediate and revocation checking on, the

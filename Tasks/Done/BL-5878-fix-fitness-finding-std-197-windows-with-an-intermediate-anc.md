@@ -49,7 +49,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Fix: `CertificateRevocationList.IsSignedBy` verifies RSASSA-PSS (new `RsaPssSignatureParameters.cs`), and a base or delta list naming no `nextUpdate` is current (`IsUnexpiredAt`). Decision: ADR-1357, which replaces ADR-1294's "no nextUpdate fails closed" (a status line added there).
+- Fix: `CertificateRevocationList.IsSignedBy` verifies RSASSA-PSS (new `RsaPssSignatureParameters.cs`), and a base or delta list naming no `nextUpdate` is current (`IsUnexpiredAt`). Decision: ADR-1364, which replaces ADR-1294's "no nextUpdate fails closed" (a status line added there).
 - Measured 2026-11-24 with a temporary C# file-based app (certificates, CRLs on loopback, one TLS server per leaf), Curl's debug build beside Git's curl 8.22.0 Schannel, strict and `--ssl-revoke-best-effort`: all 16 answers match (both revoked leaves exit 60 "has been revoked", both good leaves exit 0). The original did not need a separate reproduction run: the code at claim time rejected both list shapes by inspection.
 - `touches` widened (no other task in Doing names these): `RsaPssSignatureParameters.cs`, and in `Curl.Networking.UnitTests` `RsaPssSignatureParametersTests.cs`, `IntermediateOnlyProxyCacertTests.cs` (two tests pinned the old fail-closed answer) and `Fakes/TestRevocationList.cs`; and ADR-1294.
 - Salt lengths other than the hash length, which the base class library cannot verify, are filed as BL-5929.
@@ -59,4 +59,4 @@ The finding, verbatim:
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: fbe06d3e 69116afe 3d836d5e.
-- 2026-11-24: Doing -> Done. STD-197 fixed: RSASSA-PSS CRLs verify and a CRL with no nextUpdate is current (ADR-1357); matches curl 8.22.0 Schannel end to end
+- 2026-11-24: Doing -> Done. STD-197 fixed: RSASSA-PSS CRLs verify and a CRL with no nextUpdate is current (ADR-1364); matches curl 8.22.0 Schannel end to end

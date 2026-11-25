@@ -1,4 +1,4 @@
-# ADR-1357: Below an anchor a CRL may be RSASSA-PSS signed and may name no nextUpdate
+# ADR-1364: Below an anchor a CRL may be RSASSA-PSS signed and may name no nextUpdate
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5878). Replaces ADR-1294's
 "a list naming no `nextUpdate` fails closed".
