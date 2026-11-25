@@ -44,3 +44,4 @@ Lanes test only on Windows, so reproduce with `gh run view 45520782590 --log-fai
 - 2026-11-24: Created.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 96723aaa.
 - 2026-11-24: Doing -> Backlog. Waits for BL-5919: this gate step only reports that shard 2 (windows-latest) failed, which BL-5919 fixes
+- 2026-11-24: Backlog -> Deferred. already fixed, CI green on 6490ce256
