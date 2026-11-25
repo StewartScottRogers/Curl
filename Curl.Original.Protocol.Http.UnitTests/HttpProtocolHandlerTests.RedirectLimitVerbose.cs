@@ -62,6 +62,62 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsEmpty(output.ToArray());
     }
 
+    /// <summary>
+    /// Measured: <c>curl --digest -u a:b --max-redirs 0 -w "%{redirect_url}"</c> against a
+    /// Digest 401 writes the request URL rebuilt, not the response's <c>Location</c>
+    /// (BL-5951 Notes).
+    /// </summary>
+    [TestMethod]
+    [DataRow("http://127.0.0.1:18183/a", false, "http://127.0.0.1:18183/a", DisplayName = "as typed")]
+    [DataRow("127.0.0.1:18183", false, "http://127.0.0.1:18183/", DisplayName = "no scheme or path")]
+    [DataRow("HTTP://us:p%40w@LocalHost:18183/a/./c/../b%2f%7e?q=1&r=%2f#frag", false, "http://us:p%40w@LocalHost:18183/a/b%2f%7e?q=1&r=%2f#frag", DisplayName = "user, host case, escapes")]
+    [DataRow("http://us@127.1:18183/?#", false, "http://us@127.0.0.1:18183/", DisplayName = "empty query and fragment")]
+    [DataRow("http://Example.INVALID:80/x#f", false, "http://Example.INVALID:80/x#f", DisplayName = "written default port")]
+    [DataRow("http://example.invalid:/x?q", false, "http://example.invalid/x?q", DisplayName = "empty port")]
+    [DataRow("http://127.0.0.1:18183/a/%2E%2e/b", true, "http://127.0.0.1:18183/b", DisplayName = "--path-as-is")]
+    [DataRow("http://[0:0::1%251]:18183/?#", false, "http://[::1%251]:18183/", DisplayName = "IPv6 zone id")]
+    public async Task ExecuteAsync_AuthRetryRefusedByRedirectLimit_ReportsTheResendUrlAsRedirectUrl(
+        string url, bool pathAsIs, string expected)
+    {
+        TurnTakingConnection connection = new(65536, DigestChallenge + "Location: /elsewhere\r\nContent-Length: 0\r\n\r\n");
+        Assert.IsTrue(CurlUrl.TryParse(url, pathAsIs, out CurlUrl? parsed));
+        TransferContext context = new()
+        {
+            Url = parsed,
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest, MaxRedirects = 0 },
+        };
+        Diagnostics.Arrange("url, path as is", $"{url}, {pathAsIs}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Digest x"))
+            .ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("redirect URL", expected, result.Report!.RedirectUrl);
+        Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Assert.AreEqual(expected, result.Report.RedirectUrl);
+    }
+
+    /// <summary>
+    /// Measured: a 417 to a body waiting for <c>100 Continue</c>, refused at
+    /// <c>--max-redirs 0</c>, writes the request URL as <c>%{redirect_url}</c> (BL-5951 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_417ResendRefusedByRedirectLimit_ReportsTheResendUrlAsRedirectUrl()
+    {
+        TurnTakingConnection connection = new(65536, ExpectationFailedHead);
+        Diagnostics.Arrange("scripted responses", "417, with --max-redirs 0");
+
+        TransferResult result = await Handler(QueueConnector.For(connection))
+            .ExecuteAsync(ExpectContext(BigBodyOptions() with { MaxRedirects = 0 }, new MemoryStream(), new MemoryStream()));
+
+        WriteResult(result);
+        Diagnostics.Assert("redirect URL", ExpectUrl, result.Report!.RedirectUrl);
+        Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Assert.AreEqual(417, result.Report.ResponseCode);
+        Assert.AreEqual(ExpectUrl, result.Report.RedirectUrl);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_ProxyAndOriginNtlmAtTheRedirectLimit_EndsAsCurlDoes()
     {

@@ -143,8 +143,11 @@ public sealed partial class HttpProtocolHandler
     /// curl 8.22.0, <c>--max-redirs 0</c> with <c>--digest</c> or <c>--anyauth</c> ends with
     /// exit 47). curl refuses it only once the response is done, so its body was discarded as
     /// before a resend and its connection ends as a successful exchange's does, ahead of
-    /// <c>Maximum (N) redirects followed</c> (measured, BL-5944 Notes). The send of a body a
-    /// probe held back, which a 2xx asks for, is no redirect.
+    /// <c>Maximum (N) redirects followed</c> (measured, BL-5944 Notes). Its
+    /// <c>%{redirect_url}</c> is the URL the resend would go to
+    /// (<see cref="HttpRedirectLocation.OfResend" />), whatever <c>Location</c> the response has
+    /// (measured, BL-5951 Notes). The send of a body a probe held back, which a 2xx asks for, is
+    /// no redirect.
     /// </summary>
     private static HttpAttemptOutcome RefusingResendPastRedirectLimit(HttpRequestPlan plan, int statusCode, HttpExchangeLog exchangeLog, HttpAttemptOutcome outcome)
     {
@@ -157,7 +160,7 @@ public sealed partial class HttpProtocolHandler
         HttpTransferException refusal = new(CurlExitCode.TooManyRedirects, HttpTransferMessages.MaximumRedirectsFollowed(limit));
         exchangeLog.Failed(refusal.ExitCode, refusal);
         TransferReport report = outcome.Result.Report!;
-        TransferResult refused = TransferResult.Failure(refusal.ExitCode, refusal.Message, report.DownloadSize) with { Report = report };
+        TransferResult refused = TransferResult.Failure(refusal.ExitCode, refusal.Message, report.DownloadSize) with { Report = report with { RedirectUrl = HttpRedirectLocation.OfResend(plan.Context.Url) } };
         return new HttpAttemptOutcome(refused, null, outcome.KeepsAlive)
         {
             FailedAfterBody = true,
