@@ -1409,3 +1409,4 @@ Each option and the specific reason it lost.
 | [1365](ADR-1365-a-deflate-zlib-stream-holds-its-first-decoded-bytes-until-the-piece-decodes.md) | A deflate zlib stream holds its first decoded bytes until the piece decodes (BL-5889) | Accepted | 2026-11-24 |
 | [1366](ADR-1366-openldap-starttls-and-simple-bind-failures-follow-curl-8-21-0.md) | OpenLDAP StartTLS and simple bind failures follow curl 8.21.0 (BL-5908) | Accepted | 2026-11-24 |
 | [1367](ADR-1367-an-oauth2-flow-binds-its-token-to-the-dpop-key.md) | An --oauth2-* flow binds its token to the --dpop key (BL-5911) | Accepted | 2026-11-24 |
+| [1358](ADR-1358-state-files-are-replaced-by-rename-off-windows.md) | The cookie jar, HSTS and alt-svc files are replaced by rename off Windows (BL-5888) | Accepted | 2026-11-24 |
