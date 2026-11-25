@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Curl.Extended.Protocol.Kafka.Wire;
 using Curl.Extended.Protocol.Kafka.Wire.KafkaSasl;
 using Curl.Protocol.Abstractions;
@@ -9,9 +10,10 @@ namespace Curl.Extended.Protocol.Kafka.Client;
 /// credentials, Metadata v4 to find the partition's leader, then
 /// Produce v3 of one record and its acknowledgement, or Fetch v4 from an offset, writing each record's value and a line
 /// feed to the output and fetching again until the partition's high watermark. A topic or partition error, a malformed
-/// response or a wrong correlation id ends with exit 8.
+/// response or a wrong correlation id ends with exit 8. <c>leaderRetries</c> counts the leader retries the transfer has
+/// used, shared by every connection it opens (ADR-1375).
 /// </summary>
-internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITransferProgress progress, TimeProvider timeProvider, CancellationToken cancellationToken, Func<string>? nonceSource = null)
+internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITransferProgress progress, TimeProvider timeProvider, CancellationToken cancellationToken, StrongBox<int> leaderRetries, Func<string>? nonceSource = null)
 {
     private static readonly byte[] RecordDelimiter = [(byte)'\n'];
 
@@ -22,7 +24,6 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     private static readonly TimeSpan LeaderRetryDelay = TimeSpan.FromMilliseconds(250);
 
     private int correlationId;
-    private int leaderRetries;
 
     /// <summary>The bytes written to the output so far.</summary>
     internal long BytesWritten { get; private set; }
@@ -99,16 +100,16 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     /// When <paramref name="errorCode"/> is UNKNOWN_TOPIC_OR_PARTITION, LEADER_NOT_AVAILABLE or NOT_LEADER_OR_FOLLOWER (a
     /// broker that auto-creates a topic has no leader ready for it yet) and a retry is left, waits 250 ms on the transfer's
     /// time provider, within the transfer's cancellation, and gives <see langword="true"/>. Metadata and Produce share the
-    /// connection's nine retries (ADR-1370).
+    /// transfer's nine retries, whichever broker they are sent to (ADR-1370, ADR-1375).
     /// </summary>
     private async ValueTask<bool> WaitForLeaderAsync(short errorCode)
     {
-        if (errorCode is not (UnknownTopicOrPartition or LeaderNotAvailable or NotLeaderOrFollower) || leaderRetries >= LeaderRetries)
+        if (errorCode is not (UnknownTopicOrPartition or LeaderNotAvailable or NotLeaderOrFollower) || leaderRetries.Value >= LeaderRetries)
         {
             return false;
         }
 
-        leaderRetries++;
+        leaderRetries.Value++;
         await Task.Delay(LeaderRetryDelay, timeProvider, cancellationToken).ConfigureAwait(false);
         return true;
     }
@@ -116,9 +117,11 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     /// <summary>
     /// Produces one record whose value is <paramref name="value"/> to the address's partition. A broker that answers that no
     /// leader is ready has not stored the record, so while <see cref="WaitForLeaderAsync"/> has a retry left, Metadata is
-    /// asked again and the same record is sent again over this connection.
+    /// asked again and the same record is sent again over this connection. When that Metadata names a leader for which
+    /// <paramref name="leadsElsewhere"/> is <see langword="true"/>, nothing more is sent and that leader is given, for the
+    /// caller to connect to and produce again; <see langword="null"/> is given once the record is produced.
     /// </summary>
-    internal async ValueTask ProduceAsync(KafkaAddress address, ReadOnlyMemory<byte> value, long timestampMilliseconds)
+    internal async ValueTask<KafkaMetadataLeader?> ProduceAsync(KafkaAddress address, ReadOnlyMemory<byte> value, long timestampMilliseconds, Predicate<KafkaMetadataLeader> leadsElsewhere)
     {
         byte[] batch = KafkaRecordBatch.Encode(value.Span, timestampMilliseconds);
         while (true)
@@ -131,10 +134,15 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
                 break;
             }
 
-            await FindLeaderAsync(address).ConfigureAwait(false);
+            KafkaMetadataLeader leader = await FindLeaderAsync(address).ConfigureAwait(false);
+            if (leadsElsewhere(leader))
+            {
+                return leader;
+            }
         }
 
         progress.ReportUploaded(value.Length, value.Length);
+        return null;
     }
 
     /// <summary>Consumes the address's partition from its offset to the high watermark.</summary>

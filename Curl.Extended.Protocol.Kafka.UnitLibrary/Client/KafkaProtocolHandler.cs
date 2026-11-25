@@ -9,7 +9,8 @@ namespace Curl.Extended.Protocol.Kafka.Client;
 /// Serves <c>kafka://host[:port]/topic[/partition][?offset=N]</c> (port 9092) and <c>kafkas://</c> (port 9093, TLS
 /// from the connector) with the Kafka protocol (ADR-1076): with a body (<c>-d</c>) it produces one record whose value
 /// is the body, otherwise it consumes the partition from the offset to its end. It asks the URL's broker for Metadata
-/// first and, when another broker leads the partition, connects to that leader instead (ADR-1080). With
+/// first and, when another broker leads the partition, connects to that leader instead (ADR-1080); a produce whose
+/// leader moves to another broker during its retries connects to the new leader (ADR-1375). With
 /// <c>--user</c> it authenticates every connection with SASL before its first request: PLAIN, or SCRAM-SHA-512 or SCRAM-SHA-256 on a new connection when the broker does not enable PLAIN but offers one (ADR-1082, ADR-1317). The exchange
 /// itself is <see cref="KafkaClientFlow"/>.
 /// </summary>
@@ -24,6 +25,9 @@ internal sealed class KafkaProtocolHandler(IConnector connector, Func<string>? n
     internal const int SecureDefaultPort = 9093;
 
     private const string SecureScheme = "kafkas";
+
+    /// <summary>What a transfer carries from one connection to the next: the SASL mechanism to try and the leader retries used.</summary>
+    private sealed record KafkaTransferState(StrongBox<string> Mechanism, StrongBox<int> LeaderRetries);
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["kafka", SecureScheme];
@@ -54,10 +58,22 @@ internal sealed class KafkaProtocolHandler(IConnector connector, Func<string>? n
         return TargetAt(context, url.IdnHost, port, useTls);
     }
 
-    private static ValueTask RunAsync(KafkaClientFlow flow, ITransferContext context, KafkaAddress address, ReadOnlyMemory<byte>? body) =>
-        body is { } value
-            ? flow.ProduceAsync(address, value, context.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds())
-            : flow.ConsumeAsync(address);
+    /// <summary>
+    /// Produces <paramref name="body"/> over <paramref name="flow"/>, or consumes when there is none, and gives where to
+    /// produce instead when the partition's leader moved away from <paramref name="target"/> during the retries, else
+    /// <see langword="null"/>.
+    /// </summary>
+    private static async ValueTask<ConnectTarget?> ProduceOrConsumeAsync(KafkaClientFlow flow, ITransferContext context, ConnectTarget target, KafkaAddress address, ReadOnlyMemory<byte>? body, long timestampMilliseconds)
+    {
+        if (body is not { } value)
+        {
+            await flow.ConsumeAsync(address).ConfigureAwait(false);
+            return null;
+        }
+
+        KafkaMetadataLeader? moved = await flow.ProduceAsync(address, value, timestampMilliseconds, leader => RedirectOf(context, target, leader) is not null).ConfigureAwait(false);
+        return moved is null ? null : RedirectOf(context, target, moved);
+    }
 
     /// <summary>
     /// Gives the record value to produce: the <c>-d</c> body, else the whole <c>-T</c> upload, else
@@ -96,28 +112,33 @@ internal sealed class KafkaProtocolHandler(IConnector connector, Func<string>? n
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, KafkaAddress address)
     {
         ReadOnlyMemory<byte>? body = await RequestBodyAsync(context).ConfigureAwait(false);
+        long timestamp = context.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds();
         ConnectTarget target = TargetOf(context);
-        ConnectTarget? leader = null;
-        StrongBox<string> mechanism = new(KafkaSaslMechanisms.Plain);
-        TransferResult result = await TransferOverAsync(context, target, mechanism, async flow =>
+        ConnectTarget? next = null;
+        KafkaTransferState state = new(new(KafkaSaslMechanisms.Plain), new(0));
+        TransferResult result = await TransferOverAsync(context, target, state, async flow =>
         {
-            leader = RedirectOf(context, target, await flow.FindLeaderAsync(address).ConfigureAwait(false));
-            if (leader is null)
-            {
-                await RunAsync(flow, context, address, body).ConfigureAwait(false);
-            }
+            next = RedirectOf(context, target, await flow.FindLeaderAsync(address).ConfigureAwait(false))
+                ?? await ProduceOrConsumeAsync(flow, context, target, address, body, timestamp).ConfigureAwait(false);
         }).ConfigureAwait(false);
-        return leader is null ? result : await TransferOverAsync(context, leader, mechanism, flow => RunAsync(flow, context, address, body)).ConfigureAwait(false);
+        while (next is { } leader)
+        {
+            next = null;
+            result = await TransferOverAsync(context, leader, state, async flow =>
+                next = await ProduceOrConsumeAsync(flow, context, leader, address, body, timestamp).ConfigureAwait(false)).ConfigureAwait(false);
+        }
+
+        return result;
     }
 
-    private async ValueTask<TransferResult> TransferOverAsync(ITransferContext context, ConnectTarget target, StrongBox<string> mechanism, Func<KafkaClientFlow, ValueTask> exchange)
+    private async ValueTask<TransferResult> TransferOverAsync(ITransferContext context, ConnectTarget target, KafkaTransferState state, Func<KafkaClientFlow, ValueTask> exchange)
     {
-        string tried = mechanism.Value!;
-        TransferResult result = await TransferOnceAsync(context, target, mechanism, exchange).ConfigureAwait(false);
-        return mechanism.Value == tried ? result : await TransferOnceAsync(context, target, mechanism, exchange).ConfigureAwait(false);
+        string tried = state.Mechanism.Value!;
+        TransferResult result = await TransferOnceAsync(context, target, state, exchange).ConfigureAwait(false);
+        return state.Mechanism.Value == tried ? result : await TransferOnceAsync(context, target, state, exchange).ConfigureAwait(false);
     }
 
-    private async ValueTask<TransferResult> TransferOnceAsync(ITransferContext context, ConnectTarget target, StrongBox<string> mechanism, Func<KafkaClientFlow, ValueTask> exchange)
+    private async ValueTask<TransferResult> TransferOnceAsync(ITransferContext context, ConnectTarget target, KafkaTransferState state, Func<KafkaClientFlow, ValueTask> exchange)
     {
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -128,14 +149,14 @@ internal sealed class KafkaProtocolHandler(IConnector connector, Func<string>? n
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            var flow = new KafkaClientFlow(connection, context.Output, context.Progress, context.TimeProvider, context.CancellationToken, nonceSource);
+            var flow = new KafkaClientFlow(connection, context.Output, context.Progress, context.TimeProvider, context.CancellationToken, state.LeaderRetries, nonceSource);
             try
             {
                 if (context.Credentials is { } credentials)
                 {
-                    if (await flow.AuthenticateAsync(credentials, mechanism.Value!).ConfigureAwait(false) is { } offered)
+                    if (await flow.AuthenticateAsync(credentials, state.Mechanism.Value!).ConfigureAwait(false) is { } offered)
                     {
-                        mechanism.Value = offered;
+                        state.Mechanism.Value = offered;
                         return TransferResult.Success(0);
                     }
                 }

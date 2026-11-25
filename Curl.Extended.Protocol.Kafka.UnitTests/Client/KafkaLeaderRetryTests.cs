@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Kafka.Client;
 
-/// <summary>Checks that Metadata and Produce are tried again while an auto-created topic has no leader ready, within a shared bound.</summary>
+/// <summary>Checks that Metadata and Produce are tried again while no leader is ready, following a leader that moves, within a shared bound.</summary>
 [TestClass]
 public sealed class KafkaLeaderRetryTests
 {
@@ -118,7 +118,56 @@ public sealed class KafkaLeaderRetryTests
         Assert.AreEqual(0, time.TimersCreated);
     }
 
-    private static async Task<TransferResult> RunAsync(ScriptedKafkaConnection connection, ImmediateTimeProvider time)
+    [TestMethod]
+    public async Task ExecuteAsync_LeaderMovesDuringRetries_ProducesOverAConnectionToTheNewLeader()
+    {
+        ScriptedKafkaConnection first = new(
+            KafkaTestBytes.MetadataLeader(1, "broker", 9092),
+            KafkaTestBytes.ProduceResponse(2, 6),
+            KafkaTestBytes.MetadataLeader(3, "other", 9093));
+        ScriptedKafkaConnection second = new(KafkaTestBytes.ProduceResponse(1, 0, 17));
+        ScriptedKafkaConnector connector = new(ConnectResult.Connected(first), ConnectResult.Connected(second));
+        ImmediateTimeProvider time = new();
+
+        TransferResult result = await RunAsync(connector, time);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "broker:9092", "other:9093" }, connector.Targets.Select(target => $"{target.Host}:{target.Port}").ToArray());
+        Assert.AreEqual(3, first.Writes.Count);
+        Assert.AreEqual(1, second.Writes.Count);
+        CollectionAssert.AreEqual(KafkaRequests.Produce(1, "new", 0, KafkaRecordBatch.Encode("A"u8, Now.ToUnixTimeMilliseconds())), second.Writes[0]);
+        Assert.AreEqual(1, time.TimersCreated);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LeaderKeepsMoving_StopsAfterNineRetriesWithTheBrokerError()
+    {
+        // The first connection asks Metadata and produces; each later one produces, is refused and learns the leader moved on.
+        ScriptedKafkaConnection first = new(
+            KafkaTestBytes.MetadataLeader(1, "broker", 9092),
+            KafkaTestBytes.ProduceResponse(2, 6),
+            KafkaTestBytes.MetadataLeader(3, "broker1", 9092));
+        ScriptedKafkaConnection[] later = Enumerable.Range(1, 9)
+            .Select(move => new ScriptedKafkaConnection(
+                KafkaTestBytes.ProduceResponse(1, 6),
+                KafkaTestBytes.MetadataLeader(2, $"broker{move + 1}", 9092)))
+            .ToArray();
+        ScriptedKafkaConnector connector = new([ConnectResult.Connected(first), .. later.Select(ConnectResult.Connected)]);
+        ImmediateTimeProvider time = new();
+
+        TransferResult result = await RunAsync(connector, time);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage, "NOT_LEADER_OR_FOLLOWER");
+        Assert.AreEqual(10, connector.Targets.Count);
+        Assert.AreEqual(1, later[^1].Writes.Count);
+        Assert.AreEqual(9, time.TimersCreated);
+    }
+
+    private static Task<TransferResult> RunAsync(ScriptedKafkaConnection connection, ImmediateTimeProvider time) =>
+        RunAsync(new ScriptedKafkaConnector(ConnectResult.Connected(connection)), time);
+
+    private static async Task<TransferResult> RunAsync(ScriptedKafkaConnector connector, ImmediateTimeProvider time)
     {
         TransferContext context = new()
         {
@@ -127,7 +176,7 @@ public sealed class KafkaLeaderRetryTests
             PostData = "A"u8.ToArray(),
             TimeProvider = time,
         };
-        return await new KafkaProtocolHandler(new ScriptedKafkaConnector(ConnectResult.Connected(connection))).ExecuteAsync(context);
+        return await new KafkaProtocolHandler(connector).ExecuteAsync(context);
     }
 
     private sealed class ImmediateTimeProvider : TimeProvider
