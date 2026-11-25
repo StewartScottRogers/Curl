@@ -33,3 +33,4 @@ Command: `curl ftp://127.0.0.1:<port>/ -P 127.0.0.1` against test 251's FTP serv
 ## Log
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 24.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: a9d78d40 76c28db7 3d836d5e.
