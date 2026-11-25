@@ -16,7 +16,7 @@ namespace Curl.Engine;
 /// recorder serves the run's transfers one at a time; <see cref="EndPointReportingProtocolHandler" />
 /// clears it before each. Its units live in one file each: the first connection's end points
 /// (<c>ConnectionEndPointRecorder.EndPoints.cs</c>), the failed connect's error numbers
-/// (<c>.OsErrno.cs</c>) and the earlier redirect hop (<c>.EarlierHop.cs</c>).
+/// (<c>.OsErrno.cs</c>), the CONNECT reply status (<c>.ProxyConnect.cs</c>) and the earlier redirect hop (<c>.EarlierHop.cs</c>).
 /// </remarks>
 internal sealed partial class ConnectionEndPointRecorder
 {
@@ -36,6 +36,7 @@ internal sealed partial class ConnectionEndPointRecorder
         SetAsideEarlierHop(followingRedirect);
         ClearEndPoints();
         ClearConnectFailure();
+        ClearProxyConnect();
     }
 
     /// <summary>
@@ -59,7 +60,7 @@ internal sealed partial class ConnectionEndPointRecorder
     internal TransferResult ReportOn(TransferResult result, bool handlerCountsConnections = false)
     {
         RememberResponseCode(result);
-        TransferResult withEndPoints = WithEndPoints(WithConnectFailure(result));
+        TransferResult withEndPoints = WithEndPoints(WithProxyConnect(WithConnectFailure(result)));
         return WithEarlierHop(handlerCountsConnections ? withEndPoints : WithConnectionCount(withEndPoints));
     }
 }
