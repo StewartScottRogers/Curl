@@ -8,7 +8,9 @@ namespace Curl.Original.Protocol.Http;
 /// <content>
 /// The end of curl 8.22.0's <c>-v</c> lines for a response whose resend <c>--max-redirs</c>
 /// refuses: the response is finished first, and the limit's message comes last (measured with
-/// <c>Record-CurlExchange.ps1 -HoldOpenMilliseconds 1500</c>, BL-5944 Notes).
+/// <c>Record-CurlExchange.ps1 -HoldOpenMilliseconds 1500</c>, BL-5944 Notes). Also the lines of
+/// a 417 that arrives while the body waits for <c>100 Continue</c>, its resend refused or sent
+/// (BL-5952 Notes).
 /// </content>
 public sealed partial class HttpProtocolHandlerTests
 {
@@ -116,6 +118,41 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual(417, result.Report.ResponseCode);
         Assert.AreEqual(ExpectUrl, result.Report.RedirectUrl);
+    }
+
+    /// <summary>
+    /// Measured (BL-5952 Notes): a 417 that arrives while the body waits for <c>100 Continue</c>
+    /// writes <c>abort upload</c> after <c>Got HTTP failure 417 while waiting for a 100</c>,
+    /// whether <c>--max-redirs 0</c> refuses the resend or the resend goes out.
+    /// </summary>
+    [TestMethod]
+    [DataRow(0, CurlExitCode.TooManyRedirects, DisplayName = "--max-redirs 0")]
+    [DataRow(50, CurlExitCode.Ok, DisplayName = "resent")]
+    public async Task ExecuteAsync_417WhileWaitingForContinue_WritesAbortUploadBeforeIgnoringTheBody(
+        int maxRedirects, CurlExitCode exitCode)
+    {
+        TurnTakingConnection connection = new(65536, "HTTP/1.1 417 Expectation Failed\r\nContent-Length: 4\r\n\r\nnope", OkHead + "ok");
+        RecordingTransferEvents events = new();
+        Diagnostics.Arrange("--max-redirs", maxRedirects);
+
+        TransferResult result = await Handler(QueueConnector.For(connection))
+            .ExecuteAsync(ExpectEventsContext(BigBodyOptions() with { MaxRedirects = maxRedirects }, events));
+
+        WriteResult(result);
+        string[] expected =
+        [
+            "< HTTP/1.1 417 Expectation Failed",
+            "< Content-Length: 4",
+            "* Got HTTP failure 417 while waiting for a 100",
+            "* abort upload",
+            "* Ignoring the response-body",
+            "* setting size while ignoring",
+            "< ",
+        ];
+        string[] actual = [.. EventsFrom(events, "< HTTP/1.1 417 Expectation Failed\r\n", expected.Length).Select(line => line.TrimEnd('\r', '\n'))];
+        Diagnostics.Diff("-v lines from the 417", string.Join('\n', expected), string.Join('\n', actual));
+        CollectionAssert.AreEqual(expected, actual);
+        Assert.AreEqual(exitCode, result.ExitCode);
     }
 
     [TestMethod]

@@ -6,12 +6,6 @@ namespace Curl.Original.Protocol.Http;
 public sealed partial class HttpProtocolHandler
 {
     /// <summary>
-    /// Echoes a response head line as the exchange's HTTP/2 stream's <c>--trace-config http/2</c>
-    /// <c>status:</c> or <c>header:</c> line (BL-1205): the request stream's, else stream 1 of a
-    /// connection switched to HTTP/2 after an h2c upgrade's <c>101</c>; or, over HTTP/3, the status line
-    /// as the request stream's <c>--trace-config http/3</c> <c>status:</c> line (BL-1208); nothing over HTTP/1.x.
-    /// </summary>
-    /// <summary>
     /// Reports <c>Need to rewind upload for next request</c> after a <c>3xx</c> status line under
     /// <c>-L</c> when the request sent a body that is not empty, as curl 8.21.0 does whatever the
     /// redirect then does with the body: a <c>307</c> sends it again, a <c>302</c> drops it
@@ -86,19 +80,20 @@ public sealed partial class HttpProtocolHandler
     }
 
     /// <summary>
-    /// Reports what curl 8.21.0 writes after <c>Got HTTP failure 417 while sending data</c>, before
-    /// the 417's empty line (measured, BL-1446 Notes): <c>Need to rewind upload for next request</c>
-    /// and <c>abort upload after having sent N bytes</c>. Nothing after a 417 that arrived while
-    /// the body still waited for <c>100 Continue</c>, as none of it was sent.
+    /// Reports what curl writes after <c>Got HTTP failure 417 while ...</c>, before the 417's
+    /// empty line. After a 417 that arrived while the body was being sent:
+    /// <c>Need to rewind upload for next request</c> and <c>abort upload after having sent N
+    /// bytes</c> (curl 8.21.0, measured, BL-1446 Notes). After one that arrived while the body
+    /// still waited for <c>100 Continue</c>, so none of it was sent: only <c>abort upload</c>
+    /// (curl 8.22.0, measured, BL-5952 Notes).
     /// </summary>
     private static void ReportUploadAbandoned(ITransferEvents events, HttpRequestBodyWriter upload, bool bodyLeftUnsent)
     {
-        if (bodyLeftUnsent)
+        if (!bodyLeftUnsent)
         {
-            return;
+            events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
         }
 
-        events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
         events.ReportInfo(HttpConnectionInfoLines.AbortUpload(upload.BytesSent));
     }
 }
