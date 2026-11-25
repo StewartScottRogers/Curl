@@ -25,7 +25,7 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
             return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
         }
 
-        string bucket = context.Url.Host;
+        string bucket = S3Endpoint.BucketOf(context.Url.OriginalString, context.Url.Host);
         S3Configuration configuration = S3Configuration.From(environment, context.Credentials);
         if (S3Endpoint.For(bucket, configuration.Region, configuration.EndpointUrl) is not { } endpoint)
         {
@@ -45,9 +45,16 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
         }
         catch (S3HttpException failure)
         {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message) with { Report = headReporter.Report };
+            return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message) with { Report = headReporter.Report };
         }
     }
+
+    private static CurlExitCode ExitCodeOf(S3HttpFailure failure) => failure switch
+    {
+        S3HttpFailure.ReceiveFailed => CurlExitCode.RecvError,
+        S3HttpFailure.BodyShort => CurlExitCode.PartialFile,
+        _ => CurlExitCode.WeirdServerReply,
+    };
 
     private static string KeyOf(CurlUrl url)
     {
@@ -72,7 +79,7 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
     private static Task<long> ReadAsync(S3Operations operations, ITransferContext context, string key) =>
         IsPrefix(key)
             ? operations.ListAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output)
-            : operations.DownloadAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output);
+            : operations.DownloadAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output, context.ResumeFrom, context.RangeText);
 
     private static Task<long> UploadObjectAsync(S3Operations operations, Stream upload, string key) =>
         IsPrefix(key)

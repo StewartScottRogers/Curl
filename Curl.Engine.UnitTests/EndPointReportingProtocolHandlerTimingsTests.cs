@@ -114,7 +114,32 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_CancelledBeforeConnecting_CarriesNoReport_BL5491()
+    public async Task ExecuteAsync_CancelledWithHandlerReport_KeepsTheHandlersTimingsAndHeaders_BL5862()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        TransferTimings timings = new(1, new ConnectTimings(1, null, 5, null), 6, 7, null, 9);
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("http", _ =>
+            {
+                recorder.Record(new IPEndPoint(IPAddress.Loopback, 50000), new IPEndPoint(IPAddress.Loopback, 80), timings: new ConnectTimings(1, null, 5, null));
+                OperationCanceledException cancelled = new();
+                cancelled.Data["Curl.Engine.TransferReport"] = new TransferReport { Timings = timings, InformationalHeaderCount = 2 };
+                throw cancelled;
+            }),
+            recorder);
+
+        OperationCanceledException thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await handler.ExecuteAsync(ContextOf(time)));
+
+        TransferReport report = EndPointReportingProtocolHandler.ReportCarriedBy(thrown)!;
+        Assert.AreEqual(timings, report.Timings);
+        Assert.AreEqual(2, report.InformationalHeaderCount);
+        Assert.IsNotNull(report.RemoteEndPoint);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CancelledBeforeConnecting_CarriesTimingsOnly_BL5843()
     {
         ManualTimeProvider time = new();
         EndPointReportingProtocolHandler handler = new(
@@ -124,7 +149,9 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
         OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             async () => await handler.ExecuteAsync(ContextOf(time)));
 
-        Assert.IsNull(EndPointReportingProtocolHandler.ReportCarriedBy(cancelled));
+        TransferReport report = EndPointReportingProtocolHandler.ReportCarriedBy(cancelled)!;
+        Assert.IsNotNull(report.Timings);
+        Assert.IsNull(report.RemoteEndPoint);
     }
 
     [TestMethod]

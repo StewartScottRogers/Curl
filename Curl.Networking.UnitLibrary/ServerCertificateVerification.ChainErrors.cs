@@ -95,26 +95,28 @@ internal sealed partial class ServerCertificateVerification
                 TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, hasCaCertificateFile));
     }
 
-    // With --cacert the Schannel build names a broken name constraint (BL-5375) or a revoked certificate below the anchor (BL-5384).
+    // With --cacert the Schannel build names a broken name constraint (BL-5375), a revoked certificate below the anchor (BL-5384)
+    // or any other fault up to the anchor (STD-204).
     private (CurlExitCode ExitCode, string Message)? CaCertificateFileChainFailure(SslPolicyErrors errors, X509Chain? chain) =>
         ConstraintViolationOf(errors, chain) is var violation and not 0
             ? (CurlExitCode.PeerFailedVerification,
                 RevocationStatusIsUnknownAndChecked(chain)
                     ? TlsFailureMessages.SchannelRevocationStatusUnknown
                     : $"schannel: error 0x{violation:x8}")
-            : BelowNonSelfSignedAnchorFailure(chain);
+            : BelowNonSelfSignedAnchorFailure(chain) ?? AnchoredChainFaultFailure(chain);
 
     // Schannel names an unknown revocation status before a broken name constraint (BL-5809).
     private bool RevocationStatusIsUnknownAndChecked(X509Chain? chain) =>
         !options.SkipRevocationCheck
         && !options.RevocationCheckBestEffort
-        && ReadChainStatus(chain).Any(status => (status.Status & UnavailableRevocationFlags) != 0);
+        && ReadChainStatus(chain).Any(status => (status.Status & UnavailableRevocationFlags) != 0)
+        && ReadBelowAnchorRevocation(chain!) is not BelowAnchorRevocation.Clean;
 
     // A chain error with a name constraint of a CA in the chain broken by the server certificate
     // is named by Schannel's trust error (BL-5375); 0 for any other failure.
     private static int ConstraintViolationOf(SslPolicyErrors errors, X509Chain? chain) =>
         errors.HasFlag(SslPolicyErrors.RemoteCertificateChainErrors) && chain is not null
-            ? CertificateNameConstraints.FindViolation(chain)
+            ? CertificateNameConstraints.FindViolation(chain, matchesSchannelBuild: true)
             : 0;
 
     // The chain's errors do not count when it leads to a --capath root trusted beside the
@@ -143,26 +145,26 @@ internal sealed partial class ServerCertificateVerification
         && chain.ChainElements.Count > 0
         && HasOnlyMissingRootOrAnchorRevocationStatus(chain)
         && ListsAnAnchorCandidate(chain)
-        && CertificateNameConstraints.FindViolation(chain) == 0;
+        && CertificateNameConstraints.FindViolation(chain, matchesSchannelBuild) == 0;
 
     // With revocation checking on, a chain ending at a non-self-signed anchor also carries
     // RevocationStatusUnknown / OfflineRevocation, for the anchor has no issuer to ask (BL-5317):
-    // tolerated only when the CRLs of the certificates below the anchor leave none unknown or revoked.
+    // tolerated only when OCSP and the CRLs of the certificates below the anchor leave none unknown or revoked.
     private bool HasOnlyMissingRootOrAnchorRevocationStatus(X509Chain chain) =>
-        HasOnlyMissingRootStatus(ReadChainStatus(chain))
-        || (HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
+        HasOnlyMissingRootStatus(ReadAnchoredChainStatus(chain))
+        || (HasOnlyMissingRootOrUnavailableRevocationStatus(ReadAnchoredChainStatus(chain))
             && !IsSelfSigned(chain.ChainElements[AnchorIndexOf(chain)].Certificate)
             && NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(chain));
 
     // --ssl-revoke-best-effort masks an unknown revocation status, so a certificate below the
-    // anchor with no usable CRL (404, none listed, refused) is tolerated there; a revoked one never is (BL-5437).
+    // anchor with no usable OCSP answer or CRL (404, none listed, refused) is tolerated there; a revoked one never is (BL-5437).
     private bool NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(X509Chain chain) =>
         ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Clean
         || (matchesSchannelBuild && options.RevocationCheckBestEffort && ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Unresolved);
 
-    // The chain ends at a listed, non-self-signed anchor and a CRL revokes a certificate below it:
+    // The chain ends at a listed, non-self-signed anchor and OCSP or a CRL revokes a certificate below it:
     // Schannel's has been revoked, where the engine's own statuses only say unknown (BL-5384).
-    // A revoking CRL is Schannel's has been revoked (BL-5384), no usable CRL its revocation status is unknown (BL-5446).
+    // A revoked answer is Schannel's has been revoked (BL-5384), no usable one its revocation status is unknown (BL-5446).
     private (CurlExitCode ExitCode, string Message)? BelowNonSelfSignedAnchorFailure(X509Chain? chain) =>
         chain is not null && EndsAtListedNonSelfSignedAnchor(chain)
             ? ReadBelowAnchorRevocation(chain) switch
@@ -175,9 +177,81 @@ internal sealed partial class ServerCertificateVerification
 
     private bool EndsAtListedNonSelfSignedAnchor(X509Chain chain) =>
         chain.ChainElements.Count > 0
-        && HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
+        && HasOnlyMissingRootOrUnavailableRevocationStatus(ReadAnchoredChainStatus(chain))
         && !IsSelfSigned(chain.ChainElements[AnchorIndexOf(chain)].Certificate)
         && ListsAnAnchorCandidate(chain);
+
+    // curl's Schannel build reports the trust errors of the chain as it ends at the listed anchor, so on that
+    // build .NET's faults that only the certificates above the anchor carry, and the basic constraints of an
+    // anchor that has none, do not count (STD-204, ADR-1356). The OpenSSL build reads the whole chain.
+    private X509ChainStatus[] ReadAnchoredChainStatus(X509Chain chain) =>
+        matchesSchannelBuild && EndsShortOfATrustedRootAtAListedAnchor(chain)
+            ? WithoutFaultsOutsideAnchoredChain(
+                ReadChainStatus(chain),
+                chain.ChainElements.Cast<X509ChainElement>().Select(element => UnionOf(element.ChainElementStatus)).ToArray(),
+                AnchorIndexOf(chain),
+                chain.ChainElements[AnchorIndexOf(chain)].Certificate.Extensions.OfType<X509BasicConstraintsExtension>().Any())
+            : ReadChainStatus(chain);
+
+    // Under a non-self-signed anchor .NET finds no trusted root; a chain with one needs no anchor looked for.
+    private bool EndsShortOfATrustedRootAtAListedAnchor(X509Chain chain) =>
+        (UnionOf(ReadChainStatus(chain)) & MissingRootFlags) != 0 && ListsAnAnchorCandidate(chain);
+
+    /// <summary>
+    /// Takes out of a chain's statuses the faults that do not belong to the chain ending at its trust anchor:
+    /// those only elements above the anchor carry, and <see cref="X509ChainStatusFlags.InvalidBasicConstraints" />
+    /// of an anchor with no basic constraints extension. A fault no element carries stays.
+    /// </summary>
+    /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
+    /// <param name="elementFaults">Each chain element's faults, leaf first.</param>
+    /// <param name="anchorIndex">The anchor's position in <paramref name="elementFaults" />.</param>
+    /// <param name="anchorHasBasicConstraints">Whether the anchor has a basic constraints extension.</param>
+    /// <returns>The statuses left, none of them <see cref="X509ChainStatusFlags.NoError" />.</returns>
+    internal static X509ChainStatus[] WithoutFaultsOutsideAnchoredChain(
+        X509ChainStatus[] chainStatus, X509ChainStatusFlags[] elementFaults, int anchorIndex, bool anchorHasBasicConstraints)
+    {
+        var excusedAtAnchor = anchorHasBasicConstraints
+            ? X509ChainStatusFlags.NoError
+            : X509ChainStatusFlags.InvalidBasicConstraints;
+        var inside = UnionOf(elementFaults.Take(anchorIndex)) | (elementFaults[anchorIndex] & ~excusedAtAnchor);
+        var outside = UnionOf(elementFaults.Skip(anchorIndex + 1)) | (elementFaults[anchorIndex] & excusedAtAnchor);
+        var excused = outside & ~inside;
+        return chainStatus
+            .Select(status => new X509ChainStatus { Status = status.Status & ~excused, StatusInformation = status.StatusInformation })
+            .Where(status => status.Status != X509ChainStatusFlags.NoError)
+            .ToArray();
+    }
+
+    private static X509ChainStatusFlags UnionOf(IEnumerable<X509ChainStatusFlags> faults) =>
+        faults.Aggregate(X509ChainStatusFlags.NoError, (all, next) => all | next);
+
+    private static X509ChainStatusFlags UnionOf(X509ChainStatus[] chainStatus) =>
+        UnionOf(chainStatus.Select(status => status.Status));
+
+    // A fault of the chain up to a listed anchor, other than a missing root or an unknown revocation status,
+    // is named as the Schannel build names a chain's trust errors: 0x00000010 for a wrong usage (STD-204).
+    private (CurlExitCode ExitCode, string Message)? AnchoredChainFaultFailure(X509Chain? chain)
+    {
+        if (chain is null || !EndsShortOfATrustedRootAtAListedAnchor(chain))
+        {
+            return null;
+        }
+
+        var faults = UnionOf(ReadAnchoredChainStatus(chain)) & ~MissingRootFlags;
+        return (faults & ~UnavailableRevocationFlags) == 0
+            ? null
+            : (CurlExitCode.PeerFailedVerification,
+                TlsFailureMessages.SchannelCaCertificateFileChainError(WithBelowAnchorRevocation(chain, faults)));
+    }
+
+    // The engine cannot answer revocation below a non-self-signed anchor (BL-5384), so there the lists say
+    // whether the status is clean, revoked or unknown.
+    private X509ChainStatusFlags WithBelowAnchorRevocation(X509Chain chain, X509ChainStatusFlags faults) =>
+        NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(chain)
+            ? faults & ~UnavailableRevocationFlags
+            : ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Revoked
+                ? faults | X509ChainStatusFlags.Revoked
+                : faults;
 
     // The chain is cut at the first certificate the --cacert file lists, so a root the server
     // sent beyond it is not the anchor (BL-5438); the last element when none is listed.

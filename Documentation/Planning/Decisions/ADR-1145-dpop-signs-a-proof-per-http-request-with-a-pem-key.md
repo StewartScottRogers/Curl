@@ -28,8 +28,9 @@ changes nothing without its option.
   every request, the retry included.
 - **Access token (§7.1).** An `--oauth2-bearer` token is sent as `Authorization: DPoP <token>`, which replaces
   curl's `Bearer` header as any `-H Authorization` does, and is hashed into `ath`. A `-H "Authorization: DPoP <token>"`
-  the user gave is left as it is and its token hashed into `ath`. A `-H "Authorization: Bearer ..."` is not rewritten:
-  a transfer hook adds headers and cannot take away one `-H` gave.
+  the user gave is left as it is and its token hashed into `ath`; it wins over `--oauth2-bearer`, whose header it
+  replaces, as does the one an `--oauth2-*` flow adds for a token bound to this key (ADR-1367). A
+  `-H "Authorization: Bearer ..."` is not rewritten: a transfer hook adds headers and cannot take away one `-H` gave.
 - **Nonces (§8, §9).** The last `DPoP-Nonce` each origin (scheme, host, port) sent is put into later proofs to it. A
   400 or 401 response that brings a nonce other than the one sent is retried once with it; the server's
   `DPoP-Nonce` is the demand, so the `use_dpop_nonce` error code in the body or `WWW-Authenticate` is not parsed.
@@ -39,8 +40,8 @@ changes nothing without its option.
 
 ## Left out
 
-- Authorization requests' `dpop_jkt` parameter (§10) and token requests: the user builds those requests; the
-  proof on them is the same one this hook sends.
+- Authorization requests' `dpop_jkt` parameter (§10) and token requests the user builds: the proof on them is the
+  same one this hook sends. An `--oauth2-*` flow's token requests are proved with this key (ADR-1367).
 - Generating a key: the user supplies one (`openssl ecparam -genkey`), so the proofs stay bound to a key that
   outlives one command.
 - Proofs for a proxy: RFC 9449 defines none.

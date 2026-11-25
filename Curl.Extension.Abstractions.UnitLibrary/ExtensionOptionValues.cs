@@ -5,8 +5,12 @@ namespace Curl.Extension.Abstractions;
 /// transfer time: the value of each option given, or the empty string for a flag (ADR-1006).
 /// </summary>
 /// <param name="valuesByName">Each given option's value by its long name; the last one given wins.</param>
-public sealed class ExtensionOptionValues(IReadOnlyDictionary<string, string> valuesByName)
+/// <param name="tlsTrust">The transfer's TLS trust settings; <see langword="null" /> for the system store with verification.</param>
+public sealed class ExtensionOptionValues(IReadOnlyDictionary<string, string> valuesByName, ExtensionTlsTrust? tlsTrust = null)
 {
+    /// <summary>Gets the transfer's TLS trust settings (<c>--cacert</c>, <c>--capath</c>, <c>-k</c>).</summary>
+    public ExtensionTlsTrust TlsTrust { get; } = tlsTrust ?? new ExtensionTlsTrust();
+
     /// <summary>Gets the values of a command line that gave no extension option.</summary>
     public static ExtensionOptionValues None { get; } = new(new Dictionary<string, string>());
 

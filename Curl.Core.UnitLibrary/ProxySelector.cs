@@ -239,7 +239,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     private string? ReadProxyFor(string scheme) =>
         TryFindProxyVariable(scheme, out _, out string? proxyText) ? proxyText : null;
 
-    private static readonly HashSet<string> HttpProxySchemes = ["ws", "mcp", "grpc", "socketio", "signalr"];
+    private static readonly HashSet<string> HttpProxySchemes = ["ws", "mcp", "grpc", "socketio", "signalr", "mqtt5+ws"];
 
     private static readonly HashSet<string> HttpsProxySchemes = ["wss", "mcps", "grpcs", "socketios", "oci", "s3", "gs", "az", "abfs", "abfss", "signalrs"];
 

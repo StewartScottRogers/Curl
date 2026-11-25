@@ -30,7 +30,10 @@ internal static class Amqp0ClientMessages
 
     /// <summary>The text for a connection.close or channel.close from the server, naming its reply code and text.</summary>
     internal static string ClosedByServer(string methodName, ushort replyCode, string replyText) =>
-        string.Create(CultureInfo.InvariantCulture, $"AMQP server sent {methodName}: reply code {replyCode}, {replyText}");
+        string.Create(CultureInfo.InvariantCulture, $"AMQP server sent {methodName}: reply code {replyCode}, {EscapeControlCharacters(replyText)}");
+
+    private static string EscapeControlCharacters(string text) =>
+        string.Concat(text.Select(c => char.IsControl(c) ? $"\\x{(int)c:X2}" : c.ToString()));
 
     /// <summary>curl's text for output that could not be written.</summary>
     internal static string OutputWriteFailed(int passed) =>

@@ -1,7 +1,9 @@
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Text;
 using Curl.Api.Options.Proxy;
+using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
@@ -15,7 +17,9 @@ namespace Curl.Engine;
 /// <remarks>
 /// <see cref="ProxySelector" /> picks the proxy (ADR-0024); <c>-U</c>/<c>--proxy-user</c> then
 /// gives it a credential when the proxy URL has no user information, as curl 8.22.0 lets the
-/// proxy URL's user and password win over <c>-U</c> (CGR-079, ADR-0825). The chosen proxy reaches both <see cref="ITransferContext.Proxy" />, which a
+/// proxy URL's user and password win over <c>-U</c> (CGR-079, ADR-0825). The curl tool's <c>-U</c>
+/// user and password are percent-decoded first, as curl 8.22.0 decodes them; a library handle's are
+/// not (STD-202, BL-5883). The chosen proxy reaches both <see cref="ITransferContext.Proxy" />, which a
 /// handler connecting over TCP hands to the connector's tunnel (ADR-0056), and
 /// <see cref="Curl.Protocol.Abstractions.HttpRequestOptions.ForwardProxy" />, where the HTTP
 /// handler forwards a plain <c>http</c> request itself and hands every other route to the
@@ -28,6 +32,12 @@ internal static class TransferProxySelection
 {
     /// <summary>The one scheme that never uses a proxy.</summary>
     private const string FileScheme = "file";
+
+    /// <summary>curl's message for a <c>-U</c> user or password that percent-decodes to a NUL byte.</summary>
+    private const string NulInProxyUserMessage = "URL using bad/illegal format or missing URL";
+
+    /// <summary>The encoding whose bytes <c>-U</c> is percent-decoded in: the one credentials are sent in.</summary>
+    private static readonly Encoding ProxyUserEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
 
     /// <summary>
     /// The kind proxy text with no scheme names for each <see cref="ProxyType" />. <see cref="ProxyType.Https2" />
@@ -52,18 +62,26 @@ internal static class TransferProxySelection
     /// <param name="selector">Reads <c>-x</c>, <c>--noproxy</c> and the proxy environment variables.</param>
     /// <param name="proxyOptions">The option group's proxy, pre-proxy, proxy type and no-proxy list.</param>
     /// <param name="throughUnixSocket">Whether <c>--unix-socket</c> or <c>--abstract-unix-socket</c> was given.</param>
-    /// <param name="proxyUser">The <c>-U</c> credential, or <see langword="null" />.</param>
+    /// <param name="proxyUser">The <c>-U</c> or library proxy credential as given, or <see langword="null" />.</param>
     /// <param name="url">The URL being transferred.</param>
     /// <param name="proxy">
-    /// The proxy, with the <c>-U</c> credential when one was given; <see langword="null" /> for a
-    /// direct connection, a <c>file</c> URL, a transfer through a Unix domain socket or a failure.
+    /// The proxy, with <paramref name="proxyUser" />, percent-decoded when
+    /// <paramref name="percentDecodesProxyUser" /> asks, when one was given and the proxy URL has
+    /// none; <see langword="null" /> for a direct connection, a <c>file</c> URL, a transfer through a
+    /// Unix domain socket or a failure.
     /// </param>
     /// <param name="failure">
-    /// The selector's failure for proxy text curl cannot use; <see langword="null" /> otherwise.
+    /// The selector's failure for proxy text curl cannot use, or exit 3 for a <c>-U</c> that decodes
+    /// to a NUL byte, whatever the URL and proxy; <see langword="null" /> otherwise.
     /// </param>
     /// <param name="diagnosticLog">
     /// The run's diagnostic log, where the selector writes its choice under component <c>proxy</c>
     /// (BL-1072); <see langword="null" /> writes nothing.
+    /// </param>
+    /// <param name="percentDecodesProxyUser">
+    /// <see langword="true" />, the default, for the curl tool's <c>-U</c>; <see langword="false" />
+    /// for a library handle's <c>CURLOPT_PROXYUSERPWD</c>, <c>CURLOPT_PROXYUSERNAME</c> and
+    /// <c>CURLOPT_PROXYPASSWORD</c>, which are sent as set (upstream test503).
     /// </param>
     /// <returns><see langword="true" /> unless the transfer must end with <paramref name="failure" />.</returns>
     internal static bool TrySelect(
@@ -74,10 +92,16 @@ internal static class TransferProxySelection
         CurlUrl url,
         out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure,
-        IDiagnosticLog? diagnosticLog = null)
+        IDiagnosticLog? diagnosticLog = null,
+        bool percentDecodesProxyUser = true)
     {
         proxy = null;
-        failure = null;
+        // curl 8.22.0 refuses a NUL in -U whatever the URL and proxy are (measured, BL-5883).
+        if (!TryDecodeProxyUser(percentDecodesProxyUser, proxyUser, out NetworkCredential? decodedProxyUser, out failure))
+        {
+            return false;
+        }
+
         // curl 8.21.0 drops the proxy, unread, when --unix-socket or --abstract-unix-socket is given
         // ("do not mix proxy and Unix domain sockets"; measured, BL-507).
         if (url.Scheme == FileScheme || throughUnixSocket)
@@ -87,7 +111,7 @@ internal static class TransferProxySelection
 
         if (!string.IsNullOrEmpty(proxyOptions.PreProxy))
         {
-            return TrySelectBehindPreProxy(selector, proxyOptions, proxyOptions.PreProxy, proxyUser, url, diagnosticLog, out proxy, out failure);
+            return TrySelectBehindPreProxy(selector, proxyOptions, proxyOptions.PreProxy, decodedProxyUser, url, diagnosticLog, out proxy, out failure);
         }
 
         if (!selector.TrySelect(url, proxyOptions.Proxy, KindWithoutSchemeOf(proxyOptions), proxyOptions.NoProxy, out ProxyEndpoint? selected, out failure, diagnosticLog, proxyOptions.ProxyPort))
@@ -95,9 +119,45 @@ internal static class TransferProxySelection
             return false;
         }
 
-        proxy = WithProxyUser(WithHttp10Kind(selected, proxyOptions), proxyUser);
+        proxy = WithProxyUser(WithHttp10Kind(selected, proxyOptions), decodedProxyUser);
         return true;
     }
+
+    /// <summary>
+    /// Percent-decodes the <c>-U</c> user and password, already split at the first colon, as the curl
+    /// tool's are decoded: <c>%3A</c> is a colon in the user name, and a <c>%</c> without two hex
+    /// digits after it stays as it is (measured on curl 8.22.0, BL-5883). Gives
+    /// <paramref name="proxyUser" /> back as it is when <paramref name="percentDecodes" /> is
+    /// <see langword="false" />.
+    /// </summary>
+    /// <returns><see langword="false" />, with exit 3, when either decodes to a NUL byte.</returns>
+    private static bool TryDecodeProxyUser(
+        bool percentDecodes,
+        NetworkCredential? proxyUser,
+        out NetworkCredential? decoded,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        decoded = proxyUser;
+        failure = null;
+        if (proxyUser is null || !percentDecodes)
+        {
+            return true;
+        }
+
+        string user = PercentDecoded(proxyUser.UserName);
+        string password = PercentDecoded(proxyUser.Password);
+        if (string.Concat(user, password).Contains('\0', StringComparison.Ordinal))
+        {
+            failure = TransferResult.Failure(CurlExitCode.UrlMalformat, NulInProxyUserMessage);
+            return false;
+        }
+
+        decoded = new NetworkCredential(user, password);
+        return true;
+    }
+
+    private static string PercentDecoded(string encoded) =>
+        TransferCredentialLookup.DecodedUserInformation(encoded, ProxyUserEncoding) ?? string.Empty;
 
     /// <summary>
     /// Chooses the proxy when <c>--preproxy</c> names one, as curl 8.21.0 does (measured, BL-614):

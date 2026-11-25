@@ -20,7 +20,9 @@ namespace Curl.Protocol.Abstractions;
 /// </param>
 /// <param name="RequiredMechanism">
 /// The mechanism named by <c>AUTH=&lt;mech&gt;</c> in the login options; <see langword="null" />
-/// or <c>*</c> allows any mechanism.
+/// or <c>*</c> allows any mechanism. With a <paramref name="BearerToken" />, <see langword="null" />
+/// keeps the password mechanisms from being chosen, as curl prefers only the bearer ones until
+/// an <c>AUTH=</c> option says otherwise.
 /// </param>
 /// <param name="ServiceName">
 /// The SASL service name: <c>smtp</c>, <c>pop</c> or <c>imap</c>, or

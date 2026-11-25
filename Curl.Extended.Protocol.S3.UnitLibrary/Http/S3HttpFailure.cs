@@ -21,6 +21,12 @@ public enum S3HttpFailure
     /// <summary>The server closed the connection before the response head or its framed body ended.</summary>
     ClosedEarly,
 
+    /// <summary>The connection failed while reading (reset, aborted): curl's exit 56 <c>Recv failure</c>.</summary>
+    ReceiveFailed,
+
+    /// <summary>The connection closed before a <c>Content-Length</c> body arrived in full: curl's exit 18.</summary>
+    BodyShort,
+
     /// <summary>The request body stream ended before the length the request declared.</summary>
     RequestBodyTooShort,
 }

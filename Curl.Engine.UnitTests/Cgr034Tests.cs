@@ -70,6 +70,20 @@ public sealed partial class Cgr034Tests
     [TestMethod]
     public async Task SocketAction_TimeoutAgainstASilentServer_TellsTheTimeoutThenRemoveWithOperationTimedOut()
     {
+        // A runner starved for longer than the 4 s deadline (a 24 s run, BL-5871) times the transfer out before it ever
+        // reaches its read wait, which says nothing about the engine; run the scenario again, up to three times.
+        string[] expected = ["T0", "S=2", "T400+", "S=1", "S=4", "T-1"];
+        List<string> calls = [];
+        for (int attempt = 0; attempt < 3 && !calls.Contains("S=1"); attempt++)
+        {
+            calls = await RunSilentServerTimeoutAsync();
+        }
+
+        CollectionAssert.AreEqual(expected, calls, string.Join(" ", calls));
+    }
+
+    private static async Task<List<string>> RunSilentServerTimeoutAsync()
+    {
         SocketDialer dialer = new(null);
         List<string> calls = [];
         await using ManagedCurlEngine engine = EngineOver(dialer);
@@ -120,9 +134,9 @@ public sealed partial class Cgr034Tests
         }
 
         Assert.AreEqual(0, running);
-        CollectionAssert.AreEqual(new[] { "T0", "S=2", "T400+", "S=1", "S=4", "T-1" }, calls, string.Join(" ", calls));
         Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? message, out _));
         Assert.AreEqual(CurlCode.OperationTimedOut, message.Result);
+        return calls;
     }
 
     [TestMethod]

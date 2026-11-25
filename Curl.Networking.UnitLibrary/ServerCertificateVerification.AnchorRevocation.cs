@@ -17,6 +17,7 @@ internal sealed partial class ServerCertificateVerification
     private const string FreshestCrlOid = "2.5.29.46";
 
     private static readonly Asn1Tag ContextTag0 = new(TagClass.ContextSpecific, 0);
+    private static readonly Asn1Tag ContextTag1 = new(TagClass.ContextSpecific, 1);
 
     private static readonly Asn1Tag ContextTag6 = new(TagClass.ContextSpecific, 6);
 
@@ -29,22 +30,22 @@ internal sealed partial class ServerCertificateVerification
     internal Func<Uri, CancellationToken, byte[]> FetchRevocationList { get; init; } = RevocationListDownload.Fetch;
 
     /// <summary>
-    /// The most time all the list fetches of one verification may take together; what is left of
+    /// The most time all the list and OCSP response fetches of one verification may take together; what is left of
     /// it bounds each fetch, and a fetch past it counts as unfetchable. Five seconds unless set.
     /// </summary>
     internal TimeSpan RevocationFetchBudget { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>Where a failed list fetch is written, at <c>warning</c> as <c>tls</c>.</summary>
+    /// <summary>Where a failed list or OCSP response fetch is written, at <c>warning</c> as <c>tls</c>.</summary>
     internal IDiagnosticLog RevocationDiagnosticLog { get; init; } = NoDiagnosticLog.Instance;
 
     /// <summary>
-    /// Ends every list fetch of the verification when it is cancelled; the connect's limit, so a
+    /// Ends every list and OCSP response fetch of the verification when it is cancelled; the connect's limit, so a
     /// stalled fetch does not outlast what is left of the connect (ADR-0117).
     /// </summary>
     internal CancellationToken RevocationLimit { get; init; }
 
     /// <summary>
-    /// Returns a verification with this one's settings and seams whose below-anchor list fetches
+    /// Returns a verification with this one's settings and seams whose below-anchor revocation fetches
     /// write their failures to <paramref name="diagnosticLog" /> and stop at
     /// <paramref name="limit" />, and are bounded by the lesser of this one's budget and what is
     /// left of the connect, which <paramref name="limit" /> cancels at.
@@ -58,6 +59,7 @@ internal sealed partial class ServerCertificateVerification
         {
             IsProxy = isProxy,
             FetchRevocationList = FetchRevocationList,
+            FetchOcspResponse = FetchOcspResponse,
             RevocationFetchBudget = RevocationFetchBudget,
             RevocationDiagnosticLog = diagnosticLog,
             RevocationLimit = limit,
@@ -78,22 +80,22 @@ internal sealed partial class ServerCertificateVerification
 
     private sealed record BelowAnchorRevocationAnswer(BelowAnchorRevocation Value);
 
-    /// <summary>What the CRLs say of the certificates below an anchor.</summary>
+    /// <summary>What OCSP and the CRLs say of the certificates below an anchor.</summary>
     private enum BelowAnchorRevocation
     {
         /// <summary>Nothing is unknown or revoked.</summary>
         Clean,
 
-        /// <summary>A certificate below the anchor is listed as revoked.</summary>
+        /// <summary>A certificate below the anchor is revoked, by OCSP or a list.</summary>
         Revoked,
 
-        /// <summary>A revocation status stays unknown: no usable list was found.</summary>
+        /// <summary>A revocation status stays unknown: no usable OCSP answer or list was found.</summary>
         Unresolved,
     }
 
     // With a chain ending at a non-self-signed anchor the Windows engine reports every element's
-    // revocation status unknown, even with a valid CRL one fetch away, so the lists are read
-    // here: the certificates below the anchor are looked up in the list their issuer signed.
+    // revocation status unknown, even with a valid answer one fetch away, so it is read here:
+    // each certificate below the anchor is asked about by OCSP, else looked up in the list its issuer signed.
     // Worked out once per chain, so once per verification, however many checks ask.
     private BelowAnchorRevocation ReadBelowAnchorRevocation(X509Chain chain) =>
         _belowAnchorAnswers.GetValue(chain, key => new BelowAnchorRevocationAnswer(WorkOutBelowAnchorRevocation(key))).Value;
@@ -114,43 +116,70 @@ internal sealed partial class ServerCertificateVerification
             : outcomes.Contains(BelowAnchorRevocation.Unresolved) ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
     }
 
-    private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget) =>
+        OcspRevocationOf(certificate, issuer, budget) ?? ListRevocationOf(certificate, issuer, budget);
+
+    private BelowAnchorRevocation ListRevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var outcomes = CrlDistributionPointUris(certificate)
+        // CryptoAPI stops at the first usable list (STD-163): a later point is never asked, so its answer cannot overrule it.
+        var first = CrlDistributionPointUris(certificate)
             .Select(uri => UsableRevocationList(uri, certificate, issuer, budget))
             .OfType<CertificateRevocationList>()
-            .Select(list => list.Revokes(certificate) ? BelowAnchorRevocation.Revoked : DeltaRevocationOf(list, certificate, issuer, budget))
-            .ToArray();
-        return outcomes.Contains(BelowAnchorRevocation.Revoked)
-            ? BelowAnchorRevocation.Revoked
-            : outcomes.Contains(BelowAnchorRevocation.Clean) ? BelowAnchorRevocation.Clean : BelowAnchorRevocation.Unresolved;
+            .FirstOrDefault();
+        return first is null
+            ? BelowAnchorRevocation.Unresolved
+            : first.Revokes(certificate) ? RevokedUnlessDeltaReleases(first, certificate, issuer, budget) : DeltaRevocationOf(first, certificate, issuer, budget);
     }
 
     // The delta lists a base list or the certificate points to through freshestCRL (RFC 5280, 5.2.6): each
     // pointer needs a usable delta list, and a pointer with none (unfetchable, unusable, or not http) leaves the status unknown.
     private BelowAnchorRevocation DeltaRevocationOf(CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var pointers = new[] { baseList.FreshestCrlValue, certificate.Extensions[FreshestCrlOid]?.RawData }.OfType<byte[]>();
+        var pointers = FreshestPointers(baseList, certificate);
         var outcomes = pointers.Select(pointer => DeltaRevocationOf(pointer, baseList, certificate, issuer, budget)).ToArray();
         return outcomes.Contains(BelowAnchorRevocation.Revoked)
             ? BelowAnchorRevocation.Revoked
             : outcomes.Contains(BelowAnchorRevocation.Unresolved) ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
     }
 
+    // A hold in the base list is lifted by a usable delta entry with reason removeFromCRL (RFC 5280, 5.3.1; STD-188).
+    private BelowAnchorRevocation RevokedUnlessDeltaReleases(CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    {
+        return FreshestPointers(baseList, certificate).SelectMany(pointer => UsableDeltas(pointer, baseList, certificate, issuer, budget)).Any(delta => delta.Releases(certificate))
+            ? BelowAnchorRevocation.Clean
+            : BelowAnchorRevocation.Revoked;
+    }
+
+    private static IEnumerable<byte[]> FreshestPointers(CertificateRevocationList baseList, X509Certificate2 certificate) =>
+        new[] { baseList.FreshestCrlValue, certificate.Extensions[FreshestCrlOid]?.RawData }.OfType<byte[]>();
+
+    // A delta that is expired or newer than the base list is not usable, yet CryptoAPI still reports the leaf revoked when it lists it (STD-189).
     private BelowAnchorRevocation DeltaRevocationOf(byte[] pointer, CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var deltas = DistributionPointUris(pointer)
+        var candidates = CandidateDeltas(pointer, certificate, issuer, budget);
+        var deltas = candidates.Where(delta => IsCurrentDeltaOf(delta, baseList, certificate)).ToArray();
+        return candidates.Any(delta => delta.Revokes(certificate))
+            ? BelowAnchorRevocation.Revoked
+            : deltas.Length == 0 ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
+    }
+
+    private CertificateRevocationList[] UsableDeltas(byte[] pointer, CertificateRevocationList baseList, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget) =>
+        CandidateDeltas(pointer, certificate, issuer, budget).Where(delta => IsCurrentDeltaOf(delta, baseList, certificate)).ToArray();
+
+    private bool IsCurrentDeltaOf(CertificateRevocationList delta, CertificateRevocationList baseList, X509Certificate2 certificate) =>
+        delta.IsUnexpiredAt(timeProvider.GetUtcNow()) && delta.IsDeltaOf(baseList, certificate);
+
+    private CertificateRevocationList[] CandidateDeltas(byte[] pointer, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    {
+        return DistributionPointUris(pointer)
             .Select(uri => TryFetchRevocationList(uri, budget))
             .Select(der => der is null ? null : DecodeOrNothing(der))
             .OfType<CertificateRevocationList>()
-            .Where(delta => delta.CoversCertificatesIssuedFor(certificate) && delta.IsSignedBy(issuer) && delta.NextUpdate >= timeProvider.GetUtcNow() && delta.IsDeltaOf(baseList, certificate))
+            .Where(delta => delta.CoversCertificatesIssuedFor(certificate) && delta.IsSignedBy(issuer))
             .ToArray();
-        return deltas.Length == 0
-            ? BelowAnchorRevocation.Unresolved
-            : deltas.Any(delta => delta.Revokes(certificate)) ? BelowAnchorRevocation.Revoked : BelowAnchorRevocation.Clean;
     }
 
-    // A list is usable when it decodes, is the issuer's, is signed by the issuer and names a next update not yet passed (one naming none fails closed).
+    // A list is usable when it decodes, is the issuer's, is signed by the issuer, has not expired and covers the certificate.
     private CertificateRevocationList? UsableRevocationList(Uri uri, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
         var der = TryFetchRevocationList(uri, budget);
@@ -158,18 +187,20 @@ internal sealed partial class ServerCertificateVerification
         return list is not null && IsCurrentListOf(list, certificate, issuer, uri) ? list : null;
     }
 
-    private byte[]? TryFetchRevocationList(Uri uri, CancellationToken budget)
+    private byte[]? TryFetchRevocationList(Uri uri, CancellationToken budget) => TryFetch(FetchRevocationList, "CRL", uri, budget);
+
+    private byte[]? TryFetch(Func<Uri, CancellationToken, byte[]> fetch, string kind, Uri uri, CancellationToken budget)
     {
         try
         {
             budget.ThrowIfCancellationRequested();
-            return FetchRevocationList(uri, budget);
+            return fetch(uri, budget);
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException or InvalidOperationException)
         {
             if (RevocationDiagnosticLog.IsEnabled(DiagnosticLogLevel.Warning))
             {
-                RevocationDiagnosticLog.Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls, $"CRL {uri} could not be fetched: {exception.Message}");
+                RevocationDiagnosticLog.Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls, $"{kind} {uri} could not be fetched: {exception.Message}");
             }
 
             return null;
@@ -177,7 +208,7 @@ internal sealed partial class ServerCertificateVerification
     }
 
     private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer, Uri uri) =>
-        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.NextUpdate >= timeProvider.GetUtcNow() && list.CoversScopeOf(certificate, uri);
+        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.IsUnexpiredAt(timeProvider.GetUtcNow()) && list.CoversScopeOf(certificate, uri);
 
     // A list served as DER or as PEM text (curl accepts both); PEM armour is stripped before decoding.
     internal static CertificateRevocationList? DecodeOrNothing(byte[] body)
@@ -227,13 +258,18 @@ internal sealed partial class ServerCertificateVerification
         return uris;
     }
 
-    // DistributionPoint ::= SEQUENCE { distributionPoint [0] { fullName [0] GeneralNames }, ... }
+    // DistributionPoint ::= SEQUENCE { distributionPoint [0] { fullName [0] GeneralNames }, reasons [1], ... }
+    // A point limited to some reasons holds only a partial list, which proves nothing about the
+    // other reasons, so it yields no address and the status stays unknown, as CryptoAPI reports it.
     private static void AddUrisOfPoint(AsnReader point, List<Uri> uris)
     {
+        var pointUris = new List<Uri>();
+        var limitedToReasons = false;
         while (point.HasData)
         {
             if (!point.PeekTag().HasSameClassAndValue(ContextTag0))
             {
+                limitedToReasons |= point.PeekTag().HasSameClassAndValue(ContextTag1);
                 point.ReadEncodedValue();
                 continue;
             }
@@ -241,8 +277,13 @@ internal sealed partial class ServerCertificateVerification
             var name = point.ReadSequence(ContextTag0);
             while (name.HasData)
             {
-                AddUrisOfFullName(name, uris);
+                AddUrisOfFullName(name, pointUris);
             }
+        }
+
+        if (!limitedToReasons)
+        {
+            uris.AddRange(pointUris);
         }
     }
 
@@ -274,6 +315,9 @@ internal sealed partial class ServerCertificateVerification
         }
 
         var text = generalNames.ReadCharacterString(UniversalTagNumber.IA5String, ContextTag6);
-        return Uri.TryCreate(text, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttp ? uri : null;
+        return HttpAddressOrNothing(text);
     }
+
+    private static Uri? HttpAddressOrNothing(string text) =>
+        Uri.TryCreate(text, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttp ? uri : null;
 }

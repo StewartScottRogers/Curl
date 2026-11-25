@@ -17,8 +17,11 @@ internal static class XmppRequests
     /// <summary>The <c>id</c> of the disco <c>&lt;iq/&gt;</c>, by which the flow knows its answer.</summary>
     internal const string DiscoIdentifier = "disco";
 
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
     /// <summary>Gives the stanza for <paramref name="target"/>, the URL's query (without <c>?</c>) and the body.</summary>
-    /// <exception cref="XmppClientException">The query names a type or request the client does not provide (exit 3).</exception>
+    /// <exception cref="XmppClientException">The query names a type or request the client does not provide (exit 3),
+    /// or a message's body is not valid UTF-8 (exit 43, ADR-1350).</exception>
     internal static XElement For(string target, string? query, ReadOnlyMemory<byte>? body)
     {
         string[] parts = (query ?? string.Empty).Split(';');
@@ -46,13 +49,25 @@ internal static class XmppRequests
 
     private static XElement Message(string target, Dictionary<string, string> pairs, ReadOnlyMemory<byte>? body)
     {
-        string? text = body is { } data ? Encoding.UTF8.GetString(data.Span) : pairs.GetValueOrDefault("body");
+        string? text = body is { } data ? TextOf(data.Span) : pairs.GetValueOrDefault("body");
         return new XElement(
             XmppNamespaces.Client + "message",
             new XAttribute("to", target),
             Optional(pairs, "type", key => new XAttribute(key, pairs[key])),
             Optional(pairs, "subject", key => new XElement(XmppNamespaces.Client + key, pairs[key])),
             text is null ? null : new XElement(XmppNamespaces.Client + "body", text));
+    }
+
+    private static string TextOf(ReadOnlySpan<byte> body)
+    {
+        try
+        {
+            return StrictUtf8.GetString(body);
+        }
+        catch (DecoderFallbackException)
+        {
+            throw new XmppClientException(CurlExitCode.BadFunctionArgument, XmppClientMessages.BodyNotUtf8);
+        }
     }
 
     private static XElement Disco(string target, Dictionary<string, string> pairs)

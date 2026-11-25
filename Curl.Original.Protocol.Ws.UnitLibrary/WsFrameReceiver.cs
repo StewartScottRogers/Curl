@@ -10,8 +10,8 @@ namespace Curl.Original.Protocol.Ws;
 /// <param name="connection">The upgraded connection.</param>
 /// <param name="randomSource">Supplies the 4-byte mask of each pong.</param>
 /// <param name="progress">
-/// Receives <see cref="BytesReceived" /> after every read, so the progress meter and a <c>-m</c>
-/// timeout message count frame bytes as curl does.
+/// Receives <see cref="BytesReceived" /> after every read that breaks no protocol rule, so the
+/// progress meter and a <c>-m</c> timeout message count frame bytes as curl does.
 /// </param>
 /// <param name="events">
 /// Receives every read as data received, the empty read that ends the transfer included, as
@@ -46,6 +46,9 @@ namespace Curl.Original.Protocol.Ws;
 /// but when several pings complete in the bytes of one read only the last is answered, as
 /// curl replaces a pong it has not yet sent. A protocol violation fails with 56 after the
 /// payload decoded before it has been handed on, and no pong is sent for that read.
+/// No byte of the read that holds the violation counts as received, good frames before it in
+/// that read included, while their payload counts as delivered (measured against curl 8.22.0,
+/// BL-5894).
 /// <c>--max-filesize</c> counts the raw frame bytes, as curl 8.21.0's download writer runs
 /// before its WebSocket decoder: a read that would pass the limit is cut to the bytes under it,
 /// those are decoded and their payload handed on, and the transfer fails with exit 63 and no
@@ -63,8 +66,8 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
     private readonly WsFrameMetadataDecoder? frames = performConnection is not null && !rawMode ? new WsFrameMetadataDecoder() : null;
 
     /// <summary>
-    /// Gets how many frame bytes have been received so far, frame heads included: curl's
-    /// <c>%{size_download}</c> for a WebSocket transfer.
+    /// Gets how many frame bytes have been received so far, frame heads included, those of a read
+    /// that broke the protocol left out: curl's <c>%{size_download}</c> for a WebSocket transfer.
     /// </summary>
     internal long BytesReceived { get; private set; }
 
@@ -132,11 +135,16 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
         }
 
         int allowed = LengthUnderMaxFileSize(received.Length);
-        BytesReceived += allowed;
-        progress.ReportDownloaded(BytesReceived, null);
         ReadOnlySpan<byte> kept = received.Span[..allowed];
         IReadOnlyList<WsFrameRun>? runs = frames?.Decode(kept).Runs;
-        await DeliverAsync(Decode(kept), runs, writePayload, isCut: allowed < received.Length, cancellationToken).ConfigureAwait(false);
+        WsDecodedBytes decoded = Decode(kept);
+        if (decoded.ViolationMessage is null)
+        {
+            BytesReceived += allowed;
+            progress.ReportDownloaded(BytesReceived, null);
+        }
+
+        await DeliverAsync(decoded, runs, writePayload, isCut: allowed < received.Length, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

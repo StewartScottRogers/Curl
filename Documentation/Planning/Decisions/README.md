@@ -1385,3 +1385,28 @@ Each option and the specific reason it lost.
 | [1341](ADR-1341-curl-api-takes-the-verbose-trace-through-a-per-request-debug-callback.md) | Curl.Api takes the verbose trace through a per-request debug callback (BL-5797) | Accepted | 2026-11-22 |
 | [1342](ADR-1342-the-openssl-build-verifies-an-https-proxy-against-its-built-in-bundle.md) | The OpenSSL build verifies an HTTPS proxy against its built-in bundle (BL-5828) | Accepted | 2026-11-23 |
 | [1343](ADR-1343-openldap-sasl-bind-failures-exit-67-login-denied-or-authentication-cancelled.md) | OpenLDAP SASL bind failures exit 67 Login denied or Authentication cancelled (BL-5819) | Accepted | 2026-11-23 |
+| [1344](ADR-1344-checksum-refuses-a-resumed-download.md) | --checksum refuses a resumed download (BL-5837) | Accepted | 2026-11-24 |
+| [1345](ADR-1345-crlfile-with-a-non-self-signed-anchor-is-unable-to-get-issuer-certificate.md) | --crlfile with a non-self-signed anchor is unable to get issuer certificate (BL-5830) | Accepted | 2026-11-24 |
+| [1346](ADR-1346-azure-storage-numeric-host-is-an-ip-only-when-it-is-a-routable-ipv4-spelling.md) | An Azure Storage numeric host is an emulator IP only when it is a routable IPv4 spelling (BL-5867) | Accepted | 2026-11-24 |
+| [1347](ADR-1347-an-oauth2-flow-refuses-a-transfer-that-carries-a-dpop-proof.md) | An --oauth2-* flow refuses a transfer that carries a DPoP proof (BL-5898) | Superseded by ADR-1367 | 2026-11-24 |
+| [1348](ADR-1348-az-and-abfs-refuse-range-and-resume.md) | az:// and abfs[s]:// refuse -r and -C with exit 4 (BL-5897) | Accepted | 2026-11-24 |
+| [1349](ADR-1349-zsync-writes-a-whole-response-only-when-its-sha-1-matches-the-control-file.md) | --zsync writes a whole response only when its SHA-1 matches the control file's, and exits 61 otherwise (BL-5896) | Accepted | 2026-11-24 |
+| [1350](ADR-1350-xmpp-refuses-a-message-body-that-is-not-utf-8.md) | xmpp refuses a message body that is not valid UTF-8 (BL-5899) | Accepted | 2026-11-24 |
+| [1351](ADR-1351-openssl-build-honours-trusted-certificate-settings-in-cacert.md) | The OpenSSL build honours TRUSTED CERTIFICATE settings in --cacert (BL-5879) | Accepted | 2026-11-24 |
+| [1352](ADR-1352-telnet-read-failing-during-option-negotiation-exits-56.md) | A TELNET read that fails during the option negotiation exits 56 (BL-5882) | Accepted | 2026-11-24 |
+| [1353](ADR-1353-dns-over-tls-verifies-the-server-certificate-with-the-transfers-cacert-capath-and-k.md) | --dns-over-tls verifies the server certificate with the transfer's --cacert, --capath and -k (BL-5872) | Accepted | 2026-11-24 |
+| [1354](ADR-1354-the-openssl-build-checks-only-a-host-name-like-cn-against-dns-name-constraints.md) | The OpenSSL build checks only a host-name-like CN against DNS name constraints (BL-5829) | Accepted | 2026-11-24 |
+| [1355](ADR-1355-ocsp-answers-before-the-crl-below-a-non-self-signed-anchor.md) | OCSP answers before the CRL below a non-self-signed anchor (BL-5877) | Accepted | 2026-11-24 |
+| [1356](ADR-1356-schannel-build-judges-a-cacert-chain-only-up-to-its-anchor.md) | The Schannel build judges a --cacert chain only up to its anchor, by Windows trust error (BL-5885) | Accepted | 2026-11-24 |
+| [1357](ADR-1357-an-ignored-http2-body-is-read-to-its-end-except-on-an-upgraded-or-unsent-stream.md) | An ignored HTTP/2 body is read to its end, except on an upgraded or unsent stream (BL-5906) | Accepted | 2026-11-24 |
+| [1358](ADR-1358-oci-refuses-range-and-resume.md) | oci:// refuses -r and -C with exit 4 (BL-5913) | Accepted | 2026-11-24 |
+| [1359](ADR-1359-gs-downloads-send-a-range-header-for-r-and-c-and-uploads-and-lists-refuse-them.md) | gs:// downloads send a Range header for -r and -C; uploads and listings refuse them (BL-5912) | Accepted | 2026-11-24 |
+| [1360](ADR-1360-xmpp-gets-typed-d-text-as-utf-8.md) | xmpp gets typed -d text as UTF-8 (BL-5915) | Accepted | 2026-11-24 |
+| [1361](ADR-1361-a-bearer-token-prefers-only-the-bearer-mechanisms-until-an-auth-option.md) | --oauth2-bearer prefers only the bearer mechanisms until an AUTH= login option (BL-5880) | Accepted | 2026-11-24 |
+| [1362](ADR-1362-openldap-sasl-bind-runs-the-shared-sasl-authenticator.md) | The OpenLDAP SASL bind runs the shared SASL authenticator: every curl mechanism, EXTERNAL without a user, time limit 0 on the mechanism search (BL-5907) | Accepted | 2026-11-24 |
+| [1363](ADR-1363-openssl-build-honours-trusted-certificate-settings-in-capath.md) | The OpenSSL build honours TRUSTED CERTIFICATE settings in --capath (BL-5917) | Accepted | 2026-11-24 |
+| [1364](ADR-1364-below-an-anchor-a-crl-may-be-rsassa-pss-signed-and-may-name-no-nextupdate.md) | Below an anchor a CRL may be RSASSA-PSS signed and may name no nextUpdate (BL-5878) | Accepted | 2026-11-24 |
+| [1365](ADR-1365-a-deflate-zlib-stream-holds-its-first-decoded-bytes-until-the-piece-decodes.md) | A deflate zlib stream holds its first decoded bytes until the piece decodes (BL-5889) | Accepted | 2026-11-24 |
+| [1366](ADR-1366-openldap-starttls-and-simple-bind-failures-follow-curl-8-21-0.md) | OpenLDAP StartTLS and simple bind failures follow curl 8.21.0 (BL-5908) | Accepted | 2026-11-24 |
+| [1367](ADR-1367-an-oauth2-flow-binds-its-token-to-the-dpop-key.md) | An --oauth2-* flow binds its token to the --dpop key (BL-5911) | Accepted | 2026-11-24 |
+| [1368](ADR-1368-state-files-are-replaced-by-rename-off-windows.md) | The cookie jar, HSTS and alt-svc files are replaced by rename off Windows (BL-5888) | Accepted | 2026-11-24 |

@@ -460,6 +460,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             clientCertificate?.Dispose();
             await plaintext.DisposeAsync().ConfigureAwait(false);
             var (exitCode, message) = verification.TrustAnchorsUnusable(exception);
+            ReportUnusableCrlFile(events, exitCode, isProxy, _matchesSchannelBuild);
             return ConnectResult.Failed(exitCode, message);
         }
 
@@ -467,6 +468,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ReadOnlyMemory<byte>[] peerCertificates = [];
         var peerVerification = PeerVerification.Unobserved;
         var judgedHandshake = Unnegotiated(offeredApplicationProtocols);
+        var clientCertificateRequested = false;
         var authenticationOptions = new SslClientAuthenticationOptions
         {
             TargetHost = ServerNameIndication(targetHost),
@@ -478,6 +480,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 // The client-certificate request arrives with the server's certificate; a server
                 // that then ends the handshake for want of one never reaches the validation
                 // callback, yet curl judged the certificate first (STD-174, BL-5822).
+                clientCertificateRequested = true;
                 if (remote is not null && chainPolicy is not null)
                 {
                     (peerCertificates, peerVerification, verificationFailure) = JudgeCertificateOfClientCertificateRequest(
@@ -522,6 +525,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), matchesOpenSslBuild: !_matchesSchannelBuild)
                 {
                     MatchesSchannelBuild = _matchesSchannelBuild,
+                    ServerRequestedClientCertificate = () => clientCertificateRequested,
                     TicketRecords = FollowTicketRecordsAfterHandshake(transport, sslStream.SslProtocol),
                     TicketEvents = events,
                     PeerHostName = targetHost,
@@ -807,6 +811,22 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         if (peerVerification.RevocationCheckIncomplete && events is HandshakeCapturingTransferEvents capturing)
         {
             capturing.ReportRevocationCheckIncomplete();
+        }
+    }
+
+    /// <summary>
+    /// The OpenSSL build's verify result is 1 (unspecified) when the <c>--crlfile</c> cannot be
+    /// loaded, exit 82 (STD-180, BL-5830).
+    /// </summary>
+    /// <param name="events">Where the verify result is reported.</param>
+    /// <param name="exitCode">The exit code of the unusable trust anchors.</param>
+    /// <param name="isProxy">Whether the handshake is with an HTTPS proxy.</param>
+    /// <param name="matchesSchannelBuild">Whether the Schannel build is reproduced.</param>
+    internal static void ReportUnusableCrlFile(ITransferEvents events, CurlExitCode exitCode, bool isProxy, bool matchesSchannelBuild)
+    {
+        if (!matchesSchannelBuild && exitCode == CurlExitCode.SslCrlBadfile)
+        {
+            events.ReportCertificateVerifyResult(OpenSslVerifyResult.Unspecified, isProxy);
         }
     }
 

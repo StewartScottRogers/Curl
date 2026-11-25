@@ -105,6 +105,23 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenAClosingChallengeIsFollowedByAConnectionTheProxyClosesUnanswered_KeepsTheChallengesStatusHeadersAndBytes()
+    {
+        // STD-168: --proxy-anyauth against a proxy that answers 407 and closes, every time: curl prints [56 407 2 N].
+        var first = new ScriptedConnection(Encoding.Latin1.GetBytes(DigestChallengeClosing));
+        var second = new ScriptedConnection([]);
+        var (connector, _) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, first, second);
+
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
+
+        Diagnostics.Assert("exit code, status, headers, bytes", (CurlExitCode.RecvError, 407, 3, (long)DigestChallengeClosing.Length), (result.ExitCode, result.ProxyConnectResponseCode, result.ConnectReplyHeadersStored, result.ProxyConnectHeaderBytes));
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(407, result.ProxyConnectResponseCode);
+        Assert.AreEqual(3, result.ConnectReplyHeadersStored);
+        Assert.AreEqual((long)DigestChallengeClosing.Length, result.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheProxyRefusesTheConnect_CarriesTheRepliesHeaderCountAndBytesInTheFailure()
     {
         // STD-144: curl prints [7 2 59] for %{exitcode} %{num_headers} %{size_header} after this reply.

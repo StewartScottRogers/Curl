@@ -25,8 +25,6 @@ namespace Curl.Networking;
 /// <param name="timeProvider">Dates the OpenSSL verify result's validity checks.</param>
 internal sealed partial class ServerCertificateVerification(TlsClientOptions options, bool matchesSchannelBuild, TimeProvider timeProvider)
 {
-    private const string PemCertificateBegin = "-----BEGIN CERTIFICATE-----";
-
     private static readonly Oid ServerAuthentication = new("1.3.6.1.5.5.7.3.1");
 
     /// <summary>
@@ -229,10 +227,11 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
 
     private (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadChainAnchors()
     {
-        var directoryAnchors = ReadCaCertificateDirectory();
+        var directory = ReadCaCertificateDirectory();
         if (!HasCaCertificates)
         {
-            return (SystemStoreChainPolicy(), directoryAnchors);
+            rejectedCaCertificates = directory.RejectedForServerAuthentication;
+            return (SystemStoreChainPolicy(), directory.Certificates);
         }
 
         var chainPolicy = new X509ChainPolicy
@@ -244,8 +243,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             DisableCertificateDownloads = !matchesSchannelBuild,
         };
         chainPolicy.ApplicationPolicy.Add(ServerAuthentication);
-        chainPolicy.CustomTrustStore.AddRange(ReadCaCertificates());
-        chainPolicy.CustomTrustStore.AddRange(directoryAnchors);
+        chainPolicy.CustomTrustStore.AddRange(ReadCaCertificates(directory));
         return (chainPolicy, []);
     }
 
@@ -347,17 +345,18 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     // server did not send was completed from that store, which OpenSSL never reads: it fails
     // with "unable to get local issuer certificate (20)" (BL-5449, STD-131). The first
     // element is the server's own and the last the anchor, neither of which need be sent.
-    private bool RelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, ReadOnlyMemory<byte>[] peerCertificates)
+    // An element the --capath holds is a trust source OpenSSL reads too, so it needs no sending (STD-182).
+    private bool RelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates)
     {
         return !matchesSchannelBuild
             && !options.Insecure
             && chain is not null
             && peerCertificates.Length > 0
-            && chain.ChainElements.Skip(1).Take(Math.Max(0, AnchorIndexOf(chain) - 1)).Any(element => !WasSent(element.Certificate, peerCertificates));
+            && chain.ChainElements.Skip(1).Take(Math.Max(0, AnchorIndexOf(chain) - 1)).Any(element => !WasSent(element.Certificate, peerCertificates, anchors));
     }
 
     private bool RelyingOnAnUnsentIntermediate(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates) =>
-        RelyingOnAnIntermediateTheServerDidNotSend(chain, peerCertificates)
+        RelyingOnAnIntermediateTheServerDidNotSend(chain, anchors, peerCertificates)
         || AnchoredChainRelyingOnAnIntermediateTheServerDidNotSend(chain, anchors, peerCertificates);
 
     // The same test for the chain rebuilt against the --capath roots, which the system store's
@@ -372,11 +371,13 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         using var rebuilt = RebuildAgainstAnchors(chain, anchors, requireServerAuthentication: true, out _);
         return rebuilt is not null
             && EndsAtAnchor(rebuilt, anchors)
-            && rebuilt.ChainElements.Skip(1).Take(Math.Max(0, rebuilt.ChainElements.Count - 2)).Any(element => !WasSent(element.Certificate, peerCertificates));
+            && rebuilt.ChainElements.Skip(1).Take(Math.Max(0, rebuilt.ChainElements.Count - 2)).Any(element => !WasSent(element.Certificate, peerCertificates, anchors));
     }
 
-    private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates) =>
-        peerCertificates.Any(sent => sent.Span.SequenceEqual(certificate.RawData));
+    private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates, X509Certificate2Collection anchors) =>
+        peerCertificates.Any(sent => sent.Span.SequenceEqual(certificate.RawData))
+        || anchors.Any(anchor => anchor.RawData.AsSpan().SequenceEqual(certificate.RawData));
+
     // The Schannel build checks revocation with CertGetCertificateChain on the context Schannel
     // attached the server's stapled OCSP response to, so a staple that says good or revoked
     // answers for the server's own certificate before any online check (CGR-014, ADR-0834).
@@ -398,8 +399,13 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
 
     private const long UnsuitablePurposeVerifyResult = 26;
 
-    private static PeerVerification WithPurposeVerifyResult(PeerVerification observed, string refusalMessage) =>
-        refusalMessage == OpenSslUnsuitablePurposeRefusal ? observed with { VerifyResult = UnsuitablePurposeVerifyResult } : observed;
+    private static PeerVerification WithRefusalVerifyResult(PeerVerification observed, string refusalMessage) =>
+        refusalMessage switch
+        {
+            OpenSslUnsuitablePurposeRefusal => observed with { VerifyResult = UnsuitablePurposeVerifyResult },
+            OpenSslCertificateRejectedRefusal => observed with { VerifyResult = CertificateRejectedVerifyResult },
+            _ => observed,
+        };
 
     private const string OpenSslUnsuitablePurposeRefusal = "SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)";
 
@@ -409,7 +415,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             ? null
             : (CurlExitCode.PeerFailedVerification, OpenSslUnsuitablePurposeRefusal);
 
-    // The first refusal: a revoked staple, the chain or name, then a --crlfile list. A list's
+    // The first refusal: a rejected --cacert or --capath certificate, a revoked staple, the chain or name, then a --crlfile list. A list's
     // refusal is OpenSSL's verify result too, so %{ssl_verify_result} reports its code, 23 for
     // a revoked certificate and 12 for an expired list (measured with curl 8.18.0, CGR-168).
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) Refusal(
@@ -423,16 +429,25 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         X509Chain? reasonChain)
     {
         var purposeRefusal = PurposeRefusal(anchoredErrors, chain, anchorsBesideSystemStore);
-        var refusal = RevokedStapleRefusal(stapled) ?? purposeRefusal ?? VerifyPeer(anchoredErrors, chain, targetHost, [], reasonChain);
+        var refusal = RejectedCaCertificateOrRevokedStapleRefusal(chain, stapled, anchorsBesideSystemStore) ?? purposeRefusal ?? VerifyPeer(anchoredErrors, chain, targetHost, [], reasonChain);
         if (refusal is not null)
         {
-            return (WithPurposeVerifyResult(observed, refusal.Value.Message), refusal);
+            return (WithRefusalVerifyResult(observed, refusal.Value.Message), refusal);
         }
 
-        return revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
+        return RevocationListVerdict(observed, chain, revocationLists);
+    }
+
+    private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateOrRevokedStapleRefusal(X509Chain? chain, OcspStapleStatus? stapled, X509Certificate2Collection anchorsBesideSystemStore) =>
+        RejectedCaCertificateRefusal(chain, anchorsBesideSystemStore) ?? RevokedStapleRefusal(stapled);
+
+    private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) RevocationListVerdict(
+        PeerVerification observed,
+        X509Chain? chain,
+        CertificateRevocationListFile? revocationLists) =>
+        revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
             ? (observed with { VerifyResult = verifyResult }, (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslRevocationListRefusal(verifyResult)))
             : (observed, null);
-    }
 
     // A good staple answers the revocation status the online check could not fetch.
     private SslPolicyErrors WithoutUnavailableRevocationAGoodStapleAnswers(SslPolicyErrors errors, X509Chain? chain, OcspStapleStatus? stapled) =>

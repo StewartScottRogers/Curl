@@ -214,8 +214,14 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
     // A watchdog's failure with the report of the connection the cancelled transfer had made, so -w still knows its times and end points (BL-5491).
     private static TransferResult WithReportOf(OperationCanceledException cancelled, TransferResult failure) =>
         EndPointReportingProtocolHandler.ReportCarriedBy(cancelled) is { } report
-            ? failure with { Report = report with { DownloadSize = failure.BytesTransferred } }
+            ? failure with { Report = report with { DownloadSize = failure.BytesTransferred, Timings = WithFirstByte(report.Timings, failure.BytesTransferred) } }
             : failure;
+
+    // A receive the watchdog ended after bytes came has a first byte: it was read before the transfer ended (BL-5843).
+    private static TransferTimings? WithFirstByte(TransferTimings? timings, long received) =>
+        timings is { FirstByteReceived: null } && received > 0
+            ? timings with { FirstByteReceived = timings.Completed }
+            : timings;
 
     private static bool HasStoppedTheTransfer(LowSpeedWatchdog? watchdog) => watchdog is { IsTooSlow: true };
 

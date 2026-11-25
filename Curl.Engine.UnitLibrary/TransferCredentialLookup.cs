@@ -446,7 +446,7 @@ internal sealed class TransferCredentialLookup(
     /// <param name="encoded">The part as written in the URL, or <see langword="null" />.</param>
     /// <param name="encoding">The encoding the decoded part's bytes are sent in.</param>
     /// <returns>The decoded part, or <see langword="null" /> when it is absent or empty.</returns>
-    private static string? DecodedUserInformation(string? encoded, Encoding encoding)
+    internal static string? DecodedUserInformation(string? encoded, Encoding encoding)
     {
         if (string.IsNullOrEmpty(encoded))
         {

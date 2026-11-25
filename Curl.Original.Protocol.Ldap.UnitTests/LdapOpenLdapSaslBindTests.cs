@@ -51,6 +51,39 @@ public sealed class LdapOpenLdapSaslBindTests
     }
 
     [TestMethod]
+    [DataRow(HttpAuthSchemes.Basic | HttpAuthSchemes.Digest | HttpAuthSchemes.Ntlm | HttpAuthSchemes.Negotiate, null)]
+    [DataRow(HttpAuthSchemes.Basic, "AUTH=*")]
+    [DataRow(HttpAuthSchemes.Basic, "AUTH=PLAIN")]
+    public async Task ExecuteAsync_ServerOffersPlain_BindsWithSaslPlainAndTheCredentials(HttpAuthSchemes schemes, string? loginOptions)
+    {
+        // STD-185: curl 8.18.0 (OpenLDAP, Linux) binds with mechanism PLAIN and credentials \0alice\0secret.
+        (TransferResult result, byte[] sent) = await RunAsync(schemes, loginOptions, MechanismsEntry(1, "PLAIN"), RootDseDone1, "30 0c 02 01 02 61 07 0a 01 00 04 00 04 00", "30 0c 02 01 03 65 07 0a 01 00 04 00 04 00");
+
+        Assert.AreEqual(TransferResult.Success(0), result, result.ToString());
+        Assert.IsTrue(sent.AsSpan().IndexOf("PLAIN"u8) >= 0);
+        Assert.IsTrue(sent.AsSpan().IndexOf("\0cn=u,dc=x\0secret"u8) >= 0);
+    }
+
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Digest, null)]
+    [DataRow(HttpAuthSchemes.Basic, "AUTH=DIGEST-MD5")]
+    public async Task ExecuteAsync_ServerOffersPlainButOptionsExcludeIt_FailsWith67AndSendsNoPassword(HttpAuthSchemes schemes, string? loginOptions)
+    {
+        (TransferResult result, byte[] sent) = await RunAsync(schemes, loginOptions, MechanismsEntry(1, "PLAIN"), RootDseDone1);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Assert.IsFalse(sent.AsSpan().IndexOf("secret"u8) >= 0);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PlainBindRefused_FailsWith67()
+    {
+        (TransferResult result, _) = await RunAsync(HttpAuthSchemes.Basic, "AUTH=PLAIN", MechanismsEntry(1, "PLAIN"), RootDseDone1, "30 0c 02 01 02 61 07 0a 01 31 04 00 04 00");
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ServerOffersAuthConfWithRc4_AnswersQopAuthAndSendsLaterPdusUnwrapped()
     {
         (TransferResult result, byte[] sent) = await RunAsync(
@@ -96,12 +129,34 @@ public sealed class LdapOpenLdapSaslBindTests
     }
 
     [TestMethod]
+    [DataRow("AUTH:DIGEST-MD5")]
+    [DataRow("DIGEST-MD5")]
+    [DataRow("AUTHDIGEST-MD5")]
+    [DataRow("SASL=DIGEST-MD5")]
+    [DataRow("FOO=bar")]
+    [DataRow("AUTH=BOGUS")]
+    [DataRow("AUTH=")]
+    [DataRow("AUTH=+LOGIN")]
+    [DataRow("AUTH=DIGEST-MD5 AUTH=PLAIN")]
+    [DataRow(" AUTH=DIGEST-MD5")]
+    [DataRow(";AUTH=DIGEST-MD5")]
+    [DataRow("AUTH=DIGEST-MD5;FOO=1")]
+    [DataRow("AUTH=DIGEST-MD5;AUTH=BOGUS")]
+    public async Task ExecuteAsync_MalformedLoginOptions_FailsWith49BeforeSendingAnything(string loginOptions)
+    {
+        // Measured with curl 8.18.0 (OpenLDAP, Linux): "curl: (49) Malformed option provided in a setopt", no connection (STD-184).
+        (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Basic, loginOptions);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, "Malformed option provided in a setopt"), result);
+        Assert.AreEqual(0, sent.Length);
+    }
+
+    [TestMethod]
     [DataRow(HttpAuthSchemes.Ntlm, null)]
     [DataRow(HttpAuthSchemes.Basic, "AUTH=NTLM")]
-    public async Task ExecuteAsync_ServerOffersNtlm_FailsWith67LikeCurlsOpenLdapBuild(HttpAuthSchemes schemes, string? loginOptions)
+    public async Task ExecuteAsync_ServerOffersNtlmToAHandlerWithoutAnAuthenticator_FailsWith67(HttpAuthSchemes schemes, string? loginOptions)
     {
-        // Measured with curl 8.18.0 (OpenLDAP 2.6.10, Linux) against a server whose supportedSASLMechanisms is NTLM:
-        // "curl: (67) Login denied". Its OpenLDAP backend never does an NTLM bind.
+        // Only a handler given the shared authenticator binds with NTLM (LdapOpenLdapSaslBindMechanismTests).
         (TransferResult result, byte[] sent) = await RunAsync(schemes, loginOptions, MechanismsEntry(1, "NTLM"), RootDseDone1);
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
@@ -111,7 +166,7 @@ public sealed class LdapOpenLdapSaslBindTests
     [TestMethod]
     public async Task ExecuteAsync_DigestBindSucceedsWithoutAChallenge_FailsWith67LoginDenied()
     {
-        (TransferResult result, _) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, "30 0c 02 01 02 61 07 0a 01 00 04 00 04 00");
+        (TransferResult result, _) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, "30 0c 02 01 02 61 07 0a 01 00 04 00 04 00", "30 0c 02 01 03 65 07 0a 01 00 04 00 04 00");
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
     }
@@ -135,7 +190,7 @@ public sealed class LdapOpenLdapSaslBindTests
     [TestMethod]
     public async Task ExecuteAsync_BasicAndNoAuthOption_SendsTheSimpleBind()
     {
-        (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Basic, "other", "30 0c 02 01 01 61 07 0a 01 00 04 00 04 00", "30 0c 02 01 02 65 07 0a 01 00 04 00 04 00");
+        (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Basic, null, "30 0c 02 01 01 61 07 0a 01 00 04 00 04 00", "30 0c 02 01 02 65 07 0a 01 00 04 00 04 00");
 
         Assert.AreEqual(TransferResult.Success(0), result, result.ToString());
         Assert.IsTrue(sent.AsSpan().IndexOf("secret"u8) >= 0);

@@ -21,22 +21,32 @@ namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 /// <param name="headReporter">Shows the heads and keeps what <c>-w</c> reports about the response.</param>
 internal sealed class GcsClient(IConnector connector, ITransferContext context, GcsEndpoint endpoint, string? bearerToken, GcsHmacKey? hmacKey, GcsHttpHeadReporter headReporter)
 {
+    /// <summary>The status of a response holding only the range asked for.</summary>
+    internal const int PartialContent = 206;
+
+    /// <summary>The status of a range Cloud Storage cannot satisfy.</summary>
+    internal const int RangeNotSatisfiable = 416;
+
     /// <summary>Sends a request and reads its successful response.</summary>
     /// <typeparam name="T">What the response gives.</typeparam>
     /// <param name="method">The method.</param>
     /// <param name="path">The absolute path, before percent-encoding.</param>
     /// <param name="query">The query parameters, before percent-encoding.</param>
     /// <param name="body">The body, or <see langword="null"/> for none.</param>
-    /// <param name="readResponse">Reads the response, whose status is below 300, while the connection is open.</param>
+    /// <param name="readResponse">Reads the response, whose status is below 300 (or 416 when <paramref name="acceptsUnsatisfiableRange"/>), while the connection is open.</param>
+    /// <param name="range">The <c>Range</c> header value to send and sign, or <see langword="null"/> for none.</param>
+    /// <param name="acceptsUnsatisfiableRange">Whether a 416 goes to <paramref name="readResponse"/> instead of failing, as a resume's does.</param>
     /// <returns>What <paramref name="readResponse"/> gives.</returns>
     internal async Task<T> ExchangeAsync<T>(
         string method,
         string path,
         IReadOnlyList<KeyValuePair<string, string>> query,
         byte[]? body,
-        Func<GcsHttpResponse, Task<T>> readResponse)
+        Func<GcsHttpResponse, Task<T>> readResponse,
+        string? range = null,
+        bool acceptsUnsatisfiableRange = false)
     {
-        GcsHttpRequest request = RequestFor(method, path, query, body);
+        GcsHttpRequest request = RequestFor(method, path, query, body, range);
         ConnectTarget target = new(endpoint.Host, endpoint.Port, endpoint.UseTls) { Proxy = context.Proxy, Events = context.Events, DiagnosticLog = context.DiagnosticLog };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken);
         if (connect.Connection is not { } connection)
@@ -48,7 +58,7 @@ internal sealed class GcsClient(IConnector connector, ITransferContext context, 
         await using (connection.ConfigureAwait(false))
         {
             GcsHttpResponse response = await new GcsHttpClientConnection(connection, headReporter).SendAsync(request, context.CancellationToken);
-            if (response.StatusCode >= 300)
+            if (response.StatusCode >= 300 && !(acceptsUnsatisfiableRange && response.StatusCode == RangeNotSatisfiable))
             {
                 throw ErrorOf(response.StatusCode, await ReadErrorBodyAsync(response));
             }
@@ -93,9 +103,14 @@ internal sealed class GcsClient(IConnector connector, ITransferContext context, 
             ? new GcsTransferException(CurlExitCode.HttpReturnedError, $"Cloud Storage returned error {statusCode}: {error.Code}: {error.Message}")
             : new GcsTransferException(CurlExitCode.HttpReturnedError, $"Cloud Storage returned error {statusCode}");
 
-    private GcsHttpRequest RequestFor(string method, string path, IReadOnlyList<KeyValuePair<string, string>> query, byte[]? body)
+    private GcsHttpRequest RequestFor(string method, string path, IReadOnlyList<KeyValuePair<string, string>> query, byte[]? body, string? range)
     {
         List<KeyValuePair<string, string>> headers = [new("host", endpoint.HostHeader)];
+        if (range is not null)
+        {
+            headers.Add(new("range", range));
+        }
+
         if (bearerToken is not null)
         {
             headers.Add(GcsBearerAuthorization.Header(bearerToken));

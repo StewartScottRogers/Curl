@@ -126,10 +126,11 @@ internal static class TlsFailureMessages
     /// <param name="matchesSchannelBuild"><see langword="true" /> for curl's Schannel build.</param>
     /// <param name="presentedClientCertificate"><see langword="true" /> when <c>--cert</c> was presented.</param>
     /// <param name="insideTlsTunnel"><see langword="true" /> for TLS inside an HTTPS proxy's tunnel, where the Schannel build reports the read aborted (BL-5388).</param>
+    /// <param name="serverRequestedClientCertificate"><see langword="true" /> when the handshake carried a client-certificate request (STD-192).</param>
     /// <returns>The message curl prints, or <see langword="null" />.</returns>
-    internal static string? AlertReadFailure(IOException failure, bool matchesSchannelBuild, bool presentedClientCertificate, bool insideTlsTunnel = false) =>
+    internal static string? AlertReadFailure(IOException failure, bool matchesSchannelBuild, bool presentedClientCertificate, bool insideTlsTunnel = false, bool serverRequestedClientCertificate = false) =>
         matchesSchannelBuild
-            ? SchannelAlertReadFailure(failure, insideTlsTunnel)
+            ? SchannelAlertReadFailure(failure, insideTlsTunnel, serverRequestedClientCertificate && !presentedClientCertificate)
             : OpenSslAlertReadFailure(failure, presentedClientCertificate);
 
     /// <summary>The Schannel build's exit 56 text for a read the hand-built client saw a server alert end (BL-5330).</summary>
@@ -141,13 +142,19 @@ internal static class TlsFailureMessages
             ? "Recv failure: " + SchannelSocketErrorTexts[SocketError.ConnectionAborted]
             : SchannelFatalAlertReceived.Replace("next InitializeSecurityContext failed", "failed to read data from server", StringComparison.Ordinal);
 
-    private static string? SchannelAlertReadFailure(IOException failure, bool insideTlsTunnel)
+    private static string? SchannelAlertReadFailure(IOException failure, bool insideTlsTunnel, bool refusedForWantOfCertificate)
     {
         var code = FindInnerException<Win32Exception>(failure)?.NativeErrorCode;
-        return code == SecEIllegalMessage || code == SecEDecryptFailure
+        return code == SecEIllegalMessage || code == SecEDecryptFailure || EndedBySocketAfterRefusal(failure, refusedForWantOfCertificate)
             ? SchannelHandBuiltAlertReadFailure(automaticClientCertificate: false, insideTlsTunnel)
             : null;
     }
+
+    // A server that required a certificate none was sent for ends the read with its alert, which
+    // SslStream may surface as the socket abort or reset that follows it (STD-192, BL-5860).
+    private static bool EndedBySocketAfterRefusal(IOException failure, bool refusedForWantOfCertificate) =>
+        refusedForWantOfCertificate
+        && FindInnerException<SocketException>(failure)?.SocketErrorCode is SocketError.ConnectionAborted or SocketError.ConnectionReset;
 
     private static string? OpenSslAlertReadFailure(IOException failure, bool presentedClientCertificate)
     {
@@ -201,6 +208,7 @@ internal static class TlsFailureMessages
     // measured with curl 8.18.0's OpenSSL 3.5.5 build (BL-609); the others are OpenSSL's table.
     private static readonly FrozenDictionary<long, string> OpenSslRevocationListErrorTexts = new Dictionary<long, string>
     {
+        [OpenSslVerifyResult.UnableToGetIssuerCertificate] = "unable to get issuer certificate",
         [OpenSslVerifyResult.UnableToGetCertificateRevocationList] = "unable to get certificate CRL",
         [OpenSslVerifyResult.CertificateRevocationListSignatureFailure] = "CRL signature failure",
         [OpenSslVerifyResult.CertificateRevocationListNotYetValid] = "CRL is not yet valid",

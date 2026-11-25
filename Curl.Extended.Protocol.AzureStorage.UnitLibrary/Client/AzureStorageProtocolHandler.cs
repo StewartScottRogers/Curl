@@ -23,7 +23,7 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (AzureStorageRequestMethod.RefusalOf(context) is { } refusal)
+        if ((AzureStorageRequestMethod.RefusalOf(context) ?? AzureStorageByteRangeRefusal.RefusalOf(context)) is { } refusal)
         {
             return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
         }

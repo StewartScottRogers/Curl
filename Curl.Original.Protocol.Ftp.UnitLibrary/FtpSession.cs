@@ -370,7 +370,7 @@ internal sealed class FtpSession(
             {
                 ResponseCode = lastReplyCode,
                 FtpEntryPath = entryPath,
-                PseudoHeaders = PseudoHeadersOf(result, uploaded),
+                PseudoHeaders = PseudoHeadersOf(result),
                 DownloadSize = uploaded ? 0 : result.BytesTransferred,
                 UploadSize = uploaded ? result.BytesTransferred : 0,
                 RequestSize = uploaded ? result.BytesTransferred : 0,
@@ -1554,11 +1554,11 @@ internal sealed class FtpSession(
     /// <c>-I</c> wrote (BL-5470), or, when no reply holds a colon, the one line curl 8.22.0 counts for a
     /// successful download (BL-5403).
     /// </summary>
-    private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result, bool uploaded)
+    private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result)
     {
-        KeyValuePair<string, string>[] counted = uploaded ? [] : [.. control.ColonReplyLines, .. writtenHeaders];
+        KeyValuePair<string, string>[] counted = [.. control.ColonReplyLines, .. writtenHeaders];
         return counted.Length > 0 ? counted
-            : uploaded || context.NoBody || !result.IsSuccess ? []
+            : context.NoBody || !result.IsSuccess ? []
             : [FtpHeadHeaderLines.TransferComplete];
     }
 

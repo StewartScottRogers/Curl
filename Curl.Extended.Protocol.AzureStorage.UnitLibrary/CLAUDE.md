@@ -12,7 +12,9 @@ or another extension. It is registered in `ExtensionCatalogue.cs` and `Extension
   Path List). `AzureStorageClient` sends one request per connection over HTTPS on 443 and turns a status
   of 300 or above into exit 22 naming the `Error` code (the XML `Error` body, else the DFS JSON
   `error` body); every other failure is an
-  `AzureStorageTransferException` carrying its exit code.
+  `AzureStorageTransferException` carrying its exit code. Before any connection the handler refuses with
+  exit 4 what it cannot send: `-I` and an unsendable `-X` (`AzureStorageRequestMethod`, ADR-1249), and
+  `-r` and `-C` (`AzureStorageByteRangeRefusal`, ADR-1348).
 
 - `Http/AzureStorageHttpClientConnection` sends one HTTP/1.1 request at a time over an `IConnection`
   (RFC 9112) and returns an `AzureStorageHttpResponse` whose body is a stream framed by

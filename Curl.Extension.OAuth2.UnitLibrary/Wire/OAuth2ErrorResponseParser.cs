@@ -15,6 +15,7 @@ public static class OAuth2ErrorResponseParser
         ["slow_down"] = OAuth2ErrorCode.SlowDown,
         ["access_denied"] = OAuth2ErrorCode.AccessDenied,
         ["expired_token"] = OAuth2ErrorCode.ExpiredToken,
+        ["use_dpop_nonce"] = OAuth2ErrorCode.UseDpopNonce,
     };
 
     /// <summary>Reads the body.</summary>

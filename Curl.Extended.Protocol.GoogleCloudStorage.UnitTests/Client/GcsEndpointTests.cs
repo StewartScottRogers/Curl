@@ -41,4 +41,14 @@ public sealed class GcsEndpointTests
     [DataRow("dir/a.txt", "/bucket/dir/a.txt")]
     public void PathOf_PutsTheBucketFirst(string objectName, string path) =>
         Assert.AreEqual(path, GcsEndpoint.PathOf("bucket", objectName));
+
+    [TestMethod]
+    [DataRow("s3://12345678/k", "0.188.97.78", "12345678")]
+    [DataRow("gs://0x10/k", "0.0.0.16", "0x10")]
+    [DataRow("s3://user:pw@bucket:8080/k?a=b#c", "bucket", "bucket")]
+    [DataRow("s3://bucket", "bucket", "bucket")]
+    [DataRow("s3://[::1]/k", "[::1]", "[::1]")]
+    [DataRow("no-scheme", "fallback", "fallback")]
+    public void BucketOf_OriginalUrl_KeepsTheTextTheUserWrote(string url, string host, string expected) =>
+        Assert.AreEqual(expected, GcsEndpoint.BucketOf(url, host));
 }

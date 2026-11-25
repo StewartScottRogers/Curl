@@ -211,6 +211,28 @@ public sealed class S3ProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ConnectionResetMidBody_FailsWithExit56AndCurlsRecvFailureText()
+    {
+        QueuedS3Connector connector = new(QueuedS3Connector.ResetAfter + "HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nhello");
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(Context("s3://bucket/big.bin", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectionClosedBeforeContentLength_FailsWithExit18AndRemainingBytes()
+    {
+        QueuedS3Connector connector = new("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nhello");
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(Context("s3://bucket/big.bin", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
+        Assert.AreEqual("transfer closed with 5 bytes remaining to read", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ListingThatIsNotAListBucketResult_FailsWithExit8()
     {
         TransferResult result = await Handler(new QueuedS3Connector(QueuedS3Connector.Ok("<Other/>")), Minio).ExecuteAsync(Context("s3://bucket", new MemoryStream()));

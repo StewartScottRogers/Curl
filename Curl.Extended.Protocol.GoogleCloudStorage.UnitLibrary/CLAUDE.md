@@ -10,7 +10,8 @@ is written here rather than shared with the S3 extension. It is registered in
   name or one ending in `/` lists (List objects, `list-type=2`, delimiter `/`, every page), anything
   else downloads (GET Object). `--oauth2-bearer` sends a bearer token, else `--user ACCESS_ID:SECRET`
   signs with an HMAC key (region `auto`, or the third field of `--aws-sigv4 goog4:goog:<region>:storage`,
-  ADR-1191), else the request is unauthenticated.
+  ADR-1191), else the request is unauthenticated. A download sends `-r` and `-C` as a `Range` header; an upload or a
+  listing refuses them with exit 4 (`Client/GcsByteRangeRefusal`, ADR-1359).
 - `Client/GcsEndpoint` is `https://storage.googleapis.com`, path-style, or the emulator
   `STORAGE_EMULATOR_HOST` names. `Client/GcsOperations` holds the three operations,
   `Client/GcsClient` sends one request per connection and turns a status of 300 or more into exit 22,

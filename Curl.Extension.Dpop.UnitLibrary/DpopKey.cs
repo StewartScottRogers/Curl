@@ -16,6 +16,19 @@ internal abstract class DpopKey
     /// <param name="writer">Where the object goes.</param>
     public abstract void WriteJwk(Utf8JsonWriter writer);
 
+    /// <summary>Gives the public key's JWK thumbprint: the base64url SHA-256 of <see cref="WriteJwk" />'s JSON (RFC 7638 §3).</summary>
+    /// <returns>The thumbprint.</returns>
+    public string Thumbprint()
+    {
+        System.Buffers.ArrayBufferWriter<byte> buffer = new();
+        using (Utf8JsonWriter writer = new(buffer))
+        {
+            WriteJwk(writer);
+        }
+
+        return System.Buffers.Text.Base64Url.EncodeToString(SHA256.HashData(buffer.WrittenSpan));
+    }
+
     /// <summary>Signs a JWS signing input.</summary>
     /// <param name="signingInput">The ASCII of <c>BASE64URL(header) || '.' || BASE64URL(payload)</c>.</param>
     /// <returns>The JWS signature bytes (RFC 7518 §3.3 for RSA, §3.4 for ECDSA).</returns>

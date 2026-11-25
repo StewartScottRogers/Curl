@@ -77,17 +77,9 @@ internal static class HstsCacheFile
             return;
         }
 
-        FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(file, FileWriteMode.Truncate, HstsFileCreateMode, CancellationToken.None)
+        // A file that cannot be replaced is not reported, as curl does not.
+        await fileSystem
+            .TryReplaceFileAsync(file, Encoding.Latin1.GetBytes(text), HstsFileCreateMode, CancellationToken.None)
             .ConfigureAwait(false);
-        if (opened.Content is not { } content)
-        {
-            return;
-        }
-
-        await using (content.ConfigureAwait(false))
-        {
-            await content.WriteAsync(Encoding.Latin1.GetBytes(text)).ConfigureAwait(false);
-        }
     }
 }

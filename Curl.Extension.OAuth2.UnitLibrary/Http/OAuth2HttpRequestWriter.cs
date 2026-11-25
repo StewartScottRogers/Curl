@@ -12,7 +12,7 @@ internal static class OAuth2HttpRequestWriter
     /// <param name="request">The form body and the <c>Authorization</c> value.</param>
     /// <returns>
     /// The bytes: <c>POST</c> to the endpoint's path and query, <c>Host</c>, <c>Accept: application/json</c>, the form
-    /// <c>Content-Type</c>, any <c>Authorization</c>, <c>Content-Length</c> and <c>Connection: close</c>, then the body.
+    /// <c>Content-Type</c>, any <c>Authorization</c> and <c>DPoP</c>, <c>Content-Length</c> and <c>Connection: close</c>, then the body.
     /// </returns>
     public static byte[] Write(Uri endpoint, OAuth2FormRequest request)
     {
@@ -22,14 +22,20 @@ internal static class OAuth2HttpRequestWriter
             .Append("Host: ").Append(HostField(endpoint)).Append("\r\n")
             .Append("Accept: application/json\r\n")
             .Append("Content-Type: ").Append(OAuth2FormRequest.ContentType).Append("\r\n");
-        if (request.Authorization is not null)
-        {
-            head.Append("Authorization: ").Append(RequireNoLineBreak(request.Authorization)).Append("\r\n");
-        }
+        AppendIfGiven(head, "Authorization", request.Authorization);
+        AppendIfGiven(head, "DPoP", request.DpopProof);
 
         head.Append("Content-Length: ").Append(body.Length).Append("\r\n")
             .Append("Connection: close\r\n\r\n");
         return [.. Encoding.Latin1.GetBytes(head.ToString()), .. body];
+    }
+
+    private static void AppendIfGiven(StringBuilder head, string name, string? value)
+    {
+        if (value is not null)
+        {
+            head.Append(name).Append(": ").Append(RequireNoLineBreak(name, value)).Append("\r\n");
+        }
     }
 
     private static string HostField(Uri endpoint)
@@ -38,9 +44,9 @@ internal static class OAuth2HttpRequestWriter
         return endpoint.IsDefaultPort ? host : $"{host}:{endpoint.Port}";
     }
 
-    private static string RequireNoLineBreak(string value) =>
+    private static string RequireNoLineBreak(string name, string value) =>
         value.AsSpan().IndexOfAny('\r', '\n') < 0
             ? value
             : throw new OAuth2HttpException(
-                OAuth2HttpFailure.InvalidRequestField, CurlExitCode.BadFunctionArgument, "The Authorization value holds a CR or LF.");
+                OAuth2HttpFailure.InvalidRequestField, CurlExitCode.BadFunctionArgument, $"The {name} value holds a CR or LF.");
 }

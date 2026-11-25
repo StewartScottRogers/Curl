@@ -104,6 +104,12 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     {
     }
 
+    /// <summary>
+    /// Picks and runs the mechanism of an OpenLDAP SASL bind. The hosts give the shared authenticator;
+    /// without one the handler binds with <c>DIGEST-MD5</c> or <c>PLAIN</c> only.
+    /// </summary>
+    public ISaslAuthenticator SaslAuthenticator { get; init; } = new LdapDigestMd5AndPlainSasl();
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
 
@@ -133,12 +139,19 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
             : null;
 
+    // The refusals curl makes before it connects: control bytes in the credentials (exit 43) and, in the OpenLDAP build, malformed --login-options (exit 49, STD-184).
+    private TransferResult? RefuseBeforeConnecting(ITransferContext context) =>
+        RefuseControlBytes(context.Credentials)
+        ?? (dialect == LdapDialect.OpenLdap && !LdapOpenLdapSaslBind.AreWellFormed(context.Mail?.LoginOptions)
+            ? TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, "Malformed option provided in a setopt")
+            : null);
+
     // Reads the URL, connects, binds and searches; ExecuteAsync logs how it ended.
     private async ValueTask<TransferResult> ConnectAndSearchAsync(ITransferContext context)
     {
-        if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
+        if (RefuseBeforeConnecting(context) is { } optionsRefused)
         {
-            return credentialsRefused;
+            return optionsRefused;
         }
 
         // The OpenLDAP build reads the URL before it connects and again to search; the Windows
@@ -326,23 +339,25 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// </summary>
     private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context, LdapBindKind bindKind)
     {
-        if (StartsTls(context) && await LdapStartTls.UpgradeAsync(exchange, connection, tlsProvider, context).ConfigureAwait(false) is { } startTlsFailure)
-        {
-            return startTlsFailure;
-        }
-
-        return bindKind switch
-        {
-            LdapBindKind.LogonUser => await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false),
-            LdapBindKind.Simple => await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false),
-            LdapBindKind.Sasl => await LdapOpenLdapSaslBind.BindAsync(exchange, context.Credentials!, context.Url.IdnHost, LdapOpenLdapSaslBind.AllowsDigest(context.Mail?.LoginOptions, context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic), context.CancellationToken).ConfigureAwait(false),
-            _ => await LdapAuthenticatedBind.BindAsync(bindKind, exchange, context.Credentials!, context.Url.IdnHost, context.Url.Scheme == TlsScheme, logonTokenSource, context.CancellationToken).ConfigureAwait(false),
-        };
+        (TransferResult? startTlsFailure, int simpleBindVersion) = StartsTls(context)
+            ? await LdapStartTls.UpgradeAsync(exchange, connection, tlsProvider, context).ConfigureAwait(false)
+            : (null, LdapBind.LdapVersion3);
+        return startTlsFailure ?? await BindAsync(exchange, context, bindKind, simpleBindVersion).ConfigureAwait(false);
     }
 
+    /// <summary>Binds as <paramref name="bindKind" /> says; a simple bind starts with <paramref name="simpleBindVersion" />.</summary>
+    private async ValueTask<TransferResult?> BindAsync(LdapExchange exchange, ITransferContext context, LdapBindKind bindKind, int simpleBindVersion) =>
+        bindKind switch
+        {
+            LdapBindKind.LogonUser => await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false),
+            LdapBindKind.Simple => await BindWithCredentialsAsync(exchange, context, simpleBindVersion).ConfigureAwait(false),
+            LdapBindKind.Sasl => await LdapOpenLdapSaslBind.BindAsync(exchange, SaslAuthenticator, context).ConfigureAwait(false),
+            _ => await LdapAuthenticatedBind.BindAsync(bindKind, exchange, context.Credentials!, context.Url.IdnHost, context.Url.Scheme == TlsScheme, logonTokenSource, context.CancellationToken).ConfigureAwait(false),
+        };
+
     /// <summary>
-    /// How the transfer binds: on OpenLDAP SASL with credentials when <c>AUTH=</c> login options are given or the auth mask is not exactly Basic (as with --anyauth),
-    /// otherwise a simple bind (ADR-1299); on WinLDAP what <see cref="LdapBindKindChoice" />
+    /// How the transfer binds: on OpenLDAP SASL when <c>AUTH=</c> login options are given or the auth mask is not exactly Basic (as with --anyauth),
+    /// otherwise a simple bind (ADR-1299, ADR-1362); on WinLDAP what <see cref="LdapBindKindChoice" />
     /// picks from <c>-u</c> and the auth mask, so <c>--ntlm</c>, <c>--digest</c> and <c>--negotiate</c> never send a simple bind.
     /// </summary>
     private LdapBindKind ChooseBindKind(ITransferContext context) =>
@@ -350,10 +365,9 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             ? LdapBindKindChoice.Choose(context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic, context.Credentials is not null)
             : ChooseOpenLdapBindKind(context);
 
-    /// <summary>OpenLDAP's choice: SASL with credentials when <c>AUTH=</c> login options are given or the mask lacks Basic, otherwise a simple bind.</summary>
+    /// <summary>OpenLDAP's choice, with or without credentials: SASL when <c>AUTH=</c> login options are given or the mask is not exactly Basic, otherwise a simple bind.</summary>
     private static LdapBindKind ChooseOpenLdapBindKind(ITransferContext context) =>
-        context.Credentials is not null
-        && (LdapOpenLdapSaslBind.HasAuthOption(context.Mail?.LoginOptions) || (context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic) != HttpAuthSchemes.Basic)
+        LdapOpenLdapSaslBind.HasAuthOption(context.Mail?.LoginOptions) || (context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic) != HttpAuthSchemes.Basic
             ? LdapBindKind.Sasl
             : LdapBindKind.Simple;
 
@@ -363,7 +377,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         {
             LdapBindKind.LogonUser => "as the logged-on user",
             LdapBindKind.Simple => DescribeSimpleBind(credentials),
-            _ => $"with a {kind} bind as \"{credentials!.UserName}\"",
+            _ => $"with a {kind} bind as \"{credentials?.UserName}\"",
         };
 
     /// <summary>Names a simple bind by its DN, never its password, for the diagnostic log.</summary>
@@ -371,9 +385,9 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         credentials is null ? "anonymously" : $"with a simple bind as \"{credentials.UserName}\"";
 
     /// <summary>Binds with a simple bind: the transfer's credentials, or the anonymous bind without them.</summary>
-    private ValueTask<TransferResult?> BindWithCredentialsAsync(LdapExchange exchange, ITransferContext context)
+    private ValueTask<TransferResult?> BindWithCredentialsAsync(LdapExchange exchange, ITransferContext context, int openLdapVersion)
     {
         NetworkCredential credentials = context.Credentials ?? new NetworkCredential(string.Empty, string.Empty);
-        return LdapBind.BindAsync(dialect, exchange, credentials.UserName, credentials.Password, context.Url.Scheme == TlsScheme, context.CancellationToken);
+        return LdapBind.BindAsync(dialect, exchange, credentials.UserName, credentials.Password, context.Url.Scheme == TlsScheme, context.CancellationToken, openLdapVersion);
     }
 }

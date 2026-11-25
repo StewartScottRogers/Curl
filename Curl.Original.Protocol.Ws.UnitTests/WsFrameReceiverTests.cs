@@ -212,6 +212,31 @@ public sealed class WsFrameReceiverTests
     }
 
     [TestMethod]
+    [DataRow("", "81 82 00 00 00 00 68 69", 0L, 0L, DisplayName = "masked frame with the head")]
+    [DataRow("81 02 6f 6b", "81 82 00 00 00 00 68 69", 4L, 2L, DisplayName = "good frame, then a masked frame in a later read")]
+    [DataRow("", "81 02 6f 6b 81 82 00 00 00 00 68 69", 0L, 2L, DisplayName = "good and masked frame in one read")]
+    public async Task ReceiveAsync_Violation_CountsNoByteOfTheRejectedRead(string head, string read, long bytesReceived, long bytesDelivered)
+    {
+        // curl 8.22.0 -w '%{size_download} %{size_delivered}', measured 2026-11-24 (BL-5894): 0 0, 4 2 and 0 2.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var progress = new RecordingProgress();
+        var receiver = new WsFrameReceiver(new ScriptedConnection(Hex(read)), MeasuredMask, progress, NoTransferEvents.Instance);
+        diagnostics.Arrange("head and read", $"{head} | {read}");
+
+        WsTransferException failure = await Assert.ThrowsExactlyAsync<WsTransferException>(
+            async () => await receiver.ReceiveAsync(Hex(head), Collect([]), CancellationToken.None));
+
+        Describe(diagnostics, failure);
+        diagnostics.Assert("bytes received", bytesReceived, receiver.BytesReceived);
+        diagnostics.Assert("bytes delivered", bytesDelivered, receiver.BytesDelivered);
+        Assert.AreEqual("[WS] masked input frame", failure.Message);
+        Assert.AreEqual(bytesReceived, receiver.BytesReceived);
+        Assert.AreEqual(bytesDelivered, receiver.BytesDelivered);
+        string[] reports = [$"down {bytesReceived}/?"];
+        CollectionAssert.AreEqual(reports, progress.Reports.ToArray());
+    }
+
+    [TestMethod]
     public async Task ReceiveAsync_ViolationWithNothingBeforeIt_WritesNothing()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

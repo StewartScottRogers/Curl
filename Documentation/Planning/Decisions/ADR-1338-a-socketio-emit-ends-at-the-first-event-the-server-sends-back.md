@@ -21,3 +21,6 @@ When the transfer emits an event (`-d` or `-T`), the session ends after it has w
 ## Amendment (BL-5835, fitness finding EXT-107)
 
 Decided by Claude under Stewart's delegation. Ending at the first event dropped the later events of a server that sends several replies and a disconnect, against `--extended-help` ("writes each event received ... until the server disconnects"). A transfer that emits now writes every event until the server disconnects or closes, and also ends when the server has sent no further event for one second after an event, so a server that stays open still returns without waiting for a timeout (the BL-5763 case). The one-second quiet window restarts at every event.
+
+
+**Amendment (BL-5868, EXT-118).** Decided by Claude under Stewarts delegation. The one-second quiet window starts only at the echo of the emitted event (an event whose payload equals the emitted array), not at any event, so an unsolicited welcome event no longer ends the stream before a slower reply. A server that never echoes and stays open is ended by the timeout, as before BL-5763.

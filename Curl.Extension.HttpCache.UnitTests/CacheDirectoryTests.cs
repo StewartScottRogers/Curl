@@ -155,4 +155,17 @@ public sealed class CacheDirectoryTests
         var exception = Assert.ThrowsExactly<ArgumentException>(() => new CacheDirectory("<>:|bad"));
 
         Assert.AreEqual("--cache-dir cannot use '<>:|bad'", exception.Message);
-    }}
+    }
+
+    [TestMethod]
+    public void Constructor_PathNamingAnExistingFile_ThrowsMessageNamingOptionAndPath()
+    {
+        Directory.CreateDirectory(_directory);
+        var file = Path.Combine(_directory, "recfile");
+        File.WriteAllText(file, "x");
+
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => new CacheDirectory(file));
+
+        Assert.AreEqual($"--cache-dir cannot use '{file}'", exception.Message);
+    }
+}

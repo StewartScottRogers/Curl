@@ -25,6 +25,8 @@ internal sealed class CertificateRevocationList
         ["1.2.840.113549.1.1.13"] = HashAlgorithmName.SHA512,
     }.ToFrozenDictionary();
 
+    private const string RsaSsaPssOid = "1.2.840.113549.1.1.10";
+
     // ecdsa-with-SHA1, ecdsa-with-SHA256, ecdsa-with-SHA384, ecdsa-with-SHA512.
     private static readonly FrozenDictionary<string, HashAlgorithmName> EcdsaSignatureAlgorithms = new Dictionary<string, HashAlgorithmName>
     {
@@ -36,29 +38,33 @@ internal sealed class CertificateRevocationList
 
     private readonly byte[] _signedPart;
     private readonly string _signatureAlgorithm;
+    private readonly byte[] _signatureParameters;
     private readonly byte[] _signature;
     private readonly byte[] _issuerName;
     private readonly HashSet<BigInteger> _revokedSerialNumbers;
+    private readonly HashSet<BigInteger> _removedSerialNumbers;
     private readonly RevocationListScope _scope;
 
     private CertificateRevocationList(
         byte[] signedPart,
-        string signatureAlgorithm,
+        (string Oid, byte[] Parameters) signatureAlgorithm,
         byte[] signature,
         byte[] issuerName,
         DateTimeOffset thisUpdate,
         DateTimeOffset? nextUpdate,
         HashSet<BigInteger> revokedSerialNumbers,
+        HashSet<BigInteger> removedSerialNumbers,
         RevocationListScope scope)
     {
         _scope = scope;
         _signedPart = signedPart;
-        _signatureAlgorithm = signatureAlgorithm;
+        (_signatureAlgorithm, _signatureParameters) = signatureAlgorithm;
         _signature = signature;
         _issuerName = issuerName;
         ThisUpdate = thisUpdate;
         NextUpdate = nextUpdate;
         _revokedSerialNumbers = revokedSerialNumbers;
+        _removedSerialNumbers = removedSerialNumbers;
     }
 
     /// <summary>Gets when the list was issued: before it, the list is not valid yet.</summary>
@@ -66,6 +72,14 @@ internal sealed class CertificateRevocationList
 
     /// <summary>Gets when the list expires, or <see langword="null" /> when it names no such date.</summary>
     public DateTimeOffset? NextUpdate { get; }
+
+    /// <summary>
+    /// Returns whether the list has not expired at <paramref name="now" />: its <c>nextUpdate</c> is
+    /// not past, or it names none, which the Windows build treats as current (STD-197).
+    /// </summary>
+    /// <param name="now">The moment asked about.</param>
+    /// <returns><see langword="true" /> when the list has not expired.</returns>
+    public bool IsUnexpiredAt(DateTimeOffset now) => NextUpdate is not { } expiry || expiry >= now;
 
     /// <summary>
     /// Decodes a DER <c>CertificateList</c>: the signed <c>TBSCertList</c> (its optional
@@ -96,17 +110,17 @@ internal sealed class CertificateRevocationList
         var issuerName = signed.ReadEncodedValue().ToArray();
         var thisUpdate = ReadTime(signed);
         var nextUpdate = signed.HasData && IsTime(signed.PeekTag()) ? ReadTime(signed) : (DateTimeOffset?)null;
-        var revokedSerialNumbers = ReadRevokedSerialNumbers(signed, out var entriesUnusable);
+        var revokedSerialNumbers = ReadRevokedSerialNumbers(signed, out var removedSerialNumbers, out var entriesUnusable);
         var scope = RevocationListScope.Read(signed);
         scope.Unusable |= entriesUnusable;
         return new CertificateRevocationList(
-            signedPart, signatureAlgorithm, signature, issuerName, thisUpdate, nextUpdate, revokedSerialNumbers, scope);
+            signedPart, signatureAlgorithm, signature, issuerName, thisUpdate, nextUpdate, revokedSerialNumbers, removedSerialNumbers, scope);
     }
 
     /// <summary>
     /// Returns whether the list can answer for <paramref name="certificate" /> fetched from
     /// <paramref name="distributionPoint" /> (RFC 5280, 5.2.5): it has no unrecognised critical
-    /// extension (of the list or of an entry), is not a delta list, is not indirect, does not
+    /// extension (of the list), is not a delta list, is not indirect, does not
     /// cover only some reasons, and its issuing distribution point, when it has one, names that
     /// address and admits the certificate's kind (CA or not). A list that fails is "unknown",
     /// never "not revoked" (STD-113).
@@ -128,8 +142,9 @@ internal sealed class CertificateRevocationList
 
     /// <summary>
     /// Returns whether <paramref name="issuer" />'s key verifies the list's signature. An RSA
-    /// (PKCS #1 v1.5) or ECDSA signature over SHA-1, SHA-256, SHA-384 or SHA-512 is checked;
-    /// any other algorithm, or a key of the wrong kind, fails.
+    /// (PKCS #1 v1.5, or RSASSA-PSS as <see cref="RsaPssSignatureParameters" /> admits it) or ECDSA
+    /// signature over SHA-1, SHA-256, SHA-384 or SHA-512 is checked; any other algorithm, or a key
+    /// of the wrong kind, fails.
     /// </summary>
     /// <param name="issuer">The certificate whose key signed the list.</param>
     /// <returns><see langword="true" /> when the signature verifies.</returns>
@@ -137,8 +152,13 @@ internal sealed class CertificateRevocationList
     {
         if (RsaSignatureAlgorithms.TryGetValue(_signatureAlgorithm, out var rsaHash))
         {
-            using var rsa = issuer.GetRSAPublicKey();
-            return rsa is not null && rsa.VerifyData(_signedPart, _signature, rsaHash, RSASignaturePadding.Pkcs1);
+            return IsRsaSignedBy(issuer, rsaHash, RSASignaturePadding.Pkcs1);
+        }
+
+        if (_signatureAlgorithm == RsaSsaPssOid)
+        {
+            return RsaPssSignatureParameters.ReadVerifiableHash(_signatureParameters) is { } pssHash
+                && IsRsaSignedBy(issuer, pssHash, RSASignaturePadding.Pss);
         }
 
         if (EcdsaSignatureAlgorithms.TryGetValue(_signatureAlgorithm, out var ecdsaHash))
@@ -148,6 +168,12 @@ internal sealed class CertificateRevocationList
         }
 
         return false;
+    }
+
+    private bool IsRsaSignedBy(X509Certificate2 issuer, HashAlgorithmName hash, RSASignaturePadding padding)
+    {
+        using var rsa = issuer.GetRSAPublicKey();
+        return rsa is not null && rsa.VerifyData(_signedPart, _signature, hash, padding);
     }
 
     /// <summary>Gets the value of the list's <c>freshestCRL</c> extension (where its delta lists are), or <see langword="null" /> when it has none.</summary>
@@ -167,13 +193,23 @@ internal sealed class CertificateRevocationList
     /// <param name="certificate">The certificate checked.</param>
     /// <returns><see langword="true" /> when its serial number is listed.</returns>
     public bool Revokes(X509Certificate2 certificate) =>
-        _revokedSerialNumbers.Contains(new BigInteger(certificate.SerialNumberBytes.Span, isUnsigned: false, isBigEndian: true));
+        _revokedSerialNumbers.Contains(SerialNumberOf(certificate));
 
-    // AlgorithmIdentifier: the OID, then parameters, which are read past.
-    private static string ReadAlgorithm(AsnReader reader)
+    /// <summary>Returns whether the list lifts a hold on <paramref name="certificate" />: an entry with reason <c>removeFromCRL</c> (RFC 5280, section 5.3.1), a delta list's way to undo a <c>certificateHold</c>.</summary>
+    /// <param name="certificate">The certificate checked.</param>
+    /// <returns><see langword="true" /> when its serial number is listed with reason removeFromCRL.</returns>
+    public bool Releases(X509Certificate2 certificate) =>
+        _removedSerialNumbers.Contains(SerialNumberOf(certificate));
+
+    private static BigInteger SerialNumberOf(X509Certificate2 certificate) =>
+        new(certificate.SerialNumberBytes.Span, isUnsigned: false, isBigEndian: true);
+
+    // AlgorithmIdentifier: the OID, then its parameters' DER, empty when there are none.
+    private static (string Oid, byte[] Parameters) ReadAlgorithm(AsnReader reader)
     {
         var algorithm = reader.ReadSequence();
-        return algorithm.ReadObjectIdentifier();
+        var oid = algorithm.ReadObjectIdentifier();
+        return (oid, algorithm.HasData ? algorithm.ReadEncodedValue().ToArray() : []);
     }
 
     private static bool IsTime(Asn1Tag tag) =>
@@ -184,10 +220,11 @@ internal sealed class CertificateRevocationList
 
     // revokedCertificates is present only when something is revoked; whatever follows it is
     // the [0] extensions. An entry with an unrecognised critical extension, or a certificate
-    // issuer one (an indirect list), makes the list unusable.
-    private static HashSet<BigInteger> ReadRevokedSerialNumbers(AsnReader signed, out bool entriesUnusable)
+    // issuer one is ignored, as the Schannel build ignores them (STD-162); a malformed one makes the list unusable.
+    private static HashSet<BigInteger> ReadRevokedSerialNumbers(AsnReader signed, out HashSet<BigInteger> removedSerialNumbers, out bool entriesUnusable)
     {
         entriesUnusable = false;
+        removedSerialNumbers = [];
         var serialNumbers = new HashSet<BigInteger>();
         if (!signed.HasData || !signed.PeekTag().HasSameClassAndValue(Asn1Tag.Sequence))
         {
@@ -197,12 +234,20 @@ internal sealed class CertificateRevocationList
         var revoked = signed.ReadSequence();
         while (revoked.HasData)
         {
-            var entry = revoked.ReadSequence();
-            serialNumbers.Add(entry.ReadInteger());
-            entry.ReadEncodedValue();
-            entriesUnusable |= entry.HasData && RevocationListScope.EntryExtensionsAreUnusable(entry);
+            entriesUnusable |= ReadRevokedEntry(revoked.ReadSequence(), serialNumbers, removedSerialNumbers);
         }
 
         return serialNumbers;
+    }
+
+    // Files the entry's serial number under revoked or, for reason removeFromCRL, under removed; returns whether the entry is unusable.
+    private static bool ReadRevokedEntry(AsnReader entry, HashSet<BigInteger> revoked, HashSet<BigInteger> removed)
+    {
+        var serialNumber = entry.ReadInteger();
+        entry.ReadEncodedValue();
+        var extensions = entry.HasData ? entry.PeekEncodedValue() : default;
+        var unusable = entry.HasData && RevocationListScope.EntryExtensionsAreUnusable(entry);
+        (!unusable && RevocationListScope.EntryReasonIsRemoveFromCrl(extensions) ? removed : revoked).Add(serialNumber);
+        return unusable;
     }
 }

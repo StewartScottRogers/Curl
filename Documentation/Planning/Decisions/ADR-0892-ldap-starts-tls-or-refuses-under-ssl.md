@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-26
 - **Task:** BL-3542 (CGR-013)
+- **Amended by:** ADR-1366 (refusal codes, closed server, handshake failures, LDAPv2 fallback)
 - **Decided by Claude under Stewart's delegation**
 
 ## Context

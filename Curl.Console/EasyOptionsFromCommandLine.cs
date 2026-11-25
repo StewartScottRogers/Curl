@@ -91,11 +91,13 @@ internal static class EasyOptionsFromCommandLine
     /// <c>--create-file-mode</c>, <c>-k</c>, <c>--pass</c>, <c>--engine</c>, <c>--ech</c>, <c>-d</c>, <c>-U</c>,
     /// <c>--proto</c>, <c>--proto-redir</c>, the <c>--ssl*</c> level, <c>-l</c>, <c>--upload-flags</c>,
     /// <c>--proxy-header</c>, <c>-p</c>, <c>--unix-socket</c>, <c>--happy-eyeballs-timeout-ms</c> and the
-    /// <c>-G</c> / <c>--url-query</c> query (BL-2357).
+    /// <c>-G</c> / <c>--url-query</c> query (BL-2357). For an <c>xmpp</c> or <c>xmpps</c> URL, whose body is UTF-8
+    /// text, the <c>-d</c> body is <see cref="CommandLineOptions.PostDataWithTypedTextAsUtf8"/> (ADR-1360).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="url">The transfer's URL, or <see langword="null" /> where the body is not sent.</param>
     /// <returns>The transfer settings.</returns>
-    internal static EngineTransferSettings TransferSettingsOf(CommandLineOptions options) =>
+    internal static EngineTransferSettings TransferSettingsOf(CommandLineOptions options, CurlUrl? url = null) =>
         new(
             options.Silent,
             options.ShowError,
@@ -105,7 +107,7 @@ internal static class EasyOptionsFromCommandLine
             options.Passphrase,
             options.Engine,
             options.EchModeIsMalformed,
-            options.DataInQuery ? null : options.PostData,
+            options.DataInQuery ? null : PostDataFor(options, url),
             options.ProxyCredentials,
             options.AllowedProtocols,
             options.AllowedRedirectProtocols,
@@ -119,6 +121,11 @@ internal static class EasyOptionsFromCommandLine
             options.UnixSocketPath is not null,
             HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(options.HappyEyeballsTimeout),
             url => QueryUrl.Append(url, options));
+
+    // XMPP puts the body into an XML stream, which is UTF-8, so typed text must not go out in the ANSI code page;
+    // every other scheme gets the bytes curl sends.
+    private static ReadOnlyMemory<byte>? PostDataFor(CommandLineOptions options, CurlUrl? url) =>
+        url?.Scheme.ToUpperInvariant() is "XMPP" or "XMPPS" ? options.PostDataWithTypedTextAsUtf8 : options.PostData;
 
     // The receive buffer curl's tool asks for, 100 KiB, as --libcurl writes CURLOPT_BUFFERSIZE.
     private const long ToolBufferSize = 102400;

@@ -6,7 +6,9 @@ namespace Curl.Extension.Checksum;
 /// <summary>
 /// The hook <c>--checksum</c> gives (ADR-1096): it hashes the response body on its way to curl's output and, when
 /// the transfer otherwise succeeded, fails it with exit 61 (<see cref="CurlExitCode.BadContentEncoding" />) unless
-/// the digest is the one expected. The body is written as it arrives, as curl leaves a failed transfer's output.
+/// the digest is the one expected. A resumed download (<c>-C</c> past offset 0) is refused with exit 2 before it starts,
+/// because the hook sees only the received bytes, not the file prefix the digest also covers (ADR-1344). The body
+/// is written as it arrives, as curl leaves a failed transfer's output.
 /// </summary>
 /// <param name="expected">The digest the body must have.</param>
 internal sealed class ChecksumTransferHook(ExpectedChecksum expected) : ITransferHook
@@ -16,6 +18,11 @@ internal sealed class ChecksumTransferHook(ExpectedChecksum expected) : ITransfe
 
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
+        if (context.ResumeFrom is > 0)
+        {
+            return TransferResult.Failure(CurlExitCode.FailedInit, "--checksum cannot verify a resumed download (-C): the hook hashes only the bytes received, not the file prefix the digest also covers");
+        }
+
         using var hash = Expected.CreateHash();
         await using var hashing = new HashingStream(context.Output, hash);
         var result = await next(context.WithOutputs(hashing, context.HeaderOutput, context.DumpHeaderOutput)).ConfigureAwait(false);

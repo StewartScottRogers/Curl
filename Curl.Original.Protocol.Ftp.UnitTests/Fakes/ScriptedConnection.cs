@@ -116,8 +116,12 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
         return new ValueTask<int>(hanging.Task);
     }
 
+    /// <summary>Gets or sets what runs before each read is answered, such as moving a test's clock on.</summary>
+    public Action? OnRead { get; init; }
+
     private ValueTask<int> ReadNow(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        OnRead?.Invoke();
         ReadLengths.Add(buffer.Length);
         if (nextRead == reads.Length)
         {

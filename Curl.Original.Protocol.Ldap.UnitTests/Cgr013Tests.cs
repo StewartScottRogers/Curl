@@ -95,30 +95,6 @@ public sealed class Cgr013Tests
     }
 
     [TestMethod]
-    [DataRow("02", DisplayName = "protocolError")]
-    [DataRow("34", DisplayName = "unavailable")]
-    [DataRow("35", DisplayName = "unwillingToPerform")]
-    [DataRow("0c", DisplayName = "unavailableCriticalExtension")]
-    public async Task ExecuteAsync_OpenLdapWithSslRequiredAndStartTlsRefused_FailsWithExit1AfterAnUnbindWithoutBinding(string resultCodeHex)
-    {
-        var plaintext = new ScriptedConnection(Hex.Bytes("300c02010178070a01" + resultCodeHex + "04000400"));
-
-        TransferResult result = await Handler(LdapDialect.OpenLdap, plaintext, new FakeTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "unused"))).ExecuteAsync(Context("ldap", TransportSecurityLevel.Required, new RecordingTransferEvents()));
-
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol"), result);
-        Assert.AreEqual(StartTlsRequest + "30050201024200", Convert.ToHexStringLower(plaintext.Sent));
-    }
-    [TestMethod]
-    public async Task ExecuteAsync_OpenLdapWithSslRequiredAndServerClosed_FailsWithExit64()
-    {
-        var plaintext = new ScriptedConnection();
-
-        TransferResult result = await Handler(LdapDialect.OpenLdap, plaintext, null).ExecuteAsync(Context("ldap", TransportSecurityLevel.Required, new RecordingTransferEvents()));
-
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "LDAP local: Can't contact LDAP server"), result);
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_OpenLdapWithSslTryAndStartTlsRefused_BindsInPlaintext()
     {
         var plaintext = new ScriptedConnection(StartTlsUnavailable, BindSucceeded, SearchDone);
@@ -127,19 +103,6 @@ public sealed class Cgr013Tests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.StartsWith(StartTlsRequest + "30", Convert.ToHexStringLower(plaintext.Sent));
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_OpenLdapWhenTheTlsHandshakeFails_ReturnsItsFailure()
-    {
-        var plaintext = new ScriptedConnection(StartTlsAccepted);
-        var tls = new FakeTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake failed"));
-
-        TransferResult result = await Handler(LdapDialect.OpenLdap, plaintext, tls).ExecuteAsync(Context("ldap", TransportSecurityLevel.Required, new RecordingTransferEvents()));
-
-        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
-        Assert.AreEqual("handshake failed", result.ErrorMessage);
-        Assert.AreEqual(StartTlsRequest, Convert.ToHexStringLower(plaintext.Sent));
     }
 
     [TestMethod]

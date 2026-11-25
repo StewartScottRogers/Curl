@@ -47,7 +47,7 @@ public sealed class CacheDirectory(string path)
         {
             var full = Path.GetFullPath(path);
             var names = full[Path.GetPathRoot(full.AsSpan()).Length..].Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (names.All(name => name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0))
+            if (names.All(name => name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0) && !File.Exists(full))
             {
                 return path;
             }

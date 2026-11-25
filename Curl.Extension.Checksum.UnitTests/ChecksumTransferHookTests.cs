@@ -75,6 +75,32 @@ public sealed class ChecksumTransferHookTests
         });
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_TheTransferResumesPastOffsetZero_FailsWithExit2WithoutRunningIt()
+    {
+        var ran = false;
+        var context = new TransferContext { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), ResumeFrom = 1000 };
+
+        var result = await HookExpecting(Sha256OfAbc).ExecuteAsync(context, _ =>
+        {
+            ran = true;
+            return ValueTask.FromResult(new TransferResult(CurlExitCode.Ok, 0));
+        });
+
+        Assert.IsFalse(ran);
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TheTransferResumesFromOffsetZero_HashesTheWholeBody()
+    {
+        var context = new TransferContext { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), ResumeFrom = 0 };
+
+        var result = await HookExpecting(Sha256OfAbc).ExecuteAsync(context, WritingBody("abc", new TransferResult(CurlExitCode.Ok, 3)));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
     private static ChecksumTransferHook HookExpecting(string value) => new(ExpectedChecksum.TryParse(value)!);
 
     private static TransferContext ContextWriting(Stream output) => new() { Url = CurlUrl.Parse("http://example.com/"), Output = output };

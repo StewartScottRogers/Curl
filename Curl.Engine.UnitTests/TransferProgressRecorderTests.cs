@@ -231,11 +231,22 @@ public sealed class TransferProgressRecorderTests
     }
 
     [TestMethod]
+    public void ReportDownloaded_AFewMillisecondsShyOfASecondFromTheLastSample_StillDraws()
+    {
+        TransferProgressRecorder recorder = new(clock);
+        clock.Advance(960);
+
+        recorder.ReportDownloaded(10, 10);
+
+        Assert.AreNotEqual(Zero, recorder.StatusLines);
+    }
+
+    [TestMethod]
     public void ReportDownloaded_WithinASecondOfTheLastSample_DrawsNothing()
     {
         TransferProgressRecorder recorder = new(clock);
-        clock.Advance(999);
-        Diagnostics.Arrange("reports", "after 999 ms: downloaded 10 of 10");
+        clock.Advance(949);
+        Diagnostics.Arrange("reports", "after 949 ms: downloaded 10 of 10");
 
         recorder.ReportDownloaded(10, 10);
         Diagnostics.Act("status lines", Visible(recorder.StatusLines));

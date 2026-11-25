@@ -138,11 +138,11 @@ internal static class LdapEntryFormatter
 
     private static bool IsPrintable(LdapDialect dialect, byte[] value) =>
         value.Length == 0
-        || (!StartsUnsafe(value[0]) && !IsBlank(value[^1]) && Array.TrueForAll(value, octet => IsPrintableAscii(octet) || (dialect == LdapDialect.OpenLdap && IsInteriorWhitespaceControl(octet))));
+        || (!StartsUnsafe(dialect, value[0]) && !IsBlank(value[^1]) && Array.TrueForAll(value, octet => IsPrintableAscii(octet) || (dialect == LdapDialect.OpenLdap && IsWhitespaceControl(octet))));
 
-    private static bool IsInteriorWhitespaceControl(byte octet) => octet is 0x09 or 0x0D or 0x0A;
+    private static bool IsWhitespaceControl(byte octet) => octet is >= 0x09 and <= 0x0D;
 
-    private static bool StartsUnsafe(byte octet) => IsBlank(octet) || UnsafeFirstOctets.Contains(octet);
+    private static bool StartsUnsafe(LdapDialect dialect, byte octet) => IsBlank(octet) || (dialect == LdapDialect.WinLdap && UnsafeFirstOctets.Contains(octet));
 
     private static readonly byte[] UnsafeFirstOctets = [0x3A, 0x3C, 0x0A, 0x0D];
 

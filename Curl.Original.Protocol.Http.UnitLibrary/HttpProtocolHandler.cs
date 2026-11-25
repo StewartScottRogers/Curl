@@ -106,7 +106,8 @@ namespace Curl.Original.Protocol.Http;
 /// <c>Proxy-Authenticate</c> challenges for the proxy's credential with the scheme set the
 /// handler was given (the <c>--proxy-*</c> auth switches' pick). Each retry keeps the other
 /// header as it was, so a 407 and a 401 can each be answered in the same transfer, in either
-/// order. Measured on curl 8.21.0 (BL-603 Notes, ADR-0239).
+/// order. Measured on curl 8.21.0 (BL-603 Notes, ADR-0239). The exception is an NTLM Type 3
+/// message, sent once: neither retry sends it again (BL-2030, BL-5892).
 /// </para>
 /// <para>
 /// A 417 that arrives while the body waits for <c>100 Continue</c> is answered, unless
@@ -1415,7 +1416,8 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reports what became of the connection once it is disposed, as curl 8.21.0's <c>-v</c>
     /// does (ADR-0050): left intact when marked reusable, closed when the transfer failed, and
-    /// shut down otherwise - its response did not persist, or it died before its response. When
+    /// shut down otherwise - its response did not persist, it died before its response, or only
+    /// <c>--fail-with-body</c> failed it once its body was read. When
     /// the request goes out again on a new connection - after it died, or as a retry such as the
     /// resend after a 417 (measured, BL-1446 Notes) - the line saying so follows. A connection left intact
     /// that another transfer still shares, on a stream of its own, is reported by the last
@@ -1445,7 +1447,7 @@ public sealed class HttpProtocolHandler(
         outcome switch
         {
             { ReportsLeftIntact: true } => LeftIntactLine(target, connect),
-            { DiedBeforeResponse: false } when ClosesTheConnection(outcome.Result.ExitCode) => HttpConnectionInfoLines.Closing(connect.ConnectionNumber),
+            { DiedBeforeResponse: false, FailedAfterBody: false } when ClosesTheConnection(outcome.Result.ExitCode) => HttpConnectionInfoLines.Closing(connect.ConnectionNumber),
             _ => HttpConnectionInfoLines.ShuttingDown(connect.ConnectionNumber),
         };
 
@@ -1506,6 +1508,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
+        HttpFailMode fail;
         LogVersionChosen(exchangeLog, plan, transport, newConnection, streams);
         ReportAuthorizationLines(plan);
         try
@@ -1538,8 +1541,8 @@ public sealed class HttpProtocolHandler(
             retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
             headReader.ReleaseDeferredHeaders();
             ReportNtlmConnectionClosure(plan, actedOn);
-            HttpFailMode fail = FailModeOf(plan, retry, actedOn);
-            ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
+            fail = FailModeOf(plan, retry, actedOn);
+            ThrowIfFailingBeforeBody(fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, actedOn, exchange.RedirectUrl);
             ReportAuthRetryRewind(plan, actedOn, retry);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
@@ -1551,7 +1554,6 @@ public sealed class HttpProtocolHandler(
             await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, ignoresBody, cancellationToken).ConfigureAwait(false);
             await upload.WriteRestAfterResponseAsync(cancellationToken).ConfigureAwait(false);
             ThrowIfSendFailedUnlessClosing(sendFailedAfter2xx, actedOn);
-            ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
         {
@@ -1563,12 +1565,22 @@ public sealed class HttpProtocolHandler(
         {
             return OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
         }
+        catch (OperationCanceledException canceled)
+        {
+            // A cancellation that is not this exchange's own limit (the -Y/-y watchdog) ends the transfer in the engine, which reads the report as far as the exchange got from the exception (BL-5862).
+            canceled.Data[CancelledReportDataKey] = exchange.Report(body);
+            throw;
+        }
 
         ReportTransferDone(requestStream, connect);
-        TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
+        bool failsAfterBody = FailsAfterBody(fail, actedOn!);
+        TransferResult result = failsAfterBody
+            ? FailedAfterBody(actedOn!, exchange.Report(body), body.BytesWritten)
+            : Succeeded(delivery, actedOn!, exchange.Report(body));
         LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection), body.FoundExcess))
         {
+            FailedAfterBody = failsAfterBody,
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
             UpgradedSession = UpgradedSessionOf(connection),
         };
@@ -1602,9 +1614,6 @@ public sealed class HttpProtocolHandler(
             with
         {
             Report = WithoutFirstByteWhenHttp09Refused(WithHeadBeforeFailure(exchange.Report(body), failure), failure),
-            WriteOutErrorMessage = failure.ExitCode == CurlExitCode.HttpReturnedError && plan.Options.Fail == HttpFailMode.FailWithBody
-                ? HttpTransferMessages.HttpResponseCodeSaidError
-                : null,
         };
         HttpAttemptOutcome outcome = FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
         ReportEmptyReply(plan.Context.Events, failure, outcome);
@@ -1755,6 +1764,9 @@ public sealed class HttpProtocolHandler(
 
         return System.Text.Encoding.Latin1.GetString(headBytes).Split("\r\n\r\n").Select(head => Math.Max(0, head.Split("\r\n").Length - 1)).LastOrDefault(count => count > 0);
     }
+
+    /// <summary>The key the engine reads a cancelled transfer's report from, spelled as <c>EndPointReportingProtocolHandler.ReportDataKey</c> spells it (BL-5862).</summary>
+    private const string CancelledReportDataKey = "Curl.Engine.TransferReport";
 
     private static KeyValuePair<string, string> HeaderOfLine(string line)
     {
@@ -2741,8 +2753,9 @@ public sealed class HttpProtocolHandler(
     /// nothing when <paramref name="delivery" /> says there is no body to deliver and it is not
     /// being discarded (a 416's is, <see cref="IgnoresBody" />). Over HTTP/2 and HTTP/3
     /// the trailers are the stream's trailing field section, read once the stream has ended. An
-    /// HTTP/2 stream's discarded body is not read at all: the stream is given up
-    /// (<see cref="Http2StreamConnection.AbandonResponseAsync" />), as curl resets it (BL-970).
+    /// HTTP/2 stream's discarded body is not delivered through the body reader: the stream is given
+    /// up (<see cref="Http2StreamConnection.AbandonResponseAsync" />), which reads it to its end
+    /// or resets it, as curl does (BL-970, BL-5906).
     /// </summary>
     private static ValueTask ReadBodyAsync(
         HttpRequestPlan plan,
@@ -3033,7 +3046,7 @@ public sealed class HttpProtocolHandler(
         {
             ThrowIfRedirectLimitReached(plan);
             RewindForResend(plan, upload);
-            return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan)).DowngradedAfter(head).FailingUploadRewind(upload.RewindFailure);
+            return plan.WithProxyAuthorization(proxyAuthorization, KeptAuthorizationForProxyRetry(plan)).DowngradedAfter(head).FailingUploadRewind(upload.RewindFailure);
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
@@ -3338,13 +3351,22 @@ public sealed class HttpProtocolHandler(
             || (sentNtlmAuthorization && challenges.Any(challenge => challenge.Trim().Equals("NTLM", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>
-    /// Makes the <c>Authorization</c> value a retry that answers a 407 keeps: the one
-    /// <paramref name="plan" /> sent, as <see cref="IHttpAuthenticator.RepeatAuthorization" />
-    /// sends it again, so a Digest answer counts its nonce on as in curl 8.21.0 (BL-869);
-    /// <see langword="null" /> when it sent none.
+    /// Makes the <c>Authorization</c> value <paramref name="plan" /> sent as
+    /// <see cref="IHttpAuthenticator.RepeatAuthorization" /> sends it again, so a Digest answer
+    /// counts its nonce on as in curl 8.21.0 (BL-869); <see langword="null" /> when it sent none.
     /// </summary>
     private string? RepeatAuthorization(HttpRequestPlan plan) =>
         plan.Authorization is { } sent ? Authenticator.RepeatAuthorization(plan.AuthRequest, sent) : null;
+
+    /// <summary>
+    /// Makes the <c>Authorization</c> value a retry that answers a 407 keeps:
+    /// <see cref="RepeatAuthorization" />'s, but none after an NTLM Type 3 message, which curl
+    /// 8.22.0 sends once. The resend that answers the proxy carries no <c>Authorization</c>, so a
+    /// server that did not accept the handshake is asked to start another, until the redirect
+    /// limit ends the transfer (measured, BL-5892).
+    /// </summary>
+    private string? KeptAuthorizationForProxyRetry(HttpRequestPlan plan) =>
+        plan.Authorization is { } sent && IsNtlmType3(sent) ? null : RepeatAuthorization(plan);
 
     /// <summary>
     /// Makes the <c>Proxy-Authorization</c> value a retry that answers a 401 keeps, as
@@ -3604,19 +3626,39 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Ends the transfer with exit 22 when <paramref name="fail" /> is
-    /// <paramref name="failAt" /> and the final status is 400 or above: before the body for
-    /// <c>-f</c>, after it for <c>--fail-with-body</c>. The head is written first either way.
+    /// Ends the transfer with exit 22 before the body when <paramref name="fail" /> is
+    /// <c>-f</c> and the final status is 400 or above. The head is written first.
     /// </summary>
     /// <exception cref="HttpTransferException">The status fails the transfer (exit 22).</exception>
-    private static void ThrowIfFailing(HttpFailMode fail, HttpFailMode failAt, HttpResponseHead head)
+    private static void ThrowIfFailingBeforeBody(HttpFailMode fail, HttpResponseHead head)
     {
         int statusCode = head.StatusLine.StatusCode;
-        if (fail == failAt && statusCode >= 400)
+        if (fail == HttpFailMode.Fail && statusCode >= 400)
         {
             throw new HttpTransferException(CurlExitCode.HttpReturnedError, HttpTransferMessages.RequestedUrlReturnedError(statusCode));
         }
     }
+
+    /// <summary>
+    /// Tells whether <c>--fail-with-body</c> fails an exchange that ran whole: the final status
+    /// is 400 or above.
+    /// </summary>
+    private static bool FailsAfterBody(HttpFailMode fail, HttpResponseHead head) =>
+        fail == HttpFailMode.FailWithBody && head.StatusLine.StatusCode >= 400;
+
+    /// <summary>
+    /// Builds the exit 22 result of an exchange <c>--fail-with-body</c> fails
+    /// (<see cref="FailsAfterBody" />). curl 8.22.0's tool, not libcurl, raises this error once
+    /// the transfer has succeeded, so <c>-v</c> gets no line for it and the connection is kept as
+    /// after any response, for <c>--retry</c> to reuse (measured, BL-5891 Notes).
+    /// </summary>
+    private static TransferResult FailedAfterBody(HttpResponseHead head, TransferReport report, long bytesWritten) =>
+        TransferResult.Failure(CurlExitCode.HttpReturnedError, HttpTransferMessages.RequestedUrlReturnedError(head.StatusLine.StatusCode), bytesWritten)
+            with
+        {
+            Report = report,
+            WriteOutErrorMessage = HttpTransferMessages.HttpResponseCodeSaidError,
+        };
 
     /// <summary>
     /// Writes head or trailer bytes to the header output one line at a time, each line with
@@ -4361,6 +4403,12 @@ public sealed class HttpProtocolHandler(
         /// Gets a value indicating whether the exchange is the sixth refused one, given up on, whose HTTP/2 connection curl closes without a GOAWAY.
         /// </summary>
         public bool GaveUpOnRefusedStream { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the exchange ran whole and only <c>--fail-with-body</c>
+        /// failed it, so its connection ends as a successful one's does.
+        /// </summary>
+        public bool FailedAfterBody { get; init; }
 
         /// <summary>
         /// Gets the transfer's retries on a fresh connection so far, this one included, as

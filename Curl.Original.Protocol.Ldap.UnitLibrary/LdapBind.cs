@@ -9,10 +9,16 @@ namespace Curl.Original.Protocol.Ldap;
 internal static class LdapBind
 {
     /// <summary>The protocol version both builds bind with first.</summary>
-    private const int LdapVersion3 = 3;
+    internal const int LdapVersion3 = 3;
 
-    /// <summary>The protocol version WinLDAP retries a failed bind with.</summary>
-    private const int LdapVersion2 = 2;
+    /// <summary>The protocol version WinLDAP retries a failed bind with, and OpenLDAP's build after <c>protocolError</c>.</summary>
+    internal const int LdapVersion2 = 2;
+
+    /// <summary>The LDAP result code <c>protocolError</c>.</summary>
+    internal const int ProtocolError = 2;
+
+    /// <summary>The LDAP result code <c>insufficientAccessRights</c>.</summary>
+    private const int InsufficientAccessRights = 50;
 
     /// <summary>The LDAP result code <c>invalidCredentials</c>.</summary>
     private const int InvalidCredentials = 49;
@@ -32,6 +38,7 @@ internal static class LdapBind
     /// <param name="password">The password; empty for the anonymous bind.</param>
     /// <param name="overTls">Whether the session is <c>ldaps://</c>, where WinLDAP never retries as LDAPv2.</param>
     /// <param name="cancellationToken">Cancels the bind.</param>
+    /// <param name="openLdapVersion">The version OpenLDAP's build binds with first: LDAPv2 after <c>--ssl</c>'s StartTLS met <c>protocolError</c>. WinLDAP ignores it.</param>
     /// <returns><see langword="null" /> once bound; otherwise the failed transfer's result.</returns>
     public static ValueTask<TransferResult?> BindAsync(
         LdapDialect dialect,
@@ -39,10 +46,11 @@ internal static class LdapBind
         string name,
         string password,
         bool overTls,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        int openLdapVersion = LdapVersion3) =>
         dialect == LdapDialect.WinLdap
             ? BindAsWinLdapAsync(exchange, name, password, overTls, cancellationToken)
-            : BindAsOpenLdapAsync(exchange, name, password, cancellationToken);
+            : BindAsOpenLdapAsync(exchange, openLdapVersion, name, password, cancellationToken);
 
     /// <summary>
     /// Binds as <c>ldap_win_bind</c> does: LDAPv3, then once more as LDAPv2 when the first
@@ -102,39 +110,67 @@ internal static class LdapBind
     }
 
     /// <summary>
-    /// Binds as curl's <c>openldap.c</c> does: LDAPv3 once. Any answer but <c>success</c>,
-    /// a reply that is not a BindResponse included, sends an UnbindRequest and fails, with
-    /// exit 67 <c>Login denied</c> for <c>invalidCredentials</c> and exit 38 otherwise. A
+    /// Binds as curl's <c>openldap.c</c> does: with <paramref name="version" />, and once more as
+    /// LDAPv2 when an LDAPv3 bind is answered <c>protocolError</c> (BL-5908, ADR-1366). Any other
+    /// answer but <c>success</c>, a reply that is not a BindResponse included, sends an
+    /// UnbindRequest and fails with <see cref="OpenLdapMappedFailure" />'s result, else exit 38. A
     /// server that closes first fails with exit 7, as <c>libldap</c>'s
     /// <c>Can't contact LDAP server</c> maps.
     /// </summary>
     private static async ValueTask<TransferResult?> BindAsOpenLdapAsync(
         LdapExchange exchange,
+        int version,
         string name,
         string password,
         CancellationToken cancellationToken)
     {
-        LdapBindReply reply = await exchange.BindAsync(LdapVersion3, name, password, cancellationToken).ConfigureAwait(false);
+        LdapBindReply reply = await exchange.BindAsync(version, name, password, cancellationToken).ConfigureAwait(false);
+        if (RefusesLdapV3(version, reply))
+        {
+            reply = await exchange.BindAsync(LdapVersion2, name, password, cancellationToken).ConfigureAwait(false);
+        }
+
         return reply.IsSuccess ? null : await OpenLdapBindFailedAsync(exchange, reply, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Whether an LDAPv3 bind was answered <c>protocolError</c>, a server that does not speak version 3.</summary>
+    private static bool RefusesLdapV3(int version, LdapBindReply reply) =>
+        version == LdapVersion3 && reply.Status == LdapBindReplyStatus.Answered && reply.ResultCode == ProtocolError;
+
+    /// <summary>
+    /// The failure <c>openldap.c</c>'s <c>oldap_map_error</c> gives a result code of its own:
+    /// exit 1 for <c>protocolError</c>, 67 for <c>invalidCredentials</c> and 9 for
+    /// <c>insufficientAccessRights</c>; <see langword="null" /> for every other code.
+    /// </summary>
+    /// <param name="resultCode">The LDAP result code.</param>
+    /// <returns>The failed transfer's result, or <see langword="null" />.</returns>
+    internal static TransferResult? OpenLdapMappedFailure(int resultCode) =>
+        resultCode switch
+        {
+            ProtocolError => TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol"),
+            InvalidCredentials => TransferResult.Failure(CurlExitCode.LoginDenied, OpenLdapLoginDenied),
+            InsufficientAccessRights => TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Access denied to remote resource"),
+            _ => null,
+        };
+
+    /// <summary>The OpenLDAP build's exit 7 for a server that closed instead of answering.</summary>
+    /// <returns>The failed transfer's result.</returns>
+    internal static TransferResult OpenLdapCannotContact() =>
+        TransferResult.Failure(CurlExitCode.CouldntConnect, OpenLdapCannotContactServer);
+
     /// <summary>
     /// The OpenLDAP build's failure for a bind <paramref name="reply" /> that is not a success: exit 7 for a
-    /// server that closed, exit 67 <c>Login denied</c> for <c>invalidCredentials</c>, exit 38 otherwise;
-    /// an UnbindRequest goes first unless the server closed.
+    /// server that closed; otherwise, after an UnbindRequest, <see cref="OpenLdapMappedFailure" />'s result
+    /// for an answered code it maps and exit 38 for anything else.
     /// </summary>
-    internal static async ValueTask<TransferResult?> OpenLdapBindFailedAsync(LdapExchange exchange, LdapBindReply reply, CancellationToken cancellationToken)
-    {
-        if (reply.Status == LdapBindReplyStatus.Closed)
-        {
-            return TransferResult.Failure(CurlExitCode.CouldntConnect, OpenLdapCannotContactServer);
-        }
+    internal static async ValueTask<TransferResult?> OpenLdapBindFailedAsync(LdapExchange exchange, LdapBindReply reply, CancellationToken cancellationToken) =>
+        reply.Status == LdapBindReplyStatus.Closed
+            ? OpenLdapCannotContact()
+            : await UnbindAndFailAsync(exchange, OpenLdapAnsweredFailure(reply), cancellationToken).ConfigureAwait(false);
 
-        TransferResult failure = reply.Status == LdapBindReplyStatus.Answered && reply.ResultCode == InvalidCredentials
-            ? TransferResult.Failure(CurlExitCode.LoginDenied, OpenLdapLoginDenied)
-            : TransferResult.Failure(CurlExitCode.LdapCannotBind, OpenLdapCannotBind);
-        return await UnbindAndFailAsync(exchange, failure, cancellationToken).ConfigureAwait(false);
-    }
+    /// <summary>The failure for a reply the server sent: its result code's mapping, else exit 38; a reply that is not a BindResponse carries code 0, which maps to nothing.</summary>
+    private static TransferResult OpenLdapAnsweredFailure(LdapBindReply reply) =>
+        OpenLdapMappedFailure(reply.ResultCode) ?? TransferResult.Failure(CurlExitCode.LdapCannotBind, OpenLdapCannotBind);
 
     /// <summary>The OpenLDAP build's exit 67 <c>Login denied</c> for a server that offers no SASL mechanism the auth mask allows, after an UnbindRequest.</summary>
     internal static ValueTask<TransferResult?> OpenLdapLoginDeniedAsync(LdapExchange exchange, CancellationToken cancellationToken) =>

@@ -102,7 +102,11 @@ elsewhere; its internal constructor names the build so tests pin both on any pla
 The builds differ in message text, in which `--cacert` files are exit 77, and in `--capath`
 (`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts the certificates of its `<subject hash>.<n>` files, as OpenSSL's hashed directory lookup reads them (`OpenSslSubjectNameHash`, ADR-0836, CGR-111), the
 Schannel build ignores it and reports its one warning, unwrapped, in `SslStreamTlsProvider.Warnings`
-for the console to print wrapped at the terminal width (two lines at curl's default 79 columns). With `--cert` (`TlsClientOptions.ClientCertificate`, split into
+for the console to print wrapped at the terminal width (two lines at curl's default 79 columns).
+The OpenSSL build also reads `TRUSTED CERTIFICATE` blocks of a `--cacert` file and of `--capath` hashed files (`OpenSslCaFile`, ADR-1351, ADR-1363):
+when the settings of the lowest listed certificate above the server's own (else the server's own) refuse
+server authentication, the first copy of a certificate winning, the `--cacert` file before the directories, the chain is exit 60 `certificate rejected (28)`;
+without `--cacert`, a rejected `--capath` certificate that is the root of a system store chain built without fault is not refused. With `--cert` (`TlsClientOptions.ClientCertificate`, split into
 file and passphrase by `ClientCertificateArgument` as curl splits it) it presents a client
 certificate that `ClientCertificateLoader` loads: PKCS#12 in the Schannel build, PEM with
 `--key` (`TlsClientOptions.PrivateKey`) in the OpenSSL build. Per ADR-0066 the Schannel build
@@ -136,7 +140,7 @@ and below a TLS 1.3 ceiling the Schannel build's hello is in a record of the cei
 (`ClientHelloProfile.Tls12RecordVersionIsTheCeiling`), OpenSSL's in a TLS 1.0 one.
 The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
-the console's to print. Only `RevocationListDownload` constructs an `HttpClient`, to fetch a certificate revocation list from a CRL distribution point (ADR-1294).
+the console's to print. Only `RevocationListDownload` constructs an `HttpClient`, to fetch a certificate revocation list from a CRL distribution point (ADR-1294) or an OCSP response. Below a non-self-signed `--cacert` or `--proxy-cacert` anchor each certificate is asked about by OCSP first (`ServerCertificateVerification.AnchorOcsp.cs`, an RFC 6960 GET checked by `OcspStapleVerifier`) and looked up in its CRL only when no responder says good or revoked (ADR-1355, BL-5877).
 
 `TcpConnector` dials a host's or proxy's addresses through `AddressFamilyRace` (ADR-0254): the
 first address's family in turn, the other family beside it once `happyEyeballsTimeout`

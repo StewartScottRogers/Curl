@@ -15,4 +15,16 @@ public sealed class TransferHookServices(IConnector connector, IConnectionListen
 
     /// <summary>Gets the listener for a local port connections are made to the hook on.</summary>
     public IConnectionListener Listener { get; } = listener ?? throw new ArgumentNullException(nameof(listener));
+
+    /// <summary>
+    /// Gets the hook that lends its DPoP key for binding tokens, or <see langword="null" /> when none of the transfer's
+    /// hooks is one.
+    /// </summary>
+    public IDpopKeySource? DpopKeySource { get; init; }
+
+    /// <summary>Gives these services with the DPoP key source among <paramref name="hooks" />, the first when there are several.</summary>
+    /// <param name="hooks">The transfer's hooks.</param>
+    /// <returns>The services the hooks are given: these themselves when no hook holds a key.</returns>
+    internal TransferHookServices WithDpopKeySourceFrom(IReadOnlyList<ITransferHook> hooks) =>
+        hooks.OfType<IDpopKeySource>().FirstOrDefault() is { } source ? new(Connector, Listener) { DpopKeySource = source } : this;
 }

@@ -429,29 +429,7 @@ public sealed class CookieStore : ICookieStore
         WriteCookieJar(jar, now);
         byte[] bytes = Encoding.Latin1.GetBytes(jar.ToString());
 
-        FileOpenResult opened = await fileSystem.OpenForWriteAsync(path, FileWriteMode.Truncate, JarCreateMode, cancellationToken).ConfigureAwait(false);
-        if (!opened.IsOpen)
-        {
-            return false;
-        }
-
-        // A close that fails (a full device takes the bytes into its buffer and fails as it
-        // closes) is a jar that cannot be written too (CGR-026, BL-3830).
-        Stream content = opened.Content!;
-        try
-        {
-            await using (content.ConfigureAwait(false))
-            {
-                await content.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-                await content.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            return true;
-        }
-        catch (IOException)
-        {
-            return false;
-        }
+        return await fileSystem.TryReplaceFileAsync(path, bytes, JarCreateMode, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>curl's tests in <c>Curl_cookie_getlist</c>: secure, domain and path.</summary>

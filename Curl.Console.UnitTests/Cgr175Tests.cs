@@ -64,7 +64,7 @@ public sealed class Cgr175Tests
     }
 
     [TestMethod]
-    public async Task RunAsync_ParallelFormWithMissingFileForThreeUrls_SendsNothingAndReportsExit26ForEach()
+    public async Task RunAsync_ParallelFormWithMissingFileForThreeUrls_SendsNothingAndReportsExit26OnceForTheFirst()
     {
         (int exitCode, string stdout, string stderr, List<long> sent) = await RunAsync(
             "-Z", "-F", "a=b", "-F", "f=@nofile.txt",
@@ -73,8 +73,19 @@ public sealed class Cgr175Tests
         Diagnostics.Assert("bodies sent", string.Empty, string.Join(", ", sent));
         Assert.AreEqual(26, exitCode);
         Assert.IsEmpty(sent);
-        Assert.AreEqual("0 26 000 0\n1 26 000 0\n2 26 000 0\n", stdout.ReplaceLineEndings("\n"));
+        Assert.AreEqual("0 26 000 0\n", stdout.ReplaceLineEndings("\n"));
         Assert.Contains("curl: (26) Failed to open/read local data from file/application", stderr);
+        Assert.AreEqual(1, stderr.Split("curl: (26)").Length - 1);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ParallelFormWithMissingFile_ReportsConnectionAndTransferIdsAsMinusOne()
+    {
+        (_, string stdout, _, _) = await RunAsync(
+            "-w", "%{conn_id}|%{xfer_id}|%{errormsg}\n", "-Z", "-F", "f=@nofile.txt",
+            "http://127.0.0.1:22000/a", "http://127.0.0.1:22000/b");
+
+        Assert.AreEqual("-1|-1|Failed to open/read local data from file/application\n", stdout.ReplaceLineEndings("\n"));
     }
 
     [TestMethod]

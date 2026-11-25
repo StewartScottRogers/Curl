@@ -52,3 +52,6 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 - 2026-11-18: Backlog -> Doing. Criteria at claim: ad4d9a77 82a66894 4701464d.
 - 2026-11-18: Doing -> Blocked. Stewart: curl 8.22.0 (the port's target, measured, ADR-1275) writes Domain=host as a host cookie, so criteria 1 and 2 contradict it; close as not-a-defect or confirm 8.21.0 behaviour is wanted?
 - 2026-11-18: Blocked -> Deferred. Stewart 2026-11-18: closed as not a defect, curl 8.22.0 writes Domain=host as a host cookie (ADR-1275); do not reopen unless the target version moves
+- 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: ad4d9a77 82a66894 4701464d.
+- 2026-11-24: Doing -> Deferred. Still not a defect: target curl is still 8.22.0 (vendored test798 <file> and installed curl write #HttpOnly_localhost FALSE); Stewart 2026-11-18 said do not reopen unless the target version moves (ADR-1275)

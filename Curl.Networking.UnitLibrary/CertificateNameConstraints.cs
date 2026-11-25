@@ -23,6 +23,8 @@ internal static class CertificateNameConstraints
 
     private const string CommonNameOid = "2.5.4.3";
 
+    private const string EmailAddressOid = "1.2.840.113549.1.9.1";
+
     private const string AlternativeNameOid = "2.5.29.17";
 
     // An empty directory name is the two bytes of an empty SEQUENCE.
@@ -45,8 +47,12 @@ internal static class CertificateNameConstraints
     /// Finds the first name constraint the leaf's names break.
     /// </summary>
     /// <param name="chain">The chain built for the server certificate, leaf first.</param>
+    /// <param name="matchesSchannelBuild">
+    /// Whether every subject CN of a leaf with no dNSName is checked as a DNS name, as curl's Schannel
+    /// build (CryptoAPI) does; otherwise only a CN that looks like a host name is, as in the OpenSSL build.
+    /// </param>
     /// <returns><see cref="NotPermitted" />, <see cref="Excluded" />, or 0 when no constraint is broken.</returns>
-    internal static int FindViolation(X509Chain chain)
+    internal static int FindViolation(X509Chain chain, bool matchesSchannelBuild = false)
     {
         var elements = chain.ChainElements;
         if (elements.Count < 2)
@@ -67,7 +73,7 @@ internal static class CertificateNameConstraints
                 }
 
                 // The leaf's names are read only once some CA carries constraints (BL-5424).
-                names ??= ListNames(elements[0].Certificate);
+                names ??= ListNames(elements[0].Certificate, matchesSchannelBuild);
                 var violation = FindViolation(extension, names);
                 if (violation != 0)
                 {
@@ -95,25 +101,41 @@ internal static class CertificateNameConstraints
         return anchor == 0 ? elements.Count : anchor;
     }
 
-    private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf)
+    private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf, bool matchesSchannelBuild)
     {
         var names = new List<(Asn1Tag, byte[])>();
         var extensions = leaf.Extensions.OfType<X509SubjectAlternativeNameExtension>().ToList();
         var dnsNames = extensions.SelectMany(extension => extension.EnumerateDnsNames()).ToList();
 
-        // CryptoAPI checks the subject CN as a DNS name when the leaf has no dNSName SAN (BL-5432).
-        names.AddRange(DnsNamesOrCommonNames(leaf, dnsNames).Select(name => (DnsNameTag, System.Text.Encoding.ASCII.GetBytes(name))));
+        // Both builds check the subject CN as a DNS name when the leaf has no dNSName SAN (BL-5432, BL-5829).
+        names.AddRange(DnsNamesOrCommonNames(leaf, dnsNames, matchesSchannelBuild).Select(name => (DnsNameTag, System.Text.Encoding.ASCII.GetBytes(name))));
         names.AddRange(extensions.SelectMany(extension => extension.EnumerateIPAddresses()).Select(address => (IpAddressTag, address.GetAddressBytes())));
 
-        // directoryName, rfc822Name and URI names are constrained too; the subject counts as a directoryName (BL-5436).
+        // directoryName, rfc822Name and URI names are constrained too; the subject counts as a directoryName (BL-5436)
+        // and its emailAddress attributes as rfc822Names (RFC 5280 §4.2.1.10, BL-5804).
+        names.AddRange(ListSubjectNames(leaf));
+        names.AddRange(ListOtherAlternativeNames(leaf));
+        return names;
+    }
+
+    private static List<(Asn1Tag Tag, byte[] Value)> ListSubjectNames(X509Certificate2 leaf)
+    {
+        var names = new List<(Asn1Tag, byte[])>();
         if (leaf.SubjectName.RawData.Length > EmptyNameLength)
         {
             names.Add((DirectoryNameTag, leaf.SubjectName.RawData));
         }
 
-        names.AddRange(ListOtherAlternativeNames(leaf));
+        names.AddRange(ListSubjectEmailAddresses(leaf).Select(address => (EmailTag, System.Text.Encoding.ASCII.GetBytes(address))));
         return names;
     }
+
+    private static List<string> ListSubjectEmailAddresses(X509Certificate2 leaf) =>
+        leaf.SubjectName.EnumerateRelativeDistinguishedNames()
+            .Where(rdn => !rdn.HasMultipleElements && rdn.GetSingleElementType().Value == EmailAddressOid)
+            .Select(rdn => rdn.GetSingleElementValue())
+            .OfType<string>()
+            .ToList();
 
     private static List<(Asn1Tag Tag, byte[] Value)> ListOtherAlternativeNames(X509Certificate2 leaf)
     {
@@ -145,8 +167,33 @@ internal static class CertificateNameConstraints
         return names;
     }
 
-    private static List<string> DnsNamesOrCommonNames(X509Certificate2 leaf, List<string> dnsNames) =>
-        dnsNames.Count > 0 ? dnsNames : ListCommonNames(leaf);
+    private static List<string> DnsNamesOrCommonNames(X509Certificate2 leaf, List<string> dnsNames, bool matchesSchannelBuild) =>
+        dnsNames.Count > 0 ? dnsNames
+        : matchesSchannelBuild ? ListCommonNames(leaf)
+        : ListHostNameCommonNames(leaf);
+
+    // OpenSSL checks a CN against DNS constraints only when it looks like a host name, trailing NULs
+    // dropped, and refuses the certificate for a NUL inside it (cn2dnsid in crypto/x509/v3_ncons.c).
+    private static List<string> ListHostNameCommonNames(X509Certificate2 leaf)
+    {
+        var commonNames = ListCommonNames(leaf).Select(name => name.TrimEnd('\0')).ToList();
+        return commonNames.Any(name => name.Contains('\0'))
+            ? throw new AsnContentException("A subject CN holds a NUL.")
+            : commonNames.Where(LooksLikeHostName).ToList();
+    }
+
+    // At least two dot-separated labels of letters, digits, '_' and '-', none empty or edged with '-'.
+    private static bool LooksLikeHostName(string commonName)
+    {
+        var labels = commonName.Split('.');
+        return labels.Length > 1 && labels.All(IsHostNameLabel);
+    }
+
+    private static bool IsHostNameLabel(string label) =>
+        label.Length > 0
+        && label[0] != '-'
+        && label[^1] != '-'
+        && label.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
 
     private static List<string> ListCommonNames(X509Certificate2 leaf) =>
         leaf.SubjectName.EnumerateRelativeDistinguishedNames()
@@ -259,12 +306,26 @@ internal static class CertificateNameConstraints
             return Convert.ToHexString(encoded.Span);
         }
 
-        var text = reader.ReadCharacterString((UniversalTagNumber)tag.TagValue);
+        var text = ReadText(reader, tag);
         return string.Join(' ', text.Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
     }
 
-    // UTF8String, PrintableString, TeletexString, IA5String, BMPString.
-    private static readonly int[] StringTagValues = [12, 19, 20, 22, 30];
+    // UniversalString is four bytes per character, big endian (UTF-32BE); every other type the reader decodes itself.
+    private static string ReadText(AsnReader reader, Asn1Tag tag)
+    {
+        if (tag.TagValue != UniversalStringTagValue)
+        {
+            return reader.ReadCharacterString((UniversalTagNumber)tag.TagValue);
+        }
+
+        reader.TryReadPrimitiveCharacterStringBytes(tag, out var bytes);
+        return new System.Text.UTF32Encoding(bigEndian: true, byteOrderMark: false).GetString(bytes.Span);
+    }
+
+    private const int UniversalStringTagValue = 28;
+
+    // UTF8String, PrintableString, TeletexString, IA5String, UniversalString, BMPString.
+    private static readonly int[] StringTagValues = [12, 19, 20, 22, UniversalStringTagValue, 30];
 
     // A constraint with an @ names one mailbox, otherwise a host, or with a leading dot the hosts below it.
     private static bool EmailMatches(string constraint, string name) =>

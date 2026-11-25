@@ -244,6 +244,31 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsNull(failure);
     }
 
+    // BL-5855 (STD-187): a dNSName with a trailing dot matches the host without it on the OpenSSL build.
+    [TestMethod]
+    public void VerifyPeer_InsecureButCheckingTheHostNameWithATrailingDotAlternativeName_AcceptsOnOpenSslBuild()
+    {
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true, ChecksHostNameWhenInsecure: true), OpenSslBuild);
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest($"CN={CertificateHost}.", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var names = new SubjectAlternativeNameBuilder();
+        names.AddDnsName(CertificateHost + ".");
+        request.CertificateExtensions.Add(names.Build());
+        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using var chain = new X509Chain();
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.Build(certificate);
+        const SslPolicyErrors errors = SslPolicyErrors.RemoteCertificateNameMismatch;
+
+        Diagnostics.Arrange("policy errors", errors);
+
+        var failure = provider.VerifyPeer(errors, chain, CertificateHost, []);
+
+        Diagnostics.Act("failure", failure);
+        Assert.IsNull(failure);
+    }
+
     // A self-signed certificate naming CertificateHost, its chain built against no trusted root.
     private static X509Chain BuildUntrustedChainForCertificateHost()
     {

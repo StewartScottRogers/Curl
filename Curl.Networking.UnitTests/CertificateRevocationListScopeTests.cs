@@ -148,12 +148,12 @@ public sealed class CertificateRevocationListScopeTests
         Assert.IsTrue(DecodeWithEntries(Ext(UnknownOid, false, [0x05, 0x00])).CoversScopeOf(s_leaf, s_address));
 
     [TestMethod]
-    public void CoversScopeOf_EntryWithACriticalUnknownExtension_IsFalse() =>
-        Assert.IsFalse(DecodeWithEntries(Ext(UnknownOid, true, [0x05, 0x00])).CoversScopeOf(s_leaf, s_address));
+    public void CoversScopeOf_EntryWithACriticalUnknownExtension_IsTrue() =>
+        Assert.IsTrue(DecodeWithEntries(Ext(UnknownOid, true, [0x05, 0x00])).CoversScopeOf(s_leaf, s_address));
 
     [TestMethod]
-    public void CoversScopeOf_EntryWithACertificateIssuer_IsFalse() =>
-        Assert.IsFalse(DecodeWithEntries(Ext(CertificateIssuer, false, [0x30, 0x00])).CoversScopeOf(s_leaf, s_address));
+    public void CoversScopeOf_EntryWithACertificateIssuer_IsTrue() =>
+        Assert.IsTrue(DecodeWithEntries(Ext(CertificateIssuer, false, [0x30, 0x00])).CoversScopeOf(s_leaf, s_address));
 
     [TestMethod]
     public void CoversScopeOf_EntryWithExtensionsThatDoNotParse_IsFalse() =>

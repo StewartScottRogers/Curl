@@ -152,12 +152,47 @@ public sealed class IntermediateOnlyProxyCacertTests
     }
 
     [TestMethod]
-    public void VerifyPeer_UnknownRevocationWithAListNamingNoNextUpdate_IsExit60()
+    public void VerifyPeer_ListNamingNoNextUpdateWithoutTheLeaf_Succeeds()
     {
         using var pki = new Pki(revokeLeaf: false);
 
-        Assert.AreEqual(CurlExitCode.PeerFailedVerification, VerifyStubbed(pki, pki.BuildCrlWithoutNextUpdate())?.ExitCode);
+        Assert.IsNull(VerifyStubbed(pki, pki.BuildCrlWithoutNextUpdate()));
     }
+
+    [TestMethod]
+    public void VerifyPeer_ListNamingNoNextUpdateAndRevokingTheLeaf_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var revoking = TestRevocationList.Write(pki.Intermediate, revokedSerialNumbers: [pki.LeafSerial]);
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, VerifyStubbed(pki, revoking)?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_RsaPssSignedListRevokingTheLeaf_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyStubbed(pki, PssList(pki, [pki.LeafSerial]));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_RsaPssSignedListWithoutTheLeaf_Succeeds()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        Assert.IsNull(VerifyStubbed(pki, PssList(pki, [])));
+    }
+
+    private static byte[] PssList(Pki pki, byte[][] revoked) =>
+        TestRevocationList.Write(
+            pki.Intermediate,
+            nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
+            revokedSerialNumbers: revoked,
+            signatureAlgorithm: TestRevocationList.RsaSsaPss,
+            signatureParameters: TestRevocationList.PssParameters(TestRevocationList.Sha256, TestRevocationList.Sha256, saltLength: 32));
 
     [TestMethod]
     public void VerifyPeer_UnknownRevocationOfALeafWithoutDistributionPoints_IsExit60()
@@ -168,14 +203,13 @@ public sealed class IntermediateOnlyProxyCacertTests
     }
 
     [TestMethod]
-    public void CrlDistributionPointUris_ExtensionHoldingReasonsRelativeNamesAndOtherNames_ListsOnlyHttpAddresses()
+    public void CrlDistributionPointUris_ExtensionHoldingRelativeNamesAndOtherNames_ListsOnlyHttpAddresses()
     {
         var writer = new AsnWriter(AsnEncodingRules.DER);
         using (writer.PushSequence())
         {
             using (writer.PushSequence())
             {
-                writer.WriteBitString(new byte[] { 0x80 }, 7, new Asn1Tag(TagClass.ContextSpecific, 1));
                 using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
                 {
                     using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 1)))
@@ -200,6 +234,37 @@ public sealed class IntermediateOnlyProxyCacertTests
     }
 
     [TestMethod]
+    public void CrlDistributionPointUris_PointLimitedToReasons_ListsOnlyTheOtherPointsAddresses()
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            WritePoint(writer, "http://x.test/partial.crl", withReasons: true);
+            WritePoint(writer, "http://x.test/full.crl", withReasons: false);
+        }
+
+        var uris = ServerCertificateVerification.CrlDistributionPointUris(CertificateWith(writer.Encode()));
+
+        CollectionAssert.AreEqual(new[] { new Uri("http://x.test/full.crl") }, uris.ToArray());
+    }
+
+    private static void WritePoint(AsnWriter writer, string address, bool withReasons)
+    {
+        using (writer.PushSequence())
+        {
+            using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
+            using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
+            {
+                writer.WriteCharacterString(UniversalTagNumber.IA5String, address, new Asn1Tag(TagClass.ContextSpecific, 6));
+            }
+
+            if (withReasons)
+            {
+                writer.WriteBitString(new byte[] { 0x80 }, 7, new Asn1Tag(TagClass.ContextSpecific, 1));
+            }
+        }
+    }
+    [TestMethod]
     public void CrlDistributionPointUris_ExtensionThatDoesNotParse_ListsNone()
     {
         Assert.IsEmpty(ServerCertificateVerification.CrlDistributionPointUris(CertificateWith([1, 2, 3])));
@@ -216,6 +281,43 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
         Assert.IsNotEmpty(fetched);
         Assert.AreEqual(fetched.Count, fetched.Distinct().Count());
+    }
+
+    private const string SecondPointAddress = "http://127.0.0.1:1/second.crl";
+
+    [TestMethod]
+    public void VerifyPeer_FirstUsableListIsCleanAndSecondRevokes_Accepts()
+    {
+        using var pki = new Pki(revokeLeaf: false, secondDistributionPoint: SecondPointAddress);
+        var revoking = pki.BuildCrlOfIssuer([pki.LeafSerial], DateTimeOffset.UtcNow.AddDays(3));
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? revoking : pki.CrlBytes, NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_FirstUsableListRevokesAndSecondIsClean_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: true, secondDistributionPoint: SecondPointAddress);
+        var clean = pki.BuildCrlOfIssuer([], DateTimeOffset.UtcNow.AddDays(3));
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? clean : pki.CrlBytes, NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_FirstListUnusableAndSecondRevokes_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: true, secondDistributionPoint: SecondPointAddress);
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? pki.CrlBytes : throw new IOException("404"), NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
     }
 
     private const string DeltaAddress = "http://127.0.0.1:1/delta.crl";
@@ -265,6 +367,41 @@ public sealed class IntermediateOnlyProxyCacertTests
         var failure = VerifyWithDelta(pki, BaseListNumbered(pki, 5), Delta(pki, 4, revoked: true));
 
         Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    private static byte[] HeldBaseList(Pki pki) =>
+        TestRevocationList.Write(
+            pki.Intermediate,
+            nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
+            revokedSerialNumbers: [pki.LeafSerial],
+            extensions: [TestRevocationList.Extension("2.5.29.20", false, Number(5)), FreshestExtension(DeltaAddress)],
+            entryExtensions: [TestRevocationList.Extension("2.5.29.21", false, [0x0A, 0x01, 0x06])]);
+
+    private static byte[] DeltaWithReason(Pki pki, byte reason) =>
+        TestRevocationList.Write(
+            pki.Intermediate,
+            nextUpdate: DateTimeOffset.UtcNow.AddDays(3),
+            revokedSerialNumbers: [pki.LeafSerial],
+            extensions: [TestRevocationList.Extension("2.5.29.27", true, Number(5))],
+            entryExtensions: [TestRevocationList.Extension("2.5.29.21", false, [0x0A, 0x01, reason])]);
+
+    [TestMethod]
+    public void VerifyPeer_DeltaListRemovesTheLeafFromCrlAfterAHold_Accepts()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyWithDelta(pki, HeldBaseList(pki), DeltaWithReason(pki, 8));
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_HoldWithoutADeltaListOrWithAnotherDeltaReason_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, VerifyWithDelta(pki, HeldBaseList(pki), null)?.Message);
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, VerifyWithDelta(pki, HeldBaseList(pki), DeltaWithReason(pki, 1))?.Message);
     }
 
     [TestMethod]
@@ -340,12 +477,19 @@ public sealed class IntermediateOnlyProxyCacertTests
         var otherIssuer = TestRevocationList.Write(pki.Intermediate, new X500DistinguishedName("CN=Somebody Else"), nextUpdate: DateTimeOffset.UtcNow.AddDays(3), extensions: extensions);
         var otherSigner = TestRevocationList.Write(other.Intermediate, pki.Intermediate.SubjectName, nextUpdate: DateTimeOffset.UtcNow.AddDays(3), extensions: extensions);
 
-        var undated = TestRevocationList.Write(pki.Intermediate, extensions: extensions);
-
-        foreach (var delta in new[] { expired, otherIssuer, otherSigner, undated })
+        foreach (var delta in new[] { expired, otherIssuer, otherSigner })
         {
             Assert.AreEqual(CurlExitCode.PeerFailedVerification, VerifyWithDelta(pki, baseList, delta)?.ExitCode);
         }
+    }
+
+    [TestMethod]
+    public void VerifyPeer_DeltaListNamingNoNextUpdate_IsCurrent()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var undated = TestRevocationList.Write(pki.Intermediate, extensions: [TestRevocationList.Extension("2.5.29.27", true, Number(5))]);
+
+        Assert.IsNull(VerifyWithDelta(pki, BaseListNumbered(pki, 5, FreshestExtension(DeltaAddress)), undated));
     }
 
     [TestMethod]
@@ -497,13 +641,13 @@ public sealed class IntermediateOnlyProxyCacertTests
 
         private readonly RSA _intermediateKey;
 
-        public Pki(bool revokeLeaf, bool withDistributionPoint = true, string? freshestCrlAddress = null)
+        public Pki(bool revokeLeaf, bool withDistributionPoint = true, string? freshestCrlAddress = null, string? secondDistributionPoint = null)
         {
             _root = CreateAuthority("CN=Proxy Root", null, out _);
             using var intermediate = CreateAuthority("CN=Proxy Intermediate", _root, out _intermediateKey);
             Intermediate = intermediate.CopyWithPrivateKey(_intermediateKey);
             LeafSerial = [0x42, 0x17];
-            Leaf = CreateLeaf(Intermediate, LeafSerial, withDistributionPoint, freshestCrlAddress);
+            Leaf = CreateLeaf(Intermediate, LeafSerial, withDistributionPoint, freshestCrlAddress, secondDistributionPoint);
             CrlBytes = BuildCrlOfIssuer(revokeLeaf ? [LeafSerial] : [], DateTimeOffset.UtcNow.AddDays(3));
         }
 
@@ -578,7 +722,7 @@ public sealed class IntermediateOnlyProxyCacertTests
             return request.Create(issuer, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(20), [1, 2, 3]);
         }
 
-        private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, byte[] serial, bool withDistributionPoint, string? freshestCrlAddress)
+        private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, byte[] serial, bool withDistributionPoint, string? freshestCrlAddress, string? secondDistributionPoint)
         {
             using var key = RSA.Create(2048);
             var request = new CertificateRequest($"CN={Host}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -589,7 +733,7 @@ public sealed class IntermediateOnlyProxyCacertTests
             request.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
             if (withDistributionPoint)
             {
-                request.CertificateExtensions.Add(CertificateRevocationListBuilder.BuildCrlDistributionPointExtension([UnreachableCrlAddress]));
+                request.CertificateExtensions.Add(CertificateRevocationListBuilder.BuildCrlDistributionPointExtension(secondDistributionPoint is null ? [UnreachableCrlAddress] : [UnreachableCrlAddress, secondDistributionPoint]));
             }
 
             if (freshestCrlAddress is not null)

@@ -43,18 +43,19 @@ internal static class SaslMechanismRanking
     // whether it runs on a security context: EXTERNAL only when AUTH=EXTERNAL names it and the
     // password is empty or there is no credential; GSSAPI only with a user name naming a domain or realm, or an empty one
     // (curl's Curl_auth_user_contains_domain); the bearer mechanisms only with a token; the
-    // others only with a user and no token (measured, ADR-0123, ADR-0139).
+    // others only with a user, and with a token only when AUTH= named them or any (*)
+    // (measured, ADR-0123, ADR-0139, ADR-1361).
     private static readonly (string Name, Func<SaslRequest, bool> CanUse, bool RunsOnSecurityContext)[] CurlPreferenceOrder =
     [
         (External, CanUseExternal, false),
         (Gssapi, CanUseGssapi, true),
-        (DigestMd5, HasUserAndNoBearerToken, false),
-        (CramMd5, HasUserAndNoBearerToken, false),
-        (Ntlm, HasUserAndNoBearerToken, true),
+        (DigestMd5, CanUsePassword, false),
+        (CramMd5, CanUsePassword, false),
+        (Ntlm, CanUsePassword, true),
         (OAuthBearer, HasBearerToken, false),
         (XOAuth2, HasBearerToken, false),
-        (Plain, HasUserAndNoBearerToken, false),
-        (Login, HasUserAndNoBearerToken, false),
+        (Plain, CanUsePassword, false),
+        (Login, CanUsePassword, false),
     ];
 
     /// <summary>
@@ -89,7 +90,7 @@ internal static class SaslMechanismRanking
     // the last character; an empty user name passes too, the default credentials.
     private static bool CanUseGssapi(SaslRequest request)
     {
-        if (!HasUserAndNoBearerToken(request))
+        if (!CanUsePassword(request))
         {
             return false;
         }
@@ -101,5 +102,8 @@ internal static class SaslMechanismRanking
 
     private static bool HasBearerToken(SaslRequest request) => request.BearerToken is not null;
 
-    private static bool HasUserAndNoBearerToken(SaslRequest request) => request.BearerToken is null && request.Credential is not null;
+    // curl prefers only the bearer mechanisms once --oauth2-bearer is given, until an AUTH=
+    // login option replaces that preference.
+    private static bool CanUsePassword(SaslRequest request) =>
+        request.Credential is not null && (request.BearerToken is null || request.RequiredMechanism is not null);
 }
