@@ -47,6 +47,14 @@ internal sealed class HttpStreamOpenedLines(ITransferEvents events, string url)
         events.ReportInfo(HttpTransferMessages.Http2ShutsDownConnection(errorCode));
 
     /// <summary>
+    /// Reports the data of the DATA frame that ended an HTTP/2 response whose body is not wanted
+    /// (<c>-I</c>), which <c>-v</c> shows as <c>{ [N bytes data]</c>, N being 0 when there is none (BL-5941).
+    /// </summary>
+    /// <param name="data">The data nghttp2 delivered of the frame.</param>
+    internal void UnwantedDataReceived(ReadOnlyMemory<byte> data) =>
+        events.ReportDataReceived(data.Span);
+
+    /// <summary>
     /// Reports the lines for the stream <paramref name="streamId" /> that sent
     /// <paramref name="fields" />.
     /// </summary>

@@ -61,6 +61,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private bool isResponseEnded;
 
+    /// <summary>Whether the response is being given up (<see cref="AbandonResponseAsync" />), whose body curl reports no data of.</summary>
+    private bool isBodyAbandoned;
+
     private bool isFinalHeadReceived;
 
     private bool isHeadRequest;
@@ -256,7 +259,8 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// does (measured, BL-5906 Notes). A stream whose request has not ended, and the stream an
     /// h2c upgrade continues on, is instead reset with STREAM_CLOSED unless its response has
     /// ended, <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970 Notes), and
-    /// the frames the peer still sends on it are dropped.
+    /// the frames the peer still sends on it are dropped. No data is reported for a body read
+    /// here (measured, BL-5941 Notes).
     /// </summary>
     /// <param name="cancellationToken">Cancels the reads or the write.</param>
     /// <returns>A task that completes when the stream has ended or the reset is written.</returns>
@@ -265,6 +269,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         if (isRequestEnded && !isUpgraded)
         {
+            isBodyAbandoned = true;
             await ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         }
         else if (!isResponseEnded)
@@ -641,7 +646,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         bodyBytesReceived += frame.Content.Length;
         if (EndsAtFinalHead)
         {
-            await EndAtUnwantedBodyAsync(cancellationToken).ConfigureAwait(false);
+            await EndAtUnwantedBodyAsync(frame.Content, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -660,15 +665,23 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// it; a trailer HEADERS right after the head is still read (BL-5468). DATA past the length the
     /// head promises, which for HEAD is none, still breaks RFC 9113 section 8.1.1: nghttp2 reports
     /// it as a <c>-v</c> line and shuts the connection down with GOAWAY PROTOCOL_ERROR, and curl
-    /// exits 0 (measured, curl 8.18.0, BL-5938 Notes).
+    /// exits 0 (measured, curl 8.18.0, BL-5938 Notes). curl then reports the frame's data, as
+    /// <c>-v</c>'s <c>{ [N bytes data]</c> line: <paramref name="data" />, or none of it when it is
+    /// past that length, unless the response is abandoned (measured, BL-5941 Notes).
     /// </summary>
-    private async ValueTask EndAtUnwantedBodyAsync(CancellationToken cancellationToken)
+    private async ValueTask EndAtUnwantedBodyAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
         isResponseEnded = true;
-        if (bodyBytesReceived > promisedBodyLength)
+        bool isPastPromisedLength = bodyBytesReceived > promisedBodyLength;
+        if (isPastPromisedLength)
         {
             openedLines?.ShutsDownConnection(Http2ErrorCode.ProtocolError);
             await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!isBodyAbandoned)
+        {
+            openedLines?.UnwantedDataReceived(isPastPromisedLength ? ReadOnlyMemory<byte>.Empty : data);
         }
     }
 
