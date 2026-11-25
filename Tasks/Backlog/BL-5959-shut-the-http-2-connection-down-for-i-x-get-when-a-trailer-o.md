@@ -1,5 +1,5 @@
 ---
-id: BL-5957
+id: BL-5959
 title: Shut the HTTP/2 connection down for -I -X GET when a trailer or DATA ends the stream short of content-length
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5957 — Shut the HTTP/2 connection down for -I -X GET when a trailer or DATA ends the stream short of content-length
+# BL-5959 — Shut the HTTP/2 connection down for -I -X GET when a trailer or DATA ends the stream short of content-length
 
 ## Goal
 

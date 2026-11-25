@@ -31,7 +31,7 @@ Measured in BL-5941 with `Record-CurlExchange.ps1 -ListenAddress <WSL gateway> -
 - So the head is refused where the 1xx head ending the stream already is (`MalformedHeadOf`), for GET with and without `-I`. Plain GET used to write the empty line; the `clshort, no DATA` row of `Cgr138Tests` and ADR-0847 now say what curl does. Both refused heads now report the message as a `-v` line.
 - `touches` widened with `Cgr138Tests.cs` (that row pinned the empty line); no task in Doing names it. ADR-0847 amended rather than a new ADR: same decision, one more case.
 - `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary`: 0 failing members. Fast tests green.
-- Filed BL-5957 (`-I -X GET` ended short by a trailer or DATA, measured here: exit 0 but a shutdown Curl does not make) and BL-5958 (the `-v` line on the other shutdown paths).
+- Filed BL-5959 (`-I -X GET` ended short by a trailer or DATA, measured here: exit 0 but a shutdown Curl does not make) and BL-5958 (the `-v` line on the other shutdown paths).
 
 ## Log
 
