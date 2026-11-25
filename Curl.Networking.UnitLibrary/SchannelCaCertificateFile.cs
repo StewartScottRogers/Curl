@@ -5,7 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 namespace Curl.Networking;
 
 /// <summary>
-/// Reads a <c>--cacert</c> file as the Schannel build does (ADR-1394, BL-5884), the way curl's
+/// Reads a <c>--cacert</c> file as the Schannel build does (ADR-1396, BL-5884), the way curl's
 /// <c>add_certs_data_to_store</c> in <c>schannel_verify.c</c> walks it: each
 /// <c>-----BEGIN CERTIFICATE-----</c> followed by a line end in turn, up to a line starting
 /// <c>-----END CERTIFICATE-----</c>, whose block must yield a certificate, as Windows'

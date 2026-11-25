@@ -1,4 +1,4 @@
-# ADR-1394: The Schannel build refuses a `--cacert` file with a CERTIFICATE block it cannot read (BL-5884)
+# ADR-1396: The Schannel build refuses a `--cacert` file with a CERTIFICATE block it cannot read (BL-5884)
 
 Status: Accepted. Decided by Claude under Stewart's delegation.
 

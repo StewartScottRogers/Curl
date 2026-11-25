@@ -6,7 +6,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// <see cref="SchannelCaCertificateFile" /> against the <c>--cacert</c> texts measured with curl
-/// 8.22.0 Schannel (BL-5884, ADR-1394): which are refused with exit 77, with which line, and which
+/// 8.22.0 Schannel (BL-5884, ADR-1396): which are refused with exit 77, with which line, and which
 /// are read.
 /// </summary>
 [TestClass]

@@ -89,7 +89,7 @@ Design (record it in an ADR, decided by Claude under Stewart's delegation):
 - Check `SslStreamTlsProviderTests` near `CorruptCertificatePem` (the "corrupt" data rows and
   the "mixed.pem" test) for Schannel-build expectations that this changes.
 
-Run of 2026-11-25 (lane 1): implemented the design above, recorded in ADR-1394.
+Run of 2026-11-25 (lane 1): implemented the design above, recorded in ADR-1396.
 `SchannelCaCertificateFile` replaces `ImportParsableCertificates`; `SchannelCaCertificateFileException`
 carries curl's line and `TrustAnchorsUnusable` returns exit 77 with it. Checked with the built
 `curl.exe` through `Record-CurlExchange.ps1 -Tls`, with an unrelated self-signed root standing in for

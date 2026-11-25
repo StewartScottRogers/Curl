@@ -93,7 +93,7 @@ adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions
 it trusts only the certificates in that PEM file, which the Schannel build reads through
 `SchannelCaCertificateFile` as curl's `schannel_verify.c` walks it, a `CERTIFICATE` block without
 its end line or yielding no certificate refusing the whole file with exit 77 through
-`SchannelCaCertificateFileException` (ADR-1394, BL-5884); there the Schannel build also checks
+`SchannelCaCertificateFileException` (ADR-1396, BL-5884); there the Schannel build also checks
 revocation below the root unless `TlsClientOptions.SkipRevocationCheck` (`--ssl-no-revoke`)
 is set, and names the first of a certificate out of date, an incomplete chain, an untrusted
 root and an unknown revocation status (ADR-0321, BL-368). There too the Schannel build accepts
