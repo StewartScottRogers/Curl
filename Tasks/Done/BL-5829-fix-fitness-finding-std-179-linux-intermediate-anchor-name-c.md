@@ -59,7 +59,7 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
   `VerifyPeer`, `--capath` goes through `VerifyChain`, and the dotted CN gives exit 60 `(48)`. REF2's
   answers are the finding's measurements; the CN rule is OpenSSL's `cn2dnsid`.
 - `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
-- Follow-up: BL-5903 (a CN holding a NUL is 47 here, 53 in OpenSSL; CNs in multi-valued names).
+- Follow-up: BL-5921 (a CN holding a NUL is 47 here, 53 in OpenSSL; CNs in multi-valued names).
 
 Re-reported in fitness review 2026-11-24T0708 (commit `1e5d591`, the `preview` release binaries) as `Linux, intermediate anchor: name constraints are applied to a dotless subject CN; OpenSSL curl ignores it (STILL OPEN, unchanged)`. Where it differs from the Context above, this report wins:
 

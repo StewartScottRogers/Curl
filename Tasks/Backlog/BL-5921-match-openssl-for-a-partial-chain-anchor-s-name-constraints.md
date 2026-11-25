@@ -1,5 +1,5 @@
 ---
-id: BL-5903
+id: BL-5921
 title: Match OpenSSL for a partial-chain anchor's name constraints on a subject CN holding a NUL (53) or inside a multi-valued name
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5903 — Match OpenSSL for a partial-chain anchor's name constraints on a subject CN holding a NUL (53) or inside a multi-valued name
+# BL-5921 — Match OpenSSL for a partial-chain anchor's name constraints on a subject CN holding a NUL (53) or inside a multi-valued name
 
 ## Goal
 
