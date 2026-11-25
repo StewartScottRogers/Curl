@@ -51,3 +51,4 @@ Requeued unedited (no code written): the fix lives in CertificateNameConstraints
 - 2026-11-24: Created from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: d911915c 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Needs CertificateNameConstraints.cs held by BL-5804 (and BL-5849 for the same name matching); depends-on added
+- 2026-11-24: Backlog -> Doing. Criteria at claim: d911915c 69116afe 3d836d5e.
