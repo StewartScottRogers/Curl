@@ -25,7 +25,7 @@ internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsPro
     /// <summary>The closing tag of the client's stream.</summary>
     internal const string StreamClose = "</stream:stream>";
 
-    private static readonly XmlWriterSettings SentXmlSettings = new() { OmitXmlDeclaration = true, NewLineHandling = NewLineHandling.Entitize };
+    private static readonly XmlWriterSettings LineEndPreservingXmlSettings = new() { OmitXmlDeclaration = true, NewLineHandling = NewLineHandling.Entitize };
 
     private readonly IConnection plaintext = connection;
 
@@ -165,7 +165,7 @@ internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsPro
         }
 
         ThrowWhenError(answer);
-        await WriteOutputAsync(Encoding.UTF8.GetBytes(string.Concat(answer.Elements().Select(payload => payload.ToString(SaveOptions.DisableFormatting))) + "\n")).ConfigureAwait(false);
+        await WriteOutputAsync(Encoding.UTF8.GetBytes(string.Concat(answer.Elements().Select(Serialize)) + "\n")).ConfigureAwait(false);
     }
 
     private async ValueTask DrainUntilClosedAsync()
@@ -227,20 +227,27 @@ internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsPro
     }
 
     /// <summary>
-    /// Serialises an element to send, writing each CR in it as <c>&amp;#xD;</c> and each LF in its text as itself, so
-    /// the server's XML line-end normalisation (XML 1.0, 2.11) gives back the characters it held.
+    /// Serialises an element, writing each CR in its text and attribute values as <c>&amp;#xD;</c> and each LF in its
+    /// text as itself on every platform, so XML line-end normalisation (XML 1.0, 2.11) gives a reader back the
+    /// characters it held.
     /// </summary>
+    private static string Serialize(XElement element)
+    {
+        using StringWriter text = new(CultureInfo.InvariantCulture);
+        using (XmlWriter writer = XmlWriter.Create(text, LineEndPreservingXmlSettings))
+        {
+            element.WriteTo(writer);
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>Serialises an element to send, failing when it holds a character XML forbids.</summary>
     private static string Encode(XElement element)
     {
         try
         {
-            using StringWriter text = new(CultureInfo.InvariantCulture);
-            using (XmlWriter writer = XmlWriter.Create(text, SentXmlSettings))
-            {
-                element.WriteTo(writer);
-            }
-
-            return text.ToString();
+            return Serialize(element);
         }
         catch (ArgumentException)
         {
