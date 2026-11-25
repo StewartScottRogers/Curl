@@ -25,6 +25,12 @@ namespace Curl.Original.Protocol.Http;
 /// <see cref="HttpTransferMessages.BadContentEncoding" /> (ADR-0031).
 /// </para>
 /// <para>
+/// A <c>deflate</c> zlib stream hands out nothing until a first piece of the body has been
+/// decoded, or <see cref="OutputSize" /> bytes have: corrupt data found before then writes
+/// nothing and is read again as raw deflate for its text, which a zlib header makes
+/// <see cref="HttpTransferMessages.InvalidStoredBlockLengths" />, as curl does (BL-5889).
+/// </para>
+/// <para>
 /// A body that ends before its coding's stream does is not an error: what was decoded is
 /// written and the rest is dropped, as curl does.
 /// </para>
@@ -107,6 +113,15 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     private const int ZLibHeaderLength = 2;
 
     private bool ended;
+
+    /// <summary>How many decoded bytes <see cref="output" /> holds that are not yet handed out.</summary>
+    private int heldLength;
+
+    /// <summary>Whether any decoded byte has been handed out.</summary>
+    private bool handedOut;
+
+    /// <summary>The text of the failed trailer check, thrown once the bytes decoded before it are handed out.</summary>
+    private string? failedCheck;
 
     /// <summary>
     /// How many encoded bytes have been fed to the decompression stream.
@@ -217,8 +232,36 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         }
 
         head = [.. head, .. encoded.Span[..Math.Min(encoded.Length, Math.Max(0, HeadLength - head.Length))]];
+        foreach (ReadOnlyMemory<byte> piece in FeedAndRead(encoded))
+        {
+            yield return piece;
+        }
+
+        if (heldLength > 0)
+        {
+            yield return TakeHeld();
+        }
+
+        if (failedCheck is not null)
+        {
+            throw Corrupt(failedCheck);
+        }
+
+        if (trailer is not null)
+        {
+            FindEndOnceFinished(encoded.Span);
+            Carry(encoded.Span);
+        }
+    }
+
+    /// <summary>
+    /// Feeds <paramref name="encoded" /> to the decompression stream in the pieces
+    /// <see cref="FeedLengths" /> gives, until a trailer check fails, and returns what it decodes.
+    /// </summary>
+    private IEnumerable<ReadOnlyMemory<byte>> FeedAndRead(ReadOnlyMemory<byte> encoded)
+    {
         int fed = 0;
-        foreach (int length in FeedLengths(encoded.Length))
+        foreach (int length in FeedLengths(encoded.Length).TakeWhile(_ => failedCheck is null))
         {
             input.Pending = encoded.Slice(fed, length);
             fed += length;
@@ -228,12 +271,22 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
                 yield return piece;
             }
         }
+    }
 
-        if (trailer is not null)
-        {
-            FindEndOnceFinished(encoded.Span);
-            Carry(encoded.Span);
-        }
+    /// <summary>
+    /// Tells whether decoded bytes are held rather than handed out as they are read: a
+    /// <c>deflate</c> zlib stream's, before any has been handed out, because curl writes
+    /// nothing a zlib call decoded when that call fails.
+    /// </summary>
+    private bool HoldsDecoded() => !handedOut && coding == HttpContentCoding.Deflate && decompressor is ZLibStream;
+
+    /// <summary>Hands out the decoded bytes <see cref="output" /> holds.</summary>
+    private Memory<byte> TakeHeld()
+    {
+        Memory<byte> held = output.AsMemory(0, heldLength);
+        heldLength = 0;
+        handedOut = true;
+        return held;
     }
 
     /// <summary>
@@ -276,9 +329,10 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         int read;
         while ((read = ReadDecoded(decompressor!, readSingly.Span)) > 0)
         {
-            fedAtLastOutput = fedTotal;
-            trailer?.Append(output.AsSpan(0, read));
-            yield return output.AsMemory(0, read);
+            if (KeepDecoded(read))
+            {
+                yield return TakeHeld();
+            }
 
             // GZipStream goes on to decode a second gzip member; stop before it does.
             if (decompressor is GZipStream)
@@ -290,11 +344,30 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         // A trailer fed alone decodes nothing, and the next bytes can start a member
         // GZipStream fails on; find the end before they are fed. Before anything is decoded
         // the trailer sought is all zeros, which compressed zeros can hold.
-        if (decompressor is GZipStream && fedAtLastOutput is not null)
+        if (GZipMemberMayHaveEnded())
         {
             FindEnd(encoded.Span);
         }
     }
+
+    /// <summary>
+    /// Records the <paramref name="read" /> bytes just decoded into <see cref="output" />, and
+    /// tells whether the bytes it holds are to be handed out now.
+    /// </summary>
+    private bool KeepDecoded(int read)
+    {
+        fedAtLastOutput = fedTotal;
+        trailer?.Append(output.AsSpan(heldLength, read));
+        heldLength += read;
+        return !HoldsDecoded() || heldLength == OutputSize;
+    }
+
+    /// <summary>
+    /// Tells whether a gzip member that has decoded something, with no trailer check failed,
+    /// may have ended in the bytes fed so far.
+    /// </summary>
+    private bool GZipMemberMayHaveEnded() =>
+        decompressor is GZipStream && fedAtLastOutput is not null && failedCheck is null;
 
     /// <summary>
     /// Holds the first bytes until there are enough to choose the decompression stream, and
@@ -552,15 +625,22 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     private bool StartsAnotherGzipMember(ReadOnlySpan<byte> after) =>
         decompressor is GZipStream && after.Length >= 2 && after[0] == GzipFirstByte && after[1] == GzipSecondByte;
 
+    /// <summary>
+    /// Reads the next decoded bytes into <see cref="output" />, after those it holds. A failed
+    /// trailer check reads as no bytes and is kept in <see cref="failedCheck" />; any other
+    /// corrupt data fails at once, and the held bytes are never handed out.
+    /// </summary>
     private int ReadDecoded(Stream stream, ReadOnlySpan<byte> readSingly)
     {
         try
         {
-            return stream.Read(output);
+            return stream.Read(output.AsSpan(heldLength));
         }
         catch (InvalidDataException)
         {
-            throw Corrupt(CheckFailed(readSingly) ?? InBlockFault() ?? HttpTransferMessages.BadContentEncoding);
+            failedCheck = CheckFailed(readSingly)
+                ?? throw Corrupt(InBlockFault() ?? HttpTransferMessages.BadContentEncoding);
+            return 0;
         }
     }
 
@@ -576,13 +656,13 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
 
     /// <summary>
     /// Names zlib's text for a first deflate block it refuses, when the stream failed before
-    /// decoding anything. A <c>deflate</c> body that fails after its zlib header is read again
+    /// handing out anything. A <c>deflate</c> body that fails after its zlib header is read again
     /// as raw deflate from its first byte, as curl does, so its text is the raw one; a gzip
     /// member's block starts after its 10-byte header (one with flag bits has no answer).
     /// </summary>
     private string? InBlockFault()
     {
-        if (fedAtLastOutput is not null)
+        if (handedOut)
         {
             return null;
         }
