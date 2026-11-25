@@ -31,3 +31,4 @@ Found by BL-5874. `Transport/Udp/DnsUdpTransport.cs` already gives the right exi
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 61a38b5a ff8705aa 3d836d5e.
