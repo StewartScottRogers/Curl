@@ -1,5 +1,5 @@
 ---
-id: BL-5944
+id: BL-5948
 title: Shut the connection down after a -I HTTP/1.1 response that carries body bytes
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5944 — Shut the connection down after a -I HTTP/1.1 response that carries body bytes
+# BL-5948 — Shut the connection down after a -I HTTP/1.1 response that carries body bytes
 
 ## Goal
 

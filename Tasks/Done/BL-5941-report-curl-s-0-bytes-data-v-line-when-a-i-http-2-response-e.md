@@ -32,7 +32,7 @@ Found in BL-5938. `Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2Fr
 - So `Http2StreamConnection.EndAtUnwantedBodyAsync` reports the frame's data, empty when past the promised length, and nothing while `AbandonResponseAsync` reads the body. Matches measured curl, so no new ADR (ADR-1384 covers the shutdown).
 - `touches` widened to `HttpStreamOpenedLines.cs` (the event sink the stream has); no task in Doing named it.
 - End-to-end with Curl.Console, the DATA cases (`D no\n`, `D! `, `-I -X GET`) match curl's lines.
-- Filed the gaps found beside it: BL-5942 (no-body HTTP/2 responses without that DATA path), BL-5943 (`-I -X GET` exit 16), BL-5944 (`-I` HTTP/1.1 with body bytes shuts the connection down).
+- Filed the gaps found beside it: BL-5946 (no-body HTTP/2 responses without that DATA path), BL-5947 (`-I -X GET` exit 16), BL-5948 (`-I` HTTP/1.1 with body bytes shuts the connection down).
 - Fast tests: 58079 passed, 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary`: 0 failing members.
 
 ## Log

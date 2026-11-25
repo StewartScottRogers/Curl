@@ -1,5 +1,5 @@
 ---
-id: BL-5943
+id: BL-5947
 title: Fail -I -X GET over HTTP/2 with exit 16 when the head ends the stream short of content-length
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5943 — Fail -I -X GET over HTTP/2 with exit 16 when the head ends the stream short of content-length
+# BL-5947 — Fail -I -X GET over HTTP/2 with exit 16 when the head ends the stream short of content-length
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-5942
+id: BL-5946
 title: Report curl's { [0 bytes data] -v line for an HTTP/2 response with no body
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5942 — Report curl's { [0 bytes data] -v line for an HTTP/2 response with no body
+# BL-5946 — Report curl's { [0 bytes data] -v line for an HTTP/2 response with no body
 
 ## Goal
 
