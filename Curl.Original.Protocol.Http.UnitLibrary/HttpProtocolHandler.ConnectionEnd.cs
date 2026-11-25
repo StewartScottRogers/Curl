@@ -9,9 +9,10 @@ public sealed partial class HttpProtocolHandler
     /// Reports what became of the connection once it is disposed, as curl 8.21.0's <c>-v</c>
     /// does (ADR-0050): left intact when marked reusable, closed when the transfer failed, and
     /// shut down otherwise - its response did not persist, it died before its response, or only
-    /// <c>--fail-with-body</c> failed it once its body was read. A transfer that times out, or
-    /// that <c>-f</c> fails, on an HTTP/2 stream reports it left intact too, as curl 8.18.0's
-    /// nghttp2 build does (measured, BL-5974 and BL-5977). When
+    /// <c>--fail-with-body</c> failed it once its body was read. A transfer that times out on an
+    /// HTTP/2 or HTTP/3 stream, or that <c>-f</c> fails on an HTTP/2 one, reports it left intact
+    /// too, as curl 8.18.0's nghttp2 and ngtcp2 build does (measured, BL-5974, BL-5977 and
+    /// BL-5978). When
     /// the request goes out again on a new connection - after it died, or as a retry such as the
     /// resend after a 417 (measured, BL-1446 Notes) - the line saying so follows. A connection left intact
     /// that another transfer still shares, on a stream of its own, is reported by the last
@@ -51,11 +52,11 @@ public sealed partial class HttpProtocolHandler
 
     /// <summary>
     /// Tells whether <c>-v</c> says the connection was left intact: it is one
-    /// (<see cref="HttpAttemptOutcome.ReportsLeftIntact" />), or only its HTTP/2 stream ended
-    /// (<see cref="HttpAttemptOutcome.EndedOnlyItsHttp2Stream" />).
+    /// (<see cref="HttpAttemptOutcome.ReportsLeftIntact" />), or only its HTTP/2 or HTTP/3 stream
+    /// ended (<see cref="HttpAttemptOutcome.EndedOnlyItsStream" />).
     /// </summary>
     private static bool SaysLeftIntact(HttpAttemptOutcome outcome) =>
-        outcome.ReportsLeftIntact || outcome.EndedOnlyItsHttp2Stream;
+        outcome.ReportsLeftIntact || outcome.EndedOnlyItsStream;
 
     /// <summary>
     /// Tells whether a failure that came once a response began ends with <c>closing connection

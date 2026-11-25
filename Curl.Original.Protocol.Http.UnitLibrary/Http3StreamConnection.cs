@@ -171,14 +171,45 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     internal void EchoResponseLineAfter(byte[] line) => trace.ResponseLineReported(request!.StreamId, line);
 
     /// <summary>
+    /// Gives up the stream of a transfer that timed out, as curl's HTTP/3 layer does
+    /// (<see cref="Http3ClientRequestStream.CancelAsync" />, measured, BL-5978), unless it was
+    /// never opened or has ended both ways. A connection too broken to send that takes no new
+    /// stream.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the cancellation is sent or the send has failed.</returns>
+    internal async ValueTask CancelUnlessEndedBothWaysAsync(CancellationToken cancellationToken)
+    {
+        if (request is null || (isRequestEnded && isResponseEnded))
+        {
+            return;
+        }
+
+        try
+        {
+            await request.CancelAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            session.StopNewStreams();
+        }
+    }
+
+    /// <summary>
     /// Marks the transfer on this stream done with the session and writes curl's
     /// <c>--trace-config http/3</c> lines for it (<see cref="Http3StreamTrace.TransferDone" />, BL-1208).
+    /// Nothing for a stream a time limit cut off before it opened.
     /// </summary>
     /// <param name="connectionNumber">The connection's number, as in <c>Connection #&lt;n&gt;</c>.</param>
     internal void ReportTransferDone(long connectionNumber)
     {
+        if (request is null)
+        {
+            return;
+        }
+
         (long? streamsLeft, int streamsInUse) = session.EndRequestStream();
-        trace.TransferDone(request!.StreamId, connectionNumber, streamsLeft, streamsInUse);
+        trace.TransferDone(request.StreamId, connectionNumber, streamsLeft, streamsInUse);
     }
 
     /// <summary>

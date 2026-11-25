@@ -40,6 +40,7 @@ public sealed partial class HttpProtocolHandler
         unheldSession ??= UnheldHttp2Session(upgradedSession, connection);
         IHttpStreamSession? used = streams ?? upgradedSession;
         outcome.RanOnHttp2Stream = used is Http2Session;
+        outcome.RanOnHttp3Stream = used is Http3Session;
         SkipClosingGoAwayWhenGivenUp(outcome, used);
         SettleConnection(plan, connection, used, outcome);
         await ShutDownAsync(unheldSession).ConfigureAwait(false);
@@ -86,14 +87,33 @@ public sealed partial class HttpProtocolHandler
 
     /// <summary>
     /// Tells whether the connection can carry the next transfer: its response is reported left
-    /// intact over HTTP/1.x or HTTP/2, or over HTTP/3 while the session takes new streams; or
-    /// the transfer timed out, or <c>-f</c> failed it, on a stream of an HTTP/2 session that
-    /// still takes new ones, as curl ends only the stream then (BL-5976, BL-5977).
+    /// intact, or only its stream ended (<see cref="HttpAttemptOutcome.EndedOnlyItsStream" />,
+    /// BL-5976, BL-5977, BL-5978); over HTTP/3, or after only its stream ended, the session must
+    /// also still take new streams.
     /// </summary>
     private static bool CarriesNextTransfer(IHttpStreamSession? streams, HttpAttemptOutcome outcome) =>
-        outcome.EndedOnlyItsHttp2Stream
-            ? ((Http2Session)streams!).AcceptsNewStreams
+        outcome.EndedOnlyItsStream
+            ? (streams as Http2Session)?.AcceptsNewStreams ?? ((Http3Session)streams!).AcceptsNewStreams
             : outcome.ReportsLeftIntact && streams is not Http3Session { AcceptsNewStreams: false };
+
+    /// <summary>
+    /// Ends the stream of an exchange that timed out: an HTTP/2 stream is reset
+    /// (<see cref="ResetGivenUpStreamAsync" />); an HTTP/3 stream is cancelled
+    /// (<see cref="Http3StreamConnection.CancelUnlessEndedBothWaysAsync" />) and its transfer
+    /// marked done, curl's <c>--trace-config http/3</c> lines included (BL-5978). The
+    /// transfer's own token is cancelled, so none is passed on.
+    /// </summary>
+    private static async ValueTask EndTimedOutStreamAsync(IHttpStreamConnection? stream, ConnectResult connect)
+    {
+        if (stream is Http3StreamConnection http3)
+        {
+            await http3.CancelUnlessEndedBothWaysAsync(CancellationToken.None).ConfigureAwait(false);
+            ReportTransferDone(http3, connect);
+            return;
+        }
+
+        await ResetGivenUpStreamAsync(stream, CancellationToken.None).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Resets the HTTP/2 stream of an exchange that timed out or that <c>-f</c> failed

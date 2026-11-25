@@ -112,8 +112,7 @@ public sealed partial class HttpProtocolHandler
         {
             HttpAttemptOutcome timedOutOutcome = OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
             timedOutOutcome.UpgradedSession = UpgradedSessionOf(connection);
-            // The transfer's own token is cancelled: its time limit is what brought it here.
-            await ResetGivenUpStreamAsync(TrailerStreamOf(requestStream, connection), CancellationToken.None).ConfigureAwait(false);
+            await EndTimedOutStreamAsync(TrailerStreamOf(requestStream, connection), connect).ConfigureAwait(false);
             return timedOutOutcome;
         }
         catch (OperationCanceledException canceled)
