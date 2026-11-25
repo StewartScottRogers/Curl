@@ -1,4 +1,4 @@
-# ADR-1369: A host name mismatch outranks a rejected certificate in the OpenSSL build
+# ADR-1372: A host name mismatch outranks a rejected certificate in the OpenSSL build
 
 - Status: Accepted
 - Date: 2026-11-24

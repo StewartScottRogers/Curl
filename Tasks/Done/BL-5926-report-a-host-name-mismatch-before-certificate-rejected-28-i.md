@@ -30,7 +30,7 @@ Found by BL-5917 (ADR-1363). ADR-1351 and VerifyChain_RejectedRootAndAnotherHost
 - Re-measured with WSL curl 8.18.0 (OpenSSL 3.5.5) against `openssl s_server`: a rejected root
   (`--cacert` or `--capath`) and a rejected leaf asked for as `good.test` are exit 60
   `certificate rejected (28)`; as `other.test` or `127.0.0.1` they are exit 60 with the host name or
-  `ipv4 address` mismatch message. Recorded in ADR-1369.
+  `ipv4 address` mismatch message. Recorded in ADR-1372.
 - Fix: `ServerCertificateVerification.Refusal` skips the rejected-certificate refusal when the name is
   refused (`RefusesTheName`); the verify result is then 1. The Schannel build is unaffected: it reads no
   rejected settings, and a revoked staple still ranks as before.
