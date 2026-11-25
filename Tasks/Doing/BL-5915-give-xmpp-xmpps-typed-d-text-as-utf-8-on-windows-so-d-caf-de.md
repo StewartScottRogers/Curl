@@ -42,3 +42,4 @@ XMPP handler prefers. The path to the handler is `EasyOptionsFromCommandLine`, `
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: a04963e0 ab56beea c8baba98 5da11203 3d836d5e.
