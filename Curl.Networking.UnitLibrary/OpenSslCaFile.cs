@@ -6,9 +6,10 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The certificates of a <c>--cacert</c> file or <c>--capath</c> directory as curl's OpenSSL build
-/// reads them: <c>CERTIFICATE</c> blocks and <c>TRUSTED CERTIFICATE</c> blocks, each of the latter
-/// a certificate followed by OpenSSL's <c>X509_CERT_AUX</c> settings, which can distrust the
-/// certificate for server authentication.
+/// reads them: <c>CERTIFICATE</c>, <c>X509 CERTIFICATE</c> and <c>TRUSTED CERTIFICATE</c> blocks.
+/// A certificate may be followed by OpenSSL's <c>X509_CERT_AUX</c> settings, which can distrust it
+/// for server authentication; a <c>--cacert</c> file's are read from <c>TRUSTED CERTIFICATE</c>
+/// blocks only, a <c>--capath</c> file's from any of the three.
 /// </summary>
 /// <param name="Certificates">Every certificate read, in the order read.</param>
 /// <param name="RejectedForServerAuthentication">
@@ -18,6 +19,7 @@ namespace Curl.Networking;
 internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IReadOnlySet<string> RejectedForServerAuthentication)
 {
     private const string CertificateLabel = "CERTIFICATE";
+    private const string OldCertificateLabel = "X509 CERTIFICATE";
     private const string TrustedCertificateLabel = "TRUSTED CERTIFICATE";
     private const string ServerAuthentication = "1.3.6.1.5.5.7.3.1";
     private const string AnyExtendedKeyUsage = "2.5.29.37.0";
@@ -32,12 +34,13 @@ internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IR
     /// </exception>
     internal static OpenSslCaFile Read(string pem)
     {
-        var file = Of(ReadBlocks(pem));
+        var file = Of(ReadBlocks(pem, everyLabelMayHoldSettings: false));
 
         // PemEncoding skips a block whose body is not base64, so the blocks read are counted
         // against the blocks begun.
         var read = file.Certificates.Count;
-        if (read == 0 || read != BlocksBegun(pem, CertificateLabel) + BlocksBegun(pem, TrustedCertificateLabel))
+        var begun = BlocksBegun(pem, CertificateLabel) + BlocksBegun(pem, OldCertificateLabel) + BlocksBegun(pem, TrustedCertificateLabel);
+        if (read == 0 || read != begun)
         {
             throw new CryptographicException("The file holds no certificate, or one that could not be decoded.");
         }
@@ -56,7 +59,7 @@ internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IR
         var blocks = new List<(X509Certificate2 Certificate, bool Rejects)>();
         try
         {
-            foreach (var block in ReadBlocks(pem))
+            foreach (var block in ReadBlocks(pem, everyLabelMayHoldSettings: true))
             {
                 blocks.Add(block);
             }
@@ -107,11 +110,11 @@ internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IR
         return new OpenSslCaFile([.. Certificates, .. directory.Certificates], rejected);
     }
 
-    private static IEnumerable<(X509Certificate2 Certificate, bool Rejects)> ReadBlocks(string pem)
+    private static IEnumerable<(X509Certificate2 Certificate, bool Rejects)> ReadBlocks(string pem, bool everyLabelMayHoldSettings)
     {
         for (var rest = pem.AsMemory(); PemEncoding.TryFind(rest.Span, out var fields); rest = rest[fields.Location.End..])
         {
-            if (ReadBlock(rest.Span, fields) is { } block)
+            if (ReadBlock(rest.Span, fields, everyLabelMayHoldSettings) is { } block)
             {
                 yield return block;
             }
@@ -120,27 +123,40 @@ internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IR
 
     private static int BlocksBegun(string pem, string label) => pem.AsSpan().Count($"-----BEGIN {label}-----");
 
-    private static (X509Certificate2 Certificate, bool Rejects)? ReadBlock(ReadOnlySpan<char> text, PemFields fields) =>
-        text[fields.Label] switch
+    // OpenSSL reads a --cacert file with PEM_X509_INFO_read_bio, which ignores what follows the
+    // certificate in a CERTIFICATE or X509 CERTIFICATE block, and a --capath file with
+    // PEM_read_bio_X509_AUX, which reads it as settings under all three labels (measured with curl
+    // 8.18.0 on OpenSSL 3.5.5, BL-5927).
+    private static (X509Certificate2 Certificate, bool Rejects)? ReadBlock(ReadOnlySpan<char> text, PemFields fields, bool everyLabelMayHoldSettings)
+    {
+        var label = text[fields.Label];
+        var trusted = label is TrustedCertificateLabel;
+        if (!trusted && label is not (CertificateLabel or OldCertificateLabel))
         {
-            CertificateLabel => (X509Certificate2.CreateFromPem(text[fields.Location]), false),
-            TrustedCertificateLabel => ReadTrustedCertificate(Convert.FromBase64String(text[fields.Base64Data].ToString())),
-            _ => null,
-        };
+            return null;
+        }
 
-    private static (X509Certificate2 Certificate, bool Rejects) ReadTrustedCertificate(byte[] der)
+        return ReadCertificate(Convert.FromBase64String(text[fields.Base64Data].ToString()), trusted || everyLabelMayHoldSettings);
+    }
+
+    private static (X509Certificate2 Certificate, bool Rejects) ReadCertificate(byte[] der, bool readsSettings)
     {
         try
         {
             AsnDecoder.ReadEncodedValue(der, AsnEncodingRules.DER, out _, out _, out var certificateLength);
-            var settings = new AsnReader(der.AsMemory(certificateLength), AsnEncodingRules.DER);
-            var rejects = settings.HasData && RejectsServerAuthentication(settings.ReadSequence());
+            var rejects = readsSettings && SettingsRejectServerAuthentication(der.AsMemory(certificateLength));
             return (X509CertificateLoader.LoadCertificate(der.AsSpan(0, certificateLength)), rejects);
         }
         catch (AsnContentException exception)
         {
-            throw new CryptographicException("A trusted certificate could not be decoded.", exception);
+            throw new CryptographicException("A certificate or its trust settings could not be decoded.", exception);
         }
+    }
+
+    private static bool SettingsRejectServerAuthentication(ReadOnlyMemory<byte> afterCertificate)
+    {
+        var settings = new AsnReader(afterCertificate, AsnEncodingRules.DER);
+        return settings.HasData && RejectsServerAuthentication(settings.ReadSequence());
     }
 
     // OpenSSL's obj_trust: a rejected use naming server authentication or any use refuses it, as

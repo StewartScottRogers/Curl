@@ -14,7 +14,8 @@ namespace Curl.Networking;
 /// Pins how the OpenSSL build reads <c>TRUSTED CERTIFICATE</c> blocks of a <c>--cacert</c> file
 /// and their trust and reject settings, each verdict as <c>openssl verify -partial_chain
 /// -purpose sslserver</c> 3.5 gives it (BL-5879, STD-198), and of <c>--capath</c> hashed files,
-/// as curl 8.18.0 on OpenSSL 3.5.5 gives it (BL-5917).
+/// as curl 8.18.0 on OpenSSL 3.5.5 gives it (BL-5917), and how it reads <c>X509 CERTIFICATE</c>
+/// blocks of both, and settings after a plain label, as the same curl does (BL-5927).
 /// </summary>
 [TestClass]
 public sealed class ServerCertificateVerificationTrustedCertificateTests
@@ -323,6 +324,73 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
 
         Assert.AreNotEqual(Rejected, failure?.Message);
     }
+
+    [TestMethod]
+    public void VerifyChain_X509CertificateBlockInACaFile_Verifies()
+    {
+        using var chain = IssuedChain.Create();
+
+        var verdict = Verify(OldLabel(chain.Root), chain);
+
+        AssertVerdict(true, verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_X509CertificateBlockInACaDirectoryFile_Verifies()
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, OldLabel(chain.Root));
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        AssertVerdict(true, verdict);
+    }
+
+    [TestMethod]
+    [DataRow("MAA=")]
+    [DataRow("!!!!")]
+    public void VerifyChain_UndecodableX509CertificateBlockInACaFile_RefusesTheFile(string body)
+    {
+        using var chain = IssuedChain.Create();
+        var pem = Plain(chain.Root) + $"-----BEGIN X509 CERTIFICATE-----\n{body}\n-----END X509 CERTIFICATE-----\n";
+
+        var verdict = Verify(pem, chain);
+
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, verdict.ExitCode, verdict.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("CERTIFICATE")]
+    [DataRow("X509 CERTIFICATE")]
+    public void VerifyChain_RejectSettingsAfterAPlainLabelInACaFile_AreIgnored(string label)
+    {
+        using var chain = IssuedChain.Create();
+        var pem = Relabelled(Trusted(chain.Root, null, ServerAuthentication), label);
+
+        var verdict = Verify(pem, chain);
+
+        AssertVerdict(true, verdict);
+    }
+
+    [TestMethod]
+    [DataRow("CERTIFICATE")]
+    [DataRow("X509 CERTIFICATE")]
+    public void VerifyChain_RejectSettingsAfterAPlainLabelInACaDirectoryFile_AreHonoured(string label)
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, Relabelled(Trusted(chain.Root, null, ServerAuthentication), label));
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        AssertVerdict(false, verdict);
+    }
+
+    private static string OldLabel(X509Certificate2 certificate) => Relabelled(Plain(certificate), "X509 CERTIFICATE");
+
+    // The PEM block under another label, whichever certificate label it had.
+    private static string Relabelled(string pem, string label) =>
+        pem.Replace("TRUSTED CERTIFICATE-", "CERTIFICATE-", StringComparison.Ordinal)
+            .Replace(" CERTIFICATE-", $" {label}-", StringComparison.Ordinal);
 
     private const string Undecodable = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
 

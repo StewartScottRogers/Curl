@@ -21,9 +21,9 @@ internal sealed partial class ServerCertificateVerification
 
     private const string OpenSslCertificateRejectedRefusal = "SSL certificate OpenSSL verify result: certificate rejected (28)";
 
-    // The OpenSSL build refuses the whole file (exit 77) unless every CERTIFICATE and TRUSTED
-    // CERTIFICATE block in it parses and there is at least one. The Schannel build trusts
-    // whatever CERTIFICATE blocks parse.
+    // The OpenSSL build refuses the whole file (exit 77) unless every CERTIFICATE, X509
+    // CERTIFICATE and TRUSTED CERTIFICATE block in it parses and there is at least one. The
+    // Schannel build trusts whatever CERTIFICATE blocks parse.
     // A CURLOPT_CAINFO_BLOB is read as the file would be, and wins over it (ADR-0704).
     // The --cacert certificates, then the --capath ones.
     private X509Certificate2Collection ReadCaCertificates(OpenSslCaFile directory)
@@ -90,8 +90,8 @@ internal sealed partial class ServerCertificateVerification
             ? throw new FileNotFoundException("The CA certificate file name is empty.")
             : File.ReadAllText(path);
 
-    // The OpenSSL build reads a --capath file's TRUSTED CERTIFICATE blocks and their settings as
-    // it reads --cacert's, an earlier directory's or file's copy winning (BL-5917).
+    // The OpenSSL build reads a --capath file's certificate blocks and the settings following any
+    // of them (BL-5917, BL-5927), an earlier directory's or file's copy winning.
     private OpenSslCaFile ReadCaCertificateDirectory() =>
         OpenSslCaFile.Of(CaCertificateDirectories().SelectMany(ReadHashedDirectory));
 
