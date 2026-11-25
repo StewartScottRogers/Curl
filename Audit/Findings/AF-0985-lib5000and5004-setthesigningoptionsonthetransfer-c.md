@@ -3,8 +3,8 @@ id: AF-0985
 title: Lib5000And5004_SetTheSigningOptionsOnTheTransfer checks the signing key and key id only for null
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-25_1306.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib3101To5004Tests.cs:Lib5000And5004_SetTheSigningOptionsOnTheTransfer:weak-assertion
 reproduction: none
 task: BL-5787
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-25
+closed-how: reliable-reaudit
+closed-by: 2026-11-25_1306.md
 ---
 # AF-0985 - Lib5000And5004_SetTheSigningOptionsOnTheTransfer checks the signing key and key id only for null
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib3101To5004Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-25 | 2026-11-25_1306.md | reproduces: no | Select-String for 'IsNotNull\(seen.Authentication.HttpSignature' found no match; lines 347-349 assert the algorithm, the key 9f8362f8...29c5 and the key id test-key-ed25519 exactly.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-25: accepted -> closed. Re-audit 2026-11-25_1306.md: the reproduction no longer reproduces.

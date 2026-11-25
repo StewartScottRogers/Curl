@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-25 | 2026-11-25_1306.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: line 57, 'bool PostWithoutData = false' -> 'true', outcome survived. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-11-22: filed proposed.

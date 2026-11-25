@@ -46,6 +46,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 - 2026-11-22 | 2026-11-22_0210.md | not re-audited | Ran the -Site command: outcome site-missing. ApplyNextRule (OpenSslCipherString.cs:159) has no '<' site any more; it starts with 'if (IsSeparator(ch)) { _position++; return true; }'. Not re-audited.
 - 2026-11-22 | 2026-11-22_1351.md | not re-audited | Ran the -Site command (3 ECH tests that already fail left out). Outcome site-missing: ApplyNextRule was restructured and holds no '<' site near line 195. Not re-audited.
 - 2026-11-22 | 2026-11-22_1817.md | not re-audited | overlaps planted defect PD-103 in Curl.Tls.UnitLibrary/TlsReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the -Site command: site-missing at line 195. Re-ran at the moved site (OpenSslCipherString.cs:205:< -Member ApplyNextRule): 'separator < 0' -> 'separator <= 0' survived, so a cipher string that starts with a separator can still be read as one element. Runner's targeted mutation rerun on the clean audited commit: unverified.
+- 2026-11-25 | 2026-11-25_1306.md | not re-audited | Ran the -Site command: outcome site-missing (baseline left out 3 failing ECH tests). OpenSslCipherString.cs:195 is now in ReadSelection; ApplyNextRule holds no matching '<' site. Not re-audited.
 
 ## Log
 

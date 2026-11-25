@@ -48,6 +48,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 - 2026-11-22 | 2026-11-22_0210.md | not re-audited | Ran the -Site command: outcome site-missing (resolvedLine null). Start() no longer holds the start info; it calls BuildStartInfo, where 'UseShellExecute = false,' is now line 35. Not re-audited. Separately I ran -Site Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpServerProcessStarter.cs:35:false -Member BuildStartInfo: outcome killed.
 - 2026-11-22 | 2026-11-22_1351.md | not re-audited | Ran the -Site command. Outcome site-missing: Start no longer holds UseShellExecute; it moved to the internal BuildStartInfo (McpServerProcessStarter.cs:34, UseShellExecute = false), so no 'false' site exists in member Start. Not re-audited.
 - 2026-11-22 | 2026-11-22_1817.md | not re-audited | Not re-audited. I ran the -Site command: outcome site-missing. Start no longer sets UseShellExecute; it is in BuildStartInfo now (UseShellExecute = false further down), and the class is [ExcludeFromCodeCoverage] (ADR-1031). I re-ran it at the new line (-Site ...McpServerProcessStarter.cs:35:false -Member BuildStartInfo) and the outcome was still site-missing, so the mutant was never applied.
+- 2026-11-25 | 2026-11-25_1306.md | not re-audited | Ran the -Site command: outcome site-missing, no mutant ran. Start now calls BuildStartInfo; UseShellExecute = false sits at McpServerProcessStarter.cs:35 in BuildStartInfo, outside member Start. Not re-audited.
 
 ## Log
 

@@ -44,6 +44,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 - 2026-11-22 | 2026-11-22_1351.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: survived at resolved line 46. As with AF-0952, the line reads traceTime: true, noHex: true, and the tool flipped the first 'true' (traceTime). No test pins lib655's trace format. Runner's targeted mutation rerun on the clean audited commit: survived.
 - 2026-11-22 | 2026-11-22_1817.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command (Lib655.cs:46:true): survived. Same caveat as AF-0952: the line's first 'true' is traceTime: true -> false, which survived; the noHex mutant the title names was not run. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-11-25 | 2026-11-25_1306.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: Lib655.cs line 46, 'traceTime: true' -> 'traceTime: false' (first 'true' on the line), outcome survived. As with AF-0952 the operator hits traceTime, not noHex. Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 
