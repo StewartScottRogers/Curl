@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/RevocationListDownload.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
+touches: [Curl.Networking.UnitLibrary/RevocationListDownload.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.AnchoredChainFaults.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5886 — Fix fitness finding STD-205: Windows, intermediate anchor: a CRL distribution point that redirects to file:// aborts the handshake with exit 35
 
@@ -38,13 +38,20 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits 60 "the revocation status is unknown", and exits 0 with `--ssl-revoke-best-effort`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro exits 60 "the revocation status is unknown", and exits 0 with `--ssl-revoke-best-effort`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced on this branch with a throwaway C# harness (generated chain, CRL server answering `302` to `file://`, TLS server): Git for Windows curl 8.22.0 Schannel exits 60 / 0 with best effort; Curl exited 35 / 35. After the fix Curl exits 60 / 0. REF also exits 60 for redirects to `file://127.0.0.1/...` and `foo:bar`, as Curl now does.
+- Cause: `HttpClient` follows the redirect and then throws `UriFormatException` (address naming no host: `file:///x`, `foo:bar`) or `ArgumentOutOfRangeException` (`file://127.0.0.1/x`, port -1), neither in `TryFetch`'s catch filter. Fix: the filter takes `UriFormatException` and `ArgumentException`. Chosen over following redirects by hand in `RevocationListDownload`, which is excluded from coverage and kept thin; the OCSP fetch shares the filter.
+- `touches` widened by the one test file; no other task in Doing named it.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members. Fast tests: all projects passed. No CLAUDE.md or ADR change: behaviour now matches the platform's curl.
+- Filed BL-5934: the HTTP handler never passes the diagnostic log on its `ConnectTarget`, which is why no `could not be fetched` line shows under `--log-level` for HTTP.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 892064ce 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. A CRL or OCSP redirect to file:// or an opaque address leaves the revocation status unknown (exit 60, or 0 with --ssl-revoke-best-effort) instead of exit 35
