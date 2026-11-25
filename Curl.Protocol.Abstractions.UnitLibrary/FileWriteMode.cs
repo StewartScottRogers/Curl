@@ -34,8 +34,11 @@ public enum FileWriteMode
     /// file beside it that is renamed over the path when the stream closes with every write
     /// done: a symbolic link is replaced rather than written through, and the new file takes
     /// the old one's mode, narrowed by the umask. A device or pipe is written in place. On
-    /// Windows it is <see cref="Truncate" />. Closing throws an <see cref="IOException" />
-    /// when the file cannot be replaced.
+    /// Windows an existing file is not opened: the content goes to a temporary file beside it
+    /// that is renamed over the path in the same way, and the rename of a file that is
+    /// read-only or held open is retried for a second when the stream closes asynchronously;
+    /// a path naming nothing yet, or a device, is opened as <see cref="Truncate" /> opens it.
+    /// Closing throws an <see cref="IOException" /> when the file cannot be replaced.
     /// </summary>
     Replace,
 }

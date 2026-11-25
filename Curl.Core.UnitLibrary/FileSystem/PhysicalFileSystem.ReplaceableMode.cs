@@ -20,13 +20,23 @@ public sealed partial class PhysicalFileSystem
     private const int PermissionBits = 0x0FFF;
 
     /// <summary>
-    /// The mode reader a platform uses: none on Windows, which writes every file in place, and
-    /// the runtime's <c>fstat</c> shim elsewhere.
+    /// The mode reader a platform uses: none on Windows, which opens no file to decide whether
+    /// to replace it, and the runtime's <c>fstat</c> shim elsewhere.
     /// </summary>
     /// <param name="isWindows">Whether this is Windows.</param>
     /// <returns>The reader, or <see langword="null" /> on Windows.</returns>
     internal static Func<SafeFileHandle, UnixFileMode?>? ReplaceableModeReaderFor(bool isWindows) =>
         isWindows ? null : ReadReplaceableMode;
+
+    /// <summary>
+    /// The check a platform makes of a path before opening it: on Windows whether it names an
+    /// existing file, which curl's <c>stat</c> finds regular and which is then replaced
+    /// unopened (a directory or a device such as <c>NUL</c> is none); none elsewhere.
+    /// </summary>
+    /// <param name="isWindows">Whether this is Windows.</param>
+    /// <returns>The check, or <see langword="null" /> off Windows.</returns>
+    internal static Func<string, bool>? UnopenedReplacementCheckFor(bool isWindows) =>
+        isWindows ? File.Exists : null;
 
     /// <summary>The permission bits of a regular file's <c>st_mode</c>.</summary>
     /// <param name="status">The <c>st_mode</c>, the same values on Linux and macOS.</param>
