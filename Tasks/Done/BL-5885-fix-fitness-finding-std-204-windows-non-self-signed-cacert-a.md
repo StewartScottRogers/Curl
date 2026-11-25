@@ -56,7 +56,7 @@ The finding, verbatim:
 
 - 2026-11-24: Added the new test file to `touches` (ADR-0482 needs it; no task in Doing names it).
 - Done directly rather than through the /feature stages, to keep within the run's cost cap.
-- Reproduced with a probe of `X509Chain` and fixed in `ChainErrors.cs`; decision in ADR-1347.
+- Reproduced with a probe of `X509Chain` and fixed in `ChainErrors.cs`; decision in ADR-1356.
 - Measured with `openssl s_server` against Schannel curl 8.23.0 (System32) and 8.21.0 (Git) and Curl:
   `noCertSign` 0x00000010, `caFalse` and `pl0` 0x00000400, `intReqPol` 0x02000000, `ekuclient`
   0x00000010, `unkcrit` 0x08000100, `noBC` and `pl0sub` (root sent or not) exit 0, all with

@@ -183,7 +183,7 @@ internal sealed partial class ServerCertificateVerification
 
     // curl's Schannel build reports the trust errors of the chain as it ends at the listed anchor, so on that
     // build .NET's faults that only the certificates above the anchor carry, and the basic constraints of an
-    // anchor that has none, do not count (STD-204, ADR-1347). The OpenSSL build reads the whole chain.
+    // anchor that has none, do not count (STD-204, ADR-1356). The OpenSSL build reads the whole chain.
     private X509ChainStatus[] ReadAnchoredChainStatus(X509Chain chain) =>
         matchesSchannelBuild && EndsShortOfATrustedRootAtAListedAnchor(chain)
             ? WithoutFaultsOutsideAnchoredChain(

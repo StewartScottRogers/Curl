@@ -8,7 +8,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins which faults count under a non-self-signed <c>--cacert</c> anchor in the Schannel build
-/// (STD-204, ADR-1347): those of the chain up to the anchor, named by their trust error, and not
+/// (STD-204, ADR-1356): those of the chain up to the anchor, named by their trust error, and not
 /// the basic constraints an anchor does not have. Expected texts are curl 8.22.0 Schannel's.
 /// </summary>
 [TestClass]

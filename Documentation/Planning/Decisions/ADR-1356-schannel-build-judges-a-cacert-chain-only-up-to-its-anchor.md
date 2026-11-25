@@ -1,4 +1,4 @@
-# ADR-1347: The Schannel build judges a --cacert chain only up to its anchor, by Windows' trust error
+# ADR-1356: The Schannel build judges a --cacert chain only up to its anchor, by Windows' trust error
 
 - Status: Accepted
 - Date: 2026-11-24
