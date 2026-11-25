@@ -1,4 +1,4 @@
-# ADR-1394: POP3 logs a bearer token without a user in with an empty credential, and counts a withheld token
+# ADR-1397: POP3 logs a bearer token without a user in with an empty credential, and counts a withheld token
 
 - Status: Accepted
 - Date: 2026-11-25

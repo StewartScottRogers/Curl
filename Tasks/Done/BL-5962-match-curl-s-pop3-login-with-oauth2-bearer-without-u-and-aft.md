@@ -66,7 +66,7 @@ The stashed change gives an empty credential with `--oauth2-bearer` and no `-u`,
   no `-u`, matched on every `SASL:` and `curl:` line except one: `AUTH=SCRAM-SHA-1` made
   curl write `SASL: SCRAM-SHA-1 not builtin` and Curl `no overlap`. Fixed in
   `NoWayToLogIn`, which now reads the same credential the login does; pinned by a test.
-- Decision recorded in ADR-1394. Quality: Pop3 library 100% line, 100% branch, 0 failing.
+- Decision recorded in ADR-1397. Quality: Pop3 library 100% line, 100% branch, 0 failing.
 - The IMAP and SMTP stashed files were not restored to `HEAD`: the restore command was
   denied by the run's permissions. They are left uncommitted and are not in this task's
   commit (they remain in stash `eaa63ca596238e2eeebde20362385daf8a0b38dc` for BL-5961 and
@@ -76,4 +76,4 @@ The stashed change gives an empty credential with `--oauth2-bearer` and no `-u`,
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: dad0a42d e85fd8e6 deffc82c 3d836d5e.
-- 2026-11-25: Doing -> Done. POP3 matches curl 8.22.0 with a bearer token and no -u, and after a redirect withholds it (ADR-1394)
+- 2026-11-25: Doing -> Done. POP3 matches curl 8.22.0 with a bearer token and no -u, and after a redirect withholds it (ADR-1397)
