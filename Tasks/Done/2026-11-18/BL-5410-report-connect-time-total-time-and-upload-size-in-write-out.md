@@ -1,6 +1,6 @@
 ---
 id: BL-5410
-title: Report connect time, total time and upload size in write-out for the messaging extension protocols
+title: Report connect time, total time and upload size in write-out for the messaging extended protocols
 priority: Low
 assignee: Claude
 pipeline: feature
@@ -10,15 +10,15 @@ requirement: none
 created: 2026-11-17
 completed: 2026-11-18
 ---
-# BL-5410 — Report connect time, total time and upload size in write-out for the messaging extension protocols
+# BL-5410 — Report connect time, total time and upload size in write-out for the messaging extended protocols
 
 ## Goal
 
-`-w '%{time_connect} %{time_total} %{size_upload} %{speed_upload}'` for the messaging extension protocols (amqp, amqp1, stomp, mqtt5, nats, redis, kafka, xmpp) reports the real connect time, total time and bytes uploaded instead of 0, as the progress meter already does for the same runs.
+`-w '%{time_connect} %{time_total} %{size_upload} %{speed_upload}'` for the messaging extended protocols (amqp, amqp1, stomp, mqtt5, nats, redis, kafka, xmpp) reports the real connect time, total time and bytes uploaded instead of 0, as the progress meter already does for the same runs.
 
 ## Context
 
-From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build), finding EXT-083 (Low, Confirmed: each protocol, repeated). Area: write-out for the messaging extension protocols.
+From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build), finding EXT-083 (Low, Confirmed: each protocol, repeated). Area: write-out for the messaging extended protocols.
 
 **Repro.** Against a real broker (for example `docker run -d -p 127.0.0.1:48379:6379 redis:7 --requirepass p`):
 `curl -sS -m 10 -o NUL -w '[%{time_connect} %{time_total} up=%{size_upload} down=%{size_download} %{speed_upload}]\n' -u :p -d xyz redis://127.0.0.1:48379/SET/k`
@@ -53,4 +53,4 @@ The same pattern for kafka, amqp1, mqtt5 and nats with `-d`.
 - 2026-11-17: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 05bdf0ad 5902434f 1c28bb7d d4059c66 66536c10 f50bf17d a0b49a29.
 - 2026-11-18: Doing -> Done.
-- 2026-11-18: Doing -> Done. Messaging extension protocols now report connect time, total time and upload size in write-out via the engine's handler wrapper
+- 2026-11-18: Doing -> Done. Messaging extended protocols now report connect time, total time and upload size in write-out via the engine's handler wrapper
