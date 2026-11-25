@@ -1,5 +1,5 @@
 ---
-id: BL-5939
+id: BL-5941
 title: Report curl's { [0 bytes data] -v line when a -I HTTP/2 response ends at a DATA frame
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5939 — Report curl's { [0 bytes data] -v line when a -I HTTP/2 response ends at a DATA frame
+# BL-5941 — Report curl's { [0 bytes data] -v line when a -I HTTP/2 response ends at a DATA frame
 
 ## Goal
 
