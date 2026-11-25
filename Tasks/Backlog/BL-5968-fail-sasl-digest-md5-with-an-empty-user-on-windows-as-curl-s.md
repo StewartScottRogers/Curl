@@ -1,5 +1,5 @@
 ---
-id: BL-5964
+id: BL-5968
 title: Fail SASL DIGEST-MD5 with an empty user on Windows as curl's SSPI build does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5964 — Fail SASL DIGEST-MD5 with an empty user on Windows as curl's SSPI build does
+# BL-5968 — Fail SASL DIGEST-MD5 with an empty user on Windows as curl's SSPI build does
 
 ## Goal
 

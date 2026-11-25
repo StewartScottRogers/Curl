@@ -60,7 +60,7 @@ The stashed change gives an empty credential with `--oauth2-bearer` and no `-u`,
   | redirect to `smtp://127.0.0.1:18963/` (no user) | `XOAUTH2 PLAIN`; P with `AUTH=PLAIN` | | `HELP`, `QUIT` | 0 |
   | redirect to no user | `EXTERNAL PLAIN` | `AUTH=EXTERNAL` | `AUTH EXTERNAL`, nothing more | 67 |
 
-- Curl sends the same commands and exits with the same code in every row but one: `AUTH=DIGEST-MD5` with an empty user, where Curl answers the challenge and exits 0. The cause is in `Curl.Authentication.UnitLibrary`'s SSPI DIGEST-MD5, outside this task's touches, and `-u ':'` shows the same difference without a bearer token, so it predates this change. Filed as BL-5964.
+- Curl sends the same commands and exits with the same code in every row but one: `AUTH=DIGEST-MD5` with an empty user, where Curl answers the challenge and exits 0. The cause is in `Curl.Authentication.UnitLibrary`'s SSPI DIGEST-MD5, outside this task's touches, and `-u ':'` shows the same difference without a bearer token, so it predates this change. Filed as BL-5968.
 - Beyond the stashed work, this run found that after a redirect Curl wrote `SCRAM-SHA-256 not builtin` where curl writes `no overlap`; fixed and pinned.
 - Results: Smtp unit tests 442 passed, 7 skipped; full fast tests passed; the quality report shows 0 failing members.
 
@@ -68,4 +68,4 @@ The stashed change gives an empty credential with `--oauth2-bearer` and no `-u`,
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 75eadb9d 9157c065 13f9e547 3d836d5e.
-- 2026-11-25: Doing -> Done. SMTP matches curl 8.22.0 for --oauth2-bearer without -u and after a redirect withholds the token (ADR-1394); the DIGEST-MD5 empty-user difference is BL-5964.
+- 2026-11-25: Doing -> Done. SMTP matches curl 8.22.0 for --oauth2-bearer without -u and after a redirect withholds the token (ADR-1394); the DIGEST-MD5 empty-user difference is BL-5968.
