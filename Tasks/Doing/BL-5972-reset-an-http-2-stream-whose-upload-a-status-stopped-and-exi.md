@@ -31,3 +31,4 @@ Found by BL-5970 (ADR-1403), curl 8.18.0 nghttp2 build, `Record-CurlExchange.ps1
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 5cdfc356 deaba318 3d836d5e.
