@@ -181,6 +181,12 @@ internal static class HttpConnectionInfoLines
     internal const string StopSendingBeforeEndOfSend = "HTTP error before end of send, stop sending";
 
     /// <summary>
+    /// The line written after a response that closes its connection was read while the request
+    /// body still waited for <c>100 Continue</c> (measured, BL-5960 Notes).
+    /// </summary>
+    internal const string DoneReadingStopSending = "we are done reading and this is set to close, stop send";
+
+    /// <summary>
     /// The line written before a head's empty line when a redirect <c>-L</c> follows arrived while
     /// the request body was being sent (measured, BL-1527 Notes).
     /// </summary>
@@ -205,6 +211,15 @@ internal static class HttpConnectionInfoLines
     /// <returns>The line, such as <c>upload completely sent off: 2 bytes</c>.</returns>
     internal static string UploadSent(long bytesSent) =>
         string.Create(CultureInfo.InvariantCulture, $"upload completely sent off: {bytesSent} bytes");
+
+    /// <summary>
+    /// Formats curl 8.18.0's line for a body sent on an HTTP/2 stream whose response had already
+    /// ended, which that send closes (measured, BL-5972 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream's identifier.</param>
+    /// <returns>The line, such as <c>stream 1 closed</c>.</returns>
+    internal static string StreamClosed(int streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"stream {streamId} closed");
 
     /// <summary>
     /// Formats the line for a connection left open for another transfer.

@@ -5,9 +5,9 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
-/// <c>ldap://</c> StartTLS on the OpenLDAP dialect against a scripted server (BL-5908, ADR-1366): refusals,
-/// closes and binds as curl 8.21.0 with OpenLDAP 2.6.15 answered them; the two non-ExtendedResponse
-/// cases pin the port's own answer, not curl's.
+/// <c>ldap://</c> StartTLS on the OpenLDAP dialect against a scripted server (BL-5908 and BL-5931, ADR-1366):
+/// refusals, closes, failed handshakes and binds as curl 8.21.0 with OpenLDAP 2.6.15 answered them; the
+/// malformed-reply case pins the port's own answer, not curl's.
 /// </summary>
 [TestClass]
 public sealed class LdapStartTlsOpenLdapMeasuredTests
@@ -44,7 +44,7 @@ public sealed class LdapStartTlsOpenLdapMeasuredTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UntrustedCertificate_ExitsWith64AndTheVerifyResultWithoutBinding()
+    public async Task ExecuteAsync_UntrustedCertificate_ExitsWith64AndTheVerifyResultAfterAnUnbind()
     {
         const string message = "SSL certificate OpenSSL verify result: self-signed certificate (18)";
         var server = new ScriptedConnection(StartTlsResponse("00"));
@@ -52,7 +52,7 @@ public sealed class LdapStartTlsOpenLdapMeasuredTests
         TransferResult result = await RunAsync(server, TransportSecurityLevel.Required, ConnectResult.Failed(CurlExitCode.PeerFailedVerification, message));
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, message), result);
-        Assert.AreEqual(StartTlsRequest, Sent(server));
+        Assert.AreEqual(StartTlsRequest + UnbindAsMessage2, Sent(server));
     }
 
     [TestMethod]
@@ -65,6 +65,85 @@ public sealed class LdapStartTlsOpenLdapMeasuredTests
         TransferResult result = await RunAsync(server, TransportSecurityLevel.Try, ConnectResult.Failed(handshakeExitCode, "TLS connect error: alert"));
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "TLS connect error: alert"), result);
+        Assert.AreEqual(StartTlsRequest + UnbindAsMessage2, Sent(server));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HandshakeFailsAndTheProviderDisposesItsConnection_UnbindsInPlaintextOnTheStillOpenConnection()
+    {
+        const string alert = "15030300020228";
+        var server = new ScriptedConnection(StartTlsResponse("00"), Hex.Bytes(alert));
+        var tls = new DisposingTlsProvider(server, Hex.Bytes(alert));
+
+        TransferResult result = await RunAsync(server, TransportSecurityLevel.Required, tls, new NetworkCredential("cn=a", "pw"));
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "TLS connect error: alert"), result);
+        Assert.AreEqual(StartTlsRequest + alert + UnbindAsMessage2, Sent(server));
+        Assert.AreEqual(alert, tls.Received);
+        Assert.IsFalse(tls.ServerDisposedByTheProvider);
+        Assert.IsTrue(server.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow(TransportSecurityLevel.Try, DisplayName = "--ssl")]
+    [DataRow(TransportSecurityLevel.Required, DisplayName = "--ssl-reqd")]
+    public async Task ExecuteAsync_StartTlsSucceedsWithoutCredentials_SearchesWithoutBinding(TransportSecurityLevel level)
+    {
+        var server = new ScriptedConnection(StartTlsResponse("00"));
+        var secured = new ScriptedConnection(SearchDone(2));
+
+        TransferResult result = await RunAsync(server, level, new FixedTlsProvider(ConnectResult.Connected(secured)), null);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(StartTlsRequest, Sent(server));
+        Assert.StartsWith("30", Sent(secured));
+        Assert.AreEqual("02010263", Sent(secured).Substring(4, 8));
+        Assert.EndsWith("30050201034200", Sent(secured));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StartTlsSucceedsWithCredentials_BindsAsLdapV3OverTls()
+    {
+        var server = new ScriptedConnection(StartTlsResponse("00"));
+        var secured = new ScriptedConnection(BindResponse(2, "00"), SearchDone(3));
+
+        TransferResult result = await RunAsync(server, TransportSecurityLevel.Required, new FixedTlsProvider(ConnectResult.Connected(secured)), new NetworkCredential("cn=a", "pw"));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.StartsWith(BindV3AsMessage2, Sent(secured));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StartTlsSucceedsForASaslBindWithoutCredentials_StillAsksForTheMechanisms()
+    {
+        var server = new ScriptedConnection(StartTlsResponse("00"));
+        var secured = new ScriptedConnection();
+        var handler = new LdapProtocolHandler(
+            new RecordingConnector(ConnectResult.Connected(server)),
+            LdapDialect.OpenLdap,
+            new FakeLogonTokenSource(0),
+            new FixedTlsProvider(ConnectResult.Connected(secured)));
+
+        await handler.ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("ldap://127.0.0.1:21900/dc=x"),
+            Output = new MemoryStream(),
+            Mail = new MailRequestOptions { LoginOptions = "AUTH=PLAIN" },
+            SslLevel = TransportSecurityLevel.Required,
+        });
+
+        Assert.Contains(Convert.ToHexStringLower("supportedSASLMechanisms"u8), Sent(secured));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SslStartTlsRefusedWithoutCredentials_BindsAnonymously()
+    {
+        var server = new ScriptedConnection(StartTlsResponse("34"), BindResponse(2, "00"), SearchDone(3));
+
+        TransferResult result = await RunAsync(server, TransportSecurityLevel.Try, new FixedTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "unused")), null);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.StartsWith(StartTlsRequest + "300c020102600702010304008000", Sent(server));
     }
 
     [TestMethod]
@@ -96,9 +175,61 @@ public sealed class LdapStartTlsOpenLdapMeasuredTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SslStartTlsAnsweredByANonExtendedResponse_BindsAsLdapV3()
+    [DataRow("34", BindV3AsMessage2, DisplayName = "unavailable")]
+    [DataRow("02", BindV2AsMessage2, DisplayName = "protocolError")]
+    public async Task ExecuteAsync_SslStartTlsRefusedByABindResponse_BindsAsAfterAnExtendedResponse(string resultCode, string bind)
     {
-        var server = new ScriptedConnection(BindResponse(1, "00"), BindResponse(2, "00"), SearchDone(3));
+        var server = new ScriptedConnection(BindResponse(1, resultCode), BindResponse(2, "00"), SearchDone(3));
+
+        TransferResult result = await RunAsync(server, TransportSecurityLevel.Try);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.StartsWith(StartTlsRequest + bind, Sent(server));
+    }
+
+    [TestMethod]
+    [DataRow("34", CurlExitCode.UseSslFailed, "Requested SSL level failed")]
+    [DataRow("02", CurlExitCode.UnsupportedProtocol, "Unsupported protocol")]
+    public async Task ExecuteAsync_SslReqdStartTlsRefusedByABindResponse_FailsAsTheResultCodeMapsAfterAnUnbind(string resultCode, CurlExitCode exitCode, string message)
+    {
+        var server = new ScriptedConnection(BindResponse(1, resultCode));
+
+        TransferResult result = await RunAsync(server, TransportSecurityLevel.Required);
+
+        Assert.AreEqual(TransferResult.Failure(exitCode, message), result);
+        Assert.AreEqual(StartTlsRequest + UnbindAsMessage2, Sent(server));
+    }
+
+    [TestMethod]
+    [DataRow(TransportSecurityLevel.Try, DisplayName = "--ssl")]
+    [DataRow(TransportSecurityLevel.Required, DisplayName = "--ssl-reqd")]
+    public async Task ExecuteAsync_StartTlsAnsweredBySuccessInABindResponse_StartsTheHandshake(TransportSecurityLevel level)
+    {
+        var server = new ScriptedConnection(BindResponse(1, "00"));
+
+        TransferResult result = await RunAsync(server, level, ConnectResult.Failed(CurlExitCode.SslConnectError, "TLS connect error: eof"));
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "TLS connect error: eof"), result);
+        Assert.AreEqual(StartTlsRequest + UnbindAsMessage2, Sent(server));
+    }
+
+    [TestMethod]
+    [DataRow("300a02010164050401783000", DisplayName = "SearchResultEntry")]
+    [DataRow("30080201017303040178", DisplayName = "SearchResultReference")]
+    public async Task ExecuteAsync_SslReqdStartTlsAnsweredByASearchReply_AbandonsUnbindsAndExitsWith64(string reply)
+    {
+        var server = new ScriptedConnection(Hex.Bytes(reply));
+
+        TransferResult result = await RunAsync(server, TransportSecurityLevel.Required);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "Requested SSL level failed"), result);
+        Assert.AreEqual(StartTlsRequest + "3006020102500101" + "30050201034200", Sent(server));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SslStartTlsAnsweredByASearchReply_BindsAsLdapV3()
+    {
+        var server = new ScriptedConnection(Hex.Bytes("300a02010164050401783000"), BindResponse(2, "00"), SearchDone(3));
 
         TransferResult result = await RunAsync(server, TransportSecurityLevel.Try);
 
@@ -107,9 +238,11 @@ public sealed class LdapStartTlsOpenLdapMeasuredTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SslReqdStartTlsAnsweredByANonExtendedResponse_FailsWithExit64SendingNothingMore()
+    [DataRow("3006020101040178", DisplayName = "a universal protocolOp")]
+    [DataRow("30050201014200", DisplayName = "a primitive protocolOp")]
+    public async Task ExecuteAsync_SslReqdStartTlsAnsweredByAMessageWithNoResult_FailsWithExit64SendingNothingMore(string reply)
     {
-        var server = new ScriptedConnection(BindResponse(1, "00"));
+        var server = new ScriptedConnection(Hex.Bytes(reply));
 
         TransferResult result = await RunAsync(server, TransportSecurityLevel.Required);
 
@@ -175,17 +308,46 @@ public sealed class LdapStartTlsOpenLdapMeasuredTests
 
     private static byte[] SearchDone(int messageId) => Hex.Bytes($"300c02010{messageId}65070a010004000400");
 
-    private static async Task<TransferResult> RunAsync(ScriptedConnection server, TransportSecurityLevel level, ConnectResult? handshake = null)
+    private static Task<TransferResult> RunAsync(ScriptedConnection server, TransportSecurityLevel level, ConnectResult? handshake = null) =>
+        RunAsync(server, level, new FixedTlsProvider(handshake ?? ConnectResult.Failed(CurlExitCode.SslConnectError, "unused")), new NetworkCredential("cn=a", "pw"));
+
+    private static async Task<TransferResult> RunAsync(ScriptedConnection server, TransportSecurityLevel level, ITlsProvider tls, NetworkCredential? credentials)
     {
-        var tls = new FixedTlsProvider(handshake ?? ConnectResult.Failed(CurlExitCode.SslConnectError, "unused"));
         var handler = new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(server)), LdapDialect.OpenLdap, new FakeLogonTokenSource(0), tls);
         return await handler.ExecuteAsync(new TransferContext
         {
             Url = CurlUrl.Parse("ldap://127.0.0.1:21900/dc=x"),
             Output = new MemoryStream(),
-            Credentials = new NetworkCredential("cn=a", "pw"),
+            Credentials = credentials,
             SslLevel = level,
         });
+    }
+
+    /// <summary>
+    /// Fails the handshake as the real providers do: reads the server's bytes, writes <c>alert</c> and
+    /// disposes the connection it was given.
+    /// </summary>
+    private sealed class DisposingTlsProvider(ScriptedConnection server, byte[] alert) : ITlsProvider
+    {
+        public string Received { get; private set; } = string.Empty;
+
+        public bool ServerDisposedByTheProvider { get; private set; }
+
+        public async ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken = default)
+        {
+            Assert.IsFalse(plaintext.IsSecure);
+            Assert.IsNull(plaintext.RemoteEndPoint);
+            Assert.IsNull(plaintext.LocalEndPoint);
+            Assert.IsNull(plaintext.SocketHandle);
+            var buffer = new byte[64];
+            int read = await plaintext.ReadAsync(buffer, cancellationToken);
+            Received = Convert.ToHexStringLower(buffer, 0, read);
+            await plaintext.WriteAsync(alert, cancellationToken);
+            await plaintext.FlushAsync(cancellationToken);
+            await plaintext.DisposeAsync();
+            ServerDisposedByTheProvider = server.IsDisposed;
+            return ConnectResult.Failed(CurlExitCode.SslConnectError, "TLS connect error: alert");
+        }
     }
 
     /// <summary>Answers every handshake with one fixed result.</summary>

@@ -24,7 +24,7 @@ public sealed class CompressionDictionaryExtensionTests
     public void Composition_RegistersTheOptionOnlyWhileExtensionsAreOn()
     {
         Assert.Contains(CompressionDictionaryExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
-        Assert.DoesNotContain(CompressionDictionaryExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+        Assert.DoesNotContain(CompressionDictionaryExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
     }
 
     [TestMethod]

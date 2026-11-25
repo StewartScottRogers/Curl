@@ -7,11 +7,11 @@ namespace Curl.Original.Protocol.Http.Fakes;
 /// An <see cref="IConnection" /> that behaves as a pooled connection does towards the
 /// handler (BL-817): it holds the session a transfer hands it, keeps it and itself open when
 /// the transfer marked it reusable, and otherwise shuts the session down and closes. Reads
-/// and writes go to a <see cref="ScriptedConnection" />, so the same instance can be handed
-/// out for one transfer after another.
+/// and writes go to an inner connection, such as a <see cref="ScriptedConnection" />, so the
+/// same instance can be handed out for one transfer after another.
 /// </summary>
 /// <param name="inner">The connection the bytes go through.</param>
-public sealed class SessionHoldingConnection(ScriptedConnection inner) : IConnection
+public sealed class SessionHoldingConnection(IConnection inner) : IConnection
 {
     private bool isMarkedReusable;
 

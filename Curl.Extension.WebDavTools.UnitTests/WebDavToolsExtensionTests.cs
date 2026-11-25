@@ -48,7 +48,7 @@ public sealed class WebDavToolsExtensionTests
     public void Composition_RegistersTheOptionsOnlyWhileExtensionsAreOn()
     {
         var on = ExtensionCommandLineOptions.For(_ => null, _ => false);
-        var off = ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false);
+        var off = ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false);
 
         Assert.Contains(WebDavToolsExtension.ListOption, on);
         Assert.Contains(WebDavToolsExtension.SyncOption, on);

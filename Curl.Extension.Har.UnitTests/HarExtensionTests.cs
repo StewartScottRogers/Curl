@@ -25,7 +25,7 @@ public sealed class HarExtensionTests
     public void Composition_RegistersTheOptionOnlyWhileExtensionsAreOn_SoCurlExtensions0RefusesItAsUnknown()
     {
         Assert.Contains(HarExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
-        Assert.DoesNotContain(HarExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+        Assert.DoesNotContain(HarExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
         Assert.AreEqual(ExtensionOptionArgument.Value, HarExtension.Option.Argument);
         Assert.AreEqual("har", HarExtension.Option.Name);
     }

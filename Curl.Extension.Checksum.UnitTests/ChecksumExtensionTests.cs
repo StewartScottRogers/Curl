@@ -42,7 +42,7 @@ public sealed class ChecksumExtensionTests
     public void Composition_RegistersTheOptionOnlyWhileExtensionsAreOn()
     {
         Assert.Contains(ChecksumExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
-        Assert.DoesNotContain(ChecksumExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+        Assert.DoesNotContain(ChecksumExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
     }
 
     [TestMethod]

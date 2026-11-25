@@ -38,8 +38,10 @@ public sealed partial class HttpProtocolHandler
         Http2Session? unheldSession = UnheldHttp2Session(streams, connection);
         (HttpAttemptOutcome outcome, Http2Session? upgradedSession) = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, streams).ConfigureAwait(false);
         unheldSession ??= UnheldHttp2Session(upgradedSession, connection);
-        SkipClosingGoAwayWhenGivenUp(outcome, streams ?? upgradedSession);
-        SettleConnection(plan, connection, streams ?? upgradedSession, outcome);
+        IHttpStreamSession? used = streams ?? upgradedSession;
+        outcome.RanOnHttp2Stream = used is Http2Session;
+        SkipClosingGoAwayWhenGivenUp(outcome, used);
+        SettleConnection(plan, connection, used, outcome);
         await ShutDownAsync(unheldSession).ConfigureAwait(false);
         return outcome;
     }
@@ -66,12 +68,12 @@ public sealed partial class HttpProtocolHandler
         unheldSession?.ShutDownAsync(CancellationToken.None) ?? ValueTask.CompletedTask;
 
     /// <summary>
-    /// Marks the connection reusable when the last response is reported left intact over
-    /// HTTP/1.x or HTTP/2, or over HTTP/3 while the session takes new requests, so a pool keeps it (BL-735), or reports that a pooled connection that died is being given up.
+    /// Marks the connection reusable when it can carry the next transfer
+    /// (<see cref="CarriesNextTransfer" />), so a pool keeps it (BL-735), or reports that a pooled connection that died is being given up.
     /// </summary>
     private static void SettleConnection(HttpRequestPlan plan, IConnection connection, IHttpStreamSession? streams, HttpAttemptOutcome outcome)
     {
-        if (outcome.ReportsLeftIntact && TakesNewRequests(streams))
+        if (CarriesNextTransfer(streams, outcome))
         {
             connection.MarkReusable();
         }
@@ -83,11 +85,40 @@ public sealed partial class HttpProtocolHandler
     }
 
     /// <summary>
-    /// Tells whether a connection can carry another request once its response is left intact:
-    /// always over HTTP/1.x and HTTP/2, and over HTTP/3 while the session takes new streams.
+    /// Tells whether the connection can carry the next transfer: its response is reported left
+    /// intact over HTTP/1.x or HTTP/2, or over HTTP/3 while the session takes new streams; or
+    /// the transfer timed out, or <c>-f</c> failed it, on a stream of an HTTP/2 session that
+    /// still takes new ones, as curl ends only the stream then (BL-5976, BL-5977).
     /// </summary>
-    private static bool TakesNewRequests(IHttpStreamSession? streams) =>
-        streams is not Http3Session { AcceptsNewStreams: false };
+    private static bool CarriesNextTransfer(IHttpStreamSession? streams, HttpAttemptOutcome outcome) =>
+        outcome.EndedOnlyItsHttp2Stream
+            ? ((Http2Session)streams!).AcceptsNewStreams
+            : outcome.ReportsLeftIntact && streams is not Http3Session { AcceptsNewStreams: false };
+
+    /// <summary>
+    /// Resets the HTTP/2 stream of an exchange that timed out or that <c>-f</c> failed
+    /// (<see cref="Http2StreamConnection.ResetUnlessEndedBothWaysAsync" />); nothing on any
+    /// other connection.
+    /// </summary>
+    private static ValueTask ResetGivenUpStreamAsync(IHttpStreamConnection? stream, CancellationToken cancellationToken) =>
+        stream is Http2StreamConnection http2 ? http2.ResetUnlessEndedBothWaysAsync(cancellationToken) : ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Resets what a failed exchange leaves open of its HTTP/2 stream: when <c>-f</c> failed it,
+    /// the stream unless it has ended both ways (<see cref="ResetGivenUpStreamAsync" />); and
+    /// after any failure, one whose response ended it with the upload unsent
+    /// (<see cref="ResetFailedStreamUploadAsync" />), even on a connection that takes no new
+    /// stream.
+    /// </summary>
+    private static async ValueTask ResetFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, IConnection connection, CancellationToken cancellationToken)
+    {
+        if (failure.ExitCode == CurlExitCode.HttpReturnedError)
+        {
+            await ResetGivenUpStreamAsync(TrailerStreamOf(requestStream, connection), cancellationToken).ConfigureAwait(false);
+        }
+
+        await ResetFailedStreamUploadAsync(requestStream, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,

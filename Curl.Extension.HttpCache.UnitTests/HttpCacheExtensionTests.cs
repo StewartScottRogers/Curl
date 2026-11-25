@@ -25,7 +25,7 @@ public sealed class HttpCacheExtensionTests
     public void Composition_RegistersTheOptionOnlyWhileExtensionsAreOn()
     {
         Assert.Contains(HttpCacheExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
-        Assert.DoesNotContain(HttpCacheExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+        Assert.DoesNotContain(HttpCacheExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
     }
 
     [TestMethod]

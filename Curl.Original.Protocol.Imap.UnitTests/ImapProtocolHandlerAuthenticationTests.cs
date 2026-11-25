@@ -215,6 +215,21 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ExternalNamedAndOfferedWithoutUserButNotChosen_FailsWithLoginDenied()
+    {
+        // With no credential at all, the reasons for leaving EXTERNAL unchosen are given for no user (BL-5961).
+        var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
+        var mail = new MailRequestOptions { LoginOptions = "AUTH=EXTERNAL" };
+
+        ImapRun run = await RunAsync(Greeting + Caps("AUTH=EXTERNAL"), sasl, user: null, mail: mail);
+
+        DiffSent(run, Capability);
+        Assert.AreEqual(Capability, run.Sent);
+        AssertResult(run, TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied));
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ExternalNamedButNotOfferedWithoutUser_DoesNotLogIn()
     {
         var sasl = new FakeSaslAuthenticator("EXTERNAL", []);
@@ -224,7 +239,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
 
         DiffSent(run, Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n");
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
-        Assert.IsEmpty(sasl.Choices);
+        Assert.IsEmpty(sasl.Begun);
     }
 
     [TestMethod]
@@ -511,6 +526,65 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_BearerTokenWithheldByRedirectAndPlainOffered_ChoosesNoMechanism()
+    {
+        // Measured with curl 8.22.0: after a redirect withholds the token, a server offering
+        // AUTH=PLAIN gets nothing after CAPABILITY, exit 67, without an AUTH= option (BL-5961).
+        var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
+        var mail = new MailRequestOptions { BearerTokenWithheld = true };
+
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4 AUTH=PLAIN"), sasl, user: "v", password: "", mail: mail);
+
+        DiffSent(run, Capability);
+        Assert.AreEqual(Capability, run.Sent);
+        Assert.IsEmpty(sasl.Begun);
+        AssertResult(run, TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied));
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenWithheldByRedirectWithAuthPlain_AuthenticatesWithUrlUser()
+    {
+        // Measured with curl 8.22.0: AUTH=PLAIN after the redirect sends AUTHENTICATE PLAIN for v (BL-5961).
+        var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
+        var mail = new MailRequestOptions { LoginOptions = "AUTH=PLAIN", BearerTokenWithheld = true };
+
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4 AUTH=PLAIN") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, user: "v", password: "", mail: mail);
+
+        DiffSent(run, Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n");
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual("v", sasl.Begun[0].Credential?.UserName);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenWithoutUserAndAuthPlain_AuthenticatesWithEmptyCredential()
+    {
+        // Measured with curl 8.22.0: --oauth2-bearer, no -u and AUTH=PLAIN send AUTHENTICATE PLAIN
+        // with an empty user and password (BL-5961).
+        var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
+        var mail = new MailRequestOptions { LoginOptions = "AUTH=PLAIN", BearerToken = "tok" };
+
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4 AUTH=PLAIN") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, user: null, mail: mail);
+
+        DiffSent(run, Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n");
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(string.Empty, sasl.Begun[0].Credential?.UserName);
+        Assert.AreEqual(string.Empty, sasl.Begun[0].Credential?.Password);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenWithoutUserAndAuthPlusLogin_SendsEmptyLogin()
+    {
+        // Measured with curl 8.22.0: --oauth2-bearer, no -u and AUTH=+LOGIN send "LOGIN  " (BL-5961).
+        var mail = new MailRequestOptions { LoginOptions = "AUTH=+LOGIN", BearerToken = "tok" };
+
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4 AUTH=PLAIN") + "A002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), null, user: null, mail: mail);
+
+        DiffSent(run, Capability + "A002 LOGIN  \r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n");
+        Assert.AreEqual(Capability + "A002 LOGIN  \r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_LoginDisabledButMechanismOffered_Authenticates()
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
@@ -544,7 +618,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
 
         DiffSent(run, Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n");
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
-        Assert.IsEmpty(sasl.Choices);
+        Assert.IsEmpty(sasl.Begun);
     }
 
     [TestMethod]
@@ -557,7 +631,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
 
         DiffSent(run, Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n");
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
-        Assert.IsEmpty(sasl.Choices);
+        Assert.IsEmpty(sasl.Begun);
     }
 
     [TestMethod]

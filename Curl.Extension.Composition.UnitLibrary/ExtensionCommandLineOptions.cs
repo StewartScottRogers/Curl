@@ -11,7 +11,7 @@ namespace Curl.Extension.Composition;
 public static class ExtensionCommandLineOptions
 {
     /// <summary>
-    /// Gives every registered extension option, or none when <see cref="ExtensionProtocolHandlers.SwitchVariable" />
+    /// Gives every registered extension option, or none when <see cref="ExtensionSwitch.Variable" />
     /// is <c>0</c>, after checking that no two share a name and none has the name of one of curl's options.
     /// </summary>
     /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
@@ -22,7 +22,7 @@ public static class ExtensionCommandLineOptions
     {
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
         ArgumentNullException.ThrowIfNull(isCurlLongOption);
-        return readEnvironmentVariable(ExtensionProtocolHandlers.SwitchVariable) == "0"
+        return readEnvironmentVariable(ExtensionSwitch.Variable) == "0"
             ? []
             : Checked(ExtensionOptionCatalogue.Entries, isCurlLongOption);
     }

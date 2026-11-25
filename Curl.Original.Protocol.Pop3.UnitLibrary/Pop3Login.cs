@@ -18,12 +18,15 @@ namespace Curl.Original.Protocol.Pop3;
 /// <list type="bullet">
 /// <item>Without credentials and without a bearer token, nothing is sent, unless
 /// <c>AUTH=EXTERNAL</c> names EXTERNAL and <c>CAPA</c> offers it: then SASL EXTERNAL is tried
-/// with an empty user name, sent as <c>=</c> (BL-1989). With a bearer
-/// token alone, only SASL is tried; no mechanism chosen is exit 67 <c>Login denied</c>.</item>
+/// with an empty user name, sent as <c>=</c> (BL-1989). With a bearer token and no user,
+/// the login goes ahead with an empty user name and password (BL-5962).</item>
 /// <item>With a bearer token and no <c>AUTH=</c> option, only OAUTHBEARER and XOAUTH2 may be
 /// used: neither <c>APOP</c> nor <c>USER</c>/<c>PASS</c> is sent. <c>AUTH=*</c>,
 /// <c>AUTH=&lt;mech&gt;</c> and <c>AUTH=+APOP</c> allow what they name, token or not
 /// (BL-5880).</item>
+/// <item>A token a redirect withheld still counts for that preference, so without an
+/// <c>AUTH=</c> option no mechanism and no command is chosen: exit 67 <c>Login denied</c>
+/// when the redirect's URL named a user, and no login when it named none (BL-5962).</item>
 /// <item>SASL <c>AUTH</c> first, when <c>CAPA</c> lists <c>SASL</c> mechanisms and the
 /// authenticator chooses one. Under <c>--sasl-ir</c> the initial response goes on the
 /// command line (<c>=</c> when empty) unless the mechanism's name and the base64 are longer
@@ -95,6 +98,13 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     private const string CancelLine = "*";
 
     private readonly MailRequestOptions mail = context.Mail ?? new MailRequestOptions();
+
+    /// <summary>
+    /// The credentials to log in with: the transfer's, or with <c>--oauth2-bearer</c> and no
+    /// user an empty user and password, which curl 8.22.0 sends to any mechanism or command an
+    /// <c>AUTH=</c> option allows (measured, BL-5962).
+    /// </summary>
+    private NetworkCredential? Credential => context.Credentials ?? (mail.BearerToken is null ? null : new NetworkCredential());
 
     /// <summary>How many challenges the current exchange has been handed.</summary>
     private int challengesHanded;
@@ -207,7 +217,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// <returns>How SASL ended, and the exchange's result when one was accepted or refused.</returns>
     private async ValueTask<(SaslOutcome Outcome, TransferResult? Result)> TrySaslAsync(Pop3LoginOptions options, Pop3Capabilities? capabilities)
     {
-        if (saslAuthenticator is null || capabilities is null)
+        if (saslAuthenticator is null || capabilities is null || WithholdsEveryMechanism(options))
         {
             return (SaslOutcome.NoneChosen, null);
         }
@@ -252,7 +262,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
     private SaslRequest CreateSaslRequest(Pop3LoginOptions options) =>
         new(
-            context.Credentials,
+            Credential,
             mail.SaslAuthorizationIdentity,
             mail.BearerToken,
             options.RequiredMechanism,
@@ -419,7 +429,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     private ValueTask<TransferResult?> LogInWithoutSaslAsync(
         Pop3LoginOptions options, Pop3Capabilities? capabilities, string? apopTimestamp, bool saslCancelled)
     {
-        if (options.Method == Pop3LoginMethod.Sasl || PrefersBearerAlone(options) || context.Credentials is not { } credential)
+        if (options.Method == Pop3LoginMethod.Sasl || PrefersBearerAlone(options) || Credential is not { } credential)
         {
             return ValueTask.FromResult<TransferResult?>(NoWayToLogIn(options, capabilities, saslCancelled));
         }
@@ -449,7 +459,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     {
         string[] known = KnownOfferedMechanisms(capabilities);
         string[] enabled = known.Where(mechanism => IsAllowed(options, mechanism)).ToArray();
-        if (enabled.Length > 0 && context.Credentials is { } credential)
+        if (enabled.Length > 0 && Credential is { } credential)
         {
             ReportWhyNoneWasChosen(credential, mechanism => enabled.Contains(mechanism, StringComparer.OrdinalIgnoreCase));
         }
@@ -536,11 +546,23 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     }
 
     /// <summary>
-    /// Whether <c>--oauth2-bearer</c> was given and no <c>AUTH=</c> option, so curl's
-    /// preferred ways of logging in are the bearer mechanisms alone (BL-5880).
+    /// Whether <c>--oauth2-bearer</c> was given, even if a redirect withheld the token, and no
+    /// <c>AUTH=</c> option, so curl's preferred ways of logging in are the bearer mechanisms
+    /// alone (BL-5880, BL-5962).
     /// </summary>
     private bool PrefersBearerAlone(Pop3LoginOptions options) =>
-        mail.BearerToken is not null && options is { Method: Pop3LoginMethod.Any, RequiredMechanism: null };
+        (mail.BearerToken is not null || mail.BearerTokenWithheld) && HasNoAuthOption(options);
+
+    /// <summary>
+    /// Whether a redirect withheld the <c>--oauth2-bearer</c> token and no <c>AUTH=</c> option
+    /// was given: curl still prefers the bearer mechanisms alone, which it cannot use without
+    /// the token, so it chooses no SASL mechanism (measured with curl 8.22.0, BL-5962).
+    /// </summary>
+    private bool WithholdsEveryMechanism(Pop3LoginOptions options) =>
+        mail.BearerTokenWithheld && HasNoAuthOption(options);
+
+    private static bool HasNoAuthOption(Pop3LoginOptions options) =>
+        options is { Method: Pop3LoginMethod.Any, RequiredMechanism: null };
 
     /// <summary>
     /// Whether <c>USER</c>/<c>PASS</c> may be sent: the login options allow any way, and

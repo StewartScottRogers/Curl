@@ -20,6 +20,9 @@ internal sealed class CommandLineGlobalState
     /// <summary>The extensions' long options the parser reads beyond curl's own, by name (ADR-1006).</summary>
     public IReadOnlyDictionary<string, CommandLineExtensionOption> ExtensionOptions { get; set; } = new Dictionary<string, CommandLineExtensionOption>();
 
+    /// <summary>Whether the parser reads the options only Curl has; <see langword="false"/> when the host's extensions are off.</summary>
+    public bool KnowsPortOnlyOptions { get; set; } = true;
+
     public List<StandardErrorRedirect> StandardErrorRedirects { get; } = [];
 
     public List<string?> ConfigFileHelpSubjects { get; } = [];

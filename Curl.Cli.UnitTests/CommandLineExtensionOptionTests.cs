@@ -67,6 +67,18 @@ public sealed class CommandLineExtensionOptionTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Parse_AnOptionOnlyCurlHas_IsAnUnknownOptionOnlyWhenTheHostSaysSo(bool knowsPortOnlyOptions)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ai-help", Url], _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), new DefaultConfigFileSearch(_ => null, false, null, null), isWindows: false, _ => null, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: false, [], knowsPortOnlyOptions);
+
+        Assert.AreEqual(
+            knowsPortOnlyOptions ? null : "curl: option --ai-help: is unknown",
+            result.Refusal?.StandardErrorLines[0]);
+    }
+
+    [TestMethod]
     public void Parse_AnExtensionOptionWithNoValue_RefusesAsCurlRefusesAMissingValue()
     {
         CommandLineParseResult withExtension = Parse(["--cache-dir"], CacheDirectory);

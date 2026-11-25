@@ -177,7 +177,75 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
         CollectionAssert.AreEqual((string[])["< 535 no\r\n", Closing], events.Transcript.TakeLast(2).ToArray());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenWithoutUserAndAuthPlain_AuthenticatesWithEmptyCredential()
+    {
+        // Measured with curl 8.22.0: --oauth2-bearer, no -u and AUTH=PLAIN send AUTH PLAIN with
+        // an empty user and password (BL-5963).
+        var context = Context(null, "tok", "AUTH=PLAIN", out _);
+        var sasl = new FakeSaslAuthenticator("PLAIN", [1]);
+        string replies = Greeting + Ehlo(DefaultMechanisms) + "334 \r\n235 ok\r\n" + SmtpRun.HelpReply + "221 Bye\r\n";
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), sasl);
+
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
+        Assert.AreEqual(string.Empty, sasl.Choices[0].Request.Credential?.UserName);
+        Assert.AreEqual(string.Empty, sasl.Choices[0].Request.Credential?.Password);
+    }
+
+    [TestMethod]
+    [DataRow(null, false, DisplayName = "no login options: none chosen")]
+    [DataRow("AUTH=PLAIN", true, DisplayName = "AUTH=PLAIN: PLAIN chosen")]
+    public async Task ExecuteAsync_BearerTokenWithheldByRedirect_ChoosesAMechanismOnlyUnderAnAuthOption(string? loginOptions, bool authenticates)
+    {
+        // Measured with curl 8.22.0: after a redirect to smtp://v@host withholds the token, curl
+        // sends nothing after EHLO and exits 67 unless AUTH= names a mechanism (BL-5963).
+        var context = RedirectedContext(loginOptions, new RecordingTransferEvents());
+        var sasl = new FakeSaslAuthenticator("PLAIN", [1]);
+        string replies = Greeting + Ehlo(DefaultMechanisms) + "334 \r\n235 ok\r\n" + SmtpRun.HelpReply + "221 Bye\r\n";
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), sasl);
+
+        TransferResult expected = authenticates ? SmtpRun.HelpAnswered : TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied");
+        Diagnostics.AssertResult(expected, run.Result);
+        Assert.AreEqual(expected, run.Result);
+        Assert.HasCount(authenticates ? 1 : 0, sasl.Choices);
+    }
+
+    // Measured with curl 8.22.0 after an HTTP redirect to smtp://v@host with --oauth2-bearer tok (BL-5963).
+    [TestMethod]
+    [DataRow("SCRAM-SHA-256 PLAIN", "* SASL: no overlap between offered and configured auth mechanisms", DisplayName = "SCRAM has no reason: no overlap")]
+    [DataRow("FOO", "* SASL: no auth mechanism was offered or recognized", DisplayName = "unknown mechanism: none recognized")]
+    [DataRow(
+        "OAUTHBEARER XOAUTH2 PLAIN",
+        Selectable + "|* SASL: OAUTHBEARER is missing CURLOPT_XOAUTH2_BEARER|* SASL: XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER",
+        DisplayName = "bearer mechanisms are missing the token")]
+    public async Task ExecuteAsync_BearerTokenWithheldByRedirect_GivesReasonsForTheBearerMechanismsOnly(string mechanisms, string expectedLines)
+    {
+        var events = new RecordingTransferEvents();
+        var context = RedirectedContext(null, events);
+        string replies = Greeting + Ehlo(mechanisms);
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), new FakeSaslAuthenticator("PLAIN", [1]));
+        Diagnostics.ActEvents(run.Result, events);
+
+        string[] expected = [.. expectedLines.Split('|'), Closing];
+        AssertTranscript(expected, events.Transcript.TakeLast(expected.Length));
+        CollectionAssert.AreEqual(expected, events.Transcript.TakeLast(expected.Length).ToArray());
+    }
+
     private static string Ehlo(string mechanisms) => "250-localhost\r\n250 AUTH " + mechanisms + "\r\n";
+
+    private static TransferContext RedirectedContext(string? loginOptions, RecordingTransferEvents events) =>
+        new()
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            Credentials = new NetworkCredential("v", string.Empty),
+            Mail = new MailRequestOptions { LoginOptions = loginOptions, BearerTokenWithheld = true },
+            Events = events,
+        };
 
     private static TransferContext Context(string? user, string? bearerToken, string? loginOptions, out RecordingTransferEvents events)
     {

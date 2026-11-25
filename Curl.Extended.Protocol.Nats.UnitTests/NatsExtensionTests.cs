@@ -30,9 +30,9 @@ public sealed class NatsExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => NatsExtension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeNats()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeNats()
     {
-        ProtocolDispatcher dispatcher = new(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        ProtocolDispatcher dispatcher = new(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("nats"));
         Assert.IsTrue(dispatcher.Serves("natss"));
@@ -43,7 +43,7 @@ public sealed class NatsExtensionTests
     [DataRow("natss://example.com/a", "natss")]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string url, string scheme)
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream() });

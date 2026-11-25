@@ -17,7 +17,7 @@ it, and setting one would also make the Plugin and MCP extensions start programs
 ## Decision
 
 `ProtocolHandlerServices` gains an optional `ReadEnvironmentVariable` (`null` by default: an extension
-then reads the process environment). `ExtensionProtocolHandlers.For(readEnvironmentVariable)`, which
+then reads the process environment). `ExtendedProtocolHandlers.For(readEnvironmentVariable)`, which
 every host already calls with the run's reader, gives the extensions the services with that reader
 set. `GcsExtension` reads `STORAGE_EMULATOR_HOST` through it, else the process environment. The
 engine does not change.
@@ -25,5 +25,5 @@ engine does not change.
 ## Consequences
 
 Any extension that reads a variable can read the run's environment the same way. A host that calls
-`ExtensionProtocolHandlers.Create` directly (`Curl.Api`, `Curl.Mcp`) still gives none, which is the
+`ExtendedProtocolHandlers.Create` directly (`Curl.Api`, `Curl.Mcp`) still gives none, which is the
 process environment those hosts run in.

@@ -34,13 +34,13 @@ public sealed class WebTransportExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => WebTransportExtension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeWebTransport() =>
-        Assert.IsTrue(new ProtocolDispatcher(ExtensionProtocolHandlers.For(_ => null)!(Services)).Serves("webtransport"));
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeWebTransport() =>
+        Assert.IsTrue(new ProtocolDispatcher(ExtendedProtocolHandlers.For(_ => null)!(Services)).Serves("webtransport"));
 
     [TestMethod]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme()
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("webtransport://example.com/echo"), Output = new MemoryStream() });

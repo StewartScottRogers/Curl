@@ -823,6 +823,32 @@ public sealed partial class TlsFailureMessagesTests
     }
 
     [TestMethod]
+    public void SchannelCaCertificateFileNotFormatted_IsTheMeasuredLine()
+    {
+        Diagnostics.Arrange("file", "roottrunc.pem");
+
+        var message = TlsFailureMessages.SchannelCaCertificateFileNotFormatted("roottrunc.pem");
+
+        Diagnostics.Act("message", message);
+        Diagnostics.Assert("message", "schannel: CA file 'roottrunc.pem' is not correctly formatted", message);
+        Assert.AreEqual("schannel: CA file 'roottrunc.pem' is not correctly formatted", message);
+    }
+
+    [TestMethod]
+    [DataRow(true, "schannel: failed to extract certificate from CA file 'a.pem': An error occurred during encode or decode operation.")]
+    [DataRow(false, "schannel: failed to extract certificate from CA file 'a.pem': Cannot find the requested object.")]
+    public void SchannelCaCertificateNotExtracted_IsTheMeasuredLine(bool bodyIsEmpty, string expected)
+    {
+        Diagnostics.Arrange("body is empty", bodyIsEmpty);
+
+        var message = TlsFailureMessages.SchannelCaCertificateNotExtracted("a.pem", bodyIsEmpty);
+
+        Diagnostics.Act("message", message);
+        Diagnostics.Assert("message", expected, message);
+        Assert.AreEqual(expected, message);
+    }
+
+    [TestMethod]
     public void OpenSslCaCertificateFileUnusable_IsTheMeasuredLine()
     {
         Diagnostics.Arrange("file", "bad.pem");

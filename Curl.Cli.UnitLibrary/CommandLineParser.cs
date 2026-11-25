@@ -208,13 +208,14 @@ public static class CommandLineParser
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild, []);
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild, [], knowsPortOnlyOptions: true);
     }
 
     /// <summary>
     /// Parses <paramref name="arguments"/> as the overload without <paramref name="extensionOptions"/> does, also
     /// reading each of <paramref name="extensionOptions"/> where curl has no option of its name (ADR-1006). A host
-    /// passes none when extensions are off, so every such name is then refused as curl refuses an unknown option.
+    /// whose extensions are off passes none, and <see langword="false"/> as <paramref name="knowsPortOnlyOptions"/>,
+    /// so every such name, and every option only Curl has, is refused as curl refuses an unknown option (ADR-1402).
     /// </summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
     /// <param name="pathExists">Reports whether a path exists, as for the overload with <paramref name="pathExists"/>.</param>
@@ -227,20 +228,21 @@ public static class CommandLineParser
     /// <param name="actsAsEchBuild">Whether to read the arguments as a curl built with ECH does.</param>
     /// <param name="actsAsCAresBuild">Whether to read the arguments as a curl built with c-ares does.</param>
     /// <param name="extensionOptions">The extensions' long options; no two share a name.</param>
+    /// <param name="knowsPortOnlyOptions"><see langword="false"/> when the host's extensions are off: the options only Curl has, such as <c>--ai-help</c>, are then no options (BL-4937).</param>
     /// <returns>As the overload without <paramref name="extensionOptions"/> returns.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild, IReadOnlyList<CommandLineExtensionOption> extensionOptions)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild, IReadOnlyList<CommandLineExtensionOption> extensionOptions, bool knowsPortOnlyOptions = true)
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
         ArgumentNullException.ThrowIfNull(extensionOptions);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild, extensionOptions);
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild, extensionOptions, knowsPortOnlyOptions);
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows) =>
-        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: false, extensionOptions: []);
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: false, extensionOptions: [], knowsPortOnlyOptions: true);
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild, IReadOnlyList<CommandLineExtensionOption> extensionOptions)
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild, IReadOnlyList<CommandLineExtensionOption> extensionOptions, bool knowsPortOnlyOptions)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
@@ -249,6 +251,7 @@ public static class CommandLineParser
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
 
         CommandLineOptions options = CreateOptions(isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild, extensionOptions);
+        options.KnowsPortOnlyOptions = knowsPortOnlyOptions;
         if (!SkipsDefaultConfigFile(arguments))
         {
             ConfigFileApplier.ApplyDefaultFile(options, defaultConfigFileCandidates, pathExists, dataFileReader);
@@ -438,13 +441,13 @@ public static class CommandLineParser
     }
 
     /// <summary>
-    /// Finds a long option in the table, except that under <c>CURL_EXTENSIONS=0</c> the options only Curl has
-    /// (<see cref="CommandLineOptionTable.PortOnlyLongNames"/>) are not found, so the parser refuses each as curl
-    /// refuses an unknown option (BL-4937).
+    /// Finds a long option in the table, except that when <see cref="CommandLineOptions.KnowsPortOnlyOptions"/>
+    /// is <see langword="false"/> the options only Curl has (<see cref="CommandLineOptionTable.PortOnlyLongNames"/>)
+    /// are not found, so the parser refuses each as curl refuses an unknown option (BL-4937).
     /// </summary>
     private static bool TryFindLongOption(CommandLineOptions options, string longName, [NotNullWhen(true)] out CommandLineOption? option)
     {
-        if (CommandLineOptionTable.PortOnlyLongNames.Contains(longName) && options.ReadEnvironmentVariable(ExtensionsSwitchVariable) == "0")
+        if (!options.KnowsPortOnlyOptions && CommandLineOptionTable.PortOnlyLongNames.Contains(longName))
         {
             option = null;
             return false;
@@ -452,9 +455,6 @@ public static class CommandLineParser
 
         return CommandLineOptionTable.TryFindLong(longName, out option);
     }
-
-    /// <summary>The environment variable whose value <c>0</c> turns every Curl-only extension off.</summary>
-    private const string ExtensionsSwitchVariable = "CURL_EXTENSIONS";
 
     private static CommandLineRefusal? ParseLong(CommandLineOptions options, string argument, ArgumentReader reader)
     {

@@ -26,9 +26,9 @@ public sealed class StompExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => StompExtension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeStompAndStomps()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeStompAndStomps()
     {
-        ProtocolDispatcher dispatcher = new(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        ProtocolDispatcher dispatcher = new(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("stomp"));
         Assert.IsTrue(dispatcher.Serves("stomps"));
@@ -46,7 +46,7 @@ public sealed class StompExtensionTests
     [DataRow("stomps")]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string scheme)
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://example.com/q"), Output = new MemoryStream() });

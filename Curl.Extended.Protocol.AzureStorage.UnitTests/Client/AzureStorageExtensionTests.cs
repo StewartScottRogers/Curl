@@ -38,9 +38,9 @@ public sealed class AzureStorageExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => AzureStorageExtension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeAzAndAbfs()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeAzAndAbfs()
     {
-        ProtocolDispatcher dispatcher = new(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        ProtocolDispatcher dispatcher = new(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("az"));
         Assert.IsTrue(dispatcher.Serves("abfs"));
@@ -59,7 +59,7 @@ public sealed class AzureStorageExtensionTests
     [DataRow("abfs://fs@account/file", "abfs")]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string url, string scheme)
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream() });

@@ -8,7 +8,7 @@ depends-on: [BL-5926]
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/SchannelCaCertificateFile.cs, Curl.Networking.UnitLibrary/SchannelCaCertificateFileException.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/SchannelCaCertificateFileTests.cs, Curl.Networking.UnitTests/SslStreamTlsProviderTests.cs, Curl.Networking.UnitTests/TlsFailureMessagesTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-25
 ---
 # BL-5884 — Fix fitness finding STD-203: Windows --cacert / --proxy-cacert file with a malformed CERTIFICATE block: the port trusts the parsable rest, or silently drops the whole file; curl refuses with exit 77
 
@@ -41,9 +41,9 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] all three files give exit 77 with REF's message text.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] all three files give exit 77 with REF's message text.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -89,8 +89,24 @@ Design (record it in an ADR, decided by Claude under Stewart's delegation):
 - Check `SslStreamTlsProviderTests` near `CorruptCertificatePem` (the "corrupt" data rows and
   the "mixed.pem" test) for Schannel-build expectations that this changes.
 
+Run of 2026-11-25 (lane 1): implemented the design above, recorded in ADR-1396.
+`SchannelCaCertificateFile` replaces `ImportParsableCertificates`; `SchannelCaCertificateFileException`
+carries curl's line and `TrustAnchorsUnusable` returns exit 77 with it. Checked with the built
+`curl.exe` through `Record-CurlExchange.ps1 -Tls`, with an unrelated self-signed root standing in for
+the review's `root.pem` (alone it gives exit 60): `rootbad64` and `rootgarb` give exit 77 "Cannot find
+the requested object." and `roottrunc` gives exit 77 "is not correctly formatted", REF's text.
+`--proxy-cacert` uses the same `ServerCertificateVerification`, so it gets the same fix. Focused tests:
+`SchannelCaCertificateFileTests` (every measured case; platform-neutral, with no paths and no OS text)
+and `TlsFailureMessagesTests` for the two new lines. In `SslStreamTlsProviderTests` the Schannel
+"corrupt", "undecodable" and "mixed.pem" cases now expect exit 77, and a blob case pins
+`(memory blob)`. The change is platform-neutral, which meets the CI criterion for Linux and macOS.
+`dotnet build` is clean and the fast tests pass in every test project. `Measure-CodeQuality.ps1 -Library
+Curl.Networking.UnitLibrary` reports 0 failing members.
+
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 9e20ff72 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waiting on BL-5926, which holds Curl.Networking.UnitLibrary/ServerCertificateVerification.cs (TrustAnchorsUnusable must change); curl measured and design recorded in Notes, no code changed
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 9e20ff72 69116afe 3d836d5e.
+- 2026-11-25: Doing -> Done. Schannel build refuses a --cacert/--proxy-cacert file with a malformed CERTIFICATE block with exit 77 and curl's text

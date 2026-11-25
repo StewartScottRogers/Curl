@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Composition;
 
 [TestClass]
-public sealed class ExtensionProtocolHandlersTests
+public sealed class ExtendedProtocolHandlersTests
 {
     private static readonly ProtocolHandlerServices Services = new(null!, null!, null!, null!);
 
@@ -11,7 +11,7 @@ public sealed class ExtensionProtocolHandlersTests
     public void For_WithTheSwitchSetToZero_GivesNoFactory()
     {
         Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? factory =
-            ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null);
+            ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null);
 
         Assert.IsNull(factory);
     }
@@ -23,7 +23,7 @@ public sealed class ExtensionProtocolHandlersTests
     public void For_WithTheSwitchUnsetOrNotZero_GivesTheCatalogueFactory(string? value)
     {
         Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? factory =
-            ExtensionProtocolHandlers.For(_ => value);
+            ExtendedProtocolHandlers.For(_ => value);
 
         Assert.IsNotNull(factory);
         Assert.HasCount(ExtensionCatalogue.Entries.Count, factory(Services));
@@ -35,7 +35,7 @@ public sealed class ExtensionProtocolHandlersTests
         Func<string, string?> reader = _ => null;
         ProtocolHandlerServices? seen = null;
 
-        _ = ExtensionProtocolHandlers.For(reader, [services => { seen = services; return new SchemeOnlyHandler("x"); }])!(Services).ToList();
+        _ = ExtendedProtocolHandlers.For(reader, [services => { seen = services; return new SchemeOnlyHandler("x"); }])!(Services).ToList();
 
         Assert.AreSame(reader, seen!.ReadEnvironmentVariable);
         Assert.IsNull(Services.ReadEnvironmentVariable);
@@ -43,19 +43,19 @@ public sealed class ExtensionProtocolHandlersTests
 
     [TestMethod]
     public void For_WithTheCatalogue_GivesOneHandlerPerEntry() =>
-        Assert.HasCount(ExtensionCatalogue.Entries.Count, ExtensionProtocolHandlers.For(_ => null)!(Services));
+        Assert.HasCount(ExtensionCatalogue.Entries.Count, ExtendedProtocolHandlers.For(_ => null)!(Services));
 
     [TestMethod]
     public void For_WithNoReader_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => ExtensionProtocolHandlers.For(null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => ExtendedProtocolHandlers.For(null!));
 
     [TestMethod]
     public void Create_GivesOneHandlerPerCatalogueEntry() =>
-        Assert.HasCount(ExtensionCatalogue.Entries.Count, ExtensionProtocolHandlers.Create(Services));
+        Assert.HasCount(ExtensionCatalogue.Entries.Count, ExtendedProtocolHandlers.Create(Services));
 
     [TestMethod]
     public void Create_WithNoServices_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => ExtensionProtocolHandlers.Create(null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => ExtendedProtocolHandlers.Create(null!));
 
     [TestMethod]
     public void CreateFrom_BuildsEachHandlerOverTheServicesInOrder()
@@ -64,7 +64,7 @@ public sealed class ExtensionProtocolHandlersTests
         SchemeOnlyHandler first = new("first");
         SchemeOnlyHandler second = new("second");
 
-        IProtocolHandler[] handlers = [.. ExtensionProtocolHandlers.CreateFrom(
+        IProtocolHandler[] handlers = [.. ExtendedProtocolHandlers.CreateFrom(
             [
                 services => { seen.Add(services); return first; },
                 services => { seen.Add(services); return second; },

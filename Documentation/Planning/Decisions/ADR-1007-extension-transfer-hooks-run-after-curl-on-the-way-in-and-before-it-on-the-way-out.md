@@ -8,7 +8,7 @@
 
 SSE, the HTTP cache, digests, checksums, HAR, OpenTelemetry, record and replay and OAuth all need to
 add request headers, read the response status and headers, observe or rewrite the response body and
-read the timings of a transfer. ADR-0999 lets a host give the engine extension protocol handlers, but
+read the timings of a transfer. ADR-0999 lets a host give the engine extended protocol handlers, but
 the engine, the core and every protocol may not reference an extension project
 (`VerifyExtensionIsolation`), and with no extension option given curl's behaviour must not change.
 

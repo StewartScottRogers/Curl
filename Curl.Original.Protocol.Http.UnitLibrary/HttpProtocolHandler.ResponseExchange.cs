@@ -36,6 +36,8 @@ public sealed partial class HttpProtocolHandler
         byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, options.EarlierResponseWasHttp10 || Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = ResponseConnectionOf(plan, requestStream, timedConnection);
+        // Ends a wait still holding the body however the exchange ends.
+        using HttpContinueWaitConnection? continueWait = responseConnection as HttpContinueWaitConnection;
         HttpRequestBodyWriter upload = CreateUpload(plan, connection, responseConnection, requestStream, request);
         HttpExchange exchange = CreateExchange(plan, connect, connection, timedConnection, request.Length, upload, earlier, newConnection);
         HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
@@ -89,6 +91,7 @@ public sealed partial class HttpProtocolHandler
             ThrowIfFailingBeforeBody(fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, actedOn, exchange.RedirectUrl);
             ReportAuthRetryRewind(plan, actedOn, retry);
+            SettleUnsentBodyAtHead(plan, actedOn, retry, upload, responseConnection);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
             ReportUploadStopped(context.Events, upload, retry, discardsBody);
             delivery = DeliveryOf(plan, actedOn, discardsBody);
@@ -96,19 +99,21 @@ public sealed partial class HttpProtocolHandler
             bool ignoresBody = IgnoresBody(plan, actedOn, delivery, discardsBody);
             headReader.ReportHeldLines();
             await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, ignoresBody, cancellationToken).ConfigureAwait(false);
-            await upload.WriteRestAfterResponseAsync(cancellationToken).ConfigureAwait(false);
-            ThrowIfSendFailedUnlessClosing(sendFailedAfter2xx, actedOn);
+            await FinishSendingBodyAsync(plan, actedOn, upload, responseConnection, sendFailedAfter2xx, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpTransferException failure)
         {
             HttpAttemptOutcome failedOutcome = OutcomeOfFailure(plan, exchange, body, exchangeLog, headReader, upload, !newConnection, failure);
             failedOutcome.UpgradedSession = UpgradedSessionOf(connection);
+            await ResetFailedStreamAsync(failure, requestStream, connection, cancellationToken).ConfigureAwait(false);
             return failedOutcome;
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
             HttpAttemptOutcome timedOutOutcome = OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
             timedOutOutcome.UpgradedSession = UpgradedSessionOf(connection);
+            // The transfer's own token is cancelled: its time limit is what brought it here.
+            await ResetGivenUpStreamAsync(TrailerStreamOf(requestStream, connection), CancellationToken.None).ConfigureAwait(false);
             return timedOutOutcome;
         }
         catch (OperationCanceledException canceled)

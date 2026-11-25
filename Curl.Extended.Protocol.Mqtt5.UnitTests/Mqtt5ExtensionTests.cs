@@ -1,6 +1,6 @@
 using Curl.Core;
-using Curl.Extension.Composition;
 using Curl.Extended.Protocol.Mqtt5.Client;
+using Curl.Extension.Composition;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Mqtt5;
@@ -32,9 +32,9 @@ public sealed class Mqtt5ExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => Mqtt5Extension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeEveryMqtt5SchemeAndLeaveMqttToCurl()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeEveryMqtt5SchemeAndLeaveMqttToCurl()
     {
-        ProtocolDispatcher dispatcher = new(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        ProtocolDispatcher dispatcher = new(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("mqtt5"));
         Assert.IsTrue(dispatcher.Serves("mqtt5s"));
@@ -55,7 +55,7 @@ public sealed class Mqtt5ExtensionTests
     [DataRow("mqtt5+ws")]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string scheme)
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://example.com/t"), Output = new MemoryStream() });

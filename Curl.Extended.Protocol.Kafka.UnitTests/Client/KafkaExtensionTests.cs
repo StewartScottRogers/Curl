@@ -26,9 +26,9 @@ public sealed class KafkaExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => KafkaExtension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeKafkaAndKafkas()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeKafkaAndKafkas()
     {
-        ProtocolDispatcher dispatcher = new(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        ProtocolDispatcher dispatcher = new(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("kafka"));
         Assert.IsTrue(dispatcher.Serves("kafkas"));
@@ -46,7 +46,7 @@ public sealed class KafkaExtensionTests
     [DataRow("kafkas")]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string scheme)
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://example.com/q"), Output = new MemoryStream() });

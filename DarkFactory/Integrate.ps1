@@ -316,7 +316,11 @@ function Invoke-Integrate {
     # shared branch the rebase above put them on. A real miss of a Done task gets a repair run;
     # a "quality gates not measured" result (git diff or the report failed) is returned as it is,
     # unpushed, because no code change can satisfy it (BL-4802).
-    if ($State -eq 'Done' -or -not (Test-IncomingIsBoardOnly 'FETCH_HEAD' 'HEAD')) {
+    # A CI fix skips this measure: it took 15 to 24 minutes of red CI before each of BL-5844's and
+    # BL-5953's pushes (BL-5175..BL-5177), and CI's own quality job still gates the commit, whose
+    # miss the CI watch files as the next CI fix.
+    $ciFix = Test-CiFixTitle (Get-TaskTitle $Id)
+    if (-not $ciFix -and ($State -eq 'Done' -or -not (Test-IncomingIsBoardOnly 'FETCH_HEAD' 'HEAD'))) {
         Write-Heartbeat 'integrate' 'quality gates before the lock'
         $quality = Test-QualityGates -Id $Id -Base 'FETCH_HEAD'
         if ($quality -and $State -eq 'Done' -and $quality -notlike 'quality gates not measured*') { $quality = Repair-QualityGates -Id $Id -Red $quality }
@@ -324,7 +328,6 @@ function Invoke-Integrate {
     }
     $attempt = 0
     # A CI fix goes before the ordinary integrations waiting for the lock (ADR-1158).
-    $ciFix = Test-CiFixTitle (Get-TaskTitle $Id)
     while ($true) {
         Write-Heartbeat 'integrate' 'waiting for the integrate lock'
         $lock = Enter-Lock -Priority:$ciFix
@@ -630,6 +633,13 @@ if ($TestIntegrateLock) {
                 "$held $(Test-Path (Get-LockTicketPath))" })
             ,@('an integration of a CI fix asks for the lock with -Priority', 'True', {
                 "$((& $source 'Integrate.ps1') -match 'Enter-Lock -Priority:\$ciFix')" })
+            ,@('a CI fix''s code that misses a quality gate is pushed anyway: CI''s quality job gates it (BL-5175)', "'' 0 measures", {
+                $script:Measured = 0
+                function Test-QualityGates { param([string]$Id, [string]$Base) $script:Measured++; 'quality gates missed by 1 member(s)' }
+                function Get-TaskTitle { param([string]$Id) 'Fix CI failure SomeTest on Linux and macOS' }
+                & $commit $repo 'ci-fix-1'
+                $r = & $integrate
+                "'$r' $script:Measured measures" })
             ,@('a claim asks for the lock with -Priority, ahead of ordinary integrations (BL-4779)', 'True', {
                 "$((& $source 'Claim.ps1') -match '(?s)function Invoke-Claim.*?\$lock = Enter-Lock -Priority\r?\n')" })
             ,@('a clean integration pushes, with no resolve', "'' ours-1 0 resolves", {

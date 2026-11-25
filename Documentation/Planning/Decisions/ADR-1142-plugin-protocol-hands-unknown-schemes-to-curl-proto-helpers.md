@@ -1,4 +1,4 @@
-# ADR-1142 — The plugin protocol extension hands unknown schemes to curl-proto-<scheme> helpers
+# ADR-1142 — The plugin extended protocol hands unknown schemes to curl-proto-<scheme> helpers
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

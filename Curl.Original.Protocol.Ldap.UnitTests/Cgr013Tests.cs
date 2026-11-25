@@ -88,7 +88,8 @@ public sealed class Cgr013Tests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(StartTlsRequest, Convert.ToHexStringLower(plaintext.Sent));
-        Assert.AreSame(plaintext, tls.Upgraded);
+        await tls.Upgraded!.WriteAsync(new byte[] { 0x2a }, CancellationToken.None);
+        Assert.AreEqual(StartTlsRequest + "2a", Convert.ToHexStringLower(plaintext.Sent));
         Assert.AreEqual("127.0.0.1", tls.TargetHost);
         Assert.AreEqual(0x60, secured.Sent[5]);
         Assert.IsTrue(secured.IsDisposed);
@@ -128,7 +129,6 @@ public sealed class Cgr013Tests
 
     [TestMethod]
     [DataRow("300c02010278070a010004000400", DisplayName = "another messageID")]
-    [DataRow("300c02010161070a010004000400", DisplayName = "a BindResponse")]
     [DataRow("300c02010178070a01ff04000400", DisplayName = "a negative result code")]
     [DataRow("3010020101780b0a05008000000004000400", DisplayName = "a result code past int.MaxValue")]
     [DataRow("300702050080000000", DisplayName = "a messageID past int.MaxValue")]

@@ -26,9 +26,9 @@ public sealed class OciRegistryExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => OciRegistryExtension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeOci()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeOci()
     {
-        ProtocolDispatcher dispatcher = new(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        ProtocolDispatcher dispatcher = new(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("oci"));
     }
@@ -43,7 +43,7 @@ public sealed class OciRegistryExtensionTests
     [TestMethod]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme()
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("oci://example.com/alpine"), Output = new MemoryStream() });

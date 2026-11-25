@@ -13,6 +13,24 @@ namespace Curl.Extension.ResumableUpload.Transfer;
 /// <param name="origin">The transfer's URL: a request to another origin (scheme, host or port) gets no <c>Authorization</c>, <c>Cookie</c> or <c>Proxy-Authorization</c> from <c>-H</c>, <c>-u</c>, <c>--oauth2-bearer</c> or <c>-b</c>, as curl drops them on a cross-origin redirect.</param>
 internal sealed class ResumableUploadSession(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next, Uri origin)
 {
+    /// <summary>
+    /// The exit codes meaning the connection or the request's stream broke, so the upload can go on from the server's
+    /// offset (ADR-1398, ADR-1399): 52 (nothing received), 55 and 56 (sending or receiving broke), 92 (the server reset
+    /// the HTTP/2 stream), 16 (the HTTP/2 connection closed before the final response head, or failed on a framing or
+    /// protocol error), 95 (the HTTP/3 request stream was reset before any response body byte, closed before the final
+    /// response head, or carried a response head without a valid status) and 18 (the response was cut off part-way).
+    /// </summary>
+    private static readonly CurlExitCode[] ConnectionBreaks =
+    [
+        CurlExitCode.GotNothing,
+        CurlExitCode.SendError,
+        CurlExitCode.RecvError,
+        CurlExitCode.Http2Stream,
+        CurlExitCode.Http2,
+        CurlExitCode.Http3,
+        CurlExitCode.PartialFile,
+    ];
+
     /// <summary>Sends one request and reads its final response whole.</summary>
     /// <param name="method">The request method.</param>
     /// <param name="uri">Where the request goes.</param>
@@ -26,27 +44,35 @@ internal sealed class ResumableUploadSession(ITransferContext context, Func<ITra
     {
         var output = new MemoryStream();
         var head = new MemoryStream();
-        var sameOrigin = SameOrigin(uri);
-        var request = new ResumableUploadRequestContext(
-            context,
-            CurlUrl.Parse(uri.AbsoluteUri, pathAsIs: true),
-            HttpFor(method, headers, sameOrigin),
-            await SliceAsync(body, offset),
-            method == "HEAD",
-            output,
-            head,
-            sameOrigin ? context.Credentials : null);
-        var result = await next(request);
+        var content = body is null ? null : new UploadRemainderStream(body, offset);
+        var result = await next(RequestFor(method, uri, headers, content, output, head));
         if (result.ExitCode != CurlExitCode.Ok)
         {
             throw new ResumableUploadTransferException(result.ExitCode, result.ErrorMessage ?? string.Empty, CanResume(result.ExitCode));
         }
 
-        return new ResumableUploadExchange(method, uri, result.Report?.ResponseCode ?? 0, result.Report?.ResponseHeaders ?? [], head.ToArray(), output.ToArray());
+        return ExchangeOf(method, uri, result.Report, head, output);
     }
 
-    private static bool CanResume(CurlExitCode exitCode) =>
-        exitCode is CurlExitCode.GotNothing or CurlExitCode.SendError or CurlExitCode.RecvError;
+    private static ResumableUploadExchange ExchangeOf(string method, Uri uri, TransferReport? report, MemoryStream head, MemoryStream output) =>
+        new(method, uri, report?.ResponseCode ?? 0, report?.ResponseHeaders ?? [], head.ToArray(), output.ToArray());
+
+    private ResumableUploadRequestContext RequestFor(
+        string method, Uri uri, IReadOnlyList<KeyValuePair<string, string>> headers, Stream? content, Stream output, Stream head)
+    {
+        var sameOrigin = SameOrigin(uri);
+        return new ResumableUploadRequestContext(
+            context,
+            CurlUrl.Parse(uri.AbsoluteUri, pathAsIs: true),
+            HttpFor(method, headers, sameOrigin),
+            content,
+            method == "HEAD",
+            output,
+            head,
+            sameOrigin ? context.Credentials : null);
+    }
+
+    private static bool CanResume(CurlExitCode exitCode) => ConnectionBreaks.Contains(exitCode);
 
     private HttpRequestOptions HttpFor(string method, IReadOnlyList<KeyValuePair<string, string>> own, bool sameOrigin)
     {
@@ -79,18 +105,4 @@ internal sealed class ResumableUploadSession(ITransferContext context, Func<ITra
 
     private bool SameOrigin(Uri uri) =>
         uri.Scheme == origin.Scheme && uri.Port == origin.Port && string.Equals(uri.IdnHost, origin.IdnHost, StringComparison.OrdinalIgnoreCase);
-
-    private async Task<Stream?> SliceAsync(Stream? body, long offset)
-    {
-        if (body is null)
-        {
-            return null;
-        }
-
-        var slice = new MemoryStream();
-        body.Position = offset;
-        await body.CopyToAsync(slice, context.CancellationToken);
-        slice.Position = 0;
-        return slice;
-    }
 }

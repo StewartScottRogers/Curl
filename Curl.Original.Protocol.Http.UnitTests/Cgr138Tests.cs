@@ -1,7 +1,7 @@
 using System.Text;
 using Curl.Http2;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -19,6 +19,8 @@ namespace Curl.Original.Protocol.Http;
 public sealed class Cgr138Tests
 {
     private const string ShutsDown = "nghttp2 shuts down connection with error 1: PROTOCOL_ERROR";
+
+    private const string UpperCaseFieldRejected = "Invalid HTTP header field was received: frame type: 1, stream: 1, name: [X-Upper], value: [v]";
 
     private static readonly byte[] Body = "hello h2\n"u8.ToArray();
 
@@ -61,6 +63,34 @@ public sealed class Cgr138Tests
         Assert.AreEqual(expectedBody, Encoding.Latin1.GetString(output.ToArray()));
         byte[] goAway = Http2FrameCodec.Serialize(Http2FrameFactory.CreateGoAway(0, Http2ErrorCode.ProtocolError, ReadOnlyMemory<byte>.Empty));
         Assert.IsTrue(connection.Written.AsSpan().EndsWith(goAway), "the last frame sent is GOAWAY last 0 PROTOCOL_ERROR with no debug data");
+    }
+
+    public static IEnumerable<object?[]> ShutDownVerboseLines =>
+    [
+        ["DATA past content-length", new[] { Head("content-length", "3"), BodyDataFrame(isEndStream: true) }, new[] { "< content-length: 3\r\n", "< \r\n", "* " + ShutsDown }],
+        ["second DATA past content-length", new[] { Head("content-length", "12"), BodyDataFrame(isEndStream: false), BodyDataFrame(isEndStream: true) }, new[] { "< content-length: 12\r\n", "< \r\n", "{ hello h2\n", "* " + ShutsDown }],
+        ["DATA short of content-length", new[] { Head("content-length", "100"), BodyDataFrame(isEndStream: true) }, new[] { "< content-length: 100\r\n", "< \r\n", "{ hello h2\n", "* " + ShutsDown }],
+        ["trailer short of content-length", new[] { Head("content-length", "100"), BodyDataFrame(isEndStream: false), HeadersFrame(isEndStream: true, new HeaderField("x-t", "1")) }, new[] { "< content-length: 100\r\n", "< \r\n", "{ hello h2\n", "* " + ShutsDown }],
+        ["headers after the head without END_STREAM", new[] { Head(), BodyDataFrame(isEndStream: false), HeadersFrame(isEndStream: false, new HeaderField("x-t", "1")), BodyDataFrame(isEndStream: true) }, new[] { "< \r\n", "{ hello h2\n", "* " + ShutsDown }],
+        ["invalid field in the head", new[] { Head("x-a", "1", "X-Upper", "v") }, new[] { "< x-a: 1\r\n", "* " + UpperCaseFieldRejected, "* " + ShutsDown }],
+        ["invalid field in a trailer", new[] { Head(), BodyDataFrame(isEndStream: false), HeadersFrame(isEndStream: true, new HeaderField("X-Upper", "v")) }, new[] { "< \r\n", "{ hello h2\n", "* " + UpperCaseFieldRejected, "* " + ShutsDown }],
+    ];
+
+    [TestMethod]
+    [DynamicData(nameof(ShutDownVerboseLines))]
+    public async Task ExecuteAsync_Http2ResponseShutDownAsMalformed_ReportsCurlsNghttp2Lines(string scenario, Http2Frame[] frames, string[] expectedEventsAfterStatusLine)
+    {
+        ScriptedConnection connection = new(Reply(frames), 65536);
+        RecordingTransferEvents events = new();
+        Diagnostics.Arrange("scenario", scenario);
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator())
+            .ExecuteAsync(Context(new MemoryStream(), new MemoryStream(), method: null, isContentLengthIgnored: false, events));
+
+        string[] reported = [.. events.Events.SkipWhile(line => line != "< HTTP/2 200 \r\n").Skip(1).TakeWhile(line => line != "* closing connection #0")];
+        Diagnostics.Act("exit code, events", $"{result.ExitCode}, {string.Join(" | ", events.Events)}");
+        Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
+        CollectionAssert.AreEqual(expectedEventsAfterStatusLine, reported);
     }
 
     [TestMethod]
@@ -107,25 +137,31 @@ public sealed class Cgr138Tests
     private static HeaderField[] Fields(string status, params string[] namesAndValues) =>
         [new(":status", status), .. namesAndValues.Chunk(2).Select(pair => new HeaderField(pair[0], pair[1]))];
 
-    private static TransferContext Context(Stream output, Stream headers, string? method, bool isContentLengthIgnored) => new()
+    private static TransferContext Context(Stream output, Stream headers, string? method, bool isContentLengthIgnored, RecordingTransferEvents? events = null) => new()
     {
         Url = CurlUrl.Parse("http://127.0.0.1:21612/x"),
         Output = output,
         HeaderOutput = headers,
-        Events = new RecordingTransferEvents(),
+        Events = events ?? new RecordingTransferEvents(),
         Http = new HttpRequestOptions { Version = HttpVersionPreference.Http2PriorKnowledge, UserAgent = "curl/8.18.0", CustomMethod = method, IgnoreContentLength = isContentLengthIgnored },
     };
 
-    private static byte[] Response(HeaderField[] fields, bool hasData)
-    {
-        Http2Frame[] frames = hasData
-            ? [Http2FrameFactory.CreateHeaders(1, new HpackEncoder().Encode(fields), isEndStream: false, isEndHeaders: true), Http2FrameFactory.CreateData(1, Body, isEndStream: true)]
-            : [Http2FrameFactory.CreateHeaders(1, new HpackEncoder().Encode(fields), isEndStream: true, isEndHeaders: true)];
-        return
-        [
-            .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings([])),
-            .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettingsAcknowledgement()),
-            .. frames.SelectMany(Http2FrameCodec.Serialize),
-        ];
-    }
+    private static byte[] Response(HeaderField[] fields, bool hasData) => Reply(hasData
+        ? [HeadersFrame(isEndStream: false, fields), BodyDataFrame(isEndStream: true)]
+        : [HeadersFrame(isEndStream: true, fields)]);
+
+    /// <summary>A response head of status 200 that does not end the stream.</summary>
+    private static Http2Frame Head(params string[] namesAndValues) => HeadersFrame(isEndStream: false, Fields("200", namesAndValues));
+
+    private static Http2Frame HeadersFrame(bool isEndStream, params HeaderField[] fields) =>
+        Http2FrameFactory.CreateHeaders(1, new HpackEncoder().Encode(fields), isEndStream, isEndHeaders: true);
+
+    private static Http2Frame BodyDataFrame(bool isEndStream) => Http2FrameFactory.CreateData(1, Body, isEndStream);
+
+    private static byte[] Reply(Http2Frame[] frames) =>
+    [
+        .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings([])),
+        .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettingsAcknowledgement()),
+        .. frames.SelectMany(Http2FrameCodec.Serialize),
+    ];
 }

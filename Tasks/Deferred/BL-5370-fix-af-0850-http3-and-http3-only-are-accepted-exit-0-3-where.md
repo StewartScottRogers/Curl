@@ -56,3 +56,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-11-24: Doing -> Blocked. Stewart: this reverses ADR-1282 (HTTP/3 accepted everywhere), which you kept on 2026-11-22; was undeferring it on 2026-11-24 meant to reverse that decision?
+- 2026-11-25: Blocked -> Deferred. Stewart 2026-11-25: keep --http3 and --http3-only accepted (ADR-1282); the finding is a decided difference, not a defect, and is closed. Gap items excluded on every platform.

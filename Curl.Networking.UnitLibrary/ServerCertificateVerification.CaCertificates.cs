@@ -23,7 +23,7 @@ internal sealed partial class ServerCertificateVerification
 
     // The OpenSSL build refuses the whole file (exit 77) unless every CERTIFICATE, X509
     // CERTIFICATE and TRUSTED CERTIFICATE block in it parses and there is at least one. The
-    // Schannel build trusts whatever CERTIFICATE blocks parse.
+    // Schannel build refuses it (exit 77) when a CERTIFICATE block does not (BL-5884).
     // A CURLOPT_CAINFO_BLOB is read as the file would be, and wins over it (ADR-0704).
     // The --cacert certificates, then the --capath ones.
     private X509Certificate2Collection ReadCaCertificates(OpenSslCaFile directory)
@@ -33,9 +33,7 @@ internal sealed partial class ServerCertificateVerification
             : ReadCaCertificateFile(CaCertificateFile!);
         if (matchesSchannelBuild)
         {
-            var certificates = new X509Certificate2Collection();
-            ImportParsableCertificates(certificates, pem);
-            return certificates;
+            return SchannelCaCertificateFile.Read(pem, options.CaCertificateBlob is null ? CaCertificateFile! : "(memory blob)");
         }
 
         var trusted = OpenSslCaFile.Read(pem).FollowedBy(directory);
@@ -160,20 +158,6 @@ internal sealed partial class ServerCertificateVerification
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             return string.Empty;
-        }
-    }
-
-    // ImportFromPem throws for a block that is base64 but not a certificate; what was
-    // imported before it is kept.
-    private static void ImportParsableCertificates(X509Certificate2Collection certificates, string pem)
-    {
-        try
-        {
-            certificates.ImportFromPem(pem);
-        }
-        catch (CryptographicException)
-        {
-            // The rest of the text is not a usable certificate; it adds nothing.
         }
     }
 

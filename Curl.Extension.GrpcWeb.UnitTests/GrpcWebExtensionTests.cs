@@ -24,7 +24,7 @@ public sealed class GrpcWebExtensionTests
     public void Composition_RegistersTheOptionOnlyWhileExtensionsAreOn()
     {
         Assert.Contains(GrpcWebExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
-        Assert.DoesNotContain(GrpcWebExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+        Assert.DoesNotContain(GrpcWebExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
     }
 
     [TestMethod]

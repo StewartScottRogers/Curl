@@ -234,10 +234,11 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
 
         Diagnostics.Diff("sent", Ehlo + "AUTH OAUTHBEARER bixhPSw=\r\n" + HelpAndQuit, run.Sent);
         Diagnostics.AssertValues("bearer token", "tok", sasl.Choices.Single().Request.BearerToken);
-        Diagnostics.AssertValues("credential", null, sasl.Choices.Single().Request.Credential);
+        // With no -u the request carries an empty user and password, as curl's (BL-5925).
+        Diagnostics.AssertValues("credential user", string.Empty, sasl.Choices.Single().Request.Credential?.UserName);
         Assert.AreEqual(Ehlo + "AUTH OAUTHBEARER bixhPSw=\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual("tok", sasl.Choices.Single().Request.BearerToken);
-        Assert.IsNull(sasl.Choices.Single().Request.Credential);
+        Assert.AreEqual(string.Empty, sasl.Choices.Single().Request.Credential?.UserName);
     }
 
     [TestMethod]

@@ -23,23 +23,23 @@ public sealed class Cgr067Tests
     [TestMethod]
     [DataRow(1)]
     [DataRow(65536)]
-    public async Task WaitForContinueAsync_FinalSuccessArrivesFirst_WaitsTheSecondOutAndSendsTheBody(int chunkSize)
+    public async Task WaitForContinueAsync_FinalSuccessArrivesFirst_HoldsTheBodyUntilTheSecondRunsOut(int chunkSize)
     {
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         HttpContinueWaitConnection connection = new(new ScriptedConnection(Encoding.Latin1.GetBytes(EarlyOk), chunkSize));
         Diagnostics.Arrange("response, chunk size", $"{EarlyOk.Replace("\r", "\\r").Replace("\n", "\\n")}, {chunkSize}");
 
-        Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
-        await time.FirstTimerCreated;
+        bool sendsNow = await connection.WaitForContinueAsync(time, CancellationToken.None);
+        Task sending = connection.SendHeldBodyAsync(CancellationToken.None).AsTask();
         time.Advance(TimeSpan.FromMilliseconds(999));
-        Diagnostics.Act("completed at 999 ms", wait.IsCompleted);
-        Assert.IsFalse(wait.IsCompleted, "The wait ended before one second.");
+        Diagnostics.Act("sent at 999 ms", sending.IsCompleted);
+        Assert.IsFalse(sending.IsCompleted, "The wait ended before one second.");
         time.Advance(TimeSpan.FromMilliseconds(1));
-        bool sends = await wait;
+        await sending;
 
-        Diagnostics.Assert("sends the body, wait ran out", "True, True", $"{sends}, {connection.WaitRanOut}");
-        Assert.IsTrue(sends);
-        Assert.IsTrue(connection.WaitRanOut);
+        Diagnostics.Assert("sends the body at once, holds it after", "False, False", $"{sendsNow}, {connection.HoldsBody}");
+        Assert.IsFalse(sendsNow);
+        Assert.IsFalse(connection.HoldsBody);
         Assert.IsFalse(connection.StopsSending);
         Assert.AreEqual(EarlyOk, await ReadAllAsync(connection));
     }

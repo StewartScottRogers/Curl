@@ -62,6 +62,22 @@ public sealed partial class HttpProtocolHandler
         public Http2Session? UpgradedSession { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the exchange ran on a stream of an HTTP/2
+        /// connection, which a transfer that times out or that <c>-f</c> fails leaves intact
+        /// (BL-5974, BL-5977).
+        /// </summary>
+        public bool RanOnHttp2Stream { get; set; }
+
+        /// <summary>
+        /// Gets a value indicating whether the exchange timed out, or <c>-f</c> failed it before
+        /// its body, on an HTTP/2 stream: curl ends only the stream, reports the connection left
+        /// intact and keeps it for the next transfer. No retry may follow on it, so it does not
+        /// count towards <see cref="ReportsLeftIntact" />.
+        /// </summary>
+        public bool EndedOnlyItsHttp2Stream =>
+            RanOnHttp2Stream && !FailedAfterBody && Result.ExitCode is CurlExitCode.OperationTimedOut or CurlExitCode.HttpReturnedError;
+
+        /// <summary>
         /// Gets a value indicating whether the connection is reported left intact: it
         /// <see cref="KeepsAlive" />, or it is <see cref="LeftIntactAfterServerClosed" />.
         /// </summary>

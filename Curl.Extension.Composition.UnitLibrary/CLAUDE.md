@@ -3,7 +3,10 @@
 The one place that lists Curl's extensions: what Curl adds beyond upstream curl (ADR-0999).
 Namespace `Curl.Extension.Composition`.
 
-- `ExtensionProtocolHandlers.For(readEnvironmentVariable)` gives the factory a host passes to
+- `ExtensionSwitch.Variable` is `CURL_EXTENSIONS`, which turns every extension off when `0`: the
+  extensions' options, expanders, listings and handlers. A host that parses a command line then also
+  has the parser refuse the options only Curl has (ADR-1402).
+- `ExtendedProtocolHandlers.For(readEnvironmentVariable)` gives the factory a host passes to
   `EngineComposition.CreateProtocolHandlers`' `extensionHandlers`, or `null` when `CURL_EXTENSIONS`
   is `0`. `Curl.Console`'s `CurlComposition` passes it in both production compositions. The factory
   builds every extension over the services with `ReadEnvironmentVariable` set to that reader, so an

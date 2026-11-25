@@ -41,9 +41,9 @@ public sealed class GrpcExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => GrpcExtension.HookFor(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeGrpcAndGrpcs()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeGrpcAndGrpcs()
     {
-        var dispatcher = new ProtocolDispatcher(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        var dispatcher = new ProtocolDispatcher(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("grpc"));
         Assert.IsTrue(dispatcher.Serves("grpcs"));
@@ -62,7 +62,7 @@ public sealed class GrpcExtensionTests
     [DataRow("grpcs")]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string scheme)
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://example.com/helloworld.Greeter/SayHello"), Output = new MemoryStream() });

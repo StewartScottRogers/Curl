@@ -42,6 +42,7 @@ public sealed class ResumableUploadTransferHookTests
     public void Constructor_NegativeResumptions_Throws()
     {
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new ResumableUploadTransferHook(-1));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new ResumableUploadTransferHook(memoryLimit: -1));
         Assert.AreEqual(ResumableUploadTransferHook.DefaultMaxResumptions, new ResumableUploadTransferHook().MaxResumptions);
     }
 
@@ -69,6 +70,10 @@ public sealed class ResumableUploadTransferHookTests
     [DataRow(CurlExitCode.RecvError, "3", "lo")]
     [DataRow(CurlExitCode.SendError, "5", "")]
     [DataRow(CurlExitCode.GotNothing, "0", "hello")]
+    [DataRow(CurlExitCode.Http2Stream, "2", "llo")]
+    [DataRow(CurlExitCode.Http2, "1", "ello")]
+    [DataRow(CurlExitCode.PartialFile, "4", "o")]
+    [DataRow(CurlExitCode.Http3, "2", "llo")]
     public async Task ExecuteAsync_TusPatchBroken_RetrievesTheOffsetWithHeadAndPatchesFromIt(CurlExitCode broken, string offset, string rest)
     {
         // tus 1.0 "Core Protocol": after a broken PATCH the client sends HEAD and resumes from its Upload-Offset, the
@@ -146,9 +151,9 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UnseekableOrPartlyReadUpload_IsBufferedFromWhereItStands()
+    public async Task ExecuteAsync_UnseekableOrPartlyReadUpload_IsSentFromWhereItStands()
     {
-        var unseekable = new UnseekableStream(Encoding.ASCII.GetBytes("hello"));
+        var unseekable = new UnseekableUpload(Encoding.ASCII.GetBytes("hello"));
         var partlyRead = new MemoryStream(Encoding.ASCII.GetBytes("xxhello")) { Position = 2 };
 
         foreach (var upload in new Stream[] { unseekable, partlyRead })
@@ -157,6 +162,51 @@ public sealed class ResumableUploadTransferHookTests
             await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", upload: upload), next.SendAsync);
             Assert.AreEqual("hello", next.Sent[2].Upload);
         }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UnseekableUploadTooLargeForTheBuffer_IsSpooledResumedFromTheOffsetAndTheSpoolDisposed()
+    {
+        // BL-5967, ADR-1401: past the memory limit the upload goes to a spool file, so no length is too long for it.
+        var spool = new MemoryStream();
+        var next = new ScriptedNext(PlainOptions, IetfCreated, Failure(CurlExitCode.RecvError), Response(204, "", "Upload-Offset: 2"), IetfAppended);
+        var upload = new UnseekableUpload(Encoding.ASCII.GetBytes("hello"));
+
+        var result = await new ResumableUploadTransferHook(memoryLimit: 4, createSpoolFile: () => spool)
+            .ExecuteAsync(Context("http://up.example.com/files", upload: upload), next.SendAsync);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("hello", next.Sent[2].Upload);
+        Assert.AreEqual("llo", next.Sent[4].Upload);
+        Assert.AreEqual(5, result.Report!.UploadSize);
+        Assert.IsFalse(spool.CanRead);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UnseekableUploadPastTheBufferWithoutASpoolFactory_IsUploadedThroughATemporaryFile()
+    {
+        var next = new ScriptedNext(PlainOptions, IetfCreated, IetfAppended);
+        var upload = new UnseekableUpload(Encoding.ASCII.GetBytes("hello"));
+
+        var result = await new ResumableUploadTransferHook(memoryLimit: 0)
+            .ExecuteAsync(Context("http://up.example.com/files", upload: upload), next.SendAsync);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("hello", next.Sent[2].Upload);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SpoolFileThatCannotBeCreated_EndsWithWriteErrorAndSendsNothing()
+    {
+        var next = new ScriptedNext();
+        var upload = new UnseekableUpload(Encoding.ASCII.GetBytes("hello"));
+
+        var result = await new ResumableUploadTransferHook(memoryLimit: 0, createSpoolFile: () => throw new IOException("disk full"))
+            .ExecuteAsync(Context("http://up.example.com/files", upload: upload), next.SendAsync);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual("Failed writing the upload to a temporary file: disk full", result.ErrorMessage);
+        Assert.IsEmpty(next.Sent);
     }
 
     [TestMethod]
@@ -305,9 +355,4 @@ public sealed class ResumableUploadTransferHookTests
             HeaderOutput = headerOutput,
             DumpHeaderOutput = dumpHeaderOutput,
         };
-
-    private sealed class UnseekableStream(byte[] content) : MemoryStream(content)
-    {
-        public override bool CanSeek => false;
-    }
 }

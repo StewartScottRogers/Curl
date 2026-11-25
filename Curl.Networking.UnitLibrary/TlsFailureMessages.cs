@@ -585,6 +585,27 @@ internal static class TlsFailureMessages
         $"schannel: failed to open CA file '{caCertificateFile}'";
 
     /// <summary>
+    /// The Schannel build's message for exit 77: a <c>BEGIN CERTIFICATE</c> line in the
+    /// <c>--cacert</c> file has no <c>END CERTIFICATE</c> line after it (measured with curl
+    /// 8.22.0 Schannel, BL-5884).
+    /// </summary>
+    /// <param name="caCertificateFile">The path given to <c>--cacert</c>, or <c>(memory blob)</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelCaCertificateFileNotFormatted(string caCertificateFile) =>
+        $"schannel: CA file '{caCertificateFile}' is not correctly formatted";
+
+    /// <summary>
+    /// The Schannel build's message for exit 77: a <c>CERTIFICATE</c> block in the
+    /// <c>--cacert</c> file yields no certificate (measured with curl 8.22.0 Schannel, BL-5884).
+    /// </summary>
+    /// <param name="caCertificateFile">The path given to <c>--cacert</c>, or <c>(memory blob)</c>.</param>
+    /// <param name="bodyIsEmpty">Whether the block's body is empty or only whitespace.</param>
+    /// <returns>The message curl prints: Windows' text for the error the block's body raised.</returns>
+    public static string SchannelCaCertificateNotExtracted(string caCertificateFile, bool bodyIsEmpty) =>
+        $"schannel: failed to extract certificate from CA file '{caCertificateFile}': "
+        + (bodyIsEmpty ? "An error occurred during encode or decode operation." : "Cannot find the requested object.");
+
+    /// <summary>
     /// The OpenSSL build's message for exit 77: the <c>--cacert</c> file could not be
     /// read, or holds no certificate, or holds one that does not parse.
     /// </summary>

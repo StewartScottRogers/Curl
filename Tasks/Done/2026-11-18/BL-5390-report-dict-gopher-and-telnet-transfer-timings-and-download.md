@@ -20,7 +20,7 @@ completed: 2026-11-17
 
 From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build), finding STD-097 (Low, Confirmed by the orchestrator, 2 runs each: write-out values only). Area: dict://, gopher://, telnet:// write-out, Windows.
 
-The same gap affects the Part B messaging extension protocols (EXT-083, BL-5410), so the fix may belong in a shared engine path for non-HTTP handlers. Coordinate with BL-5410 before writing three copies of timing code; if a shared engine fix is chosen, widen `touches` to the engine files it changes.
+The same gap affects the Part B messaging extended protocols (EXT-083, BL-5410), so the fix may belong in a shared engine path for non-HTTP handlers. Coordinate with BL-5410 before writing three copies of timing code; if a shared engine fix is chosen, widen `touches` to the engine files it changes.
 
 **Repro.**
 1. A DICT server on 127.0.0.1:41628: greeting `220 ready`, answers `CLIENT` with `250 ok`, any other command with `150 1 definitions\r\n151 "x" db "Db"\r\nhello\r\n.\r\n250 ok\r\n`, `QUIT` with `221 bye`.
@@ -47,7 +47,7 @@ The same gap affects the Part B messaging extension protocols (EXT-083, BL-5410)
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check: the three commands print non-zero `time_connect`, `time_starttransfer`, `time_total` and `speed_download`.
-- Related: EXT-083 (BL-5410), the same gap in the messaging extension protocols.
+- Related: EXT-083 (BL-5410), the same gap in the messaging extended protocols.
 
 - Decision: stamped by each handler (no shared engine change): Started at transfer start, Connect from the connector, FirstByteReceived = Completed (the reply is read to the server close). Only Ok results are stamped. TELNET now reports DownloadSize = bytes written. Existing tests pinning result equality or stepping-clock milliseconds were adjusted.
 - Hand check 2026-11-17 (PowerShell loopback servers, Curl build): gopher `0.184069 0.553417 0.553417 15 27`, telnet `0.153110 0.540669 0.540669 15 27`, dict `0.065888 0.406618 0.406618 33 81`. Quality run: Dict, Gopher, Telnet libraries at the gates.

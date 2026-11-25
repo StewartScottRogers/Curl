@@ -23,9 +23,9 @@ public sealed class SocketIoExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => SocketIoExtension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeSocketIo()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeSocketIo()
     {
-        ProtocolDispatcher dispatcher = new(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        ProtocolDispatcher dispatcher = new(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("socketio"));
         Assert.IsTrue(dispatcher.Serves("socketios"));
@@ -36,7 +36,7 @@ public sealed class SocketIoExtensionTests
     [DataRow("socketios://example.com/", "socketios")]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string url, string scheme)
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream() });

@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 using Curl.Original.Protocol.Http.Fakes;
 using Curl.Testing;
 
@@ -290,6 +291,70 @@ public sealed class HttpContinueWaitConnectionTests
         OperationCanceledException thrown = await Assert.ThrowsAsync<OperationCanceledException>(async () => await wait);
         Diagnostics.Act("thrown", thrown.GetType().Name);
         Diagnostics.Assert("cancelled", true, wait.IsCanceled || wait.IsFaulted);
+    }
+
+    [TestMethod]
+    public async Task WaitForContinueAsync_Final2xxOnAMultiplexedStream_HoldsTheBodyUntilTheWaitRunsOut()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        HttpContinueWaitConnection connection = new(Connection("HTTP/2 200 \r\n\r\n", 65536)) { IsMultiplexedStream = true };
+        Diagnostics.Arrange("response on a stream", "HTTP/2 200");
+
+        bool sendsNow = await connection.WaitForContinueAsync(time, CancellationToken.None);
+        bool held = connection.HoldsBody;
+        Task sending = connection.SendHeldBodyAsync(CancellationToken.None).AsTask();
+        bool sentBeforeTheWaitRanOut = sending.IsCompleted;
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
+        await sending;
+
+        Diagnostics.Assert("sends the body at once, holds it", "False, True", $"{sendsNow}, {held}");
+        Assert.IsFalse(sendsNow);
+        Assert.IsTrue(held);
+        Assert.IsFalse(sentBeforeTheWaitRanOut);
+        Assert.IsFalse(connection.StoppedStreamUpload);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/2 100 \r\n\r\n", true, false)]
+    [DataRow("HTTP/3 100 \r\n\r\n", true, false)]
+    [DataRow("HTTP/2 500 \r\n\r\n", false, true)]
+    [DataRow("HTTP/3 500 \r\n\r\n", false, true)]
+    public async Task WaitForContinueAsync_StatusOnAMultiplexedStream_IsReadFromTheStreamsStatusLine(string response, bool sends, bool stops)
+    {
+        HttpContinueWaitConnection connection = new(Connection(response, 65536)) { IsMultiplexedStream = true };
+        Diagnostics.Arrange("response on a stream", Visible(response));
+
+        bool sendsNow = await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None);
+
+        Diagnostics.Assert("sends, stops, holds", $"{sends}, {stops}, False", $"{sendsNow}, {connection.StoppedStreamUpload}, {connection.HoldsBody}");
+        Assert.AreEqual(sends, sendsNow);
+        Assert.AreEqual(stops, connection.StoppedStreamUpload);
+        Assert.IsFalse(connection.HoldsBody);
+        Assert.IsFalse(connection.StopsSending);
+    }
+
+    [TestMethod]
+    public async Task SendHeldBodyAsync_AfterA500_SendsOnceTheWaitRunsOutAndNoLongerStopsSending()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        int waitsEnded = 0;
+        HttpContinueWaitConnection connection = new(Connection("HTTP/1.1 500 No\r\n\r\n", 65536)) { WaitEnds = () => waitsEnded++ };
+        await connection.WaitForContinueAsync(time, CancellationToken.None);
+        bool stoppedWhileHeld = connection.StopsSending;
+        Diagnostics.Arrange("response", "500 during the wait");
+
+        Task sending = connection.SendHeldBodyAsync(CancellationToken.None).AsTask();
+        bool sentBeforeTheWaitRanOut = sending.IsCompleted;
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
+        await sending;
+        connection.Dispose();
+
+        Diagnostics.Assert("stops sending after, waits ended", "False, 1", $"{connection.StopsSending}, {waitsEnded}");
+        Assert.IsTrue(stoppedWhileHeld);
+        Assert.IsFalse(sentBeforeTheWaitRanOut);
+        Assert.IsFalse(connection.StopsSending);
+        Assert.IsFalse(connection.HoldsBody);
+        Assert.AreEqual(1, waitsEnded);
     }
 
     [TestMethod]

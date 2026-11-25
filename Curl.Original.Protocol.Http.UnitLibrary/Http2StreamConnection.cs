@@ -24,10 +24,11 @@ namespace Curl.Original.Protocol.Http;
 /// head is exit 16, and part way through the body exit 18. A response whose length does not add
 /// up (RFC 9113 section 8.1.1: DATA past or short of its <c>content-length</c>, a body on HEAD, 204
 /// or 304, a 1xx head ending the stream, an invalid or second <c>content-length</c>) makes this
-/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0847), except DATA past it on a body
-/// that is not wanted (<see cref="EndsAtFinalHead" />), which sends the GOAWAY and succeeds
-/// (BL-5938). A head that ends the stream is refused the same way when its length is short,
-/// whether or not the body is wanted (BL-5947).
+/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0847), except on a body that is not
+/// wanted (<see cref="EndsAtFinalHead" />): DATA past it (BL-5938), or a trailer or DATA that
+/// ends the stream short of it (BL-5959), sends the GOAWAY and succeeds. A head that ends the
+/// stream is refused with exit 16 when its length is short, whether or not the body is wanted
+/// (BL-5947).
 /// Failed reads and writes of the connection itself pass through as <see cref="IOException" />.
 /// </remarks>
 /// <param name="session">The connection's HTTP/2 session.</param>
@@ -56,6 +57,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private bool isRequestEnded;
 
+    /// <summary>Whether DATA still goes out once the response has ended (<see cref="SendBodyAfterResponseEnd" />).</summary>
+    private bool sendsAfterResponseEnd;
+
     private bool isReceiveWindowGrown;
 
     /// <summary>Whether this is the stream an h2c upgrade continues on (<see cref="StartUpgradedAsync" />).</summary>
@@ -81,10 +85,16 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     internal bool EndedWithEmptyData { get; private set; }
 
+    /// <summary>Gets or sets whether curl reports no data of this end, although <see cref="EndedWithEmptyData" />.</summary>
+    internal bool LeavesEmptyDataUnreported { get; set; }
+
     /// <summary>The body length the final head promises (RFC 9113 section 8.1.1), or <see langword="null" /> when it promises none.</summary>
     private long? promisedBodyLength;
 
     private long bodyBytesReceived;
+
+    /// <summary>Whether the body's DATA so far is less than the length the head promises.</summary>
+    private bool IsShortOfPromisedLength => bodyBytesReceived < promisedBodyLength;
 
     /// <summary>The failure of a response this client shut the connection down for, thrown once the bytes before it are read.</summary>
     private HttpTransferException? malformedResponseFailure;
@@ -209,13 +219,14 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>
     /// Ends the request with an empty DATA frame carrying END_STREAM, then grows the stream's
     /// receive window, unless it has ended already - it had no body, or the last body write
-    /// ended it - or the response has ended, after which nothing more is sent.
+    /// ended it - or the response has ended, after which nothing more is sent unless
+    /// <see cref="SendBodyAfterResponseEnd" /> asked for it.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the frame is written.</returns>
     public async ValueTask EndRequestAsync(CancellationToken cancellationToken)
     {
-        if (isRequestEnded || isResponseEnded)
+        if (isRequestEnded || StopsSendingData)
         {
             return;
         }
@@ -266,10 +277,11 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>
     /// Gives up a response body curl ignores before a retry or a followed redirect. A stream
     /// whose request has ended is read to its end, its DATA dropped, and is not reset, as curl
-    /// does (measured, BL-5906 Notes). A stream whose request has not ended, and the stream an
-    /// h2c upgrade continues on, is instead reset with STREAM_CLOSED unless its response has
-    /// ended, <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970 Notes), and
-    /// the frames the peer still sends on it are dropped. No data is reported for a body read
+    /// does (measured, BL-5906 Notes). A stream whose request has not ended is instead reset
+    /// with STREAM_CLOSED, whether or not its response has ended (measured, BL-5972 Notes), and
+    /// so is the stream an h2c upgrade continues on unless its response has ended,
+    /// <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970 Notes); the frames
+    /// the peer still sends on a reset stream are dropped. No data is reported for a body read
     /// here (measured, BL-5941 Notes).
     /// </summary>
     /// <param name="cancellationToken">Cancels the reads or the write.</param>
@@ -282,12 +294,81 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             isBodyAbandoned = true;
             await ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         }
-        else if (!isResponseEnded)
+        else if (!isRequestEnded || !isResponseEnded)
         {
-            await ResetAsync(Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
-            isResponseEnded = true;
+            await ResetAsClosedAsync(cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Resets a stream whose request has not ended, as one a status of 300 or above stopped the
+    /// upload of, with STREAM_CLOSED, whether or not its response has ended, as curl does once
+    /// that response is read (measured, BL-5972 Notes); nothing once the request has ended or
+    /// the stream is reset.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when any reset is written.</returns>
+    internal ValueTask ResetUnendedRequestAsync(CancellationToken cancellationToken) =>
+        isRequestEnded ? ValueTask.CompletedTask : ResetAsClosedAsync(cancellationToken);
+
+    /// <summary>
+    /// Resets a failed transfer's stream with STREAM_CLOSED when its response has ended and its
+    /// request has not, as curl does when <c>-f</c> fails the status that ended the stream during
+    /// the wait for <c>100 Continue</c> (measured, BL-5975 Notes); nothing otherwise, as
+    /// <see cref="Http2Session.ShutDownAsync" /> resets a stream whose response is unfinished. A
+    /// connection that fails the write leaves the transfer's own failure to be reported.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when any reset is written.</returns>
+    internal async ValueTask ResetUnendedRequestOfEndedResponseAsync(CancellationToken cancellationToken)
+    {
+        if (!isResponseEnded)
+        {
+            return;
+        }
+
+        try
+        {
+            await ResetUnendedRequestAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The transport is already gone; there is no stream left to reset.
+        }
+    }
+
+    /// <summary>
+    /// Resets the stream of a transfer that timed out, or that <c>-f</c> failed, with
+    /// STREAM_CLOSED, unless it has ended both ways, as curl does before it sends the next
+    /// transfer on the connection (measured, BL-5976 and BL-5977 Notes). Nothing is sent before
+    /// the stream is open, or on a connection that takes no new stream, whose closing resets it
+    /// (<see cref="Http2Session.ShutDownAsync" />); a connection that fails the write takes none
+    /// from then on.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when any reset is sent.</returns>
+    internal async ValueTask ResetUnlessEndedBothWaysAsync(CancellationToken cancellationToken)
+    {
+        if (streamId == 0 || (isRequestEnded && isResponseEnded) || !session.AcceptsNewStreams)
+        {
+            return;
+        }
+
+        try
+        {
+            await ResetAsClosedAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            session.MarkPeerGone();
+        }
+    }
+
+    /// <summary>
+    /// Lets the request's remaining DATA go out although the response has ended, as curl sends a
+    /// body it held for <c>100 Continue</c> (measured, BL-5972 Notes).
+    /// </summary>
+    internal void SendBodyAfterResponseEnd() => sendsAfterResponseEnd = true;
 
     /// <summary>
     /// Does nothing: the stream's connection is disposed by the handler that opened it.
@@ -340,7 +421,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private async ValueTask SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
-        while (!data.IsEmpty && !isResponseEnded)
+        while (!data.IsEmpty && !StopsSendingData)
         {
             bool isLast = bodyBytesSent + data.Length == bodyLength;
             int sent = await session.WriteDataAsync(streamId, data, isLast, cancellationToken).ConfigureAwait(false);
@@ -361,6 +442,17 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         {
             await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>Whether the response's end has stopped the request's DATA.</summary>
+    private bool StopsSendingData => isResponseEnded && !sendsAfterResponseEnd;
+
+    /// <summary>Resets the stream with STREAM_CLOSED, which ends it both ways.</summary>
+    private async ValueTask ResetAsClosedAsync(CancellationToken cancellationToken)
+    {
+        await ResetAsync(Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
+        isRequestEnded = true;
+        isResponseEnded = true;
     }
 
     /// <summary>
@@ -566,13 +658,13 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         if (isFinalHeadReceived && !frame.IsEndStream)
         {
             // Trailers must end the stream (RFC 9113 section 8.1); nghttp2 shuts the connection down (measured, BL-3664 Notes).
-            await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
+            await ShutDownMalformedAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
         if (isFinalHeadReceived)
         {
-            trailers.Write(Http2ResponseHead.FormatTrailers(fields));
+            await ReceiveTrailersAsync(fields, cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -585,6 +677,22 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
         EndedWithEmptyData = frame.IsEndStream;
         await EndResponseAsync(IsEndedBy(frame), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Keeps the trailers, which end the stream. When the body is not wanted (-I) and they end it
+    /// short of the length the head promises, nghttp2 shuts the connection down instead: the
+    /// trailers are dropped and curl still exits 0 (measured, curl 8.18.0, BL-5959 Notes).
+    /// </summary>
+    private async ValueTask ReceiveTrailersAsync(IReadOnlyList<HeaderField> fields, CancellationToken cancellationToken)
+    {
+        if (EndsAtFinalHead && IsShortOfPromisedLength)
+        {
+            await ShutDownUnwantedBodyAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        trailers.Write(Http2ResponseHead.FormatTrailers(fields));
     }
 
     /// <summary>
@@ -616,11 +724,10 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <returns><see langword="true" /> for a head taken, <see langword="false" /> for one the connection was shut down for.</returns>
     private async ValueTask<bool> IsHeadTakenAsync(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream, CancellationToken cancellationToken)
     {
-        if (MalformedHeadOf(statusCode, fields, isEndStream) is { } malformed)
+        if (IsHeadMalformed(statusCode, fields, isEndStream))
         {
-            received.Enqueue(malformed.Written);
-            // The message is also a -v line, after the head lines (measured, BL-5947 Notes).
-            await ShutDownMalformedAsync(new HttpTransferException(CurlExitCode.Http2, malformed.Message) { InfoLines = [malformed.Message] }, cancellationToken).ConfigureAwait(false);
+            received.Enqueue(HeadWithoutEmptyLine(statusCode, fields));
+            await ShutDownMalformedAsync(cancellationToken).ConfigureAwait(false);
             return false;
         }
 
@@ -637,14 +744,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     private long? PromisedBodyLengthOf(int statusCode, IReadOnlyList<HeaderField> fields) =>
         isHeadRequest || statusCode is 204 or 304 ? 0 : ContentLengthOf(fields);
 
-    /// <summary>
-    /// Gives what curl writes of a head nghttp2 rejects and the message it fails with, or
-    /// <see langword="null" /> for a head it takes (<see cref="IsHeadTakenAsync" />).
-    /// </summary>
-    private (byte[] Written, string Message)? MalformedHeadOf(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream) =>
-        isEndStream && (statusCode < 200 || PromisedBodyLengthOf(statusCode, fields) > 0)
-            ? (HeadWithoutEmptyLine(statusCode, fields), HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError))
-            : null;
+    /// <summary>Tells whether nghttp2 rejects a head (<see cref="IsHeadTakenAsync" />).</summary>
+    private bool IsHeadMalformed(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream) =>
+        isEndStream && (statusCode < 200 || PromisedBodyLengthOf(statusCode, fields) > 0);
 
     /// <summary>Tells whether a head or trailer frame ends the response: it carries END_STREAM. The <c>-I</c> ending (<see cref="EndsAtFinalHead" />) is not decided here: it comes at the first DATA frame or when the peer closes (BL-5468).</summary>
     private bool IsEndedBy(Http2StreamFrame frame) => frame.IsEndStream;
@@ -659,13 +761,13 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         bodyBytesReceived += frame.Content.Length;
         if (EndsAtFinalHead)
         {
-            await EndAtUnwantedBodyAsync(frame.Content, cancellationToken).ConfigureAwait(false);
+            await EndAtUnwantedBodyAsync(frame, cancellationToken).ConfigureAwait(false);
             return;
         }
 
         if (bodyBytesReceived > promisedBodyLength)
         {
-            await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
+            await ShutDownMalformedAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -677,26 +779,59 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>
     /// Ends the response at the first DATA frame of a body that is not wanted (-I), without failing
     /// it; a trailer HEADERS right after the head is still read (BL-5468). DATA past the length the
-    /// head promises, which for HEAD is none, still breaks RFC 9113 section 8.1.1: nghttp2 reports
-    /// it as a <c>-v</c> line and shuts the connection down with GOAWAY PROTOCOL_ERROR, and curl
-    /// exits 0 (measured, curl 8.18.0, BL-5938 Notes). curl then reports the frame's data, as
-    /// <c>-v</c>'s <c>{ [N bytes data]</c> line: <paramref name="data" />, or none of it when it is
-    /// past that length, unless the response is abandoned (measured, BL-5941 Notes).
+    /// head promises, which for HEAD is none, or DATA that ends the stream short of it, still breaks
+    /// RFC 9113 section 8.1.1: nghttp2 reports it as a <c>-v</c> line and shuts the connection down
+    /// with GOAWAY PROTOCOL_ERROR, and curl exits 0 (measured, curl 8.18.0, BL-5938 and BL-5959
+    /// Notes). curl reports the frame's data as <c>-v</c>'s <c>{ [N bytes data]</c> line, unless the
+    /// response is abandoned (measured, BL-5941 Notes): past the length, empty data after the
+    /// shutdown line; short of it, the data before that line and empty data after it.
     /// </summary>
-    private async ValueTask EndAtUnwantedBodyAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+    private async ValueTask EndAtUnwantedBodyAsync(Http2StreamFrame frame, CancellationToken cancellationToken)
     {
         isResponseEnded = true;
-        bool isPastPromisedLength = bodyBytesReceived > promisedBodyLength;
-        if (isPastPromisedLength)
+        bool endsShort = frame.IsEndStream && IsShortOfPromisedLength;
+        if (endsShort || bodyBytesReceived > promisedBodyLength)
         {
-            openedLines?.ShutsDownConnection(Http2ErrorCode.ProtocolError);
-            await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+            await ShutDownAtUnwantedDataAsync(endsShort ? frame.Content : ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
+            return;
         }
 
+        ReportUnwantedData(frame.Content);
+    }
+
+    /// <summary>
+    /// Shuts the connection down at a malformed DATA frame of a body that is not wanted (-I):
+    /// reports <paramref name="dataBeforeShutdown" />, when there is any, then the shutdown, then
+    /// empty data.
+    /// </summary>
+    private async ValueTask ShutDownAtUnwantedDataAsync(ReadOnlyMemory<byte> dataBeforeShutdown, CancellationToken cancellationToken)
+    {
+        if (!dataBeforeShutdown.IsEmpty)
+        {
+            ReportUnwantedData(dataBeforeShutdown);
+        }
+
+        await ShutDownUnwantedBodyAsync(cancellationToken).ConfigureAwait(false);
+        ReportUnwantedData(ReadOnlyMemory<byte>.Empty);
+    }
+
+    /// <summary>Reports data of a body that is not wanted (-I), unless the response is abandoned.</summary>
+    private void ReportUnwantedData(ReadOnlyMemory<byte> data)
+    {
         if (!isBodyAbandoned)
         {
-            openedLines?.UnwantedDataReceived(isPastPromisedLength ? ReadOnlyMemory<byte>.Empty : data);
+            openedLines?.UnwantedDataReceived(data);
         }
+    }
+
+    /// <summary>
+    /// Shuts the connection down for a malformed body that is not wanted (-I), which does not fail
+    /// the transfer: the <c>-v</c> line, then GOAWAY PROTOCOL_ERROR.
+    /// </summary>
+    private async ValueTask ShutDownUnwantedBodyAsync(CancellationToken cancellationToken)
+    {
+        openedLines?.ShutsDownConnection(Http2ErrorCode.ProtocolError);
+        await SendProtocolErrorGoAwayAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -708,27 +843,49 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         if (isEndStream && isFinalHeadReceived && !EndsAtFinalHead && bodyBytesReceived != (promisedBodyLength ?? bodyBytesReceived))
         {
-            await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
+            await ShutDownMalformedAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
         isResponseEnded = isEndStream;
     }
 
+    /// <summary>Shuts the connection down for a malformed response that rejects no header field: exit 16, saying nghttp2 shut it down.</summary>
+    private ValueTask ShutDownMalformedAsync(CancellationToken cancellationToken) =>
+        ShutDownMalformedAsync(CurlExitCode.Http2, rejectedFieldMessage: null, cancellationToken);
+
     /// <summary>
     /// Shuts the connection down for a malformed response as nghttp2 does: GOAWAY with
-    /// PROTOCOL_ERROR, last stream 0 and no debug data (measured, BL-3667 Notes). The failure,
-    /// <paramref name="exitCode" /> with <paramref name="message" />, is thrown by the stream's
-    /// next read, after the bytes curl wrote before it.
+    /// PROTOCOL_ERROR, last stream 0 and no debug data (measured, BL-3667 Notes). The failure is
+    /// thrown by the stream's next read, after the bytes curl wrote before it. Its <c>-v</c>
+    /// lines are <paramref name="rejectedFieldMessage" />, when a field was rejected, then
+    /// nghttp2's shutdown line; its message is the first of them (measured, BL-5947 and BL-5958
+    /// Notes).
     /// </summary>
-    private ValueTask ShutDownMalformedAsync(CurlExitCode exitCode, string message, CancellationToken cancellationToken) =>
-        ShutDownMalformedAsync(new HttpTransferException(exitCode, message), cancellationToken);
-
-    /// <summary>Shuts the connection down for a malformed response, keeping <paramref name="failure" /> for the stream's next read to throw.</summary>
-    private async ValueTask ShutDownMalformedAsync(HttpTransferException failure, CancellationToken cancellationToken)
+    private async ValueTask ShutDownMalformedAsync(CurlExitCode exitCode, string? rejectedFieldMessage, CancellationToken cancellationToken)
     {
-        malformedResponseFailure = failure;
-        await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        string shutsDown = HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError);
+        string[] infoLines = rejectedFieldMessage is null ? [shutsDown] : [rejectedFieldMessage, shutsDown];
+        malformedResponseFailure = new HttpTransferException(exitCode, infoLines[0]) { InfoLines = infoLines };
+        await SendProtocolErrorGoAwayAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends GOAWAY PROTOCOL_ERROR for a response that broke the protocol. A peer that has
+    /// already gone cannot be sent it, which changes nothing about how the transfer ends: the
+    /// session is told the peer has gone, so the connection is shut down all the same.
+    /// </summary>
+    private async ValueTask SendProtocolErrorGoAwayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The transport is already gone; there is no one left to tell.
+            session.MarkPeerGone();
+        }
     }
 
     /// <summary>

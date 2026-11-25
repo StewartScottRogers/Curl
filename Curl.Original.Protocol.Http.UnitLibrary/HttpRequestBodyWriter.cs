@@ -76,6 +76,17 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     internal ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
 
+    private bool leavesSentDataUnreported;
+
+    /// <summary>Where the body sent is reported: <see cref="Events" />, or nowhere after <see cref="LeaveSentDataUnreported" />.</summary>
+    private ITransferEvents SentDataEvents => leavesSentDataUnreported ? NoTransferEvents.Instance : Events;
+
+    /// <summary>
+    /// Stops reporting the body as sent data, as curl reports none of a body whose send fails
+    /// because the response had already ended its stream (measured, BL-5972 Notes).
+    /// </summary>
+    internal void LeaveSentDataUnreported() => leavesSentDataUnreported = true;
+
     /// <summary>
     /// Gets the length of the request head that shares the upload buffer with the first read:
     /// the whole head when the body follows it at once, 0 when the head went out alone to wait
@@ -200,6 +211,19 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// status of 300 or above arrived first.
     /// </summary>
     internal bool CutShort { get; private set; }
+
+    /// <summary>Gets a value indicating whether <see cref="StopBeforeSending" /> cut the body short.</summary>
+    internal bool StoppedBeforeSending { get; private set; }
+
+    /// <summary>
+    /// Cuts the body short before any of it is sent, as a status of 300 or above does to one
+    /// still waiting for <c>100 Continue</c>.
+    /// </summary>
+    internal void StopBeforeSending()
+    {
+        CutShort = true;
+        StoppedBeforeSending = true;
+    }
 
     /// <summary>
     /// Gets the message an <see cref="IUploadRewinder" /> gave when <see cref="Rewound" /> failed
@@ -861,7 +885,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     private void ReportPieceSent(ReadOnlyMemory<byte> piece, ReadOnlyMemory<byte> framed)
     {
-        Events.ReportDataSent(framed.Span);
+        SentDataEvents.ReportDataSent(framed.Span);
         CountPieceSent(piece, framed);
     }
 
@@ -903,7 +927,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     {
         ReadOnlyMemory<byte> previous = watchedHeldPiece;
         watchedHeldPiece = piece.ToArray();
-        Events.ReportDataSent(Framed(piece, true).Span);
+        SentDataEvents.ReportDataSent(Framed(piece, true).Span);
         if (!await SendWatchedHeldPieceAsync(previous, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false))
         {
             unsent = (byte[])[.. previous.Span, .. piece.Span];
@@ -1095,7 +1119,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     private void ReportSent(ReadOnlySpan<byte> bytes)
     {
         BytesSent += bytes.Length;
-        Events.ReportDataSent(bytes);
+        SentDataEvents.ReportDataSent(bytes);
     }
 
     /// <summary>

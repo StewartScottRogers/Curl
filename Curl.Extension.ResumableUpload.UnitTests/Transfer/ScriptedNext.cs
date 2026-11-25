@@ -21,7 +21,14 @@ internal sealed class ScriptedNext(params ScriptedNext.Answer[] answers)
     /// <summary>Records <paramref name="context" /> and answers it.</summary>
     public async ValueTask<TransferResult> SendAsync(ITransferContext context)
     {
-        var upload = context.Upload is { } stream ? Encoding.ASCII.GetString(((MemoryStream)stream).ToArray()) : null;
+        string? upload = null;
+        if (context.Upload is { } stream)
+        {
+            var read = new MemoryStream();
+            await stream.CopyToAsync(read);
+            upload = Encoding.ASCII.GetString(read.ToArray());
+        }
+
         Sent.Add(new(context.Http?.CustomMethod ?? (context.NoBody ? "HEAD" : "GET"), context.Url.OriginalString, context.Http?.Headers ?? [], upload, context));
         var answer = answers[next++];
         if (answer.ExitCode is { } exitCode)

@@ -130,7 +130,7 @@ public sealed class McpExtensionOptionCheckerTests
 
     [TestMethod]
     public void ExtensionOptionsFor_WithCurlExtensionsZero_IsEmpty() =>
-        Assert.AreEqual(0, CurlMcpHost.ExtensionOptionsFor(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null).Count);
+        Assert.AreEqual(0, CurlMcpHost.ExtensionOptionsFor(name => name == ExtensionSwitch.Variable ? "0" : null).Count);
 
     [TestMethod]
     public void Table_PathAndNoPathNamesDoNotOverlap() =>

@@ -790,6 +790,22 @@ function Test-CiFixAlreadyIn {
     return $false
 }
 
+function Test-CiFixChangedCode {
+    # Whether a commit between -From and -To whose message names CI-fix task -Id changes a file
+    # outside Tasks/. A CI fix that closed "not reproducible, no change" carries none, so a run
+    # lacking it lacks nothing: on 2026-11-22 and 11-24 runs that already had their macOS runners
+    # were cancelled for lacking BL-5760 and BL-5846..BL-5848, which changed nothing, and green
+    # came 40 to 70 minutes later (BL-5175..BL-5177). $false when git cannot say.
+    param([string]$Repo, [string]$Id, [string]$From, [string]$To)
+    $shas = @(git -C $Repo log --format=%H -E --grep "$Id([^0-9]|$)" "$From..$To" 2>$null | Where-Object { $_ })
+    if ($LASTEXITCODE -ne 0) { return $false }
+    foreach ($sha in $shas) {
+        $paths = @(git -C $Repo diff-tree --no-commit-id --name-only -r "$sha" 2>$null | Where-Object { $_ })
+        if (@($paths | Where-Object { -not "$_".StartsWith('Tasks/') }).Count) { return $true }
+    }
+    return $false
+}
+
 function Stop-CiRunWithoutFix {
     # Cancels the CI run running on the branch when the run waiting behind it has a CI fix the
     # running commit lacks, so the fix is tested at once. On work/dark-factory a running run
@@ -800,7 +816,8 @@ function Stop-CiRunWithoutFix {
     # A CI fix that closed naming a commit the running commit already holds ("already dropped by
     # 8fa866b82") is no fix it lacks (Test-CiFixAlreadyIn): run 41570033273 held 8fa866b82 and
     # was cancelled 23 minutes in for lacking BL-4604 and BL-4605, which both closed so, and green
-    # waited a whole run (AF-0569, BL-4717).
+    # waited a whole run (AF-0569, BL-4717). Nor is one whose commits change only task files
+    # (Test-CiFixChangedCode, BL-5175).
     # -Listed is gh's run list, newest first; -Repo a checkout that holds both commits;
     # -CancelRun (a run id -> whether gh cancelled it) stands in for gh in -TestCiWatch.
     # Returns the cancelled run's id, or ''.
@@ -821,6 +838,7 @@ function Stop-CiRunWithoutFix {
         return ''
     }
     $fixes = @($fixes | Where-Object { -not (Test-CiFixAlreadyIn -Repo $Repo -Id $_ -Sha "$($running.headSha)" -At "$($waiting.headSha)") })
+    $fixes = @($fixes | Where-Object { Test-CiFixChangedCode -Repo $Repo -Id $_ -From "$($running.headSha)" -To "$($waiting.headSha)" })
     $script:CiWatch.Logged[$decided] = 'looked'
     if (-not @($fixes).Count) { return '' }
     if (-not $CancelRun) { $CancelRun = { param([string]$Id) gh run cancel $Id 2>&1 | Out-Null; return ($LASTEXITCODE -eq 0) } }
@@ -998,11 +1016,19 @@ function New-CiFailureTasks {
                 if ($verdict.Kind -eq 'audit') { $script:CiWatch.AuditTasks["$id"] = Get-CiTaskTitle $verdict }
             }
             if (-not $filed.Count) { return }
+            # A red only an interactive session can fix gets a revert a lane can make (BL-5175).
+            $filed += @(New-CiRevertTasks -Filed $filed -Runs $runs -Board $board)
             git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
             git -C $CiWatchDir commit -q -m "chore(tasks): file $(($filed | ForEach-Object { $_.Id }) -join ', ') for CI failures" -m "Filed by the dark factory's CI watch (BL-987)." -m $SkipCiNote 2>&1 | Out-Null
             git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { continue }
             foreach ($task in $filed) {
+                # A revert leaves the failure settled by the interactive-only task it waits beside.
+                if ($task.PSObject.Properties['Revert']) {
+                    Write-Trace $task.Id 'ci' "filed: revert $($task.Revert) while the interactive-only fix of $($task.Verdict.Key) waits" 'Yellow'
+                    Send-CiWhisper $task.Line
+                    continue
+                }
                 $script:CiWatch.Settled["$($task.Verdict.Key)|$($task.Verdict.RunId)"] = "filed $($task.Id)$(if ($task.Interactive) { ' (interactive only)' })"
                 Write-Trace $task.Id 'ci' "filed: $($task.Verdict.Verdict) $($task.Verdict.Key) on $($task.Verdict.Platforms -join '+'), run $($task.Verdict.RunId)" 'Yellow'
                 Send-CiWhisper $task.Line
@@ -1013,6 +1039,104 @@ function New-CiFailureTasks {
     } catch {
         Write-Trace '-' 'ci' "CI watch failed: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
     } finally { $env:CLAUDE_PROJECT_DIR = $saved }
+}
+
+function Get-CiRevertPlan {
+    # The commits a lane can revert to turn CI green while an interactive-only task holds the
+    # real fix of -Verdict (BL-5175: on 2026-11-21 CI stayed red 227 minutes while BL-5710..BL-5712,
+    # a fix in the guard file ci.yml, waited for Stewart; reverting the breaking commit would have
+    # been green within one run). The plan is every non-merge commit between the last green run
+    # before -Verdict's first failing run and that run's commit that changes a file outside Tasks/.
+    # $null when there is no such plan: not a regression, an audit or hang failure, no green run
+    # or first failing commit known, a merge in the range (master's work is no lane's to undo),
+    # a commit touching an audit path or guard file (no lane can revert it), no code commit, more
+    # than -Most of them, or git failing. -Runs are the finished runs, newest first.
+    param($Verdict, [object[]]$Runs, [string]$Repo, [int]$Most = 3)
+    if ($Verdict.Verdict -ne 'regression' -or $Verdict.Kind -in 'audit', 'hang' -or -not $Verdict.FirstSha) { return $null }
+    $Runs = @($Runs | Where-Object { $_ })
+    $at = -1
+    for ($i = 0; $i -lt $Runs.Count; $i++) { if ("$($Runs[$i].Sha)" -eq "$($Verdict.FirstSha)") { $at = $i; break } }
+    if ($at -lt 0) { return $null }
+    $green = $null
+    for ($i = $at + 1; $i -lt $Runs.Count; $i++) { if (-not @($Runs[$i].Failures | Where-Object { $_ }).Count) { $green = $Runs[$i]; break } }
+    if (-not $green) { return $null }
+    $range = "$($green.Sha)..$($Verdict.FirstSha)"
+    $merges = @(git -C $Repo rev-list --merges $range 2>$null | Where-Object { $_ })
+    if ($LASTEXITCODE -ne 0 -or $merges.Count) { return $null }
+    $commits = @(git -C $Repo rev-list --no-merges $range 2>$null | Where-Object { $_ })
+    if ($LASTEXITCODE -ne 0) { return $null }
+    $isAudit = Get-CiAuditPathTest
+    $code = @(); $paths = @()
+    foreach ($commit in $commits) {
+        $changed = @(git -C $Repo diff-tree --no-commit-id --name-only -r "$commit" 2>$null | Where-Object { $_ } | ForEach-Object { "$_" })
+        if ($LASTEXITCODE -ne 0) { return $null }
+        $outside = @($changed | Where-Object { -not $_.StartsWith('Tasks/') })
+        if (-not $outside.Count) { continue }
+        if (@($outside | Where-Object { & $isAudit $_ }).Count) { return $null }
+        $code += "$commit"; $paths += $outside
+    }
+    if (-not $code.Count -or $code.Count -gt $Most) { return $null }
+    return [pscustomobject]@{
+        Commits = $code; GreenSha = "$($green.Sha)"; FailingSha = "$($Verdict.FirstSha)"
+        Short = "$($Verdict.FirstSha)".Substring(0, [math]::Min(8, "$($Verdict.FirstSha)".Length))
+        Paths = @($paths | Select-Object -Unique)
+    }
+}
+
+function Get-CiAuditPathTest {
+    # The board's audit-path and guard-file test (Claim.ps1's Get-AuditPathTest) once loaded;
+    # before that, a stand-in that treats every audit office, Claude or workflow path as one.
+    if (Get-Command Get-AuditPathTest -ErrorAction SilentlyContinue) { return (Get-AuditPathTest) }
+    return { param([string]$Path) "$Path" -match '^(?:Audit|Gap|\.claude|\.github)/' }
+}
+
+function Get-CiRevertTitle {
+    # A revert task's title. It starts "Fix CI failure" so a lane takes it as a CI fix, first
+    # (ADR-1158), but names no failing test: the interactive-only task stays the one covering it.
+    param($Plan, [string]$WaitingId)
+    return "Fix CI failure by reverting $($Plan.Short) while $WaitingId waits for an interactive session"
+}
+
+function Set-CiRevertTaskBody {
+    # Fills a revert task's Goal, Context and Acceptance criteria (Get-CiRevertPlan).
+    param([string]$Path, $Plan, [string]$WaitingId, [string]$RunUrl)
+    $list = ($Plan.Commits | ForEach-Object { "$_".Substring(0, [math]::Min(9, "$_".Length)) }) -join ' '
+    $goal = "The ``CI`` workflow on the shift's branch is green again: the commits that broke it ($list) are reverted until $WaitingId, whose fix only an interactive session can make, is done."
+    $context = @(
+        "Filed by the dark factory's CI watch (BL-5175) beside $WaitingId, which covers the failure ($RunUrl) but touches an audit path or guard file, so no lane can take it. Without this revert CI stays red until an interactive session acts: 227 minutes on 2026-11-21 (BL-5710..BL-5712)."
+        ''
+        "CI was green on $($Plan.GreenSha.Substring(0, [math]::Min(9, $Plan.GreenSha.Length))) and red from $($Plan.FailingSha.Substring(0, [math]::Min(9, $Plan.FailingSha.Length))). The commits between them that change code, newest first: $list."
+        ''
+        "Revert them with ``git revert --no-edit $list``, newest first. If $WaitingId is already done, or CI is already green, there is nothing to revert: say so under Notes and finish. File a Backlog task that re-lands the reverted work after $WaitingId (``depends-on: [$WaitingId]``), naming the reverted commits and their tasks."
+    ) -join "`n"
+    $criteria = "- [ ] The commits are reverted, or Notes say why none needed reverting.`n- [ ] A Backlog task re-lands the reverted work after $WaitingId, or Notes say why none is needed.`n- [ ] The ``CI`` workflow passes on Windows, Linux and macOS for the commit that lands the revert."
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
+    $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
+    $text = $text.Replace('- [ ] <!-- A statement someone else can check from the repository without asking a question. -->', $criteria)
+    [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function New-CiRevertTasks {
+    # For each interactive-only task just filed in -Filed, one revert task (Get-CiRevertPlan)
+    # a lane can take, filed with -Board in the ci-watch worktree, unless a live task already
+    # reverts that commit. Returns the filed reverts as -Filed's entries are, with Revert set.
+    param([object[]]$Filed, [object[]]$Runs, [string]$Board)
+    $reverts = @(); $planned = @{}
+    $live = @(Get-LiveTaskTitles -Repo $CiWatchDir)
+    foreach ($task in @($Filed | Where-Object { $_ -and $_.Interactive })) {
+        $plan = Get-CiRevertPlan -Verdict $task.Verdict -Runs $Runs -Repo $CiWatchDir
+        if (-not $plan -or $planned.ContainsKey($plan.Short)) { continue }
+        if (@($live | Where-Object { $_ -like "*by reverting $($plan.Short) *" }).Count) { continue }
+        $planned[$plan.Short] = $true
+        $newArgs = @('new', '-Title', (Get-CiRevertTitle $plan $task.Id), '-Priority', 'High', '-Pipeline', 'direct', '-Touches', ($plan.Paths -join ','))
+        $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $Board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'ci' "cannot file the revert of $($plan.Short): $(Get-Short $out 60)" 'DarkYellow'; continue }
+        $url = "https://github.com/$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>$null)/actions/runs/$($task.Verdict.RunId)"
+        Set-CiRevertTaskBody -Path (Join-Path $CiWatchDir $Matches[2]) -Plan $plan -WaitingId $task.Id -RunUrl $url
+        $reverts += [pscustomobject]@{ Id = $Matches[1]; Line = $Matches[0]; Verdict = $task.Verdict; Interactive = $false; Revert = $plan.Short }
+    }
+    return $reverts
 }
 
 function Reset-CiWatchWorktree {
@@ -1735,7 +1859,8 @@ if ($TestCiWatch) {
         git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m two 2>&1 | Out-Null
         $shaNoFix = "$(git -C $fixTemp rev-parse HEAD)".Trim()
         Set-Content -Path (Join-Path $fixTemp 'Tasks\Done\BL-0003-fix-ci-failure-test1173-on-linux-and-macos.md') -Value 'fix'
-        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m three 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $fixTemp 'fix.cs') -Value 'fixed'
+        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m 'fix: three (BL-0003)' 2>&1 | Out-Null
         $shaFix = "$(git -C $fixTemp rev-parse HEAD)".Trim()
         & $check 'a CI fix reaching Done counts; an archived one and another task do not' 'BL-0003' ((Get-CiFixTasksBetween -Repo $fixTemp -From $shaRunning -To $shaFix) -join ',')
         $redRuns = @([pscustomobject]@{ Id = '70'; Sha = $shaRunning; FinishedAt = $now; Failures = @(& $f A @('Linux')) })
@@ -1771,9 +1896,46 @@ if ($TestCiWatch) {
         git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m five 2>&1 | Out-Null
         $noopPair[0].headSha = "$(git -C $fixTemp rev-parse HEAD)".Trim()
         & $check 'red, and the waiting run carries only fixes that name commits the running run holds: nothing cancelled (AF-0569)' '' (Stop-CiRunWithoutFix -Listed $noopPair -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
+        # BL-5175: a CI fix that closed with no change ("not reproducible") is no fix the running run lacks.
+        Set-Content -Path (Join-Path $fixTemp 'Tasks\Done\BL-0006-fix-flaky-ci-test-test1173-on-windows.md') -Value '## Log', '', '- 2026-11-22: Doing -> Done. Not reproducible; no change needed.'
+        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m 'chore(tasks): BL-0006 done' 2>&1 | Out-Null
+        $shaNoChange = "$(git -C $fixTemp rev-parse HEAD)".Trim()
+        & $check 'a fix with a commit changing code counts; one whose only commit names it on a task file, a task ID it is a prefix of, or git failing do not' 'True False False False' "$(Test-CiFixChangedCode -Repo $fixTemp -Id 'BL-0003' -From $shaRunning -To $shaFix) $(Test-CiFixChangedCode -Repo $fixTemp -Id 'BL-0006' -From $shaFix -To $shaNoChange) $(Test-CiFixChangedCode -Repo $fixTemp -Id 'BL-000' -From $shaRunning -To $shaFix) $(Test-CiFixChangedCode -Repo $fixTemp -Id 'BL-0003' -From 'nosuchcommit' -To $shaFix)"
+        $noChangePair = @([pscustomobject]@{ databaseId = 97; status = 'pending'; headSha = $shaNoChange }, [pscustomobject]@{ databaseId = 96; status = 'in_progress'; headSha = "$($noopPair[0].headSha)" })
+        & $check 'red, and the waiting run carries only a fix that changed nothing: nothing cancelled (BL-5175)' '' (Stop-CiRunWithoutFix -Listed $noChangePair -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
         & $check 'the watch looks every minute while CI is red, every heartbeat otherwise, and every 3 minutes with publishing off' '1 3 3 1' "$(Get-CiWatchEveryMinutes -HeartbeatMinutes 3 -Red $true) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 3 -Red $false) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 0 -Red $false) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 0 -Red $true)"
         & $check 'gh cancelled only runs 78 and 86' '78,86' ($script:cancelledIds -join ',')
     } finally { Remove-Item -Recurse -Force -Path $fixTemp -ErrorAction SilentlyContinue }
+    # BL-5175: a red only an interactive session can fix gets a plan to revert the breaking commits.
+    $revTemp = Join-Path ([IO.Path]::GetTempPath()) "df-ci-revert-$PID"
+    try {
+        New-Item -ItemType Directory -Force -Path (Join-Path $revTemp 'Tasks\Done') | Out-Null
+        git init -q -b work $revTemp 2>&1 | Out-Null
+        git -C $revTemp config user.email t@t; git -C $revTemp config user.name t
+        $commitRev = { param([string]$File, [string]$Message) New-Item -ItemType Directory -Force -Path (Split-Path (Join-Path $revTemp $File)) | Out-Null; Set-Content -Path (Join-Path $revTemp $File) -Value $Message; git -C $revTemp add -A 2>&1 | Out-Null; git -C $revTemp commit -q -m $Message 2>&1 | Out-Null; "$(git -C $revTemp rev-parse HEAD)".Trim() }
+        $shaGreen = & $commitRev 'Lib/a.cs' 'green'
+        $shaBreak = & $commitRev 'Lib/b.csproj' 'feat: rename the package (BL-0010)'
+        $shaRed = & $commitRev 'Tasks/Done/BL-0010-rename.md' 'chore(tasks): BL-0010 done'
+        $regression = [pscustomobject]@{ Key = 'job Pack step Check'; Kind = 'job'; Verdict = 'regression'; RunId = '61'; FirstSha = $shaRed }
+        $revRuns = @(
+            [pscustomobject]@{ Id = '61'; Sha = $shaRed; FinishedAt = $now; Failures = @(& $f A @('Linux')) },
+            [pscustomobject]@{ Id = '60'; Sha = $shaGreen; FinishedAt = $now; Failures = @() })
+        $plan = Get-CiRevertPlan -Verdict $regression -Runs $revRuns -Repo $revTemp
+        & $check 'the code commit since the last green run is planned for revert; the task-only commit is not' "$shaBreak|Lib/b.csproj|$($shaRed.Substring(0, 8))" "$($plan.Commits -join ',')|$($plan.Paths -join ',')|$($plan.Short)"
+        & $check 'the revert task is a CI fix by title and names no failing test' 'True False' "$(Test-CiFixTitle (Get-CiRevertTitle $plan 'BL-0011')) $((Get-CiRevertTitle $plan 'BL-0011') -like '*Pack*')"
+        $flaky = [pscustomobject]@{ Key = 'A'; Kind = 'test'; Verdict = 'flaky'; RunId = '61'; FirstSha = $shaRed }
+        $audit = [pscustomobject]@{ Key = 'audit guard Audit/x.md'; Kind = 'audit'; Verdict = 'regression'; RunId = '61'; FirstSha = $shaRed }
+        $noGreen = @($revRuns[0])
+        & $check 'no plan for a flaky failure, an audit-guard failure, or with no green run before' 'True True True' "$($null -eq (Get-CiRevertPlan -Verdict $flaky -Runs $revRuns -Repo $revTemp)) $($null -eq (Get-CiRevertPlan -Verdict $audit -Runs $revRuns -Repo $revTemp)) $($null -eq (Get-CiRevertPlan -Verdict $regression -Runs $noGreen -Repo $revTemp))"
+        $shaGuard = & $commitRev '.github/workflows/ci.yml' 'ci: check the new ids'
+        $guardRuns = @([pscustomobject]@{ Id = '62'; Sha = $shaGuard; FinishedAt = $now; Failures = @(& $f A @('Linux')) }) + $revRuns[1]
+        $guarded = [pscustomobject]@{ Key = 'job Pack step Check'; Kind = 'job'; Verdict = 'regression'; RunId = '62'; FirstSha = $shaGuard }
+        & $check 'no plan when a commit in the range touches a guard file: no lane can revert it' 'True' "$($null -eq (Get-CiRevertPlan -Verdict $guarded -Runs $guardRuns -Repo $revTemp))"
+        $shaMore = & $commitRev 'Lib/c.cs' 'c'; $shaMore = & $commitRev 'Lib/d.cs' 'd'; $shaMore = & $commitRev 'Lib/e.cs' 'e'
+        $manyRuns = @([pscustomobject]@{ Id = '63'; Sha = $shaMore; FinishedAt = $now; Failures = @(& $f A @('Linux')) }, [pscustomobject]@{ Id = '62'; Sha = $shaGuard; FinishedAt = $now; Failures = @() })
+        $many = [pscustomobject]@{ Key = 'A'; Kind = 'test'; Verdict = 'regression'; RunId = '63'; FirstSha = $shaMore }
+        & $check 'three code commits are planned by default; none past -Most 2' '3 True' "$(@((Get-CiRevertPlan -Verdict $many -Runs $manyRuns -Repo $revTemp).Commits).Count) $($null -eq (Get-CiRevertPlan -Verdict $many -Runs $manyRuns -Repo $revTemp -Most 2))"
+    } finally { Remove-Item -Recurse -Force -Path $revTemp -ErrorAction SilentlyContinue }
     exit $(if ($script:ciTestFailed) { 1 } else { 0 })
 }
 

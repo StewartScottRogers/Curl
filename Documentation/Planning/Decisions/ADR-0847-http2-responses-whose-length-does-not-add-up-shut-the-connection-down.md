@@ -26,6 +26,12 @@ data, and exit 16, even with `--ignore-content-length`:
 
 Otherwise the message is `nghttp2 shuts down connection with error 1: PROTOCOL_ERROR`.
 
+BL-5958 measured `-v` for these and for the other responses curl shuts the connection down for
+(headers after the head without END_STREAM, an invalid header field in a head or a trailer): every
+one writes `* nghttp2 shuts down connection with error 1: PROTOCOL_ERROR` before
+`* closing connection #0`, after the data lines of the DATA before the failure, and an invalid
+field writes its own message as a `-v` line just before it.
+
 ## Decision
 
 1. `Http2StreamConnection` keeps the body length the final head promises (none for HEAD, 204 and

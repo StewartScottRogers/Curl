@@ -22,7 +22,8 @@ namespace Curl.Authentication;
 /// <param name="answerDigestMd5AsSspi">
 /// <see langword="true" /> to answer DIGEST-MD5 as curl's Schannel build on Windows does,
 /// through SSPI; <see langword="false" /> to answer as curl's own code in the OpenSSL build
-/// does (ADR-0139).
+/// does (ADR-0139). Only the former refuses an empty user: it gives no answer, which fails
+/// the transfer with exit 67.
 /// </param>
 /// <param name="securityContexts">
 /// Makes the Kerberos and NTLM contexts GSSAPI and NTLM run on, ADR-0142's router in
@@ -96,6 +97,9 @@ public sealed class SaslAuthenticator(
 
     /// <summary>The message curl prints for exit 94, <see cref="CurlExitCode.AuthError" />.</summary>
     private const string AuthErrorMessage = "An authentication function returned an error";
+
+    /// <summary>The message curl prints for exit 67, <see cref="CurlExitCode.LoginDenied" />.</summary>
+    private const string LoginDeniedMessage = "Login denied";
 
     // Each built mechanism's messages: the initial response first, then the answers to the
     // challenges after it. OAUTHBEARER acknowledges an error continuation with 0x01, as curl
@@ -207,15 +211,28 @@ public sealed class SaslAuthenticator(
         credentialEncoding.GetBytes(
             UserOf(request) + " " + Convert.ToHexStringLower(HMACMD5.HashData(credentialEncoding.GetBytes(PasswordOf(request)), challenge)));
 
-    // The principal is service/host, as curl's Curl_auth_build_spn makes it. A challenge SSPI
-    // rejects fails the transfer with exit 94 rather than cancelling it (BL-781).
+    // The principal is service/host, as curl's Curl_auth_build_spn makes it.
     private byte[]? DigestMd5Answer(SaslRequest request, byte[] challenge)
     {
         string digestUri = request.ServiceName + "/" + request.Host;
         return answerDigestMd5AsSspi
-            ? SaslDigestMd5.AnswerAsSspi(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce())
-                ?? throw DigestMd5Failed()
+            ? DigestMd5SspiAnswer(request, challenge, digestUri)
             : SaslDigestMd5.AnswerAsCurl(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce());
+    }
+
+    // With an empty user, curl's SSPI build exits 67 with nothing sent, whatever the challenge
+    // holds: no answer and no cancel reason (BL-5968). Otherwise a challenge SSPI rejects
+    // fails the transfer with exit 94 rather than cancelling it (BL-781).
+    private byte[]? DigestMd5SspiAnswer(SaslRequest request, byte[] challenge, string digestUri)
+    {
+        if (UserOf(request).Length == 0)
+        {
+            log.Failed(SaslMechanismRanking.DigestMd5, CurlExitCode.LoginDenied, LoginDeniedMessage);
+            return null;
+        }
+
+        return SaslDigestMd5.AnswerAsSspi(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce())
+            ?? throw DigestMd5Failed();
     }
 
     // An empty challenge is cancelled with * and the next mechanism tried, as curl does

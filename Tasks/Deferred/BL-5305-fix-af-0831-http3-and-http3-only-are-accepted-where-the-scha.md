@@ -58,3 +58,4 @@ Stewart decided 2026-11-16 (option 1, keep HTTP/3 on): --http3 and --http3-only 
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-11-24: Doing -> Blocked. Stewart: Fixing this makes --http3/--http3-only exit 2, reversing your 2026-11-16 and 2026-11-22 decisions (ADR-1282); the 2026-11-24 undefer was a bulk move, so confirm you want ADR-1282 reversed, else close AF-0831 as a known difference.
+- 2026-11-25: Blocked -> Deferred. Stewart 2026-11-25: keep --http3 and --http3-only accepted (ADR-1282); the finding is a decided difference, not a defect, and is closed. Gap items excluded on every platform.
