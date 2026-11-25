@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.Kafka.UnitLibrary/Client/KafkaClientFlow.cs]
+touches: [Curl.Extended.Protocol.Kafka.UnitLibrary/Client/KafkaClientFlow.cs, Curl.Extended.Protocol.Kafka.UnitTests/Client/KafkaLeaderRetryTests.cs, Curl.Extended.Protocol.Kafka.UnitTests/Client/KafkaProtocolHandlerTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5902 — Fix fitness finding EXT-127: Kafka produce to a topic auto-created just after broker start fails with NOT_LEADER_OR_FOLLOWER (exit 8); the retriable error is not retried
 
@@ -35,13 +35,22 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] five runs of `curl -sS -d x kafka://localhost:38092/fresh$i/0` against a freshly started broker all exit 0, and consuming each topic prints `x`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] five runs of `curl -sS -d x kafka://localhost:38092/fresh$i/0` against a freshly started broker all exit 0, and consuming each topic prints `x`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix (ADR-1369): a Produce answered with error 3, 5 or 6 waits 250 ms, asks Metadata again and sends the same batch again. Metadata and Produce share nine retries per connection.
+- Live check: `apache/kafka:3.9.0` in Docker on port 38592 (the finding's port is an example), two fresh starts, five produces and five consumes each: all exit 0, each consume printed `x`.
+- The finding is timing-dependent and did not reproduce here: the build before the fix also passed on one fresh broker. The code path was plain from `ProduceAsync`, and the new tests in `KafkaLeaderRetryTests` pin it.
+- `ExecuteAsync_ProduceRefused_...` used error 3, now retried, so it uses error 29.
+- `touches` widened to the two test files; no other task in Doing names them.
+- Fast tests: 57984 passed, 0 failed. Quality for the Kafka library: 0 failing members.
+- Follow-up BL-5934: a leader that moves to another broker during the retries is not followed.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: bc19a0af 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. Kafka produce retries a not-ready leader (errors 3, 5, 6) within nine shared retries
