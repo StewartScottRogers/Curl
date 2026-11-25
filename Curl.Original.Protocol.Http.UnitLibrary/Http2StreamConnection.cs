@@ -566,7 +566,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         if (isFinalHeadReceived && !frame.IsEndStream)
         {
             // Trailers must end the stream (RFC 9113 section 8.1); nghttp2 shuts the connection down (measured, BL-3664 Notes).
-            await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
+            await ShutDownMalformedAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -616,11 +616,10 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <returns><see langword="true" /> for a head taken, <see langword="false" /> for one the connection was shut down for.</returns>
     private async ValueTask<bool> IsHeadTakenAsync(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream, CancellationToken cancellationToken)
     {
-        if (MalformedHeadOf(statusCode, fields, isEndStream) is { } malformed)
+        if (IsHeadMalformed(statusCode, fields, isEndStream))
         {
-            received.Enqueue(malformed.Written);
-            // The message is also a -v line, after the head lines (measured, BL-5947 Notes).
-            await ShutDownMalformedAsync(new HttpTransferException(CurlExitCode.Http2, malformed.Message) { InfoLines = [malformed.Message] }, cancellationToken).ConfigureAwait(false);
+            received.Enqueue(HeadWithoutEmptyLine(statusCode, fields));
+            await ShutDownMalformedAsync(cancellationToken).ConfigureAwait(false);
             return false;
         }
 
@@ -637,14 +636,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     private long? PromisedBodyLengthOf(int statusCode, IReadOnlyList<HeaderField> fields) =>
         isHeadRequest || statusCode is 204 or 304 ? 0 : ContentLengthOf(fields);
 
-    /// <summary>
-    /// Gives what curl writes of a head nghttp2 rejects and the message it fails with, or
-    /// <see langword="null" /> for a head it takes (<see cref="IsHeadTakenAsync" />).
-    /// </summary>
-    private (byte[] Written, string Message)? MalformedHeadOf(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream) =>
-        isEndStream && (statusCode < 200 || PromisedBodyLengthOf(statusCode, fields) > 0)
-            ? (HeadWithoutEmptyLine(statusCode, fields), HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError))
-            : null;
+    /// <summary>Tells whether nghttp2 rejects a head (<see cref="IsHeadTakenAsync" />).</summary>
+    private bool IsHeadMalformed(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream) =>
+        isEndStream && (statusCode < 200 || PromisedBodyLengthOf(statusCode, fields) > 0);
 
     /// <summary>Tells whether a head or trailer frame ends the response: it carries END_STREAM. The <c>-I</c> ending (<see cref="EndsAtFinalHead" />) is not decided here: it comes at the first DATA frame or when the peer closes (BL-5468).</summary>
     private bool IsEndedBy(Http2StreamFrame frame) => frame.IsEndStream;
@@ -665,7 +659,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
         if (bodyBytesReceived > promisedBodyLength)
         {
-            await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
+            await ShutDownMalformedAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -708,26 +702,30 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         if (isEndStream && isFinalHeadReceived && !EndsAtFinalHead && bodyBytesReceived != (promisedBodyLength ?? bodyBytesReceived))
         {
-            await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
+            await ShutDownMalformedAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
         isResponseEnded = isEndStream;
     }
 
+    /// <summary>Shuts the connection down for a malformed response that rejects no header field: exit 16, saying nghttp2 shut it down.</summary>
+    private ValueTask ShutDownMalformedAsync(CancellationToken cancellationToken) =>
+        ShutDownMalformedAsync(CurlExitCode.Http2, rejectedFieldMessage: null, cancellationToken);
+
     /// <summary>
     /// Shuts the connection down for a malformed response as nghttp2 does: GOAWAY with
-    /// PROTOCOL_ERROR, last stream 0 and no debug data (measured, BL-3667 Notes). The failure,
-    /// <paramref name="exitCode" /> with <paramref name="message" />, is thrown by the stream's
-    /// next read, after the bytes curl wrote before it.
+    /// PROTOCOL_ERROR, last stream 0 and no debug data (measured, BL-3667 Notes). The failure is
+    /// thrown by the stream's next read, after the bytes curl wrote before it. Its <c>-v</c>
+    /// lines are <paramref name="rejectedFieldMessage" />, when a field was rejected, then
+    /// nghttp2's shutdown line; its message is the first of them (measured, BL-5947 and BL-5958
+    /// Notes).
     /// </summary>
-    private ValueTask ShutDownMalformedAsync(CurlExitCode exitCode, string message, CancellationToken cancellationToken) =>
-        ShutDownMalformedAsync(new HttpTransferException(exitCode, message), cancellationToken);
-
-    /// <summary>Shuts the connection down for a malformed response, keeping <paramref name="failure" /> for the stream's next read to throw.</summary>
-    private async ValueTask ShutDownMalformedAsync(HttpTransferException failure, CancellationToken cancellationToken)
+    private async ValueTask ShutDownMalformedAsync(CurlExitCode exitCode, string? rejectedFieldMessage, CancellationToken cancellationToken)
     {
-        malformedResponseFailure = failure;
+        string shutsDown = HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError);
+        string[] infoLines = rejectedFieldMessage is null ? [shutsDown] : [rejectedFieldMessage, shutsDown];
+        malformedResponseFailure = new HttpTransferException(exitCode, infoLines[0]) { InfoLines = infoLines };
         await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
     }
 
