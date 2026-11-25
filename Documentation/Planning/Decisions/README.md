@@ -1388,7 +1388,7 @@ Each option and the specific reason it lost.
 | [1344](ADR-1344-checksum-refuses-a-resumed-download.md) | --checksum refuses a resumed download (BL-5837) | Accepted | 2026-11-24 |
 | [1345](ADR-1345-crlfile-with-a-non-self-signed-anchor-is-unable-to-get-issuer-certificate.md) | --crlfile with a non-self-signed anchor is unable to get issuer certificate (BL-5830) | Accepted | 2026-11-24 |
 | [1346](ADR-1346-azure-storage-numeric-host-is-an-ip-only-when-it-is-a-routable-ipv4-spelling.md) | An Azure Storage numeric host is an emulator IP only when it is a routable IPv4 spelling (BL-5867) | Accepted | 2026-11-24 |
-| [1347](ADR-1347-an-oauth2-flow-refuses-a-transfer-that-carries-a-dpop-proof.md) | An --oauth2-* flow refuses a transfer that carries a DPoP proof (BL-5898) | Superseded by ADR-1356 | 2026-11-24 |
+| [1347](ADR-1347-an-oauth2-flow-refuses-a-transfer-that-carries-a-dpop-proof.md) | An --oauth2-* flow refuses a transfer that carries a DPoP proof (BL-5898) | Superseded by ADR-1367 | 2026-11-24 |
 | [1348](ADR-1348-az-and-abfs-refuse-range-and-resume.md) | az:// and abfs[s]:// refuse -r and -C with exit 4 (BL-5897) | Accepted | 2026-11-24 |
 | [1349](ADR-1349-zsync-writes-a-whole-response-only-when-its-sha-1-matches-the-control-file.md) | --zsync writes a whole response only when its SHA-1 matches the control file's, and exits 61 otherwise (BL-5896) | Accepted | 2026-11-24 |
 | [1350](ADR-1350-xmpp-refuses-a-message-body-that-is-not-utf-8.md) | xmpp refuses a message body that is not valid UTF-8 (BL-5899) | Accepted | 2026-11-24 |
@@ -1408,4 +1408,4 @@ Each option and the specific reason it lost.
 | [1364](ADR-1364-below-an-anchor-a-crl-may-be-rsassa-pss-signed-and-may-name-no-nextupdate.md) | Below an anchor a CRL may be RSASSA-PSS signed and may name no nextUpdate (BL-5878) | Accepted | 2026-11-24 |
 | [1365](ADR-1365-a-deflate-zlib-stream-holds-its-first-decoded-bytes-until-the-piece-decodes.md) | A deflate zlib stream holds its first decoded bytes until the piece decodes (BL-5889) | Accepted | 2026-11-24 |
 | [1366](ADR-1366-openldap-starttls-and-simple-bind-failures-follow-curl-8-21-0.md) | OpenLDAP StartTLS and simple bind failures follow curl 8.21.0 (BL-5908) | Accepted | 2026-11-24 |
-| [1356](ADR-1356-an-oauth2-flow-binds-its-token-to-the-dpop-key.md) | An --oauth2-* flow binds its token to the --dpop key (BL-5911) | Accepted | 2026-11-24 |
+| [1367](ADR-1367-an-oauth2-flow-binds-its-token-to-the-dpop-key.md) | An --oauth2-* flow binds its token to the --dpop key (BL-5911) | Accepted | 2026-11-24 |

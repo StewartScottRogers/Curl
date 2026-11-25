@@ -1,4 +1,4 @@
-# ADR-1356 — An --oauth2-* flow binds its token to the --dpop key
+# ADR-1367 — An --oauth2-* flow binds its token to the --dpop key
 
 - **Status:** Accepted
 - **Date:** 2026-11-24

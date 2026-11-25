@@ -29,7 +29,7 @@ BL-5898 (fitness finding EXT-123) made the combination fail closed: ADR-1347, `O
 
 ## Notes
 
-- Design (ADR-1356, supersedes ADR-1347): the OAuth2 hook now runs before `--dpop`'s, so the existing DPoP hook signs
+- Design (ADR-1367, supersedes ADR-1347): the OAuth2 hook now runs before `--dpop`'s, so the existing DPoP hook signs
   the request carrying the token (`ath`, nonce retry, followed hops) with one change: an `Authorization: DPoP` header's
   token wins over `--oauth2-bearer`'s. The key is lent through `IDpopKeySource` / `TransferHookServices.DpopKeySource`.
 - With a key only `token_type` `DPoP` is accepted (fail closed, exit 8). `-H "DPoP: ..."` beside a flow stays exit 2.
