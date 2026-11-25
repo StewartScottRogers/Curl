@@ -31,3 +31,4 @@ BL-5974 (ADR-1405) and BL-5976 (ADR-1407) matched curl for HTTP/2: the stream is
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 24b1db49 9289376a 3d836d5e.
