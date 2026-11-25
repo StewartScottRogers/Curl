@@ -1,5 +1,5 @@
 ---
-id: BL-5951
+id: BL-5953
 title: Check intermediates' names against name constraints in the OpenSSL build, and report the first refusal when the chain engine flags several
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5951 — Check intermediates' names against name constraints in the OpenSSL build, and report the first refusal when the chain engine flags several
+# BL-5953 — Check intermediates' names against name constraints in the OpenSSL build, and report the first refusal when the chain engine flags several
 
 ## Goal
 
