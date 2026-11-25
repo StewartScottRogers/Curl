@@ -3,12 +3,12 @@ id: AF-0993
 title: Lib1553_PostsTheMimeWithTracingAndWaitsOnce never checks that the MIME post is set
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1551To1559Tests.cs:Lib1553_PostsTheMimeWithTracingAndWaitsOnce:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5987
+tasks: BL-5987
 found: 2026-11-25
 found-at: eb33fe3c5ab162945003079cf4f807e5608dde01
 scorecard: 2026-11-25_1306.md

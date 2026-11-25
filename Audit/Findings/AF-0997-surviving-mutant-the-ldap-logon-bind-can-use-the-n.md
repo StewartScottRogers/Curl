@@ -3,12 +3,12 @@ id: AF-0997
 title: Surviving mutant: the LDAP logon bind can use the Negotiate package for NTLM and NTLM for Negotiate (== -> !=)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Ldap.UnitLibrary/NegotiateLogonTokenSource.cs:NegotiateLogonAuthentication-eq:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Ldap.UnitLibrary/NegotiateLogonTokenSource.cs:23:==
-task: none
-tasks:
+task: BL-5991
+tasks: BL-5991
 found: 2026-11-25
 found-at: eb33fe3c5ab162945003079cf4f807e5608dde01
 scorecard: 2026-11-25_1306.md

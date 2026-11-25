@@ -3,12 +3,12 @@ id: AF-0995
 title: Surviving mutant: an Azure Storage response field line starting with whitespace can be accepted as a field (>= -> >)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpResponseHead.cs:ParseField-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpResponseHead.cs:31:>=
-task: none
-tasks:
+task: BL-5989
+tasks: BL-5989
 found: 2026-11-25
 found-at: eb33fe3c5ab162945003079cf4f807e5608dde01
 scorecard: 2026-11-25_1306.md

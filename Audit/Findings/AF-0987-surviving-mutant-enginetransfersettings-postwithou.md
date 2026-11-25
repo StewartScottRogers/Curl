@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/EngineTransferSettings.cs:EngineTransferSettings-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineTransferSettings.cs:57:false
-task: BL-5789
-tasks: BL-5789
+task: BL-5986
+tasks: BL-5789, BL-5986
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md

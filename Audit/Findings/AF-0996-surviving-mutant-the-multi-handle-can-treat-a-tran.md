@@ -3,12 +3,12 @@ id: AF-0996
 title: Surviving mutant: the multi handle can treat a transfer whose deadline is exactly now as still settled (<= -> <)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs:IsSettled-le:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs:273:<=
-task: none
-tasks:
+task: BL-5990
+tasks: BL-5990
 found: 2026-11-25
 found-at: eb33fe3c5ab162945003079cf4f807e5608dde01
 scorecard: 2026-11-25_1306.md

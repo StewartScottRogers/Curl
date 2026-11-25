@@ -3,12 +3,12 @@ id: AF-0998
 title: Surviving mutant: the lib1560 port can report the zoneid part as UNKNOWN (> -> >=)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs:SetPart-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs:134:>
-task: none
-tasks:
+task: BL-5992
+tasks: BL-5992
 found: 2026-11-25
 found-at: eb33fe3c5ab162945003079cf4f807e5608dde01
 scorecard: 2026-11-25_1306.md

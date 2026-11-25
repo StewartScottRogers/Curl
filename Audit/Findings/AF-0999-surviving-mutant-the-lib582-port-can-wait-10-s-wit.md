@@ -3,12 +3,12 @@ id: AF-0999
 title: Surviving mutant: the lib582 port can wait 10 s with no sockets and 100 ms with sockets (== -> !=)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs:TurnAsync-eq:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs:177:==
-task: none
-tasks:
+task: BL-5993
+tasks: BL-5993
 found: 2026-11-25
 found-at: eb33fe3c5ab162945003079cf4f807e5608dde01
 scorecard: 2026-11-25_1306.md
