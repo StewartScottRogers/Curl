@@ -1,5 +1,5 @@
 ---
-id: BL-5954
+id: BL-5955
 title: Fail -I with exit 52 on an unsolicited HTTP/1.1 101 as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5954 — Fail -I with exit 52 on an unsolicited HTTP/1.1 101 as curl does
+# BL-5955 — Fail -I with exit 52 on an unsolicited HTTP/1.1 101 as curl does
 
 ## Goal
 

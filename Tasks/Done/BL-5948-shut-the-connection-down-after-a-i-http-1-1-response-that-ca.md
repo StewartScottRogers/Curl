@@ -29,7 +29,7 @@ Measured in BL-5941, `Record-CurlExchange.ps1 -Response 'HTTP/1.1 200 OK\r\nCont
 
 - Measured 2026-11-25 with `Record-CurlExchange.ps1`, reference Windows curl, `-sS -v -I`, two URLs on one host, the server holding the connection open: body bytes with `Content-Length: 3`, without `Content-Length`, on a `204` and on `HTTP/1.0` with `Connection: keep-alive` all end `{ [3 bytes data]`, `* shutting down connection #N`, and the second URL opens connection #1. The same head with no body bytes is left intact and reused. A `--digest` 401 with body bytes shuts down and retries on a new connection (Curl matched this already).
 - Decision (matches curl, so no ADR): over HTTP/1.x, `-I` with any body bytes read along with the head makes the connection not reusable (`ReceivedUnwantedBody` in `HttpProtocolHandler.ConnectionReuse.cs`). HTTP/2 and HTTP/3 are unchanged: the stream, not the connection, ends. Bytes that arrive only in a later read are never read, as in curl.
-- Compared the built Curl with real curl afterwards: the `-v` connection lines match. An unsolicited `101` under `-I` differs (curl exits 52): filed as BL-5954.
+- Compared the built Curl with real curl afterwards: the `-v` connection lines match. An unsolicited `101` under `-I` differs (curl exits 52): filed as BL-5955.
 - `dotnet build` clean, fast tests pass, `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary`: 0 failing members.
 
 ## Log
