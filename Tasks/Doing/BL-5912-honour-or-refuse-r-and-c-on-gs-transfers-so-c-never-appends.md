@@ -31,3 +31,4 @@ Left by BL-5897 (fitness finding EXT-122, which says gs:// probably shares the g
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 54562497 aa739c66 3d836d5e.
