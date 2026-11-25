@@ -59,7 +59,7 @@ The finding, verbatim:
 - `touches` widened to `XmppClientMessages.cs`, `XmppUploadTests.cs` and `Xmpp.md` (the message, the test and the
   document of this change); no other task in Doing named them.
 - Also filed BL-5916: CR and CR LF in a body look to be changed to LF by the stanza serialiser.
-- Second claim (BL-5915 Done): measured with the built curl.exe on Windows. `-T` Latin-1 `caf� latin1` exits 43,
+- Second claim (BL-5915 Done): measured with the built curl.exe on Windows. `-T` Latin-1 `caf\xe9 latin1` exits 43,
   `curl: (43) XMPP message body is not valid UTF-8`, before any connection, so nothing can be stored for carol; typed
   `-d 'café'` now passes the check and goes on to connect (exit 7 with no server listening). `XmppUploadTests` pins that valid
   UTF-8 `café` reaches the `<body/>` unchanged. No Prosody was run. XMPP unit tests: 82 passed.
