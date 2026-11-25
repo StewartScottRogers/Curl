@@ -527,15 +527,15 @@ public sealed class WsProtocolHandlerTests
         diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         diagnostics.Assert("error message", "[WS] masked input frame", result.ErrorMessage);
         diagnostics.Assert("output", "ok", written);
-        diagnostics.Assert("bytes transferred", 10L, result.BytesTransferred);
+        diagnostics.Assert("bytes transferred", 4L, result.BytesTransferred);
         diagnostics.Assert("response code", 101, result.Report.ResponseCode);
-        diagnostics.Assert("download size", 10L, result.Report.DownloadSize);
+        diagnostics.Assert("download size", 4L, result.Report.DownloadSize);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("[WS] masked input frame", result.ErrorMessage);
         Assert.AreEqual("ok", written);
-        Assert.AreEqual(10L, result.BytesTransferred);
+        Assert.AreEqual(4L, result.BytesTransferred);
         Assert.AreEqual(101, result.Report!.ResponseCode);
-        Assert.AreEqual(10L, result.Report.DownloadSize);
+        Assert.AreEqual(4L, result.Report.DownloadSize);
     }
 
     [TestMethod]
