@@ -832,23 +832,24 @@ public static partial class CommandLineOptionTable
         AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, true, options.AppendJsonData);
 
     /// <summary>
-    /// Hands <paramref name="append"/> the bytes of <paramref name="value"/> (<see cref="CommandLineOptions.CommandLineTextBytes"/>),
-    /// or, when it starts with <c>@</c>, the unchanged bytes of the file it names, standard input for <c>@-</c> read in
-    /// Windows text mode when <paramref name="readsStandardInputAsText"/> (<see cref="WindowsTextModeInput"/>). A file
-    /// that cannot be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/> and nothing is appended.
+    /// Hands <paramref name="append"/> the bytes of <paramref name="value"/> (<see cref="CommandLineOptions.CommandLineTextBytes"/>)
+    /// and its <see cref="CommandLineOptions.TypedTextAsUtf8Bytes"/>, or, when it starts with <c>@</c>, the unchanged
+    /// bytes of the file it names as both, standard input for <c>@-</c> read in Windows text mode when
+    /// <paramref name="readsStandardInputAsText"/> (<see cref="WindowsTextModeInput"/>). A file that cannot be read is
+    /// refused with <see cref="CommandLineRefusal.DataFileUnreadable"/> and nothing is appended.
     /// </summary>
-    private static CommandLineRefusal? AppendTextOrFileBytes(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, Action<byte[]> append)
+    private static CommandLineRefusal? AppendTextOrFileBytes(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, Action<byte[], byte[]> append)
     {
         if (!value.StartsWith('@'))
         {
-            append(options.CommandLineTextBytes(value));
+            append(options.CommandLineTextBytes(value), options.TypedTextAsUtf8Bytes(value));
             return null;
         }
 
         CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, readsStandardInputAsText, false, out byte[] contents);
         if (refusal is null)
         {
-            append(contents);
+            append(contents, contents);
         }
 
         return refusal;

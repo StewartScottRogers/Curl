@@ -5987,7 +5987,7 @@ internal sealed class CurlCommandRunner(
 
         // CURLOPT_URL takes any string, so its answer is always CURLE_OK.
         _ = easy.Easy.SetOption(CurlOption.Url, StyledHeaderBaseUrl(attempt.Url));
-        easy.Hooks.ToolSettings = EasyOptionsFromCommandLine.TransferSettingsOf(options);
+        easy.Hooks.ToolSettings = EasyOptionsFromCommandLine.TransferSettingsOf(options, attempt.Url);
         easy.Hooks.Host = EasyTransferHost.Library with { DiagnosticLog = diagnosticLog };
         return easy.SetOptions([.. easySetoptsOf(groups), .. FormSetoptOf(form)]);
     }

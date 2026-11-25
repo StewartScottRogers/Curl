@@ -95,6 +95,12 @@ public sealed class CommandLineOptions
     internal bool ApplyingValueLedByVariableBytes { get => globals.ApplyingValueLedByVariableBytes; set => globals.ApplyingValueLedByVariableBytes = value; }
 
     /// <summary>
+    /// <see langword="true"/> while <see cref="CommandLineParser"/> applies an <c>--expand-</c> value in which a
+    /// variable reference was replaced: its text stands for bytes, some from a variable, not only typed characters.
+    /// </summary>
+    internal bool ApplyingExpandedValue { get => globals.ApplyingExpandedValue; set => globals.ApplyingExpandedValue = value; }
+
+    /// <summary>
     /// <paramref name="value"/> as curl 8.21.0's leading-Unicode check reads it: while <see cref="ApplyingValueLedByVariableBytes"/>,
     /// the value's bytes (<see cref="CommandLineTextBytes"/>) read as UTF-8 (BL-1814, BL-3848); otherwise unchanged.
     /// </summary>
@@ -696,6 +702,17 @@ public sealed class CommandLineOptions
     /// (see <see cref="QueryUrl"/>).
     /// </summary>
     public ReadOnlyMemory<byte>? PostData { get; private set; }
+
+    /// <summary>
+    /// <see cref="PostData"/> with each piece typed on the command line spelled in UTF-8 rather than in
+    /// <see cref="ConfigFileWireTextEncoding"/> (<see cref="TypedTextAsUtf8Bytes"/>), for a protocol whose body is
+    /// text. A file's bytes, a config file's line and an expanded <c>--expand-</c> value are as in
+    /// <see cref="PostData"/>. The same bytes as <see cref="PostData"/> wherever typed text already goes out in UTF-8.
+    /// </summary>
+    public ReadOnlyMemory<byte>? PostDataWithTypedTextAsUtf8 => postDataSpelledInUtf8 ?? PostData;
+
+    // Set from the first piece whose UTF-8 spelling differs from its bytes in PostData, so a body is held twice only then.
+    private ReadOnlyMemory<byte>? postDataSpelledInUtf8;
 
     /// <summary>
     /// <see langword="true"/> when <c>--json</c> was given at least once: curl 8.21.0 then sends
@@ -2480,29 +2497,56 @@ public sealed class CommandLineOptions
     /// after a single <c>&amp;</c> when <see cref="PostData"/> already holds at least one byte, as curl 8.22.0 does.
     /// </summary>
     /// <param name="data">A <c>-d</c> / <c>--data</c> value, possibly empty.</param>
-    internal void AppendPostData(string data) => AppendPostData(CommandLineTextBytes(data));
+    internal void AppendPostData(string data) => AppendPostData(CommandLineTextBytes(data), TypedTextAsUtf8Bytes(data));
+
+    /// <summary>
+    /// The bytes <paramref name="text"/>, a body value as parsed, has in
+    /// <see cref="PostDataWithTypedTextAsUtf8"/>: UTF-8 for a value typed on the command line. A config file's
+    /// line and an expanded <c>--expand-</c> value stand for bytes already, so they keep
+    /// <see cref="CommandLineTextBytes"/>.
+    /// </summary>
+    /// <param name="text">The value as parsed.</param>
+    /// <returns>The value's bytes.</returns>
+    internal byte[] TypedTextAsUtf8Bytes(string text) =>
+        ReadingConfigFile || ApplyingExpandedValue ? CommandLineTextBytes(text) : InvalidUtf8ByteEscape.Encoding.GetBytes(text);
 
     /// <summary>
     /// Appends <paramref name="data"/> to <see cref="PostData"/>, after a single <c>&amp;</c> when
     /// <see cref="PostData"/> already holds at least one byte, as curl 8.21.0 does.
     /// </summary>
     /// <param name="data">The bytes of one <c>-d</c> / <c>--data</c> piece, possibly empty.</param>
-    internal void AppendPostData(byte[] data)
-    {
-        byte[] separator = PostData is { Length: > 0 } ? [(byte)'&'] : [];
-        PostData = PostData is { } body ? [.. body.Span, .. separator, .. data] : data;
-    }
+    internal void AppendPostData(byte[] data) => AppendPostData(data, data);
+
+    /// <summary>As <see cref="AppendPostData(byte[])"/>, with the piece's own bytes for <see cref="PostDataWithTypedTextAsUtf8"/>.</summary>
+    /// <param name="data">The piece's bytes in <see cref="PostData"/>.</param>
+    /// <param name="utf8Data">The piece's bytes in <see cref="PostDataWithTypedTextAsUtf8"/>.</param>
+    internal void AppendPostData(byte[] data, byte[] utf8Data) =>
+        AppendToBody(PostData is { Length: > 0 } ? "&"u8 : [], data, utf8Data);
 
     /// <summary>
     /// Appends <paramref name="data"/> to <see cref="PostData"/> with no separator and sets
     /// <see cref="SendsJson"/>, as curl 8.21.0 does for <c>--json</c>.
     /// </summary>
     /// <param name="data">The bytes of one <c>--json</c> value, possibly empty.</param>
-    internal void AppendJsonData(byte[] data)
+    /// <param name="utf8Data">The value's bytes in <see cref="PostDataWithTypedTextAsUtf8"/>.</param>
+    internal void AppendJsonData(byte[] data, byte[] utf8Data)
     {
-        PostData = PostData is { } body ? [.. body.Span, .. data] : data;
+        AppendToBody([], data, utf8Data);
         SendsJson = true;
     }
+
+    private void AppendToBody(ReadOnlySpan<byte> separator, byte[] data, byte[] utf8Data)
+    {
+        if (postDataSpelledInUtf8 is not null || !data.AsSpan().SequenceEqual(utf8Data))
+        {
+            postDataSpelledInUtf8 = Joined(PostDataWithTypedTextAsUtf8, separator, utf8Data);
+        }
+
+        PostData = Joined(PostData, separator, data);
+    }
+
+    private static byte[] Joined(ReadOnlyMemory<byte>? body, ReadOnlySpan<byte> separator, byte[] data) =>
+        [.. body.GetValueOrDefault().Span, .. separator, .. data];
 
     /// <summary>
     /// Appends <paramref name="query"/> to <see cref="UrlQuery"/>, after a <c>&amp;</c> when
