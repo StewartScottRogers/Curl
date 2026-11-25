@@ -49,7 +49,7 @@ The finding, verbatim:
 - Fix (ADR-1347): a failed read exits 56 when a reply failed to send, or replies went and no data was written yet; otherwise exit 0 as before. curl 55 for a failed upload was already matched.
 - Acceptance loop after the fix, 3 x 8 runs with a PowerShell mock: only `56/7` and `0/18`; never `0/0`.
 - Measure-CodeQuality for the Telnet library: 0 failing members. Full solution build clean, fast tests green. No command-line option changed, so `--ai-help` is untouched.
-- Linux and macOS behaviour is filed as BL-5903; the new tests are platform-neutral.
+- Linux and macOS behaviour is filed as BL-5918; the new tests are platform-neutral.
 
 ## Log
 

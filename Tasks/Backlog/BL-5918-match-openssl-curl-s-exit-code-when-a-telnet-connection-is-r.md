@@ -1,5 +1,5 @@
 ---
-id: BL-5903
+id: BL-5918
 title: Match OpenSSL curl's exit code when a TELNET connection is reset on Linux and macOS
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5903 — Match OpenSSL curl's exit code when a TELNET connection is reset on Linux and macOS
+# BL-5918 — Match OpenSSL curl's exit code when a TELNET connection is reset on Linux and macOS
 
 ## Goal
 
