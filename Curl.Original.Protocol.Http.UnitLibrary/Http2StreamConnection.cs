@@ -312,6 +312,32 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         isRequestEnded ? ValueTask.CompletedTask : ResetAsClosedAsync(cancellationToken);
 
     /// <summary>
+    /// Resets a failed transfer's stream with STREAM_CLOSED when its response has ended and its
+    /// request has not, as curl does when <c>-f</c> fails the status that ended the stream during
+    /// the wait for <c>100 Continue</c> (measured, BL-5975 Notes); nothing otherwise, as
+    /// <see cref="Http2Session.ShutDownAsync" /> resets a stream whose response is unfinished. A
+    /// connection that fails the write leaves the transfer's own failure to be reported.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when any reset is written.</returns>
+    internal async ValueTask ResetUnendedRequestOfEndedResponseAsync(CancellationToken cancellationToken)
+    {
+        if (!isResponseEnded)
+        {
+            return;
+        }
+
+        try
+        {
+            await ResetUnendedRequestAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The transport is already gone; there is no stream left to reset.
+        }
+    }
+
+    /// <summary>
     /// Lets the request's remaining DATA go out although the response has ended, as curl sends a
     /// body it held for <c>100 Continue</c> (measured, BL-5972 Notes).
     /// </summary>

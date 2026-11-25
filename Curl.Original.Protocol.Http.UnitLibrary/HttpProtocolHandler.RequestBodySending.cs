@@ -221,6 +221,14 @@ public sealed partial class HttpProtocolHandler
     private static ValueTask ResetStoppedStreamUploadAsync(HttpContinueWaitConnection waiting, CancellationToken cancellationToken) =>
         waiting is { StoppedStreamUpload: true, Http2Stream: { } stopped } ? stopped.ResetUnendedRequestAsync(cancellationToken) : ValueTask.CompletedTask;
 
+    /// <summary>
+    /// Resets a failed exchange's HTTP/2 stream whose response ended it with the upload unsent
+    /// (<see cref="Http2StreamConnection.ResetUnendedRequestOfEndedResponseAsync" />); nothing on
+    /// any other connection.
+    /// </summary>
+    private static ValueTask ResetFailedStreamUploadAsync(IHttpStreamConnection? requestStream, CancellationToken cancellationToken) =>
+        requestStream is Http2StreamConnection stream ? stream.ResetUnendedRequestOfEndedResponseAsync(cancellationToken) : ValueTask.CompletedTask;
+
     /// <summary>Sends or gives up a body still held once the response is read.</summary>
     private static async ValueTask SettleHeldBodyAfterResponseAsync(HttpRequestPlan plan, HttpResponseHead head, HttpContinueWaitConnection waiting, CancellationToken cancellationToken)
     {

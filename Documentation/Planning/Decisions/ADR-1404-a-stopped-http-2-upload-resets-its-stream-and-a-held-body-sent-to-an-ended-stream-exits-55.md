@@ -25,8 +25,10 @@ connection for want of a length, so a held body on a stream is sent whatever the
 head says about its length (Curl had given it up when the head had no `content-length`).
 
 A body being sent when the response ends the stream, with no wait holding it, still stops
-there (unmeasured). `-f` on a status that ended the stream during the wait still sends no
-RST_STREAM, where curl does (measured, filed as a task of its own).
+there (unmeasured). `-f` on a status that ended the stream during the wait resets the stream
+with STREAM_CLOSED, as curl does (measured, BL-5975): a failed exchange resets its stream when
+the response has ended and the request has not, at once rather than at the closing GOAWAY, so
+the reset goes out before any later stream's HEADERS.
 
 ## Consequences
 

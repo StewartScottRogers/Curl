@@ -13,7 +13,8 @@ namespace Curl.Original.Protocol.Http;
 /// with 8.18.0, <c>--http2-prior-knowledge -v -H "Expect: 100-continue" -d x=1</c>): a 100 sends
 /// it at once, a 200 lets the wait run out and then sends it, and a 500 or a followed redirect
 /// leaves it unsent. A stopped upload resets its stream with STREAM_CLOSED, and a 200 that ends
-/// the stream before the held body goes out fails the send with exit 55 (BL-5972). The clock is
+/// the stream before the held body goes out fails the send with exit 55 (BL-5972). <c>-f</c> on
+/// a status that ended the stream with the body unsent resets it too (BL-5975). The clock is
 /// a fake one, advanced only for a 200.
 /// </summary>
 [TestClass]
@@ -137,6 +138,31 @@ public sealed class Http2ContinueWaitStatusTests
         AssertInOrder(events.Events, "< HTTP/2 200 \r\n", "< \r\n", "* Done waiting for 100-continue", "* stream 1 closed", "* Connection #0 to host h:80 left intact");
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_FailOnAStatusThatEndsTheStreamBeforeTheHeldBody_ResetsItWithStreamClosedOnce()
+    {
+        ScriptedConnection connection = new(Response(Headers("500", endsStream: true)), 65536);
+
+        TransferResult result = await StartAsync(connection, new RecordingTransferEvents(), new FakeTimeProvider(DateTimeOffset.UnixEpoch), fail: HttpFailMode.Fail);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(0, await BodyBytesSentAsync(connection.Written));
+        CollectionAssert.AreEqual(new[] { "1:5" }, await ResetsSentAsync(connection.Written));
+        Http2FrameType[] closing = [.. (await FramesSentAsync(connection.Written)).Select(frame => frame.Type).TakeLast(2)];
+        CollectionAssert.AreEqual(new[] { Http2FrameType.RstStream, Http2FrameType.GoAway }, closing);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TheResetOfAFailedUploadCannotBeWritten_StillFailsWith22()
+    {
+        FailsTheResetConnection connection = new(new ScriptedConnection(Response(Headers("500", endsStream: true)), 65536));
+
+        TransferResult result = await StartAsync(connection, new RecordingTransferEvents(), new FakeTimeProvider(DateTimeOffset.UnixEpoch), fail: HttpFailMode.Fail);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode, result.ErrorMessage);
+        Assert.IsTrue(connection.RefusedTheReset);
+    }
+
     private static async Task<List<Http2Frame>> FramesSentAsync(byte[] written)
     {
         const int PrefaceLength = 24;
@@ -207,7 +233,8 @@ public sealed class Http2ContinueWaitStatusTests
         IConnection connection,
         RecordingTransferEvents events,
         FakeTimeProvider time,
-        bool followsRedirects = false)
+        bool followsRedirects = false,
+        HttpFailMode fail = HttpFailMode.None)
     {
         TransferContext context = new()
         {
@@ -219,6 +246,7 @@ public sealed class Http2ContinueWaitStatusTests
             {
                 Version = HttpVersionPreference.Http2PriorKnowledge,
                 FollowRedirects = followsRedirects,
+                Fail = fail,
                 Headers = ["Expect: 100-continue"],
                 Body = new BytesBody("x=1"u8.ToArray(), "application/x-www-form-urlencoded"),
             },
@@ -230,6 +258,33 @@ public sealed class Http2ContinueWaitStatusTests
 
     private static async Task<int> BodyBytesSentAsync(byte[] written) =>
         (await FramesSentAsync(written)).Where(frame => frame.Type == Http2FrameType.Data).Sum(frame => frame.Payload.Length);
+
+    /// <summary><paramref name="inner" />, except that it fails the write of an RST_STREAM frame.</summary>
+    private sealed class FailsTheResetConnection(IConnection inner) : IConnection
+    {
+        public bool IsSecure => inner.IsSecure;
+
+        public EndPoint? RemoteEndPoint => inner.RemoteEndPoint;
+
+        public bool RefusedTheReset { get; private set; }
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) => inner.ReadAsync(buffer, cancellationToken);
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        {
+            if (buffer.Length == 13 && buffer.Span[3] == (byte)Http2FrameType.RstStream)
+            {
+                RefusedTheReset = true;
+                throw new IOException("The connection is gone.");
+            }
+
+            return inner.WriteAsync(buffer, cancellationToken);
+        }
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
 
     /// <summary>
     /// A server that answers at once with <paramref name="head" /> and sends
