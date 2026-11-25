@@ -41,3 +41,4 @@ What decides: curl 8.21.0 manual (`--ssl`, `--ssl-reqd`, exit codes 1, 60 and 64
 ## Log
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 27.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: a9e74800 545cbb75 3d836d5e.
