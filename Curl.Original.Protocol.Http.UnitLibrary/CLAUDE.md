@@ -6,6 +6,11 @@ HTTP/1.0, HTTP/1.1, HTTP/2 and HTTP/3. Also serves ipfs and ipns, which curl rew
 
 **URL schemes:** `http`, `https`, `ipfs`, `ipns`
 
+`HttpProtocolHandler` is one partial class with one concern per file (ADR-1391):
+`HttpProtocolHandler.cs` holds the constructor, the properties and `ExecuteAsync`, and
+`HttpProtocolHandler.<Concern>.cs` everything else, each file saying above the class what it
+holds. Put a new member in the file whose concern it is, or in a new one.
+
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and, of the
 hand-built libraries ADR-0120 lets a protocol use, `Curl.Http2.UnitLibrary` (HPACK and
 the HTTP/2 frame layer) and `Curl.Http3.UnitLibrary` (QPACK and the HTTP/3 frame layer,
