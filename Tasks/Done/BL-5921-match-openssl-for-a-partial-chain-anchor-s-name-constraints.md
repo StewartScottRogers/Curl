@@ -44,7 +44,7 @@ and `ListCommonNames` skips a CN in a multi-valued relative name in both builds,
   re-measured, per the lane rule of one quality run.
 - Tests ran on Windows only (a Linux container run did not finish in its 15 minutes); the chain-status
   tests carry the same macOS exclusion as their neighbours.
-- Follow-up: BL-5935 (subject emailAddress in a multi-valued relative name).
+- Follow-up: BL-5940 (subject emailAddress in a multi-valued relative name).
 
 ## Log
 

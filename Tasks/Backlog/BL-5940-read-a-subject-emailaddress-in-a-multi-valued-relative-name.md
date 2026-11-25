@@ -1,5 +1,5 @@
 ---
-id: BL-5935
+id: BL-5940
 title: Read a subject emailAddress in a multi-valued relative name against name constraints in the OpenSSL build
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5935 — Read a subject emailAddress in a multi-valued relative name against name constraints in the OpenSSL build
+# BL-5940 — Read a subject emailAddress in a multi-valued relative name against name constraints in the OpenSSL build
 
 ## Goal
 
