@@ -56,6 +56,9 @@ internal static class OpenSslVerifyResult
     /// <summary><c>X509_V_ERR_EXCLUDED_VIOLATION</c>.</summary>
     internal const long ExcludedSubtreeViolation = 48;
 
+    /// <summary><c>X509_V_ERR_UNSUPPORTED_NAME_SYNTAX</c>.</summary>
+    internal const long UnsupportedNameSyntax = 53;
+
     /// <summary><c>X509_V_ERR_INVALID_CA</c>.</summary>
     internal const long InvalidCaCertificate = 79;
 
@@ -110,7 +113,8 @@ internal static class OpenSslVerifyResult
     /// <summary>
     /// A chain's combined status as OpenSSL's build sees it: .NET stops a chain at a name-constrained
     /// intermediate the trust store lists (OpenSSL's partial-chain anchor) as partial and never checks
-    /// the constraints, so a broken constraint replaces the partial-chain flag (47 or 48, STD-101).
+    /// the constraints, so a broken constraint replaces the partial-chain flag (47 or 48, STD-101;
+    /// 53 for a CN holding a NUL, BL-5921).
     /// </summary>
     /// <param name="chain">The chain built for the server certificate.</param>
     /// <returns>Every status flag of the chain, combined.</returns>
@@ -128,13 +132,12 @@ internal static class OpenSslVerifyResult
             return status;
         }
 
-        return CertificateNameConstraints.FindViolation(chain) switch
-        {
-            CertificateNameConstraints.NotPermitted => (status & ~X509ChainStatusFlags.PartialChain) | X509ChainStatusFlags.HasNotPermittedNameConstraint,
-            CertificateNameConstraints.Excluded => (status & ~X509ChainStatusFlags.PartialChain) | X509ChainStatusFlags.HasExcludedNameConstraint,
-            _ => status,
-        };
+        return WithNameConstraintViolation(status, CertificateNameConstraints.FindViolation(chain));
     }
+
+    // A violation's value is its X509ChainStatusFlags value: both are Windows' CERT_TRUST_ error bits.
+    private static X509ChainStatusFlags WithNameConstraintViolation(X509ChainStatusFlags status, int violation) =>
+        violation == 0 ? status : (status & ~X509ChainStatusFlags.PartialChain) | (X509ChainStatusFlags)violation;
 
     private static bool ListsAChainCertificate(X509Chain chain) =>
         chain.ChainElements.Cast<X509ChainElement>().Any(element =>
@@ -179,9 +182,12 @@ internal static class OpenSslVerifyResult
     /// Returns the code for what OpenSSL finds wrong with a chain it could build to a trusted
     /// root, before it checks validity dates: its <c>check_chain_extensions</c> finds an issuer
     /// that may not act as a CA (79) or whose path length is exceeded (25), then
-    /// <c>check_name_constraints</c> a name outside a permitted subtree (47), and last
+    /// <c>check_name_constraints</c> a name outside a permitted subtree (47), inside an excluded one
+    /// (48) or of a syntax it cannot check (53), and last
     /// <c>internal_verify</c> a signature that does not verify (7) before it checks dates
-    /// (BL-5104). .NET reports both 79 and 25 as <see cref="X509ChainStatusFlags.InvalidBasicConstraints" />.
+    /// (BL-5104). .NET reports both 79 and 25 as <see cref="X509ChainStatusFlags.InvalidBasicConstraints" />,
+    /// and 53 as <see cref="X509ChainStatusFlags.HasNotSupportedNameConstraint" />, which it also sets for
+    /// OpenSSL's other unsupported-constraint errors; 53 is answered for all of them (ADR-1376).
     /// </summary>
     /// <param name="status">Every status flag of the chain, combined.</param>
     /// <param name="pathLengthExceeded">Whether a CA in the chain has its path length exceeded.</param>
@@ -193,6 +199,12 @@ internal static class OpenSslVerifyResult
             return pathLengthExceeded ? PathLengthExceeded : InvalidCaCertificate;
         }
 
+        return OfNameConstraints(status)
+            ?? ((status & X509ChainStatusFlags.NotSignatureValid) != 0 ? CertificateSignatureFailure : null);
+    }
+
+    private static long? OfNameConstraints(X509ChainStatusFlags status)
+    {
         if ((status & X509ChainStatusFlags.HasNotPermittedNameConstraint) != 0)
         {
             return PermittedSubtreeViolation;
@@ -203,7 +215,7 @@ internal static class OpenSslVerifyResult
             return ExcludedSubtreeViolation;
         }
 
-        return (status & X509ChainStatusFlags.NotSignatureValid) != 0 ? CertificateSignatureFailure : null;
+        return (status & X509ChainStatusFlags.HasNotSupportedNameConstraint) != 0 ? UnsupportedNameSyntax : null;
     }
 
     /// <summary>

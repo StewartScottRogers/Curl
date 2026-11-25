@@ -505,9 +505,183 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     [TestMethod]
     [DataRow("www.other.org")]
     [DataRow("a_b-1.other.org")]
-    [DataRow("www\0.example.com")]
-    public void FindViolation_OpenSslBuildHostNameCnOrOneHoldingANul_IsNotPermitted(string commonName) =>
+    public void FindViolation_OpenSslBuildHostNameCnOutsideThePermittedSubtree_IsNotPermitted(string commonName) =>
         Assert.AreEqual(CertificateNameConstraints.NotPermitted, FindViolationOfCommonName(commonName, Constraints(permitted: "example.com")));
+
+    [TestMethod]
+    [DataRow("www\0.example.com")]
+    [DataRow("a\0b")]
+    public void FindViolation_OpenSslBuildCnHoldingAnInnerNul_IsUnsupportedNameSyntax(string commonName) =>
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedNameSyntax, FindViolationOfCommonName(commonName, Constraints(permitted: "example.com")));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildCnHoldingANulUnderADirectoryNameConstraintOnly_IsUnsupportedNameSyntax() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.UnsupportedNameSyntax,
+            FindViolationOfCommonName("a\0b", Constraints(excludedName: DirectoryName("O=Nobody"))));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildCnHoldingANulBesideAnExcludedEmail_ReportsTheOtherNameFirst() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(
+                Subject([(CommonName, "a\0b")]), Constraints(excludedName: GeneralName(1, "other.org")), alternativeNames: AlternativeNames(GeneralName(1, "evil@other.org"))));
+
+    // curl 8.18.0's OpenSSL build (BL-5921): the CNs are checked in order, multi-valued relative names included.
+    [TestMethod]
+    [DataRow("www.example.com", "a\0b", CertificateNameConstraints.Excluded)]
+    [DataRow("a\0b", "www.example.com", CertificateNameConstraints.UnsupportedNameSyntax)]
+    [DataRow("a.safe.org", "a\0b", CertificateNameConstraints.UnsupportedNameSyntax)]
+    public void FindViolation_OpenSslBuildTwoCns_StopsAtTheFirstRefused(string first, string second, int expected) =>
+        Assert.AreEqual(expected, FindViolationOfSubject(Subject([(CommonName, first)], [(CommonName, second)]), Constraints(excluded: "example.com")));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildDottedCnInAMultiValuedRelativeNameInsideTheExcludedSubtree_IsExcluded() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(Subject([(CommonName, "www.example.com"), (OrganizationalUnit, "Unit")]), Constraints(excluded: "example.com")));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildDottedCnInAMultiValuedRelativeNameOutsideThePermittedSubtree_IsNotPermitted() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.NotPermitted,
+            FindViolationOfSubject(Subject([(CommonName, "www.example.com"), (OrganizationalUnit, "Unit")]), Constraints(permitted: "other.org")));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildCnHoldingAnInnerNulBeforeTheHostCn_IsUnsupportedNameSyntax()
+    {
+        var failure = Verify(
+            Constraints(permitted: "example.com"), "www.example.com", true, withNames: false, matchesSchannelBuild: false,
+            subjectName: Subject([(CommonName, "a\0b")], [(CommonName, "www.example.com")]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: unsupported or invalid name syntax (53)", failure?.Message);
+    }
+
+    // ossl_verifyhost runs before the verify result is read, so a NUL in the matched CN is reported first.
+    [TestMethod]
+    [DataRow("www\0.example.com")]
+    [DataRow("www.example.com\0")]
+    public void VerifyPeer_OpenSslBuildOnlyCnHoldingANul_IsAnIllegalCertNameField(string commonName)
+    {
+        var failure = Verify(
+            Constraints(permitted: "example.com"), "www.example.com", true, withNames: false, matchesSchannelBuild: false,
+            subjectName: Subject([(CommonName, commonName)]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL: illegal cert name field", failure?.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildDottedCnInAMultiValuedRelativeNameInsideTheExcludedSubtree_IsExcludedSubtreeViolation()
+    {
+        var failure = Verify(
+            Constraints(excluded: "example.com"), "www.example.com", true, withNames: false, matchesSchannelBuild: false,
+            subjectName: Subject([(CommonName, "www.example.com"), (OrganizationalUnit, "Unit")]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    [TestMethod]
+    public void MatchedCommonNameHoldsANul_NulInAnEarlierCnOnly_IsFalse()
+    {
+        using var certificate = CreateSelfSigned(Subject([(CommonName, "a\0b")], [(CommonName, "www.example.com")]), null);
+
+        Assert.IsFalse(OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(certificate));
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void MatchedCommonNameHoldsANul_DnsOrIpAlternativeName_IsFalse(bool ipAddress)
+    {
+        var names = new SubjectAlternativeNameBuilder();
+        if (ipAddress)
+        {
+            names.AddIpAddress(System.Net.IPAddress.Loopback);
+        }
+        else
+        {
+            names.AddDnsName(Host);
+        }
+
+        using var certificate = CreateSelfSigned(Subject([(CommonName, "a\0b")]), names.Build());
+
+        Assert.IsFalse(OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(certificate));
+    }
+
+    [TestMethod]
+    public void MatchedCommonNameHoldsANul_NoCn_IsFalse()
+    {
+        using var certificate = CreateSelfSigned(Subject([(OrganizationalUnit, "Unit")]), null);
+
+        Assert.IsFalse(OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(certificate));
+    }
+
+    [TestMethod]
+    [DataRow(UniversalTagNumber.UTF8String)]
+    [DataRow(UniversalTagNumber.BMPString)]
+    public void DecodeCharacterString_CharacterString_IsItsText(UniversalTagNumber stringType)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        writer.WriteCharacterString(stringType, "a.org");
+
+        CollectionAssert.AreEqual(new[] { "a.org" }, CertificateNameConstraints.DecodeCharacterString(writer.Encode()));
+    }
+
+    [TestMethod]
+    public void DecodeCharacterString_UniversalString_IsItsText() =>
+        CollectionAssert.AreEqual(new[] { "a" }, CertificateNameConstraints.DecodeCharacterString([0x1C, 0x04, 0, 0, 0, 0x61]));
+
+    [TestMethod]
+    [DataRow(new byte[] { 0x04, 0x01, 0x61 })]
+    [DataRow(new byte[] { 0x8C, 0x01, 0x61 })]
+    public void DecodeCharacterString_AnotherType_IsNothing(byte[] encoded) =>
+        Assert.IsEmpty(CertificateNameConstraints.DecodeCharacterString(encoded));
+
+    private const string CommonName = "2.5.4.3";
+
+    private const string OrganizationalUnit = "2.5.4.11";
+
+    // A subject of UTF8String attributes, each array one relative name.
+    private static X500DistinguishedName Subject(params (string Type, string Value)[][] relativeNames)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            foreach (var relativeName in relativeNames)
+            {
+                using (writer.PushSetOf())
+                {
+                    foreach (var (type, value) in relativeName)
+                    {
+                        using (writer.PushSequence())
+                        {
+                            writer.WriteObjectIdentifier(type);
+                            writer.WriteCharacterString(UniversalTagNumber.UTF8String, value);
+                        }
+                    }
+                }
+            }
+        }
+
+        return new X500DistinguishedName(writer.Encode());
+    }
+
+    private static X509Certificate2 CreateSelfSigned(X500DistinguishedName subject, X509Extension? alternativeNames)
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        if (alternativeNames is not null)
+        {
+            request.CertificateExtensions.Add(alternativeNames);
+        }
+
+        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(10));
+    }
 
     [TestMethod]
     public void FindViolation_SchannelBuildDotlessCnInsideTheExcludedSubtree_IsExcluded() =>
@@ -580,9 +754,14 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     {
         var subject = new X500DistinguishedNameBuilder();
         subject.AddCommonName(commonName);
+        return FindViolationOfSubject(subject.Build(), constraints, matchesSchannelBuild);
+    }
+
+    private static int FindViolationOfSubject(X500DistinguishedName subject, byte[] constraints, bool matchesSchannelBuild = false, byte[]? alternativeNames = null)
+    {
         using var root = CreateAuthority("CN=Common Name Root", null, null);
         using var intermediate = CreateAuthority("CN=Common Name Intermediate", root, constraints);
-        using var leaf = CreateLeaf(intermediate, Host, false, false, false, subjectName: subject.Build());
+        using var leaf = CreateLeaf(intermediate, Host, false, false, false, alternativeNames: alternativeNames, subjectName: subject);
         using var chain = new X509Chain();
         chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
         chain.ChainPolicy.CustomTrustStore.Add(root);
