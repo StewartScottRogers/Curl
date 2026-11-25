@@ -265,12 +265,14 @@ public sealed partial class HttpProtocolHandler
         /// <summary>
         /// Makes the same request without the NTLM Type 1 <c>Authorization</c> value it carries,
         /// with the body a probe held back for it, for a connection NTLM already authenticated
-        /// (BL-3003); this plan itself when its value is no Type 1.
+        /// (BL-3003); this plan itself when its value is no Type 1. The request counts as sent after
+        /// the Type 3 (<see cref="NtlmType3WentOut" />), so it still writes <c>Server auth using
+        /// NTLM</c> and a bare <c>NTLM</c> challenge to it restarts the handshake (BL-5945).
         /// </summary>
         /// <returns>The request's plan on the authenticated connection.</returns>
         public HttpRequestPlan WithoutNtlmType1Probe() =>
             IsNtlmType1(Authorization)
-                ? With(ProbedFraming ?? Framing, authorization: null, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, endsProbe: true)
+                ? With(ProbedFraming ?? Framing, authorization: null, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, endsProbe: true, onNtlmAuthenticatedConnection: true)
                 : this;
 
         private static string? WithoutNtlmType1(string? value) => IsNtlmType1(value) ? null : value;
@@ -474,7 +476,8 @@ public sealed partial class HttpProtocolHandler
             IReadOnlyList<string>? authorizationInfoLines = null,
             HttpTransferException? authorizationFailure = null,
             bool endsProbe = false,
-            HttpRequestFraming? nextProbedFraming = null) =>
+            HttpRequestFraming? nextProbedFraming = null,
+            bool onNtlmAuthenticatedConnection = false) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 ProbedFraming = endsProbe ? nextProbedFraming : ProbedFraming,
@@ -490,7 +493,7 @@ public sealed partial class HttpProtocolHandler
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,
                 AuthorizationInfoLines = authorizationInfoLines ?? AuthorizationInfoLines,
-                NtlmType3WentOut = SendsNothingAfterNtlmType3(NtlmType3WentOut, Authorization, authorization),
+                NtlmType3WentOut = onNtlmAuthenticatedConnection || SendsNothingAfterNtlmType3(NtlmType3WentOut, Authorization, authorization),
                 ProxyNtlmType3WentOut = SendsNothingAfterNtlmType3(ProxyNtlmType3WentOut, ProxyAuthorization, proxyAuthorization),
                 AuthorizationFailure = authorizationFailure ?? AuthorizationFailure,
                 StreamRefusedRetries = StreamRefusedRetries,
