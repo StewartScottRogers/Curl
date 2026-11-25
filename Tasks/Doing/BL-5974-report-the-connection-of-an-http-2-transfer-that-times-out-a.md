@@ -30,3 +30,4 @@ Found by BL-5970. curl 8.18.0 nghttp2 build over `--http2-prior-knowledge -m 3` 
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 8f351810 3d836d5e.
