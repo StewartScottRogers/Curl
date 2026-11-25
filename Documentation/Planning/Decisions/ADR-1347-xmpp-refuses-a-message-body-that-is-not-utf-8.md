@@ -26,4 +26,4 @@ to have changed. A disco query sends no body, so its data is not checked.
 ## Consequence
 
 On Windows a typed `-d` argument arrives as bytes in the ANSI code page (ADR-0838), so typed non-ASCII text such as
-`-d café` is refused too; it was delivered with U+FFFD before. BL-5903 is filed to give the handler that text as UTF-8.
+`-d café` is refused too; it was delivered with U+FFFD before. BL-5915 is filed to give the handler that text as UTF-8.

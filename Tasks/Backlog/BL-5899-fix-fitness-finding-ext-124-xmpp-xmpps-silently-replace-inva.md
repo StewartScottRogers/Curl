@@ -4,7 +4,7 @@ title: Fix fitness finding EXT-124: xmpp / xmpps silently replace invalid UTF-8 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-5903]
+depends-on: [BL-5915]
 touches: [Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppRequests.cs, Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppClientMessages.cs, Curl.Extended.Protocol.Xmpp.UnitTests/XmppUploadTests.cs, Documentation/Conformance/Extended/Xmpp.md]
 requirement: none
 created: 2026-11-24
@@ -53,15 +53,15 @@ The finding, verbatim:
 - Measured with the built curl.exe on Windows (ACP 1252): the `-T` Latin-1 repro exits 43 with that message; `-d @file`
   holding UTF-8 `café` goes on to connect; typed `-d 'café'` also exits 43, because a typed argument is bytes in the ANSI
   code page (ADR-0838). So the first criterion's second half does not hold on Windows (it did not before either: the body
-  arrived with U+FFFD). It needs the command line, context and handler changed: BL-5903. Once BL-5903 is Done, run the
+  arrived with U+FFFD). It needs the command line, context and handler changed: BL-5915. Once BL-5915 is Done, run the
   first criterion's two commands and tick it. No Prosody was used: the refusal happens before any connection, so nothing
   can be stored.
 - `touches` widened to `XmppClientMessages.cs`, `XmppUploadTests.cs` and `Xmpp.md` (the message, the test and the
   document of this change); no other task in Doing named them.
-- Also filed BL-5904: CR and CR LF in a body look to be changed to LF by the stanza serialiser.
+- Also filed BL-5916: CR and CR LF in a body look to be changed to LF by the stanza serialiser.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 3cabc559 69116afe 3d836d5e.
-- 2026-11-24: Doing -> Backlog. Waits on BL-5903: typed -d café on Windows reaches xmpp as ANSI bytes; the invalid-UTF-8 refusal is committed
+- 2026-11-24: Doing -> Backlog. Waits on BL-5915: typed -d café on Windows reaches xmpp as ANSI bytes; the invalid-UTF-8 refusal is committed

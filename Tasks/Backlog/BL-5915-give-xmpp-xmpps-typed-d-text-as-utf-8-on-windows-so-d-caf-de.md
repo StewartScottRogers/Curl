@@ -1,5 +1,5 @@
 ---
-id: BL-5903
+id: BL-5915
 title: Give xmpp / xmpps typed -d text as UTF-8 on Windows, so -d café delivers café
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5903 — Give xmpp / xmpps typed -d text as UTF-8 on Windows, so -d café delivers café
+# BL-5915 — Give xmpp / xmpps typed -d text as UTF-8 on Windows, so -d café delivers café
 
 ## Goal
 

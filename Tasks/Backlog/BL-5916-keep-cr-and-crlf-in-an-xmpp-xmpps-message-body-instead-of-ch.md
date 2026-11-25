@@ -1,5 +1,5 @@
 ---
-id: BL-5904
+id: BL-5916
 title: Keep CR and CRLF in an xmpp / xmpps message body instead of changing them to LF
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5904 — Keep CR and CRLF in an xmpp / xmpps message body instead of changing them to LF
+# BL-5916 — Keep CR and CRLF in an xmpp / xmpps message body instead of changing them to LF
 
 ## Goal
 
