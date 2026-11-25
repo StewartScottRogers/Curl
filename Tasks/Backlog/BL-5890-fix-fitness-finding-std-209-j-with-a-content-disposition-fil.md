@@ -4,8 +4,8 @@ title: Fix fitness finding STD-209: -J with a Content-Disposition filename of co
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Engine.UnitLibrary/EngineToolTransferOutputs.cs]
+depends-on: [BL-5915]
+touches: [Curl.Console/DeferredOutputFileStream.cs, Curl.Console.UnitTests/DeferredOutputFileStreamTests.cs]
 requirement: none
 created: 2026-11-24
 completed:
@@ -42,7 +42,36 @@ The finding, verbatim:
 
 ## Notes
 
+2026-11-24, lane 11 (measured and diagnosed; no code edited).
+
+- `touches` changed from `Curl.Engine.UnitLibrary/EngineToolTransferOutputs.cs` (the finding's guess; that
+  record holds no stream logic) to the two `Curl.Console` files where the fault is. Waiting on BL-5915, which
+  is in Doing and names the whole `Curl.Console.UnitTests`.
+- Reproduces on this branch: `-sS -OJ`, `-OJ`, and `-sS -OJ` with `-i` and an empty body exit 2 with
+  `curl: (2) Cannot access a closed file.`; `-sS -i -OJ` with a 5-byte body says `closed Stream`.
+- Real curl 8.22.0 Schannel (`Record-CurlExchange.ps1`, `filename="conin$"`,
+  `-w "[%{filename_effective} %{exitcode} %{size_download}]\n"`):
+  - 5-byte body, `-sS -OJ`, `-OJ` or `-sS -i -OJ`: exit 23, `[conin$ 23 5]`, stderr
+    `curl: curl: (23) Failed writing body` (the doubled `curl: ` is real, already
+    `CurlCommandRunner.OutputFileCloseFailureLine`; the finding's single prefix is wrong).
+  - Empty body: `-OJ` exits 0; `-i -OJ` exits 23, `[conin$ 23 0]`, the same close-failure line.
+  - 20000-byte body: exit 23, `[conin$ 23 0]`,
+    `curl: (23) Failure writing output to destination, passed 16384 returned 0`. Curl already does this but
+    for the number (20000, its own chunk size; out of scope).
+  - Plain `-o conin$`, 5-byte body: real curl also prints the close-failure line; Curl prints
+    `passed 5 returned 0` with exit 23 (`[conin$ 23 0]`). Same stream; check it after the fix.
+- Cause (`DeferredOutputFileStream`): with the file already open (`-J` opens it from the header line),
+  `WriteToOpenFile` buffers the write and `FlushIgnoringFailure` swallows the flush's `IOException`; .NET
+  has by then closed the invalid console handle, so the next `Write`, `Flush`/`FlushAsync` (`-N`) or
+  `TryFlushAsync` throws `ObjectDisposedException`, which nothing catches.
+- Fix to make: `TryFlushAsync` returns false for `ObjectDisposedException` too (gives the close-failure
+  line); `WriteToOpenFile` on a stream whose `CanWrite` is false accepts a write smaller than the 4096-byte
+  buffer (C stdio holds it and `fclose` reports the failure) and fails a larger one with `IOException`;
+  `Flush` and `FlushAsync` do nothing on such a stream. Unit test with a fake stream whose flush throws
+  `IOException` and closes itself (platform-neutral; no real `conin$`).
+
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: c6a727e1 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Backlog. Waiting on BL-5915 (in Doing), whose touches names Curl.Console.UnitTests, where this fix's unit test goes; cause found in Curl.Console/DeferredOutputFileStream.cs and real curl measured (see Notes)
