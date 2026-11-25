@@ -554,5 +554,5 @@ Once an `http` or `https` request has been sent and the transfer is neither an u
 A wait or poll answers `PollIn` for an engine socket number of another multi handle's transfer
 while that handle has a callback queued or the transfer's perform has finished and is not yet
 reported (`TransferSocketWait.IsReadableOn`), so `curl_multi_waitfds` sockets polled on a second
-handle wake it at once, as real descriptors do (upstream test2407, ADR-1388). Its tests are
+handle wake it at once, as real descriptors do (upstream test2407, ADR-1390). Its tests are
 `ManagedMultiTransferTests.SecondHandlePoll.cs`.

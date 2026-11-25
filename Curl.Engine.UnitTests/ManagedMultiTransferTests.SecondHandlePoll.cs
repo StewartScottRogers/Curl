@@ -8,7 +8,7 @@ namespace Curl.Engine;
 
 /// <summary>
 /// A second multi handle polling the sockets the first one's <c>curl_multi_waitfds</c> gave, as upstream's
-/// lib2405 does (upstream test2407, BL-5943, ADR-1388).
+/// lib2405 does (upstream test2407, BL-5943, ADR-1390).
 /// </summary>
 public sealed partial class ManagedMultiTransferTests
 {

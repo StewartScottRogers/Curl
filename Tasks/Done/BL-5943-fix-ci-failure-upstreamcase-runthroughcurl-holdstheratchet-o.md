@@ -32,7 +32,7 @@ Lanes test only on Windows, so reproduce with `gh run view 45585553449 --log-fai
 
 ## Notes
 
-- Cause (ADR-1388): not the commits between the last green run and this one (the next run, 45588569394, passed its Windows tests). `lib2405` polls the first multi handle's `curl_multi_waitfds` sockets on a second handle for 500 ms after each perform. In-memory connections have engine socket numbers, which another handle never found an event on, so every turn slept 500 ms. A queued callback runs only inside a perform (20 ms follow-up wait), so a loaded runner spent one turn per callback and passed the harness's 20 s twice. That load explanation is inferred from the code and the timings; it was not reproduced under load.
+- Cause (ADR-1390): not the commits between the last green run and this one (the next run, 45588569394, passed its Windows tests). `lib2405` polls the first multi handle's `curl_multi_waitfds` sockets on a second handle for 500 ms after each perform. In-memory connections have engine socket numbers, which another handle never found an event on, so every turn slept 500 ms. A queued callback runs only inside a perform (20 ms follow-up wait), so a loaded runner spent one turn per callback and passed the harness's 20 s twice. That load explanation is inferred from the code and the timings; it was not reproduced under load.
 - Fix: a second handle's wait or poll finds such a socket readable while its owner has a callback queued or an unreported finished perform. Case 2407 run alone: 2.8 s before, 0.8 s after.
 - The fix is in the engine, so `Curl.Engine` files were added to `touches`; no other task in Doing on `origin/work/dark-factory` names them (BL-5936 names only `MailRequestOptionsMapping.cs` there). No Conformance file changed.
 - Verified: `dotnet build` clean, all fast tests green on Windows, Measure-CodeQuality for `Curl.Engine.UnitLibrary` 0 failing members. CI on Linux and macOS cannot be seen from a lane: the change and its tests are platform-neutral (no sockets, paths or OS text); the shift's CI watch files a task for any failure.
@@ -41,4 +41,4 @@ Lanes test only on Windows, so reproduce with `gh run view 45585553449 --log-fai
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: bf51ea8b.
-- 2026-11-25: Doing -> Done. A second multi handle finds another's engine transfer socket readable when it has work, so test2407 no longer sleeps 500 ms a turn (ADR-1388).
+- 2026-11-25: Doing -> Done. A second multi handle finds another's engine transfer socket readable when it has work, so test2407 no longer sleeps 500 ms a turn (ADR-1390).

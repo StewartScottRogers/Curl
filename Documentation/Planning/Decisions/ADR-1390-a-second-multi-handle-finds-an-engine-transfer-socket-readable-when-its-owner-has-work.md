@@ -1,4 +1,4 @@
-# ADR-1388: A second multi handle finds an engine transfer socket readable when its owner has work (BL-5943)
+# ADR-1390: A second multi handle finds an engine transfer socket readable when its owner has work (BL-5943)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-0955 and ADR-0982.
 

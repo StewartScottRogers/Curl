@@ -129,7 +129,7 @@ internal sealed partial class ManagedMultiTransfer
     /// <summary>
     /// A transfer socket another multi handle's <c>curl_multi_waitfds</c> gave is readable while that handle
     /// has work for its transfer's next perform, as a real descriptor is once data has arrived, so an
-    /// application polling it here is woken at once rather than at its timeout (upstream test2407, ADR-1388).
+    /// application polling it here is woken at once rather than at its timeout (upstream test2407, ADR-1390).
     /// This handle's own transfers are counted by <see cref="CountReady" /> already.
     /// </summary>
     private CurlWaitEvents EngineSocketEvents(CurlSocket socket, CurlWaitEvents events) =>

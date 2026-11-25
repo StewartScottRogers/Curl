@@ -59,7 +59,7 @@ internal sealed partial class ManagedMultiTransfer
     /// entry's <see cref="MultiEntry.SocketWait" />, so its I/O waits for the application's poll (ADR-0821,
     /// ADR-0973); without one, a wait whose gating is stopped from the start, so perform and wait drive the transfer
     /// and the wait only records its socket for <see cref="GetWaitSockets" /> (ADR-0982). Either way the wait
-    /// tells another handle polling that socket when this one has work for it (ADR-1388).
+    /// tells another handle polling that socket when this one has work for it (ADR-1390).
     /// </summary>
     private TransferSocketWait SocketWaitFor(MultiEntry entry)
     {
