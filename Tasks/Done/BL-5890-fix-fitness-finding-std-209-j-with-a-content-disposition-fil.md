@@ -76,7 +76,7 @@ The finding, verbatim:
   4096 bytes succeeds and a larger one fails with `IOException` (`WriteToClosedFile`), `Flush` and
   `FlushAsync` do nothing, and `TryFlushAsync` returns false, so `CompleteAsync` gives the close-failure
   line. Chose a `CanWrite` check over catching `ObjectDisposedException`: no exception path, fewer
-  branches. ADR-1369 records it.
+  branches. ADR-1371 records it.
 - Unit tests `CompleteAsync_JNamedFileClosedByAFailedFlush_ReportsTheCloseFailure` and
   `WriteAsync_FileClosedByAFailedFlush_FailsAWriteTheStdioBufferCannotHold`, with a `MemoryStream` that
   closes itself on its first flush, reached through the `openUnderRawBytes` hook (platform-neutral).
@@ -91,4 +91,4 @@ The finding, verbatim:
 - 2026-11-24: Backlog -> Doing. Criteria at claim: c6a727e1 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waiting on BL-5915 (in Doing), whose touches names Curl.Console.UnitTests, where this fix's unit test goes; cause found in Curl.Console/DeferredOutputFileStream.cs and real curl measured (see Notes)
 - 2026-11-24: Backlog -> Doing. Criteria at claim: c6a727e1 69116afe 3d836d5e.
-- 2026-11-24: Doing -> Done. -OJ with a Content-Disposition name of conin$ exits 23 with curl's Failed writing body line and -w output; a file closed by a failed flush no longer throws ObjectDisposedException (ADR-1369).
+- 2026-11-24: Doing -> Done. -OJ with a Content-Disposition name of conin$ exits 23 with curl's Failed writing body line and -w output; a file closed by a failed flush no longer throws ObjectDisposedException (ADR-1371).

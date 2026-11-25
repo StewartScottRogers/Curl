@@ -1,4 +1,4 @@
-# ADR-1369: An output file closed by a failed flush fails at close, as curl's fclose does
+# ADR-1371: An output file closed by a failed flush fails at close, as curl's fclose does
 
 - Status: Accepted
 - Date: 2026-11-24
