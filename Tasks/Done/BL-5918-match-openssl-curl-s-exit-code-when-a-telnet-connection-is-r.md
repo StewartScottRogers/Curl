@@ -46,7 +46,7 @@ Each 56 also prints `* Recv failure: Connection reset by peer` before
 
 - Curl published self-contained for `linux-x64` (`-p:PublishAot=false`) and run against the same
   server gave the same exit codes, stdout and messages in all rows; the only difference is `(32)`
-  instead of `(104)` for the first reply in the last row, filed as BL-5935.
+  instead of `(104)` for the first reply in the last row, filed as BL-5939.
 - The recorder's reset options really sent a FIN then a RST, so Linux read an ordinary close and
   every case first measured as exit 0. `Record-CurlExchange.ps1` now closes the socket itself
   (`$client.Client.Close(0)`) at its three reset sites; added to `touches` (no task in Doing held it).

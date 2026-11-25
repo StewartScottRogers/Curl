@@ -1,5 +1,5 @@
 ---
-id: BL-5935
+id: BL-5939
 title: Report errno 104 for the first TELNET reply a reset connection refuses on Linux, as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5935 — Report errno 104 for the first TELNET reply a reset connection refuses on Linux, as curl does
+# BL-5939 — Report errno 104 for the first TELNET reply a reset connection refuses on Linux, as curl does
 
 ## Goal
 
