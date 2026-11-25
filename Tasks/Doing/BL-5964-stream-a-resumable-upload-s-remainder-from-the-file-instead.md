@@ -34,3 +34,4 @@ A resumable upload (`-T` through the ResumableUpload extension) sends each PATCH
 ## Log
 
 - 2026-11-25: Created by the shift-end review (ADR-0710).
+- 2026-11-25: Backlog -> Doing. Criteria at claim: d86cd4db fc85aa0d b5584880.
