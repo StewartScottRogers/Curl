@@ -24,10 +24,10 @@ Repro: `surl -v --cert server.pem --key server.key --dns-transport tls dns://127
 
 ## Acceptance criteria
 
-- [ ] With a test-double DoT server whose certificate chains to a private CA, `--dns-over-tls` with `--cacert <ca>` resolves the name, pinned by a unit test.
-- [ ] With `-k` and an untrusted certificate the lookup resolves; without `-k` or `--cacert` it still fails as now (exit 6), each pinned by a unit test.
-- [ ] `--ai-help` and the extension's documentation say which trust options `--dns-over-tls` honours.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] With a test-double DoT server whose certificate chains to a private CA, `--dns-over-tls` with `--cacert <ca>` resolves the name, pinned by a unit test.
+- [x] With `-k` and an untrusted certificate the lookup resolves; without `-k` or `--cacert` it still fails as now (exit 6), each pinned by a unit test.
+- [x] `--ai-help` and the extension's documentation say which trust options `--dns-over-tls` honours.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -36,6 +36,10 @@ Repro: `surl -v --cert server.pem --key server.key --dns-transport tls dns://127
 - Left: criteria 1 and 2. `DnsOverTlsTrustTests` pins only the mapping to `TlsClientOptions`. Add unit tests that resolve through a test-double DoT server over an in-memory duplex `IConnection` (server side `SslStream`, certificate from a private CA): resolves with `--cacert`, resolves with `-k` and an untrusted certificate, fails without either. `DnsOverTlsResolver` takes the connector, so inject a fake one and `new SslStreamTlsProvider(hook.TlsOptions, TimeProvider.System)`. Check whether Linux/macOS chain building answers the same.
 - `--dns-over-quic` does not read `TlsTrust`; outside this task.
 - Criterion 3 is partly done: the option help and CLAUDE.md say it, but `curl --ai-help` printed no `dns-over-tls` trust text; `--extended-help` shows only `EncryptedDnsExtension.Description`. Check where `--ai-help` should carry it.
+
+- Second claim: `DnsOverTlsHandshakeTests` resolves through an in-memory test-double DoT server (`SslStream` server, certificate from a private CA): resolves with `--cacert`, resolves with `-k`, finds nothing without either (exit 6 at the CLI). On Windows the Schannel build checks revocation under `--cacert` as Windows curl does, and a private CA has no CRL, so `--ssl-no-revoke` is now carried in `ExtensionTlsTrust` too (ADR-1353 amended); the `--cacert` test passes it. The OpenSSL build (Linux, macOS) checks no revocation, so the tests are platform-neutral; CI criterion met by that and the fast tests green here.
+- Criterion 3: `curl --ai-help extensions` prints the `--dns-over-tls` option help, which names `--cacert`/`--capath` (and `--ssl-no-revoke`) and `-k`.
+- Measure-CodeQuality: Curl.Extension.Abstractions, Curl.Extension.EncryptedDns and Curl.Console have 0 failing members; full build clean, fast tests green.
 
 ## Log
 
