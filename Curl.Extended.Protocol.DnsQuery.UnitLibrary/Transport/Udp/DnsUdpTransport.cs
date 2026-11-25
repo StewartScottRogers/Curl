@@ -82,7 +82,10 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         throw new DnsQueryException(CurlExitCode.OperationTimedOut, $"The DNS server sent no answer to {Attempts} queries over UDP");
     }
 
-    /// <summary>Sends the query once; a socket error (a refusal after a datagram was received, say) ends with exit 55.</summary>
+    /// <summary>
+    /// Sends the query once; a socket error (a refusal after a datagram was received, say) ends with exit 55 and
+    /// curl's <c>Send failure: </c> words.
+    /// </summary>
     private static async ValueTask SendQueryAsync(IDatagramChannel channel, byte[] query, ITransferContext context)
     {
         try
@@ -91,11 +94,14 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         }
         catch (SocketException exception) when (exception.GetType() == typeof(SocketException))
         {
-            throw new DnsQueryException(CurlExitCode.SendError, $"Failed sending the query over UDP: {exception.Message}");
+            throw new DnsQueryException(CurlExitCode.SendError, $"Send failure: {CurlSocketErrorText.Words(exception, OperatingSystem.IsWindows())}");
         }
     }
 
-    /// <summary>Waits one attempt's time for the answer, and gives <see langword="null" /> when none came.</summary>
+    /// <summary>
+    /// Waits one attempt's time for the answer, and gives <see langword="null" /> when none came; a socket error ends
+    /// with exit 56 and curl's <c>Recv failure: </c> words.
+    /// </summary>
     private static async ValueTask<byte[]?> ReceiveAnswerAsync(IDatagramChannel channel, byte[] query, ITransferContext context)
     {
         using var timeout = new CancellationTokenSource(AttemptTimeout, context.TimeProvider);
@@ -118,7 +124,7 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         }
         catch (SocketException exception) when (exception.GetType() == typeof(SocketException))
         {
-            throw new DnsQueryException(CurlExitCode.RecvError, $"Failed receiving the answer over UDP: {exception.Message}");
+            throw new DnsQueryException(CurlExitCode.RecvError, $"Recv failure: {CurlSocketErrorText.Words(exception, OperatingSystem.IsWindows())}");
         }
     }
 

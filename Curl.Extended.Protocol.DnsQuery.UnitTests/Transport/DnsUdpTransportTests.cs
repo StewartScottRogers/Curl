@@ -189,26 +189,53 @@ public sealed class DnsUdpTransportTests
         new() { Url = CurlUrl.Parse("dns://h/example.com"), Output = new MemoryStream(), TimeProvider = clock, CancellationToken = cancellationToken, Events = events ?? NoTransferEvents.Instance };
 
     [TestMethod]
-    public async Task ExchangeAsync_RefusalAfterAStrayDatagram_ThrowsExitRecvError()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExchangeAsync_RefusalAfterAStrayDatagramOnWindows_FailsWithExit56AndCurlsRecvFailure()
     {
-        var connector = new RefusingConnector(failSend: false, new SocketException((int)SocketError.ConnectionReset));
+        DnsQueryException failure = await SocketFailureOfAsync(failSend: false, new SocketException((int)SocketError.ConnectionReset));
 
-        DnsQueryException exception = await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
-            await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
-
-        Assert.AreEqual(CurlExitCode.RecvError, exception.ExitCode);
+        Assert.AreEqual(CurlExitCode.RecvError, failure.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", failure.Message);
     }
 
     [TestMethod]
-    public async Task ExchangeAsync_SendFailsWithASocketError_ThrowsExitSendError()
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExchangeAsync_RefusalAfterAStrayDatagramOffWindows_FailsWithExit56AndTheSocketErrorsWords()
     {
-        var connector = new RefusingConnector(failSend: true, new SocketException((int)SocketError.ConnectionReset));
+        var error = new SocketException((int)SocketError.ConnectionReset);
 
-        DnsQueryException exception = await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
-            await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
+        DnsQueryException failure = await SocketFailureOfAsync(failSend: false, error);
 
-        Assert.AreEqual(CurlExitCode.SendError, exception.ExitCode);
+        Assert.AreEqual(CurlExitCode.RecvError, failure.ExitCode);
+        Assert.AreEqual($"Recv failure: {error.Message}", failure.Message);
     }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExchangeAsync_SendFailsWithASocketErrorOnWindows_FailsWithExit55AndCurlsSendFailure()
+    {
+        DnsQueryException failure = await SocketFailureOfAsync(failSend: true, new SocketException((int)SocketError.ConnectionReset));
+
+        Assert.AreEqual(CurlExitCode.SendError, failure.ExitCode);
+        Assert.AreEqual("Send failure: Connection was reset", failure.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExchangeAsync_SendFailsWithASocketErrorOffWindows_FailsWithExit55AndTheSocketErrorsWords()
+    {
+        var error = new SocketException((int)SocketError.ConnectionReset);
+
+        DnsQueryException failure = await SocketFailureOfAsync(failSend: true, error);
+
+        Assert.AreEqual(CurlExitCode.SendError, failure.ExitCode);
+        Assert.AreEqual($"Send failure: {error.Message}", failure.Message);
+    }
+
+    private static Task<DnsQueryException> SocketFailureOfAsync(bool failSend, SocketException error) =>
+        Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
+            await new DnsUdpTransport(new RefusingConnector(failSend, error), new RecordingTransport())
+                .ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
 
     [TestMethod]
     public async Task ExchangeAsync_SendFailsWithAPortUnreachableError_EscapesUnchanged()
