@@ -454,9 +454,9 @@ public sealed class UpstreamCaseRunner(
         MemoryStream standardInput = new(StandardInput(testCase));
         UpstreamStandInContext standIns = new(testCase, certificateDirectory, server);
         FtpServerConnector ftp = new(testCase, new NoListenPortConnector(fronts.Wrap(UpstreamStandInStage.Sws, server, standIns)), serverClock);
-        SmtpServerConnector smtp = new(testCase, ftp);
-        ImapServerConnector imap = new(testCase, smtp);
-        Pop3ServerConnector pop3 = new(testCase, imap);
+        SmtpServerConnector smtp = new(testCase, ftp, serverClock);
+        ImapServerConnector imap = new(testCase, smtp, serverClock);
+        Pop3ServerConnector pop3 = new(testCase, imap, serverClock);
         SocksServerConnector socks = new(testCase, fronts.Wrap(UpstreamStandInStage.Pop3, pop3, standIns));
         MqttServerConnector mqtt = new(testCase, socks);
         RtspServerConnector rtsp = new(testCase, fronts.Wrap(UpstreamStandInStage.Mqtt, mqtt, standIns));

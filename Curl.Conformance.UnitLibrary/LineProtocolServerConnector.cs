@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -9,7 +10,9 @@ namespace Curl.Conformance;
 /// <c>tests/ftpserver.pl</c> (at <c>curl-8_21_0</c>): the greeting is sent on connect, the client's
 /// bytes are read as CRLF-terminated command lines however its writes split them, each line is
 /// answered by the connection's <see cref="ILineProtocolResponder"/>, and every byte the server
-/// reads is recorded for comparison with <c>&lt;verify&gt;&lt;protocol&gt;</c>. No socket is opened.
+/// reads is recorded for comparison with <c>&lt;verify&gt;&lt;protocol&gt;</c>. Under <c>SLOWDOWN</c> the
+/// client reads each connection's greeting and replies one byte at a time,
+/// <see cref="SlowReplyByteDelay"/> apart (BL-5924, BL-5937). No socket is opened.
 /// </summary>
 internal sealed class LineProtocolServerConnector : IConnector
 {
@@ -21,17 +24,24 @@ internal sealed class LineProtocolServerConnector : IConnector
 
     private readonly TimeProvider clock;
 
+    private readonly bool sendsRepliesSlowly;
+
     private int connectionsOpened;
 
     /// <summary>Creates a server that gives each connection a responder of its own.</summary>
     /// <param name="createResponder">Creates the responder for one new connection.</param>
-    /// <param name="clock">The clock a reply's <see cref="LineProtocolReply.Delay"/> is waited on; <see langword="null"/> for the system clock.</param>
-    public LineProtocolServerConnector(Func<ILineProtocolResponder> createResponder, TimeProvider? clock = null)
+    /// <param name="clock">The clock a reply's <see cref="LineProtocolReply.Delay"/> and the <c>SLOWDOWN</c> waits are on; <see langword="null"/> for the system clock.</param>
+    /// <param name="serverCommands">The case's <c>&lt;servercmd&gt;</c> body, read here only for a <c>SLOWDOWN</c> line; empty when there is none.</param>
+    public LineProtocolServerConnector(Func<ILineProtocolResponder> createResponder, TimeProvider? clock = null, ReadOnlyMemory<byte> serverCommands = default)
     {
         ArgumentNullException.ThrowIfNull(createResponder);
         this.createResponder = createResponder;
         this.clock = clock ?? TimeProvider.System;
+        sendsRepliesSlowly = HasSlowDownLine(serverCommands.Span);
     }
+
+    /// <summary>Gets how long ftpserver.pl's <c>SLOWDOWN</c> waits between the bytes of a reply: 10 ms.</summary>
+    internal static TimeSpan SlowReplyByteDelay { get; } = TimeSpan.FromMilliseconds(10);
 
     /// <summary>
     /// Gets the <c>&lt;server&gt;</c> names whose cases <see cref="UpstreamCaseScreening"/> lets run
@@ -56,10 +66,18 @@ internal sealed class LineProtocolServerConnector : IConnector
     /// <param name="target">Gives the remote end point's port and address family: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
-    public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(ConnectResult.Connected(new LineProtocolServerConnection(createResponder(), recording, clock)
+    public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        LineProtocolServerConnection connection = new(createResponder(), recording, clock)
         {
             LocalEndPoint = new IPEndPoint(LoopbackAddress.For(target.Host), FirstLocalPort + Interlocked.Increment(ref connectionsOpened) - 1),
             RemoteEndPoint = new IPEndPoint(LoopbackAddress.For(target.Host), target.Port),
-        }));
+        };
+        return ValueTask.FromResult(ConnectResult.Connected(
+            sendsRepliesSlowly ? new OneBytePerReadConnection(connection, SlowReplyByteDelay, clock) : connection));
+    }
+
+    // The word alone on its line, so that SLOWDOWNDATA, which paces only FTP's data, is not taken for it.
+    private static bool HasSlowDownLine(ReadOnlySpan<byte> serverCommands) =>
+        Encoding.Latin1.GetString(serverCommands).Split('\n').Any(line => line.Trim() == "SLOWDOWN");
 }

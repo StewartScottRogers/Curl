@@ -103,7 +103,7 @@ public sealed class FtpServerConnectorTests
 
         Assert.AreEqual("220 hi\r\n", greeting);
         Assert.AreEqual("530 no\r\n", reply);
-        Assert.AreEqual(16 * FtpServerConnector.SlowReplyByteDelay, clock.Now);
+        Assert.AreEqual(16 * LineProtocolServerConnector.SlowReplyByteDelay, clock.Now);
         Assert.AreEqual("USER a\r\n", Encoding.Latin1.GetString(connector.ReceivedBytes.Span));
         Assert.IsFalse(connection.IsSecure);
         Assert.AreEqual($"127.0.0.1:{FtpServerConnector.FtpPort}", connection.RemoteEndPoint!.ToString());
@@ -152,7 +152,7 @@ public sealed class FtpServerConnectorTests
         {
             Task<int> read = connection.ReadAsync(buffer, TestContext.CancellationToken).AsTask();
             Assert.IsFalse(read.IsCompleted);
-            clock.Advance(FtpServerConnector.SlowReplyByteDelay);
+            clock.Advance(LineProtocolServerConnector.SlowReplyByteDelay);
             Assert.AreEqual(1, await read);
             text.Append((char)buffer[0]);
         }
