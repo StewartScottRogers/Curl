@@ -339,19 +339,21 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// </summary>
     private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context, LdapBindKind bindKind)
     {
-        if (StartsTls(context) && await LdapStartTls.UpgradeAsync(exchange, connection, tlsProvider, context).ConfigureAwait(false) is { } startTlsFailure)
-        {
-            return startTlsFailure;
-        }
+        (TransferResult? startTlsFailure, int simpleBindVersion) = StartsTls(context)
+            ? await LdapStartTls.UpgradeAsync(exchange, connection, tlsProvider, context).ConfigureAwait(false)
+            : (null, LdapBind.LdapVersion3);
+        return startTlsFailure ?? await BindAsync(exchange, context, bindKind, simpleBindVersion).ConfigureAwait(false);
+    }
 
-        return bindKind switch
+    /// <summary>Binds as <paramref name="bindKind" /> says; a simple bind starts with <paramref name="simpleBindVersion" />.</summary>
+    private async ValueTask<TransferResult?> BindAsync(LdapExchange exchange, ITransferContext context, LdapBindKind bindKind, int simpleBindVersion) =>
+        bindKind switch
         {
             LdapBindKind.LogonUser => await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false),
-            LdapBindKind.Simple => await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false),
+            LdapBindKind.Simple => await BindWithCredentialsAsync(exchange, context, simpleBindVersion).ConfigureAwait(false),
             LdapBindKind.Sasl => await LdapOpenLdapSaslBind.BindAsync(exchange, SaslAuthenticator, context).ConfigureAwait(false),
             _ => await LdapAuthenticatedBind.BindAsync(bindKind, exchange, context.Credentials!, context.Url.IdnHost, context.Url.Scheme == TlsScheme, logonTokenSource, context.CancellationToken).ConfigureAwait(false),
         };
-    }
 
     /// <summary>
     /// How the transfer binds: on OpenLDAP SASL when <c>AUTH=</c> login options are given or the auth mask is not exactly Basic (as with --anyauth),
@@ -383,9 +385,9 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         credentials is null ? "anonymously" : $"with a simple bind as \"{credentials.UserName}\"";
 
     /// <summary>Binds with a simple bind: the transfer's credentials, or the anonymous bind without them.</summary>
-    private ValueTask<TransferResult?> BindWithCredentialsAsync(LdapExchange exchange, ITransferContext context)
+    private ValueTask<TransferResult?> BindWithCredentialsAsync(LdapExchange exchange, ITransferContext context, int openLdapVersion)
     {
         NetworkCredential credentials = context.Credentials ?? new NetworkCredential(string.Empty, string.Empty);
-        return LdapBind.BindAsync(dialect, exchange, credentials.UserName, credentials.Password, context.Url.Scheme == TlsScheme, context.CancellationToken);
+        return LdapBind.BindAsync(dialect, exchange, credentials.UserName, credentials.Password, context.Url.Scheme == TlsScheme, context.CancellationToken, openLdapVersion);
     }
 }
