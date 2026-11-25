@@ -67,7 +67,7 @@ A disco answer's output holds the same line ends on every platform, never the pl
 the server's XML (CR LF, CR or LF) is read as LF (XML 1.0, 2.11) and written as LF. A CR the server sent as a character
 reference (`&#xD;`) is written as `&#xD;`, as is an LF in an attribute value as `&#xA;`, so parsing the output gives back
 the characters the server's answer held. The output ends with one LF
-(ADR-1376; `XmppProtocolHandlerTests.ExecuteAsync_DiscoAnswerHoldingLineEnds_WritesLfAndEntitizedCrOnEveryPlatform` pins it).
+(ADR-1378; `XmppProtocolHandlerTests.ExecuteAsync_DiscoAnswerHoldingLineEnds_WritesLfAndEntitizedCrOnEveryPlatform` pins it).
 
 Text typed on the command line (`-d`, `--data-ascii`, `--data-raw`, `--data-binary`, `--json`) reaches an `xmpp` or
 `xmpps` transfer as UTF-8 on every platform, so `-d café` sends `<body>café</body>` on Windows too, though curl's own

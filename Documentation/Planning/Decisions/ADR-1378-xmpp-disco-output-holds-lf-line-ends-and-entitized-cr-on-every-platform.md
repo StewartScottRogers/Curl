@@ -1,4 +1,4 @@
-# ADR-1376: XMPP disco output holds LF line ends and entitized CR on every platform
+# ADR-1378: XMPP disco output holds LF line ends and entitized CR on every platform
 
 - Status: Accepted
 - Date: 2026-11-25

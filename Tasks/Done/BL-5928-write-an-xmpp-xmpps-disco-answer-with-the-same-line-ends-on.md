@@ -33,7 +33,7 @@ default for the stanzas sent. This is an extended protocol, so decide the line e
 ## Notes
 
 - A failing test showed it first: `DisableFormatting` wrote each LF in text as CR LF on Windows, and a `&#xD;` as a newline.
-- Serialised with the same `NewLineHandling.Entitize` settings as the stanzas sent: LF stays LF, CR is `&#xD;` (ADR-1376).
+- Serialised with the same `NewLineHandling.Entitize` settings as the stanzas sent: LF stays LF, CR is `&#xD;` (ADR-1378).
 - CI on Linux and macOS: the output no longer depends on the platform; fast tests green on Windows, quality run 0 failing members.
 
 ## Log

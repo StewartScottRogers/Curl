@@ -1419,4 +1419,4 @@ Each option and the specific reason it lost.
 | [1375](ADR-1375-s3-refuses-range-and-resume-on-uploads-lists-and-deletes.md) | s3:// refuses -r and -C on uploads, lists and deletes with exit 4 (BL-5914) | Accepted | 2026-11-24 |
 | [1376](ADR-1376-rsassa-pss-crl-signatures-verify-with-any-named-salt-length.md) | RSASSA-PSS CRL signatures verify with any salt length they name (BL-5929) | Accepted | 2026-11-24 |
 | [1377](ADR-1377-a-kafka-produce-follows-a-leader-that-moves-during-its-retries.md) | A Kafka produce follows a leader that moves to another broker during its retries (BL-5934) | Accepted | 2026-11-25 |
-| [1376](ADR-1376-xmpp-disco-output-holds-lf-line-ends-and-entitized-cr-on-every-platform.md) | An XMPP disco answer is written with LF line ends and entitized CR on every platform (BL-5928) | Accepted | 2026-11-25 |
+| [1378](ADR-1378-xmpp-disco-output-holds-lf-line-ends-and-entitized-cr-on-every-platform.md) | An XMPP disco answer is written with LF line ends and entitized CR on every platform (BL-5928) | Accepted | 2026-11-25 |
