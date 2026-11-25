@@ -55,6 +55,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private bool isReceiveWindowGrown;
 
+    /// <summary>Whether this is the stream an h2c upgrade continues on (<see cref="StartUpgradedAsync" />).</summary>
+    private bool isUpgraded;
+
     private bool isResponseEnded;
 
     private bool isFinalHeadReceived;
@@ -214,6 +217,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         while (!isResponseEnded)
         {
+            received.Clear();
             await ReceiveFrameAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -234,27 +238,33 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         isHeadRequest = isHead;
         streamId = await session.StartUpgradedStreamAsync(this, cancellationToken).ConfigureAwait(false);
+        isUpgraded = true;
         isRequestEnded = true;
         isReceiveWindowGrown = true;
     }
 
     /// <summary>
-    /// Gives up the response's body without reading it, as curl does with a body it ignores
-    /// before a retry or a followed redirect: unless the stream has already ended, it is reset
-    /// with STREAM_CLOSED, <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970
-    /// Notes), and the frames the peer still sends on it are dropped.
+    /// Gives up a response body curl ignores before a retry or a followed redirect. A stream
+    /// whose request has ended is read to its end, its DATA dropped, and is not reset, as curl
+    /// does (measured, BL-5906 Notes). A stream whose request has not ended, and the stream an
+    /// h2c upgrade continues on, is instead reset with STREAM_CLOSED unless its response has
+    /// ended, <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970 Notes), and
+    /// the frames the peer still sends on it are dropped.
     /// </summary>
-    /// <param name="cancellationToken">Cancels the write.</param>
-    /// <returns>A task that completes when the reset is written, or at once when none is due.</returns>
+    /// <param name="cancellationToken">Cancels the reads or the write.</param>
+    /// <returns>A task that completes when the stream has ended or the reset is written.</returns>
+    /// <exception cref="HttpTransferException">The stream failed while it was read (exit 16, 18, 56 or 92).</exception>
     public async ValueTask AbandonResponseAsync(CancellationToken cancellationToken)
     {
-        if (isResponseEnded)
+        if (isRequestEnded && !isUpgraded)
         {
-            return;
+            await ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         }
-
-        await ResetAsync(Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
-        isResponseEnded = true;
+        else if (!isResponseEnded)
+        {
+            await ResetAsync(Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
+            isResponseEnded = true;
+        }
     }
 
     /// <summary>

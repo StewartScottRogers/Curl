@@ -1,6 +1,6 @@
 # ADR-0343 — An ignored HTTP/2 body resets its stream instead of being read
 
-- **Status:** Accepted
+- **Status:** Accepted, superseded in part by [ADR-1350](ADR-1350-an-ignored-http2-body-is-read-to-its-end-except-on-an-upgraded-or-unsent-stream.md): only an upgraded or unsent stream is reset
 - **Date:** 2026-10-02
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-970.

@@ -685,6 +685,38 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http2Digest401WhoseDataEndsTheStream_RetriesWithNoReset()
+    {
+        // curl --http2-prior-knowledge --digest -u tester:secret (curl 8.18.0, BL-5906 Notes): the
+        // 401's HEADERS and DATA END_STREAM, then HEADERS on stream 3 and no RST_STREAM.
+        HpackEncoder server = new();
+        byte[] response = Http2Response(
+            Http2FrameFactory.CreateSettings([]),
+            Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "401"), new("www-authenticate", "Digest realm=\"x\", nonce=\"abc\", qop=\"auth\""), new("content-length", "3")]), isEndStream: false, isEndHeaders: true),
+            Http2FrameFactory.CreateData(1, "no\n"u8.ToArray(), isEndStream: true),
+            Http2FrameFactory.CreateHeaders(3, server.Encode([new(":status", "200"), new("content-length", "2")]), isEndStream: false, isEndHeaders: true),
+            Http2FrameFactory.CreateData(3, "ok"u8.ToArray(), isEndStream: true));
+        ScriptedConnection connection = new(response, 65536);
+        ScriptedAuthenticator authenticator = new(null, "Digest username=\"tester\"");
+        MemoryStream output = new();
+        Diagnostics.Arrange("url, authorization on retry", "http://example.com/, Digest username=\"tester\"");
+        Diagnostics.Arrange("response frames", "SETTINGS, HEADERS 401 on 1, DATA no on 1 (end stream), HEADERS 200 on 3, DATA ok");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator)
+            .ExecuteAsync(Http2Context("http://example.com/", output));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Http2Frame[] sent = [.. await FramesAfterPreface(connection.Written)];
+        string sentTypes = string.Join(", ", sent.Select(frame => $"{frame.Type} {frame.StreamId}"));
+        Diagnostics.Act("frames sent", sentTypes);
+        Assert.IsFalse(sent.Any(frame => frame.Type == Http2FrameType.RstStream), sentTypes);
+        Assert.IsTrue(sent.Any(frame => frame.Type == Http2FrameType.Headers && frame.StreamId == 3), sentTypes);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http2RetryAfterGoAway_GoesOnANewConnection()
     {
         HpackEncoder first = new();

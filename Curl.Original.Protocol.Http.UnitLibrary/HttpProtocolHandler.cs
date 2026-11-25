@@ -2750,8 +2750,9 @@ public sealed class HttpProtocolHandler(
     /// nothing when <paramref name="delivery" /> says there is no body to deliver and it is not
     /// being discarded (a 416's is, <see cref="IgnoresBody" />). Over HTTP/2 and HTTP/3
     /// the trailers are the stream's trailing field section, read once the stream has ended. An
-    /// HTTP/2 stream's discarded body is not read at all: the stream is given up
-    /// (<see cref="Http2StreamConnection.AbandonResponseAsync" />), as curl resets it (BL-970).
+    /// HTTP/2 stream's discarded body is not delivered through the body reader: the stream is given
+    /// up (<see cref="Http2StreamConnection.AbandonResponseAsync" />), which reads it to its end
+    /// or resets it, as curl does (BL-970, BL-5906).
     /// </summary>
     private static ValueTask ReadBodyAsync(
         HttpRequestPlan plan,
