@@ -1,5 +1,5 @@
 ---
-id: BL-5947
+id: BL-5952
 title: Write curl's abort upload -v line after a 417 that arrived while the body waited for 100 Continue
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5947 — Write curl's abort upload -v line after a 417 that arrived while the body waited for 100 Continue
+# BL-5952 — Write curl's abort upload -v line after a 417 that arrived while the body waited for 100 Continue
 
 ## Goal
 

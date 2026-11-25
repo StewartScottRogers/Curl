@@ -1,5 +1,5 @@
 ---
-id: BL-5946
+id: BL-5951
 title: Report curl's %{redirect_url} for an authentication or 417 resend the redirect limit refuses
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5946 — Report curl's %{redirect_url} for an authentication or 417 resend the redirect limit refuses
+# BL-5951 — Report curl's %{redirect_url} for an authentication or 417 resend the redirect limit refuses
 
 ## Goal
 

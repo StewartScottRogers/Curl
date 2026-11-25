@@ -40,7 +40,7 @@ Measure whether a Digest or `--anyauth` retry at `--max-redirs 0` ends the same 
 - Measured 2026-11-25 with `Record-CurlExchange.ps1 -HoldOpenMilliseconds 1500`, curl 8.22.0, `--max-redirs 0`: Digest, `--anyauth`, chunked, `Connection: close`, `-d`, `-f` and a 417 all end this way. Curl's `-v` lines from the status line on and its stdout are now identical, except for the two gaps filed below.
 - The task's NTLM exchange (limit 50): Curl's whole stderr, 1015 lines, is identical to curl's once the connection's source port, the Authorization values and curl's debug-build lines are masked.
 - A side effect that matches curl: the refused response's body now counts in `%{size_download}` (4 for a 4-byte body) and a chunked body's trailers reach `-i`/`-D`.
-- Filed BL-5946 (`%{redirect_url}` of the refused resend) and BL-5947 (`abort upload` after a 417 while waiting); both predate this task.
+- Filed BL-5951 (`%{redirect_url}` of the refused resend) and BL-5952 (`abort upload` after a 417 while waiting); both predate this task.
 - Gates: build clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary` 0 failing members.
 
 ## Log
