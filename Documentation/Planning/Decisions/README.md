@@ -1411,4 +1411,4 @@ Each option and the specific reason it lost.
 | [1367](ADR-1367-an-oauth2-flow-binds-its-token-to-the-dpop-key.md) | An --oauth2-* flow binds its token to the --dpop key (BL-5911) | Accepted | 2026-11-24 |
 | [1368](ADR-1368-state-files-are-replaced-by-rename-off-windows.md) | The cookie jar, HSTS and alt-svc files are replaced by rename off Windows (BL-5888) | Accepted | 2026-11-24 |
 | [1369](ADR-1369-d-with-t-stays-refused-for-extended-schemes.md) | `-d` with `-T` stays refused for extended protocol schemes (BL-5901) | Accepted | 2026-11-24 |
-| [1369](ADR-1369-kafka-retries-a-produce-that-finds-no-ready-leader.md) | Kafka sends a produce again when the broker has no ready leader (BL-5902) | Accepted | 2026-11-24 |
+| [1370](ADR-1370-kafka-retries-a-produce-that-finds-no-ready-leader.md) | Kafka sends a produce again when the broker has no ready leader (BL-5902) | Accepted | 2026-11-24 |

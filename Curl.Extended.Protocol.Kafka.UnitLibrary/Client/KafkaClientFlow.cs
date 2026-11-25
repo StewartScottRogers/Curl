@@ -99,7 +99,7 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     /// When <paramref name="errorCode"/> is UNKNOWN_TOPIC_OR_PARTITION, LEADER_NOT_AVAILABLE or NOT_LEADER_OR_FOLLOWER (a
     /// broker that auto-creates a topic has no leader ready for it yet) and a retry is left, waits 250 ms on the transfer's
     /// time provider, within the transfer's cancellation, and gives <see langword="true"/>. Metadata and Produce share the
-    /// connection's nine retries (ADR-1369).
+    /// connection's nine retries (ADR-1370).
     /// </summary>
     private async ValueTask<bool> WaitForLeaderAsync(short errorCode)
     {

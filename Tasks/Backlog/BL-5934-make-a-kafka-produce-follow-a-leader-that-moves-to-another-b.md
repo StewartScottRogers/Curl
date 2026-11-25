@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Follow-up of BL-5902 (ADR-1369). `KafkaClientFlow.ProduceAsync` asks Metadata again after a Produce answered with error 3, 5 or 6, but sends the record again over the same connection and ignores the leader that Metadata names. In a cluster where leadership moved to another broker, every retry fails and the transfer ends with exit 8. `KafkaProtocolHandler.TransferAsync` and `RedirectOf` already reconnect to the leader on the first Metadata answer (ADR-1080); do the same for a later one, within the same retry budget.
+Follow-up of BL-5902 (ADR-1370). `KafkaClientFlow.ProduceAsync` asks Metadata again after a Produce answered with error 3, 5 or 6, but sends the record again over the same connection and ignores the leader that Metadata names. In a cluster where leadership moved to another broker, every retry fails and the transfer ends with exit 8. `KafkaProtocolHandler.TransferAsync` and `RedirectOf` already reconnect to the leader on the first Metadata answer (ADR-1080); do the same for a later one, within the same retry budget.
 
 ## Acceptance criteria
 

@@ -1,4 +1,4 @@
-# ADR-1369: Kafka sends a produce again when the broker has no ready leader
+# ADR-1370: Kafka sends a produce again when the broker has no ready leader
 
 - Status: Accepted
 - Date: 2026-11-24

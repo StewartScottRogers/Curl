@@ -41,7 +41,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Fix (ADR-1369): a Produce answered with error 3, 5 or 6 waits 250 ms, asks Metadata again and sends the same batch again. Metadata and Produce share nine retries per connection.
+- Fix (ADR-1370): a Produce answered with error 3, 5 or 6 waits 250 ms, asks Metadata again and sends the same batch again. Metadata and Produce share nine retries per connection.
 - Live check: `apache/kafka:3.9.0` in Docker on port 38592 (the finding's port is an example), two fresh starts, five produces and five consumes each: all exit 0, each consume printed `x`.
 - The finding is timing-dependent and did not reproduce here: the build before the fix also passed on one fresh broker. The code path was plain from `ProduceAsync`, and the new tests in `KafkaLeaderRetryTests` pin it.
 - `ExecuteAsync_ProduceRefused_...` used error 3, now retried, so it uses error 29.
