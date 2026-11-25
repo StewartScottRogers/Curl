@@ -8,7 +8,7 @@ RFC 7858 and RFC 9250, not against curl.
 - `EncryptedDnsExtension` (ADR-1070): the `encrypted-dns` description and the options `--dns-over-tls <host[:port]>`
   and `--dns-over-quic <host[:port]>` (port 853 by default, read by the internal `EncryptedDnsServerAddress`), each
   with its own resolver hook activator in `Curl.Extension.Composition`'s `ExtensionResolverHookCatalogue`
-  (ADR-1012). `DnsOverTlsResolverHook` verifies the server certificate with the transfer's `--cacert`, `--capath` and `-k` (`ExtensionOptionValues.TlsTrust`, as `--doh-url` does; no `--dns-over-tls` override exists) and builds the DoT resolver over `Curl.Networking.UnitLibrary`'s `TcpConnector`
+  (ADR-1012). `DnsOverTlsResolverHook` verifies the server certificate with the transfer's `--cacert`, `--capath`, `-k` and `--ssl-no-revoke` (`ExtensionOptionValues.TlsTrust`, as `--doh-url` does; no `--dns-over-tls` override exists) and builds the DoT resolver over `Curl.Networking.UnitLibrary`'s `TcpConnector`
   and `SslStreamTlsProvider`; `DnsOverQuicResolverHook` builds the DoQ resolver over `UdpDatagramConnector`, its
   certificate judged by `TlsProviderCertificateVerifier` through `ITlsProvider.VerifyServerCertificateChain`. Both
   resolve the server's own name with curl's resolver.
