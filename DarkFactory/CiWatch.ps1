@@ -790,6 +790,22 @@ function Test-CiFixAlreadyIn {
     return $false
 }
 
+function Test-CiFixChangedCode {
+    # Whether a commit between -From and -To whose message names CI-fix task -Id changes a file
+    # outside Tasks/. A CI fix that closed "not reproducible, no change" carries none, so a run
+    # lacking it lacks nothing: on 2026-11-22 and 11-24 runs that already had their macOS runners
+    # were cancelled for lacking BL-5760 and BL-5846..BL-5848, which changed nothing, and green
+    # came 40 to 70 minutes later (BL-5175..BL-5177). $false when git cannot say.
+    param([string]$Repo, [string]$Id, [string]$From, [string]$To)
+    $shas = @(git -C $Repo log --format=%H -E --grep "$Id([^0-9]|$)" "$From..$To" 2>$null | Where-Object { $_ })
+    if ($LASTEXITCODE -ne 0) { return $false }
+    foreach ($sha in $shas) {
+        $paths = @(git -C $Repo diff-tree --no-commit-id --name-only -r "$sha" 2>$null | Where-Object { $_ })
+        if (@($paths | Where-Object { -not "$_".StartsWith('Tasks/') }).Count) { return $true }
+    }
+    return $false
+}
+
 function Stop-CiRunWithoutFix {
     # Cancels the CI run running on the branch when the run waiting behind it has a CI fix the
     # running commit lacks, so the fix is tested at once. On work/dark-factory a running run
@@ -800,7 +816,8 @@ function Stop-CiRunWithoutFix {
     # A CI fix that closed naming a commit the running commit already holds ("already dropped by
     # 8fa866b82") is no fix it lacks (Test-CiFixAlreadyIn): run 41570033273 held 8fa866b82 and
     # was cancelled 23 minutes in for lacking BL-4604 and BL-4605, which both closed so, and green
-    # waited a whole run (AF-0569, BL-4717).
+    # waited a whole run (AF-0569, BL-4717). Nor is one whose commits change only task files
+    # (Test-CiFixChangedCode, BL-5175).
     # -Listed is gh's run list, newest first; -Repo a checkout that holds both commits;
     # -CancelRun (a run id -> whether gh cancelled it) stands in for gh in -TestCiWatch.
     # Returns the cancelled run's id, or ''.
@@ -821,6 +838,7 @@ function Stop-CiRunWithoutFix {
         return ''
     }
     $fixes = @($fixes | Where-Object { -not (Test-CiFixAlreadyIn -Repo $Repo -Id $_ -Sha "$($running.headSha)" -At "$($waiting.headSha)") })
+    $fixes = @($fixes | Where-Object { Test-CiFixChangedCode -Repo $Repo -Id $_ -From "$($running.headSha)" -To "$($waiting.headSha)" })
     $script:CiWatch.Logged[$decided] = 'looked'
     if (-not @($fixes).Count) { return '' }
     if (-not $CancelRun) { $CancelRun = { param([string]$Id) gh run cancel $Id 2>&1 | Out-Null; return ($LASTEXITCODE -eq 0) } }
@@ -1735,7 +1753,8 @@ if ($TestCiWatch) {
         git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m two 2>&1 | Out-Null
         $shaNoFix = "$(git -C $fixTemp rev-parse HEAD)".Trim()
         Set-Content -Path (Join-Path $fixTemp 'Tasks\Done\BL-0003-fix-ci-failure-test1173-on-linux-and-macos.md') -Value 'fix'
-        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m three 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $fixTemp 'fix.cs') -Value 'fixed'
+        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m 'fix: three (BL-0003)' 2>&1 | Out-Null
         $shaFix = "$(git -C $fixTemp rev-parse HEAD)".Trim()
         & $check 'a CI fix reaching Done counts; an archived one and another task do not' 'BL-0003' ((Get-CiFixTasksBetween -Repo $fixTemp -From $shaRunning -To $shaFix) -join ',')
         $redRuns = @([pscustomobject]@{ Id = '70'; Sha = $shaRunning; FinishedAt = $now; Failures = @(& $f A @('Linux')) })
@@ -1771,6 +1790,13 @@ if ($TestCiWatch) {
         git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m five 2>&1 | Out-Null
         $noopPair[0].headSha = "$(git -C $fixTemp rev-parse HEAD)".Trim()
         & $check 'red, and the waiting run carries only fixes that name commits the running run holds: nothing cancelled (AF-0569)' '' (Stop-CiRunWithoutFix -Listed $noopPair -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
+        # BL-5175: a CI fix that closed with no change ("not reproducible") is no fix the running run lacks.
+        Set-Content -Path (Join-Path $fixTemp 'Tasks\Done\BL-0006-fix-flaky-ci-test-test1173-on-windows.md') -Value '## Log', '', '- 2026-11-22: Doing -> Done. Not reproducible; no change needed.'
+        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m 'chore(tasks): BL-0006 done' 2>&1 | Out-Null
+        $shaNoChange = "$(git -C $fixTemp rev-parse HEAD)".Trim()
+        & $check 'a fix with a commit changing code counts; one whose only commit names it on a task file, a task ID it is a prefix of, or git failing do not' 'True False False False' "$(Test-CiFixChangedCode -Repo $fixTemp -Id 'BL-0003' -From $shaRunning -To $shaFix) $(Test-CiFixChangedCode -Repo $fixTemp -Id 'BL-0006' -From $shaFix -To $shaNoChange) $(Test-CiFixChangedCode -Repo $fixTemp -Id 'BL-000' -From $shaRunning -To $shaFix) $(Test-CiFixChangedCode -Repo $fixTemp -Id 'BL-0003' -From 'nosuchcommit' -To $shaFix)"
+        $noChangePair = @([pscustomobject]@{ databaseId = 97; status = 'pending'; headSha = $shaNoChange }, [pscustomobject]@{ databaseId = 96; status = 'in_progress'; headSha = "$($noopPair[0].headSha)" })
+        & $check 'red, and the waiting run carries only a fix that changed nothing: nothing cancelled (BL-5175)' '' (Stop-CiRunWithoutFix -Listed $noChangePair -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
         & $check 'the watch looks every minute while CI is red, every heartbeat otherwise, and every 3 minutes with publishing off' '1 3 3 1' "$(Get-CiWatchEveryMinutes -HeartbeatMinutes 3 -Red $true) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 3 -Red $false) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 0 -Red $false) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 0 -Red $true)"
         & $check 'gh cancelled only runs 78 and 86' '78,86' ($script:cancelledIds -join ',')
     } finally { Remove-Item -Recurse -Force -Path $fixTemp -ErrorAction SilentlyContinue }
