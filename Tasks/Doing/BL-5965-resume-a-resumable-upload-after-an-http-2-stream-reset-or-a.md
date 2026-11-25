@@ -33,3 +33,4 @@ A resumable upload interrupted by an HTTP/2 stream reset, an HTTP/2 framing fail
 ## Log
 
 - 2026-11-25: Created by the shift-end review (ADR-0710).
+- 2026-11-25: Backlog -> Doing. Criteria at claim: e47344f9 e4cbea69 922c5bba.
