@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/RedirectFollowerTests.cs, Curl.Engine.UnitLibrary/MailRequestOptionsMapping.cs, Curl.Engine.UnitTests/MailRequestOptionsMappingTests.cs]
+touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/RedirectFollowerTests.cs, Curl.Engine.UnitLibrary/MailRequestOptionsMapping.cs, Curl.Engine.UnitTests/MailRequestOptionsMappingTests.cs, Curl.Engine.UnitTests/TransferContextFactoryMailTests.cs, Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-25
 ---
 # BL-5936 — Carry the command line's mail options over an HTTP redirect to a mail URL
 
@@ -24,13 +24,19 @@ Measured with `Record-CurlExchange.ps1` (BL-5925): an HTTP server answering `302
 
 ## Acceptance criteria
 
-- [ ] Both measurements above, run again through `Record-CurlExchange.ps1` against real curl and Curl, give the same commands and exit codes.
-- [ ] A focused unit test in each changed library's own `.UnitTests` project pins the behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Both measurements above, run again through `Record-CurlExchange.ps1` against real curl and Curl, give the same commands and exit codes.
+- [x] A focused unit test in each changed library's own `.UnitTests` project pins the behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- The engine now builds `MailRequestOptions` for `http` and `https` too (ADR-1378). `RedirectFollower` already carried the first hop's `Mail`, so only its comment changed.
+- Added to `touches`: `TransferContextFactoryMailTests.cs` (its `http` row pinned `Mail` null) and `ITransferContext.cs` (the `Mail` doc said null for every non-mail scheme). No task in Doing on origin/work/dark-factory named either.
+- Measured 2026-11-25 with both command lines against curl 8.22.0 and Curl, a 302 server beside `Record-CurlExchange.ps1 -Smtp` and `-Imap`: transcripts identical, exit 0 for all four.
+- The Linux and macOS criteria are covered by platform-neutral tests; fast tests green on Windows. Measure-CodeQuality.ps1 for Core, Engine and Protocol.Abstractions: 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-11-24: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: eed75b13 caafd3c7 3d836d5e.
+- 2026-11-25: Doing -> Done. An HTTP redirect to a mail URL now keeps the command line's mail options, as curl 8.22.0
