@@ -30,3 +30,4 @@ BL-5878 (ADR-1364) verifies RSASSA-PSS lists through `RSASignaturePadding.Pss`, 
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: f5c9856a 3d836d5e.
