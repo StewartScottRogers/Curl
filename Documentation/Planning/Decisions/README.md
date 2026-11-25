@@ -1400,3 +1400,4 @@ Each option and the specific reason it lost.
 | [1356](ADR-1356-schannel-build-judges-a-cacert-chain-only-up-to-its-anchor.md) | The Schannel build judges a --cacert chain only up to its anchor, by Windows trust error (BL-5885) | Accepted | 2026-11-24 |
 | [1357](ADR-1357-an-ignored-http2-body-is-read-to-its-end-except-on-an-upgraded-or-unsent-stream.md) | An ignored HTTP/2 body is read to its end, except on an upgraded or unsent stream (BL-5906) | Accepted | 2026-11-24 |
 | [1358](ADR-1358-oci-refuses-range-and-resume.md) | oci:// refuses -r and -C with exit 4 (BL-5913) | Accepted | 2026-11-24 |
+| [1354](ADR-1354-gs-downloads-send-a-range-header-for-r-and-c-and-uploads-and-lists-refuse-them.md) | gs:// downloads send a Range header for -r and -C; uploads and listings refuse them (BL-5912) | Accepted | 2026-11-24 |

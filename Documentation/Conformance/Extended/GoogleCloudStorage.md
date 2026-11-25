@@ -28,6 +28,10 @@ locator naming the XML API reference page.
 | GoogleCloudStorage:XMLAPI-Anonymous-1 | REQUIRED | A request without credentials carries no `Authorization` header; a private bucket refuses it with `401`. | GcsXmlApiObjectCases.Download_NoCredentials_SendsNoAuthorizationAndIsRefusedByAPrivateBucket |
 | GoogleCloudStorage:XMLAPI-Emulator-1 | SHOULD | `STORAGE_EMULATOR_HOST` replaces the endpoint, as Google's client libraries read it. | GcsXmlApiObjectCases.Download_StorageEmulatorHost_SendsTheRequestToTheEmulator |
 
+## Byte ranges
+
+An object download sends `-C <offset>` above 0 as `Range: bytes=<offset>-` and otherwise `-r <text>` as `Range: bytes=<text>`, signed with an HMAC key, and treats 200, 206 and 416 as `https://` does. An upload or a listing with `-r`, or with `-C` other than offset 0, fails with exit 4 before any connection (ADR-1354, `GcsByteRangeTests`).
+
 ## Request methods
 
 `gs://` sends only the methods its operations need: GET to download or list, and with `-T` PUT. `-X GET` without `-T` and `-X PUT` with it are accepted, since they name what is sent anyway. `-I`/`--head` and every other `-X` (`DELETE`, `HEAD`, `POST`, ...) fail with exit 4 and `gs:// does not support ...` before any connection, so a destructive method is never reported done while a GET was sent instead (ADR-1249, `GcsRequestMethodTests`).

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Curl.Extended.Protocol.GoogleCloudStorage.Http;
 using Curl.Extended.Protocol.GoogleCloudStorage.Xml;
@@ -15,12 +16,25 @@ namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 /// <param name="cancellationToken">Cancels the transfer.</param>
 internal sealed class GcsOperations(GcsClient client, string bucket, CancellationToken cancellationToken)
 {
-    /// <summary>Writes the object <paramref name="objectName"/> to <paramref name="output"/> (GET Object).</summary>
+    /// <summary>
+    /// Writes the object <paramref name="objectName"/> to <paramref name="output"/> (GET Object), or only the part
+    /// <paramref name="resumeFrom"/> or <paramref name="rangeText"/> asks for, sent as a <c>Range</c> header and treated
+    /// as over https: a resume answered 416, or answered whole when the object is exactly the size already held, writes
+    /// nothing, and a resume answered whole otherwise fails with exit 33 (ADR-1354).
+    /// </summary>
     /// <param name="objectName">The object name.</param>
     /// <param name="output">Where the object's bytes go.</param>
+    /// <param name="resumeFrom">The offset <c>-C</c> resumes from; when above 0 it wins over <paramref name="rangeText"/>.</param>
+    /// <param name="rangeText">The <c>-r</c> text, sent as <c>bytes=</c> and that text, or <see langword="null"/>.</param>
     /// <returns>The number of bytes written.</returns>
-    internal Task<long> DownloadAsync(string objectName, Stream output) =>
-        client.ExchangeAsync("GET", GcsEndpoint.PathOf(bucket, objectName), [], null, response => CopyAsync(response.Body, output));
+    internal Task<long> DownloadAsync(string objectName, Stream output, long? resumeFrom, string? rangeText)
+    {
+        long? offset = resumeFrom > 0 ? resumeFrom : null;
+        string? range = offset is null
+            ? rangeText is null ? null : "bytes=" + rangeText
+            : string.Create(CultureInfo.InvariantCulture, $"bytes={offset}-");
+        return client.ExchangeAsync("GET", GcsEndpoint.PathOf(bucket, objectName), [], null, response => ReadObjectAsync(response, output, offset), range, offset is not null);
+    }
 
     /// <summary>Writes, one per line, the common prefixes and then the object names of each page of the listing under <paramref name="prefix"/> (List objects).</summary>
     /// <param name="prefix">The prefix the names start with, empty for the whole bucket.</param>
@@ -69,6 +83,25 @@ internal sealed class GcsOperations(GcsClient client, string bucket, Cancellatio
 
         return query;
     }
+
+    // A 416 reaches here only for a resume, which then has nothing to add.
+    private async Task<long> ReadObjectAsync(GcsHttpResponse response, Stream output, long? resumeFrom)
+    {
+        if (response.StatusCode == GcsClient.RangeNotSatisfiable)
+        {
+            return 0;
+        }
+
+        return resumeFrom is { } offset && response.StatusCode != GcsClient.PartialContent
+            ? NothingLeftOf(response, offset)
+            : await CopyAsync(response.Body, output);
+    }
+
+    // A resume answered with the whole object: only one exactly the size already held has nothing to add, as over https.
+    private static long NothingLeftOf(GcsHttpResponse response, long offset) =>
+        long.TryParse(response.FindHeader("Content-Length"), CultureInfo.InvariantCulture, out long length) && length == offset
+            ? 0
+            : throw new GcsTransferException(CurlExitCode.RangeError, "HTTP server does not seem to support byte ranges. Cannot resume.");
 
     private async Task<long> CopyAsync(Stream source, Stream output)
     {
