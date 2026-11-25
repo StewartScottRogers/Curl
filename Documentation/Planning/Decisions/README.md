@@ -1414,4 +1414,4 @@ Each option and the specific reason it lost.
 | [1370](ADR-1370-kafka-retries-a-produce-that-finds-no-ready-leader.md) | Kafka sends a produce again when the broker has no ready leader (BL-5902) | Accepted | 2026-11-24 |
 | [1371](ADR-1371-an-output-file-closed-by-a-failed-flush-fails-at-close.md) | An output file closed by a failed flush fails at close, as curl's fclose does (BL-5890) | Accepted | 2026-11-24 |
 | [1372](ADR-1372-a-host-name-mismatch-outranks-a-rejected-certificate-in-the-openssl-build.md) | A host name mismatch outranks a rejected certificate in the OpenSSL build (BL-5926) | Accepted | 2026-11-24 |
-| [1369](ADR-1369-stdin-needs-a-rewind-only-once-read-and-a-redirected-file-rewinds.md) | Stdin needs a rewind only once read, and a file redirected into it rewinds (BL-5910) | Accepted | 2026-11-24 |
+| [1373](ADR-1373-stdin-needs-a-rewind-only-once-read-and-a-redirected-file-rewinds.md) | Stdin needs a rewind only once read, and a file redirected into it rewinds (BL-5910) | Accepted | 2026-11-24 |

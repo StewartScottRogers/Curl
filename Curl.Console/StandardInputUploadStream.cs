@@ -23,7 +23,7 @@ internal sealed class StandardInputUploadStream(Stream inner) : Stream, IRewinda
     /// Gets a value indicating whether the C runtime's <c>lseek</c> of descriptor 0, the one curl's
     /// seek callback makes, succeeds: on Windows it does even on a pipe (measured, BL-2337 Notes);
     /// elsewhere it does when a file is redirected into standard input and fails on a pipe
-    /// (ADR-1369). By default it is probed once for this process.
+    /// (ADR-1373). By default it is probed once for this process.
     /// </summary>
     internal bool SeekOfStandardInputSucceeds { get; init; } = SeekOfThisProcessStandardInputSucceeds();
 
@@ -32,7 +32,7 @@ internal sealed class StandardInputUploadStream(Stream inner) : Stream, IRewinda
     /// has been read from it yet, since curl rewinds only a reader it has read from; when the
     /// wrapped stream can seek; or when <see cref="SeekOfStandardInputSucceeds" />. Off Windows,
     /// stdin read through a pipe cannot be rewound once read, so curl fails a chunked resend of it
-    /// to an HTTP/1.0 server with exit 65 rather than 25 (ADR-0524, ADR-1369, BL-2337, BL-5910).
+    /// to an HTTP/1.0 server with exit 65 rather than 25 (ADR-0524, ADR-1373, BL-2337, BL-5910).
     /// </summary>
     public bool CanRewind => !hasBeenRead || inner.CanSeek || SeekOfStandardInputSucceeds;
 
@@ -86,9 +86,9 @@ internal sealed class StandardInputUploadStream(Stream inner) : Stream, IRewinda
     /// <summary>
     /// Tells whether <c>lseek</c> of this process's descriptor 0 succeeds: always on Windows, whose
     /// C runtime seeks a pipe too; elsewhere when .NET can seek the descriptor, which it learns
-    /// from the same <c>lseek</c>, and not when standard input is closed (ADR-1369).
+    /// from the same <c>lseek</c>, and not when standard input is closed (ADR-1373).
     /// </summary>
-    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-1369: the platform and the process's standard input pick the branch.")]
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-1373: the platform and the process's standard input pick the branch.")]
     private static bool SeekOfThisProcessStandardInputSucceeds()
     {
         if (OperatingSystem.IsWindows())

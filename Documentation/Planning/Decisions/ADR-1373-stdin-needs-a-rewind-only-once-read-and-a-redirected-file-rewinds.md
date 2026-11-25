@@ -1,4 +1,4 @@
-# ADR-1369: Stdin needs a rewind only once read, and a file redirected into it rewinds
+# ADR-1373: Stdin needs a rewind only once read, and a file redirected into it rewinds
 
 - Status: Accepted
 - Date: 2026-11-24

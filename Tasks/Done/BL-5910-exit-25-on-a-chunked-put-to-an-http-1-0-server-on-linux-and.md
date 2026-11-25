@@ -77,7 +77,7 @@ and moves the task to Blocked with that question; it must not make the port exit
 Lane 6, 2026-11-24: fixed as the Notes above planned. `StandardInputUploadStream.CanRewind` is now
 `!hasBeenRead || inner.CanSeek || SeekOfStandardInputSucceeds` (renamed from
 `SeekOfUnseekableInputSucceeds`); the probe defaults to true on Windows and elsewhere to `CanSeek` of a
-`FileStream` over descriptor 0, in one `ExcludeFromCodeCoverage` adapter method (ADR-0083). ADR-1369
+`FileStream` over descriptor 0, in one `ExcludeFromCodeCoverage` adapter method (ADR-0083). ADR-1373
 records it, amending ADR-0524. Handler tests
 `ExecuteAsync_Http10ChallengeBeforeAnUnrewindableBodyIsRead_ReturnsUploadFailedRatherThanSendFailRewind`
 (`--anyauth`) and `ExecuteAsync_RedirectHopAfterAnHttp10ResponseWithAnUnrewindableBodyNotYetRead_FailsWithExit25BeforeAnyRewindCheck`
