@@ -4,7 +4,7 @@ title: Fix CI failure job Quality gates (windows-latest) step Every shard succee
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-5919]
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-11-24
@@ -30,7 +30,17 @@ Lanes test only on Windows, so reproduce with `gh run view 45520782590 --log-fai
 
 ## Notes
 
+- 2026-11-24, lane 11: this step has no failure of its own. It runs
+  `if ('failure' -ne 'success') { ... exit 1 }` to report that a Quality gates shard failed.
+  In run 45520782590 the only failed shard was shard 2 of 3 (windows-latest): "Collect
+  coverage for shard 2" threw at `Measure-CodeQuality.ps1:296` after `dotnet test` of
+  `Curl.Console.UnitTests` ended with "Test host process crashed" (2026-11-25T01:00:00Z).
+  BL-5919 (in Doing on another lane, same `touches`) is that failure, so this task depends
+  on it. Nothing was edited or measured beyond reading the CI log. Once BL-5919 is Done,
+  check that it covers the crash; then this task's criterion needs no further code.
+
 ## Log
 
 - 2026-11-24: Created.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 96723aaa.
+- 2026-11-24: Doing -> Backlog. Waits for BL-5919: this gate step only reports that shard 2 (windows-latest) failed, which BL-5919 fixes
