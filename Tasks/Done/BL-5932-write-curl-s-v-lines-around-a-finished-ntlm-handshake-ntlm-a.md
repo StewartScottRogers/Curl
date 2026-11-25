@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpNtlmInfoLines.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.NtlmThroughNtlmProxy.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.NtlmVerbose.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-25
 ---
 # BL-5932 — Write curl's -v lines around a finished NTLM handshake: NTLM auth restarted, and the auth using lines as curl 8.22.0 writes them
 
@@ -39,13 +39,30 @@ The authenticator is stateless, so the handler has to remember that a side's Typ
 
 ## Acceptance criteria
 
-- [ ] For the exchange above, the port's `*` lines about authentication (`auth using` and `NTLM`) are the ones curl 8.22.0 writes, in the same positions.
-- [ ] A unit test in `Curl.Original.Protocol.Http.UnitTests` pins those lines.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] For the exchange above, the port's `*` lines about authentication (`auth using` and `NTLM`) are the ones curl 8.22.0 writes, in the same positions.
+- [x] A unit test in `Curl.Original.Protocol.Http.UnitTests` pins those lines.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: the request plan carries, per side, "this request sends no header because the NTLM Type 3
+  went out earlier" (libcurl's `NTLMSTATE_LAST`). Such a request still writes `<side> auth using
+  NTLM`, and a bare `NTLM` challenge to it writes `NTLM auth restarted` before its header.
+- Also: a challenge's deferred header lines are now released even when the redirect limit refuses
+  its retry, so `NTLM auth restarted` and the challenge come before `Maximum (50) redirects
+  followed`, as curl orders them.
+- Measured 2026-11-25 with `Record-CurlExchange.ps1` (curl 8.22.0 Schannel, the Type 2 of the
+  `ProxyNtlmType2` test constant, which SSPI accepts). Auth, NTLM, status and authentication
+  header lines of curl and this build: 400 each, no difference; both exit 47.
+- The lines after the last `< Content-Length: 0` still differ (not authentication lines): filed
+  as BL-5941.
+- No ADR: no design choice, the lines are measured from curl.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary` reported
+  0 failing members. `dotnet build` 0 warnings, fast tests exit 0.
+- Platform: the tests drive scripted bytes and scripted tokens, the same on Linux and macOS.
 
 ## Log
 
 - 2026-11-24: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: c4f7fe93 164d3fb1 3d836d5e.
+- 2026-11-25: Doing -> Done. With --proxy-ntlm and --ntlm together, -v writes curl 8.22.0's auth using and NTLM auth restarted lines
