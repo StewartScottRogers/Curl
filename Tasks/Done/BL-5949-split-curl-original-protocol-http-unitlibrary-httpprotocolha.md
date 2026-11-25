@@ -30,7 +30,7 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Notes
 
-- The 4522-line file is now one partial class in 31 files (ADR-1391): `HttpProtocolHandler.cs`
+- The 4522-line file is now one partial class in 31 files (ADR-1392): `HttpProtocolHandler.cs`
   (365 lines: constructor, properties, `ExecuteAsync`) and one `HttpProtocolHandler.<Concern>.cs`
   per concern. A partial file registers itself: the project compiles every `.cs` file.
 - Code moved only: the 4117 non-blank lines other than the scaffolding (usings, namespace, class

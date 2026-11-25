@@ -1,4 +1,4 @@
-# ADR-1391: HttpProtocolHandler keeps one concern per partial file
+# ADR-1392: HttpProtocolHandler keeps one concern per partial file
 
 - Status: Accepted
 - Date: 2026-11-25
