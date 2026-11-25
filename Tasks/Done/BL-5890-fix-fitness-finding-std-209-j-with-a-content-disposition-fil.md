@@ -8,7 +8,7 @@ depends-on: [BL-5915]
 touches: [Curl.Console/DeferredOutputFileStream.cs, Curl.Console.UnitTests/DeferredOutputFileStreamTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5890 — Fix fitness finding STD-209: -J with a Content-Disposition filename of conin$ exits 2 with ".NET" text "Cannot access a closed file."; curl exits 23
 
@@ -36,9 +36,9 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits 23, prints `[conin$ 23]` on stdout, and stderr contains no .NET exception text.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro exits 23, prints `[conin$ 23]` on stdout, and stderr contains no .NET exception text.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -70,9 +70,25 @@ The finding, verbatim:
   `Flush` and `FlushAsync` do nothing on such a stream. Unit test with a fake stream whose flush throws
   `IOException` and closes itself (platform-neutral; no real `conin$`).
 
+2026-11-24, lane 12 (fixed).
+
+- `DeferredOutputFileStream`: once a failed flush has closed the file (`CanWrite` false), a write under
+  4096 bytes succeeds and a larger one fails with `IOException` (`WriteToClosedFile`), `Flush` and
+  `FlushAsync` do nothing, and `TryFlushAsync` returns false, so `CompleteAsync` gives the close-failure
+  line. Chose a `CanWrite` check over catching `ObjectDisposedException`: no exception path, fewer
+  branches. ADR-1369 records it.
+- Unit tests `CompleteAsync_JNamedFileClosedByAFailedFlush_ReportsTheCloseFailure` and
+  `WriteAsync_FileClosedByAFailedFlush_FailsAWriteTheStdioBufferCannotHold`, with a `MemoryStream` that
+  closes itself on its first flush, reached through the `openUnderRawBytes` hook (platform-neutral).
+- Repro with `Record-CurlExchange.ps1` against the built `curl.exe`: `-sS -OJ`, `-OJ` and `-sS -i -OJ` with
+  a 5-byte body each exit 23, stdout `[conin$ 23]`, stderr `curl: curl: (23) Failed writing body` (the
+  doubled prefix is real curl 8.22.0's, measured by lane 11).
+- Fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Console`: 100% line, 100% branch, 0 failing.
+
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: c6a727e1 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waiting on BL-5915 (in Doing), whose touches names Curl.Console.UnitTests, where this fix's unit test goes; cause found in Curl.Console/DeferredOutputFileStream.cs and real curl measured (see Notes)
 - 2026-11-24: Backlog -> Doing. Criteria at claim: c6a727e1 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. -OJ with a Content-Disposition name of conin$ exits 23 with curl's Failed writing body line and -w output; a file closed by a failed flush no longer throws ObjectDisposedException (ADR-1369).
