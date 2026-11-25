@@ -30,3 +30,4 @@ BL-5947 measured `* nghttp2 shuts down connection with error 1: PROTOCOL_ERROR` 
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 1c4d76b9 3d836d5e.
