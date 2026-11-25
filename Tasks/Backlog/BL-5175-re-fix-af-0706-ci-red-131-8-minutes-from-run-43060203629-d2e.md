@@ -58,3 +58,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-19: Backlog -> Deferred. Its finding closed on a reliable re-audit (audit 20261119-013420, closed-how reliable-reaudit); nothing left to fix
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-25: Doing -> Backlog. Fix landed: efda64f912 (2026-11-25 ~13:45 Arizona) - CI fixes that changed nothing no longer cancel a running CI run, and a CI fix skips the pre-push quality measure. Waits for a shift on it, then the measurement over logs from that time.
