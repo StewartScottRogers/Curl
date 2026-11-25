@@ -17,8 +17,9 @@ namespace Curl.Original.Protocol.Ldap;
 /// <para>
 /// The port defaults to 389 for <c>ldap</c> and 636 for <c>ldaps</c>. The bind is a simple
 /// LDAPv3 bind with <see cref="ITransferContext.Credentials" />' user name as the DN and its
-/// password, or the anonymous bind (empty DN and password) without <c>-u</c>; how it fails
-/// is <see cref="LdapBind" />'s. A connect failure is returned as the connector reported it.
+/// password, or the anonymous bind (empty DN and password) without <c>-u</c>, which the
+/// OpenLDAP dialect leaves out after a successful StartTLS; how it fails is
+/// <see cref="LdapBind" />'s. A connect failure is returned as the connector reported it.
 /// </para>
 /// <para>
 /// The URL is read as the build reads it (<see cref="WinLdapUrlReader" />,
@@ -303,14 +304,11 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         var exchange = new LdapExchange(connection, new LdapBerWriter(dialect), new LdapTransferLog(context.DiagnosticLog));
         await using (exchange.ConfigureAwait(false))
         {
-            LdapBindKind bindKind = ChooseBindKind(context);
-            TransferResult? bindFailure = await StartTlsAndBindAsync(exchange, connection, context, bindKind).ConfigureAwait(false);
+            TransferResult? bindFailure = await StartTlsAndBindAsync(exchange, connection, context).ConfigureAwait(false);
             if (bindFailure is not null)
             {
                 return bindFailure;
             }
-
-            exchange.Log.Bound(DescribeBind(bindKind, context.Credentials));
 
             if (dialect == LdapDialect.OpenLdap)
             {
@@ -335,15 +333,31 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
 
     /// <summary>
     /// Starts TLS when <see cref="StartsTls" /> says so, then binds as the logged-on user or with
-    /// the transfer's credentials; the failure that ends the transfer, or <see langword="null" />.
+    /// the transfer's credentials, except that after StartTLS succeeds a simple bind without them
+    /// is not sent; the failure that ends the transfer, or <see langword="null" />.
     /// </summary>
-    private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context, LdapBindKind bindKind)
+    private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context)
     {
-        (TransferResult? startTlsFailure, int simpleBindVersion) = StartsTls(context)
+        (TransferResult? startTlsFailure, int simpleBindVersion, bool secured) = StartsTls(context)
             ? await LdapStartTls.UpgradeAsync(exchange, connection, tlsProvider, context).ConfigureAwait(false)
-            : (null, LdapBind.LdapVersion3);
-        return startTlsFailure ?? await BindAsync(exchange, context, bindKind, simpleBindVersion).ConfigureAwait(false);
+            : (null, LdapBind.LdapVersion3, false);
+        LdapBindKind bindKind = ChooseBindKind(context);
+        if (startTlsFailure is not null || (secured && IsSimpleBindWithoutCredentials(bindKind, context)))
+        {
+            return startTlsFailure;
+        }
+
+        TransferResult? bindFailure = await BindAsync(exchange, context, bindKind, simpleBindVersion).ConfigureAwait(false);
+        if (bindFailure is null)
+        {
+            exchange.Log.Bound(DescribeBind(bindKind, context.Credentials));
+        }
+
+        return bindFailure;
     }
+
+    private static bool IsSimpleBindWithoutCredentials(LdapBindKind bindKind, ITransferContext context) =>
+        bindKind == LdapBindKind.Simple && context.Credentials is null;
 
     /// <summary>Binds as <paramref name="bindKind" /> says; a simple bind starts with <paramref name="simpleBindVersion" />.</summary>
     private async ValueTask<TransferResult?> BindAsync(LdapExchange exchange, ITransferContext context, LdapBindKind bindKind, int simpleBindVersion) =>

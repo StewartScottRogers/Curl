@@ -34,7 +34,26 @@ falls back to LDAPv2, as `openldap.c` excludes it. The WinLDAP dialect is unchan
 ADR-0892's correction, that curl 8.18 exits 1 for result codes 52, 53 and 12, does not hold
 for 8.21.0; the port follows 8.21.0, the release it replaces.
 
-Not covered here, and filed as a follow-up task: the plaintext UnbindRequest curl sends after
-a failed StartTLS handshake (the TLS provider disposes the connection), the bind curl skips
-after StartTLS when there is no `-u`, and a reply to StartTLS that is not an ExtendedResponse,
-which keeps the port's earlier behaviour.
+## Added by BL-5931 (2026-11-24, decided by Claude under Stewart's delegation)
+
+Measured the same way, against a `socat` stand-in that also completes or fails the handshake:
+
+| Server | curl 8.21.0, and now the port |
+| --- | --- |
+| accepts StartTLS, then fails the handshake with an alert | exit 64, then an UnbindRequest (messageID 2) in plaintext |
+| accepts StartTLS and the handshake, no `-u` | no BindRequest: the search is messageID 2, the UnbindRequest 3, exit 0 |
+| answers StartTLS with a BindResponse | its result code counts as the ExtendedResponse's would: 0 starts the handshake; 52 and 2 act as in the table above |
+| answers StartTLS with a SearchResultEntry, `--ssl` | binds as LDAPv3, in clear |
+| answers StartTLS with a SearchResultEntry, `--ssl-reqd` | AbandonRequest for message 1, UnbindRequest, exit 64 `Requested SSL level failed` |
+
+- `LdapStartTls` gives the TLS provider a connection whose disposal does nothing, so the
+  plaintext connection is still open for the UnbindRequest; the handler disposes it. The
+  `ITlsProvider` contract and the providers are unchanged.
+- The missing bind applies to a simple bind only: a SASL bind after StartTLS still asks for the
+  server's mechanisms, and `--ssl` after a refused StartTLS still binds anonymously
+  (`oldap_connecting`).
+- Any application-class response with the request's messageID that opens with a result code is
+  read as `libldap` reads it. A SearchResultReference counts as a SearchResultEntry does
+  (`openldap.c` treats the two alike; read in source).
+- Not measured, and unchanged: a reply that is no LDAP response at all fails `--ssl-reqd` with
+  exit 64 `LDAP local: Can't contact LDAP server` and sends nothing, and `--ssl` binds as LDAPv3.
