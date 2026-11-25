@@ -33,7 +33,7 @@ stream and dialled a new connection for the next URL. Measured with curl 8.18.0 
 - `QpackDecoder.CancelStream` queues the instruction at capacity zero too. RFC 9204 section
   4.4.2 allows leaving it out; nghttp3 sends it.
 - A connection that fails the write takes no new stream.
-- `-f` over HTTP/3 is unchanged until measured (BL-5979).
+- `-f` over HTTP/3 is unchanged until measured (BL-5983).
 
 ## Consequences
 

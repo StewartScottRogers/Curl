@@ -49,7 +49,7 @@ lines, abort codes and decoder bytes. Decision: ADR-1409.
 - Quality: both changed libraries 100% line and branch, no failing member.
 - Fast tests: one `Curl.Networking.UnitTests` test failed in the full run and none when that
   project ran alone: BL-5980.
-- Follow-ups: BL-5979 (`-f` over HTTP/3), BL-5982 (`quic close` trace line).
+- Follow-ups: BL-5983 (`-f` over HTTP/3), BL-5982 (`quic close` trace line).
 
 ## Log
 

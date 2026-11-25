@@ -1,5 +1,5 @@
 ---
-id: BL-5979
+id: BL-5983
 title: Measure and match curl's connection end when -f fails an HTTP/3 transfer
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5979 — Measure and match curl's connection end when -f fails an HTTP/3 transfer
+# BL-5983 — Measure and match curl's connection end when -f fails an HTTP/3 transfer
 
 ## Goal
 
