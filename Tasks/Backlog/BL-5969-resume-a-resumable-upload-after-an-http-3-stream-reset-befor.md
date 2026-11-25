@@ -1,5 +1,5 @@
 ---
-id: BL-5968
+id: BL-5969
 title: Resume a resumable upload after an HTTP/3 stream reset before the response head
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5968 — Resume a resumable upload after an HTTP/3 stream reset before the response head
+# BL-5969 — Resume a resumable upload after an HTTP/3 stream reset before the response head
 
 ## Goal
 

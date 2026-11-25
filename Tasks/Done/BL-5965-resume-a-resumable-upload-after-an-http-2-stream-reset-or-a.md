@@ -34,7 +34,7 @@ A resumable upload interrupted by an HTTP/2 stream reset, an HTTP/2 framing fail
 - The codes are a `ConnectionBreaks` list that `CanResume` looks in: as one `is ... or` pattern it measured complexity 12, over the gate of 10.
 - Test: the `Http2Stream` row (and `Http2`, `PartialFile` rows) of `ExecuteAsync_TusPatchBroken_RetrievesTheOffsetWithHeadAndPatchesFromIt`.
 - Verified: build clean; all fast tests exit 0; after the list refactor, build clean again and the 102 ResumableUpload tests pass; `Measure-CodeQuality.ps1 -Library Curl.Extension.ResumableUpload.UnitLibrary` gives 100% line, 100% branch, 0 failing members. The test uses a scripted transfer only, so it is platform-neutral.
-- Filed BL-5968 for HTTP/3's exit 95, outside this task's three codes.
+- Filed BL-5969 for HTTP/3's exit 95, outside this task's three codes.
 
 ## Log
 
