@@ -1,5 +1,5 @@
 ---
-id: BL-5904
+id: BL-5913
 title: Honour or refuse -r and -C on oci:// transfers, so -C - never appends the whole artifact to the partial file
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5904 — Honour or refuse -r and -C on oci:// transfers, so -C - never appends the whole artifact to the partial file
+# BL-5913 — Honour or refuse -r and -C on oci:// transfers, so -C - never appends the whole artifact to the partial file
 
 ## Goal
 

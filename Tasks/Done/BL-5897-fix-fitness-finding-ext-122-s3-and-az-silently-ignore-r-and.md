@@ -58,7 +58,7 @@ The finding, verbatim:
   `touches` was widened to the Azure `Client` folders, its `CLAUDE.md` and its conformance matrix (no other task in
   Doing named them).
 - Fast tests: 115 assemblies passed. `Measure-CodeQuality.ps1` on the Azure Storage library: 0 failing members.
-- Follow-ups filed: BL-5903 (gs://), BL-5904 (oci://), BL-5905 (s3 uploads, lists, deletes).
+- Follow-ups filed: BL-5912 (gs://), BL-5913 (oci://), BL-5914 (s3 uploads, lists, deletes).
 
 ## Log
 

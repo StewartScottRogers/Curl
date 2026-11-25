@@ -1,5 +1,5 @@
 ---
-id: BL-5905
+id: BL-5914
 title: Refuse -r and -C on s3:// uploads, lists and deletes, which silently ignore them
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5905 — Refuse -r and -C on s3:// uploads, lists and deletes, which silently ignore them
+# BL-5914 — Refuse -r and -C on s3:// uploads, lists and deletes, which silently ignore them
 
 ## Goal
 

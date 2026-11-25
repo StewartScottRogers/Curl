@@ -1,5 +1,5 @@
 ---
-id: BL-5903
+id: BL-5912
 title: Honour or refuse -r and -C on gs:// transfers, so -C - never appends the whole object to the partial file
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5903 — Honour or refuse -r and -C on gs:// transfers, so -C - never appends the whole object to the partial file
+# BL-5912 — Honour or refuse -r and -C on gs:// transfers, so -C - never appends the whole object to the partial file
 
 ## Goal
 
