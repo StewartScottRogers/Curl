@@ -91,7 +91,7 @@ public sealed partial class HttpProtocolHandler
             ThrowIfFailingBeforeBody(fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, actedOn, exchange.RedirectUrl);
             ReportAuthRetryRewind(plan, actedOn, retry);
-            SettleHeldBodyAtHead(plan, actedOn, retry, upload, responseConnection);
+            SettleUnsentBodyAtHead(plan, actedOn, retry, upload, responseConnection);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
             ReportUploadStopped(context.Events, upload, retry, discardsBody);
             delivery = DeliveryOf(plan, actedOn, discardsBody);

@@ -120,16 +120,28 @@ public sealed partial class HttpProtocolHandler
     }
 
     /// <summary>
-    /// Settles a held body once the final status's head is read, as curl 8.22.0 does (measured,
-    /// BL-5960 Notes): a response answered with a resend gives it up; a status of 300 or above on
-    /// a connection that stays open stops the upload, which shuts the connection down
-    /// (<see cref="ReportUploadStopped" />); any other response leaves it held while it is read.
+    /// Settles an unsent body once the final status's head is read. A held body, as curl 8.22.0
+    /// does (measured, BL-5960 Notes): a response answered with a resend gives it up; a status of
+    /// 300 or above on a connection that stays open stops the upload, which shuts the connection
+    /// down (<see cref="ReportUploadStopped" />); any other response leaves it held while it is
+    /// read. A body left unsent on an HTTP/2 or HTTP/3 stream
+    /// (<see cref="HttpContinueWaitConnection.StoppedStreamUpload" />) writes the same two stop
+    /// lines unless a resend answers it, and the connection stays open (measured, BL-5970 Notes).
     /// </summary>
-    private static void SettleHeldBodyAtHead(HttpRequestPlan plan, HttpResponseHead head, HttpRequestPlan? retry, HttpRequestBodyWriter upload, IConnection responseConnection)
+    private static void SettleUnsentBodyAtHead(HttpRequestPlan plan, HttpResponseHead head, HttpRequestPlan? retry, HttpRequestBodyWriter upload, IConnection responseConnection)
     {
-        if (responseConnection is HttpContinueWaitConnection { HoldsBody: true } waiting)
+        if (responseConnection is not HttpContinueWaitConnection waiting)
+        {
+            return;
+        }
+
+        if (waiting.HoldsBody)
         {
             StopOrKeepHolding(plan, head, retry, upload, waiting);
+        }
+        else if (waiting.StoppedStreamUpload && retry is null)
+        {
+            ReportStopBeforeEndOfSend(plan.Context.Events, upload);
         }
     }
 

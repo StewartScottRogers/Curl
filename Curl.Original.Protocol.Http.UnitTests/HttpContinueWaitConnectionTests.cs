@@ -294,21 +294,43 @@ public sealed class HttpContinueWaitConnectionTests
     }
 
     [TestMethod]
-    public async Task WaitForContinueAsync_Final2xxOnAMultiplexedStream_WaitsItOutAndHoldsNoBody()
+    public async Task WaitForContinueAsync_Final2xxOnAMultiplexedStream_HoldsTheBodyUntilTheWaitRunsOut()
     {
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         HttpContinueWaitConnection connection = new(Connection("HTTP/2 200 \r\n\r\n", 65536)) { IsMultiplexedStream = true };
         Diagnostics.Arrange("response on a stream", "HTTP/2 200");
 
-        Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
-        bool endedBeforeTheWaitRanOut = wait.IsCompleted;
+        bool sendsNow = await connection.WaitForContinueAsync(time, CancellationToken.None);
+        bool held = connection.HoldsBody;
+        Task sending = connection.SendHeldBodyAsync(CancellationToken.None).AsTask();
+        bool sentBeforeTheWaitRanOut = sending.IsCompleted;
         time.Advance(HttpRequestOptions.DefaultContinueWait);
-        bool sends = await wait;
+        await sending;
 
-        Diagnostics.Assert("sends the body, holds it", "True, False", $"{sends}, {connection.HoldsBody}");
-        Assert.IsFalse(endedBeforeTheWaitRanOut);
-        Assert.IsTrue(sends);
+        Diagnostics.Assert("sends the body at once, holds it", "False, True", $"{sendsNow}, {held}");
+        Assert.IsFalse(sendsNow);
+        Assert.IsTrue(held);
+        Assert.IsFalse(sentBeforeTheWaitRanOut);
+        Assert.IsFalse(connection.StoppedStreamUpload);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/2 100 \r\n\r\n", true, false)]
+    [DataRow("HTTP/3 100 \r\n\r\n", true, false)]
+    [DataRow("HTTP/2 500 \r\n\r\n", false, true)]
+    [DataRow("HTTP/3 500 \r\n\r\n", false, true)]
+    public async Task WaitForContinueAsync_StatusOnAMultiplexedStream_IsReadFromTheStreamsStatusLine(string response, bool sends, bool stops)
+    {
+        HttpContinueWaitConnection connection = new(Connection(response, 65536)) { IsMultiplexedStream = true };
+        Diagnostics.Arrange("response on a stream", Visible(response));
+
+        bool sendsNow = await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None);
+
+        Diagnostics.Assert("sends, stops, holds", $"{sends}, {stops}, False", $"{sendsNow}, {connection.StoppedStreamUpload}, {connection.HoldsBody}");
+        Assert.AreEqual(sends, sendsNow);
+        Assert.AreEqual(stops, connection.StoppedStreamUpload);
         Assert.IsFalse(connection.HoldsBody);
+        Assert.IsFalse(connection.StopsSending);
     }
 
     [TestMethod]

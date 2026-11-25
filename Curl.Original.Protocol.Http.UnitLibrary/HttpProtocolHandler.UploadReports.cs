@@ -11,7 +11,8 @@ public sealed partial class HttpProtocolHandler
     /// redirect then does with the body: a <c>307</c> sends it again, a <c>302</c> drops it
     /// (measured, BL-1213 Notes). When the status line arrived while the body was being sent,
     /// <c>close instead of sending N more bytes</c> follows it (measured, BL-1527 Notes). Nothing
-    /// while the body still waits for <c>100 Continue</c> (measured, BL-5960 Notes).
+    /// while the body still waits for <c>100 Continue</c> (measured, BL-5960 Notes), or once a
+    /// status on an HTTP/2 or HTTP/3 stream has left it unsent (measured, BL-5970 Notes).
     /// </summary>
     private static void ReportUploadRewind(HttpRequestPlan plan, HttpStatusLine statusLine, HttpRequestBodyWriter upload)
     {
@@ -24,11 +25,14 @@ public sealed partial class HttpProtocolHandler
         }
     }
 
-    /// <summary>Tells whether the request has a body, not empty, that is not still waiting for <c>100 Continue</c>.</summary>
+    /// <summary>
+    /// Tells whether the request has a body, not empty, that is neither still waiting for
+    /// <c>100 Continue</c> nor left unsent on a stream.
+    /// </summary>
     private static bool SendsBodyBeforeTheRedirect(HttpRequestPlan plan, HttpRequestBodyWriter upload) =>
         plan.Framing.Body is not null
             && plan.Framing.KnownLength != 0
-            && upload.EarlyResponseWatch is not { HoldsBody: true };
+            && upload.EarlyResponseWatch is not ({ HoldsBody: true } or { StoppedStreamUpload: true });
 
     /// <summary>
     /// Reports <c>close instead of sending N more bytes</c> when the body was cut short, N being
@@ -64,6 +68,12 @@ public sealed partial class HttpProtocolHandler
             return;
         }
 
+        ReportStopBeforeEndOfSend(events, upload);
+    }
+
+    /// <summary>Reports <c>HTTP error before end of send, stop sending</c> and the <c>abort upload</c> line.</summary>
+    private static void ReportStopBeforeEndOfSend(ITransferEvents events, HttpRequestBodyWriter upload)
+    {
         events.ReportInfo(HttpConnectionInfoLines.StopSendingBeforeEndOfSend);
         events.ReportInfo(HttpConnectionInfoLines.AbortUpload(upload.BytesSent));
     }

@@ -12,14 +12,17 @@ namespace Curl.Original.Protocol.Http;
 /// <remarks>
 /// curl 8.21.0 sends the body when <c>100 Continue</c> arrives or when the wait runs out
 /// with nothing received, and leaves it unsent when any other reply arrives first (BL-175
-/// Notes). When that reply is a final status over HTTP/1.x, the wait keeps running while the
-/// response is read (<see cref="HoldsBody" />): curl 8.22.0 sends the body when it runs out,
+/// Notes). When that reply is a final status over HTTP/1.x, or a final 2xx on a stream, the wait
+/// keeps running while the response is read (<see cref="HoldsBody" />): curl sends the body when it runs out,
 /// during a read or after the response, unless the response stops the upload first (measured,
 /// CGR-067, BL-3596 and BL-5960 Notes). The read the wait started keeps running after the wait
 /// runs out, so a status of 300 or above that arrives while the body is sent is seen in time to
 /// stop sending it (<see cref="SendUnlessStoppedAsync" />, BL-319 and BL-395 Notes); the next
-/// read waits for it. Disposing this only ends a wait still holding the body: the connection it
-/// wraps belongs to the handler.
+/// read waits for it. On a stream (<see cref="IsMultiplexedStream" />) the status is the response's
+/// own: a <c>100</c> sends the body at once, a status of 300 or above during the wait leaves it
+/// unsent (<see cref="StoppedStreamUpload" />), and no body is stopped part way (curl
+/// 8.18.0's nghttp2 build, measured, BL-5970 Notes). Disposing this only ends a wait still holding
+/// the body: the connection it wraps belongs to the handler.
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
 internal sealed class HttpContinueWaitConnection(IConnection connection) : IConnection, IDisposable
@@ -52,7 +55,7 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
 
     /// <summary>
     /// Gets a value indicating whether this stands for an HTTP/2 or HTTP/3 stream, where no body
-    /// is held: a final 2xx is waited out before the response is read.
+    /// is held after a status of 300 or above.
     /// </summary>
     internal bool IsMultiplexedStream { get; init; }
 
@@ -173,7 +176,7 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
         statusLineRead = ReadStatusLineAsync(cancellationToken);
         CancellationTokenSource waitEnded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task wait = Task.Delay(ContinueWait > LongestTimedWait ? Timeout.InfiniteTimeSpan : ContinueWait, timeProvider, waitEnded.Token);
-        Task first = await WhenWaitEndsAsync(statusLineRead, wait).ConfigureAwait(false);
+        Task first = await Task.WhenAny(statusLineRead, wait).ConfigureAwait(false);
         await HoldOrEndWaitAsync(first != wait, wait, waitEnded).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         WaitRanOut = first == wait;
@@ -181,12 +184,12 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     }
 
     /// <summary>
-    /// Keeps <paramref name="wait" /> running to hold the body when a final status over HTTP/1.x
-    /// ended the caller's wait, and otherwise cancels it.
+    /// Keeps <paramref name="wait" /> running to hold the body when a final status over HTTP/1.x,
+    /// or a final 2xx on a stream, ended the caller's wait, and otherwise cancels it.
     /// </summary>
     private async ValueTask HoldOrEndWaitAsync(bool answered, Task wait, CancellationTokenSource waitEnded)
     {
-        if (answered && !IsMultiplexedStream && firstStatusCode >= 200)
+        if (answered && firstStatusCode >= 200 && !(IsMultiplexedStream && firstStatusCode >= 300))
         {
             heldWaitTimer = waitEnded;
             heldWaitEnd = wait;
@@ -198,23 +201,8 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     }
 
     /// <summary>
-    /// Waits for the first status line or the end of <paramref name="wait" />, whichever comes
-    /// first, and on a stream (<see cref="IsMultiplexedStream" />) on past a final 2xx to the end
-    /// of <paramref name="wait" />: curl 8.22.0 still waits the time out after one and then sends
-    /// the body (measured, CGR-067, BL-3596 Notes).
-    /// </summary>
-    /// <returns><paramref name="wait" /> when the wait ended it; otherwise <paramref name="read" />.</returns>
-    private async Task<Task> WhenWaitEndsAsync(Task<bool> read, Task wait)
-    {
-        Task first = await Task.WhenAny(read, wait).ConfigureAwait(false);
-        return IsMultiplexedStream && first != wait && AnsweredWithFinal2xx
-            ? await Task.WhenAny(wait).ConfigureAwait(false)
-            : first;
-    }
-
-    /// <summary>
     /// Gets a value indicating whether <see cref="WaitForContinueAsync" /> ran out of time
-    /// before any status line arrived, or on a stream after a final 2xx did, after which curl 8.21.0 reports
+    /// before any status line arrived, after which curl 8.21.0 reports
     /// <see cref="HttpConnectionInfoLines.DoneWaitingForContinue" /> (measured, BL-449 Notes).
     /// </summary>
     internal bool WaitRanOut { get; private set; }
@@ -225,9 +213,16 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// <c>417 Expectation Failed</c> (BL-319 Notes) or any other redirect or error
     /// (<c>HTTP error before end of send, stop sending</c>, BL-395 Notes). A 1xx or 2xx lets
     /// the body go on, and so does any status that held the body until the wait ran out
-    /// (<see cref="SendHeldBodyAsync" />).
+    /// (<see cref="SendHeldBodyAsync" />). Never on a stream (<see cref="IsMultiplexedStream" />),
+    /// where a body being sent goes on.
     /// </summary>
-    internal bool StopsSending => !sendsHeldBody && statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300;
+    internal bool StopsSending => !IsMultiplexedStream && !sendsHeldBody && statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300;
+
+    /// <summary>
+    /// Gets a value indicating whether a status of 300 or above arrived on a stream
+    /// (<see cref="IsMultiplexedStream" />) during the wait, which leaves the whole body unsent.
+    /// </summary>
+    internal bool StoppedStreamUpload => IsMultiplexedStream && !WaitRanOut && firstStatusCode >= 300;
 
     /// <summary>
     /// Gets a value indicating whether the first status line received is a 1xx one, the
@@ -349,13 +344,24 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
             receivedLength += read;
         }
 
-        firstStatusCode = lineFeed >= 0 ? StatusCodeOf(received.AsSpan(0, lineFeed + 1)) : null;
+        firstStatusCode = lineFeed >= 0 ? FirstStatusCodeOf(received.AsSpan(0, lineFeed + 1)) : null;
         return firstStatusCode < 200;
     }
 
     /// <summary>
-    /// Gives the status code of a received first line, or <see langword="null" /> when it is not a
-    /// status line.
+    /// Gives the status code of the first line received: on a stream
+    /// (<see cref="IsMultiplexedStream" />) the line is the <c>HTTP/2 NNN </c> or
+    /// <c>HTTP/3 NNN </c> one the stream connection writes, and otherwise it is read as
+    /// <see cref="StatusCodeOf" /> reads it.
+    /// </summary>
+    private int? FirstStatusCodeOf(ReadOnlySpan<byte> line) =>
+        IsMultiplexedStream
+            ? HttpStatusLine.ParseHttp2OrHttp3(HttpLine.Split(line).Content).StatusCode
+            : StatusCodeOf(line);
+
+    /// <summary>
+    /// Gives the status code of a first line received over HTTP/1.x, or <see langword="null" />
+    /// when it is not a status line.
     /// </summary>
     internal static int? StatusCodeOf(ReadOnlySpan<byte> line)
     {

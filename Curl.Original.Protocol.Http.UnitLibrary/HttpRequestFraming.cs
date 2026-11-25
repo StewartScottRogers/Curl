@@ -181,15 +181,17 @@ internal sealed class HttpRequestFraming
     /// <summary>
     /// Makes the same framing for an HTTP/2 or HTTP/3 stream, where DATA frames carry the body and the
     /// stream's end ends it: never chunked, and with no <c>Expect: 100-continue</c> of curl's
-    /// own and no wait for <c>100 Continue</c>, as curl 8.21.0 sends a 2 MB <c>-T</c> upload over
-    /// HTTP/2 (measured, BL-658 Notes); HTTP/3 carries the body the same way (ADR-0172). An <c>-H</c>
-    /// <c>Expect</c> line is still sent.
+    /// own, so no wait for <c>100 Continue</c> on its account, as curl 8.21.0 sends a 2 MB
+    /// <c>-T</c> upload over HTTP/2 (measured, BL-658 Notes); HTTP/3 carries the body the same way
+    /// (ADR-0172). An <c>-H</c> <c>Expect</c> line is still sent, and one asking for
+    /// <c>100-continue</c> is still waited on, as curl's nghttp2 build does (measured, BL-5970
+    /// Notes).
     /// </summary>
     /// <returns>The framing of the HTTP/2 or HTTP/3 request.</returns>
     internal HttpRequestFraming ForHttp2OrHttp3() =>
         IsChunkedOnlyByHeader
             ? new(Method, null, null, isChunked: false, addsExpect: false, awaitsContinue: false)
-            : new(Method, Body, KnownLength, isChunked: false, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange, IsAuthProbe);
+            : new(Method, Body, KnownLength, isChunked: false, addsExpect: false, awaitsContinue: AwaitsContinue && !AddsExpect, RefusesUnknownLength, Upload, ContentRange, IsAuthProbe);
 
     /// <summary>
     /// The empty chunked body <see cref="OfNoBody" /> gives a request with no body of its own when an
