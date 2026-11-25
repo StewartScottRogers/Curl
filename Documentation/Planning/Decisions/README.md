@@ -1432,3 +1432,4 @@ Each option and the specific reason it lost.
 | [1388](ADR-1388-http-transfers-carry-the-mail-options-for-a-redirect-to-mail.md) | An HTTP transfer carries the mail options, for a redirect followed to a mail URL (BL-5936) | Accepted | 2026-11-25 |
 | [1389](ADR-1389-the-openssl-build-refuses-a-subject-email-address-that-is-not-an-ia5string.md) | The OpenSSL build refuses a subject emailAddress that is not an IA5String under name constraints with verify result 53 (BL-5942) | Accepted | 2026-11-25 |
 | [1390](ADR-1390-a-second-multi-handle-finds-an-engine-transfer-socket-readable-when-its-owner-has-work.md) | A second multi handle finds an engine transfer socket readable while its owner has work for it (BL-5943) | Accepted | 2026-11-25 |
+| [1390](ADR-1390-the-openssl-build-checks-name-constraints-name-by-name-from-the-top-ca-down.md) | The OpenSSL build checks name constraints name by name, from the top CA down (BL-5950) | Accepted | 2026-11-25 |

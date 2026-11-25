@@ -50,8 +50,18 @@ internal static class CertificateNameConstraints
     // The name kinds whose constraint is a primitive string or octet string.
     private static readonly Asn1Tag[] OctetNameTags = [DnsNameTag, IpAddressTag, EmailTag, UriTag];
 
+    // Every name kind constraints are checked for.
+    private static readonly Asn1Tag[] ConstrainedNameTags = [DirectoryNameTag, .. OctetNameTags];
+
+    // The kinds the Schannel build's names take from here: its DNS names and addresses are listed apart.
+    private static readonly Asn1Tag[] SchannelOtherNameTags = [DirectoryNameTag, EmailTag, UriTag];
+
     /// <summary>
-    /// Finds the first name constraint the leaf's names break.
+    /// Finds the first name constraint the leaf's names break. The Schannel build reads the CAs from the
+    /// leaf upwards and, for each, checks every name against the permitted subtrees before any against the
+    /// excluded ones. The OpenSSL build reads the CAs from the top of the chain down and takes the names one
+    /// at a time, each against the permitted then the excluded subtrees: the subject, its emailAddresses,
+    /// then the alternative names in the order the certificate holds them.
     /// </summary>
     /// <param name="chain">The chain built for the server certificate, leaf first.</param>
     /// <param name="matchesSchannelBuild">
@@ -74,8 +84,7 @@ internal static class CertificateNameConstraints
         try
         {
             LeafNames? names = null;
-            var end = CountThroughAnchor(chain);
-            for (var index = 1; index < end; index++)
+            foreach (var index in ListAuthoritiesInCheckOrder(chain, matchesSchannelBuild))
             {
                 var extension = elements[index].Certificate.Extensions[NameConstraintsOid];
                 if (extension is null)
@@ -101,6 +110,13 @@ internal static class CertificateNameConstraints
         }
     }
 
+    // OpenSSL's check_name_constraints reads the constraining CAs from the top of the chain down (BL-5950).
+    private static IEnumerable<int> ListAuthoritiesInCheckOrder(X509Chain chain, bool matchesSchannelBuild)
+    {
+        var fromTheLeafUpwards = Enumerable.Range(1, CountThroughAnchor(chain) - 1);
+        return matchesSchannelBuild ? fromTheLeafUpwards : fromTheLeafUpwards.Reverse();
+    }
+
     // A certificate the custom trust store lists is the anchor: those above it, sent by the server, do not apply (BL-5444).
     private static int CountThroughAnchor(X509Chain chain)
     {
@@ -112,10 +128,11 @@ internal static class CertificateNameConstraints
         return anchor == 0 ? elements.Count : anchor;
     }
 
-    // The leaf's names checked together, the subject CNs the OpenSSL build checks after them, one by one, and
+    // The leaf's names in the groups checked one after another (all of them at once in the Schannel build, one
+    // name each in the OpenSSL build), the subject CNs the OpenSSL build checks after them, one by one, and
     // whether the names stop short at a subject emailAddress the OpenSSL build refuses to check.
     private sealed record LeafNames(
-        List<(Asn1Tag Tag, byte[] Value)> Names, List<string> OpenSslCommonNames, bool StopsAtUnsupportedEmailAddress = false);
+        List<List<(Asn1Tag Tag, byte[] Value)>> CheckedTogether, List<string> OpenSslCommonNames, bool StopsAtUnsupportedEmailAddress = false);
 
     // Both builds check the subject CN as a DNS name when the leaf has no dNSName SAN (BL-5432, BL-5829).
     private static LeafNames ReadLeafNames(X509Certificate2 leaf, bool matchesSchannelBuild)
@@ -125,25 +142,32 @@ internal static class CertificateNameConstraints
             .ToList();
         return matchesSchannelBuild
             ? new LeafNames(
-                ListNames(leaf, dnsNames.Count > 0 ? dnsNames : ListSingleValuedAttributes(leaf, CommonNameOid), ListSingleValuedAttributes(leaf, EmailAddressOid)), [])
-            : ReadOpenSslLeafNames(leaf, dnsNames);
+                [ListSchannelNames(leaf, dnsNames.Count > 0 ? dnsNames : ListSingleValuedAttributes(leaf, CommonNameOid))], [])
+            : ReadOpenSslLeafNames(leaf, hasDnsName: dnsNames.Count > 0);
     }
 
     // OpenSSL's NAME_CONSTRAINTS_check takes the subject's directoryName, then each subject emailAddress, and
-    // stops at one that is not an IA5String, before any alternative name or CN (BL-5942).
-    private static LeafNames ReadOpenSslLeafNames(X509Certificate2 leaf, List<string> dnsNames)
+    // stops at one that is not an IA5String, before any alternative name or CN (BL-5942). It takes the
+    // alternative names in the extension's order and answers for the first name it refuses (BL-5950).
+    private static LeafNames ReadOpenSslLeafNames(X509Certificate2 leaf, bool hasDnsName)
     {
         var encodedEmailAddresses = ListEveryEncodedAttribute(leaf, EmailAddressOid);
         var emailAddresses = encodedEmailAddresses.TakeWhile(IsIa5String).SelectMany(value => DecodeCharacterString(value)).ToList();
+        var subjectNames = ListSubjectNames(leaf, emailAddresses);
         return emailAddresses.Count < encodedEmailAddresses.Count
-            ? new LeafNames(ListSubjectNames(leaf, emailAddresses), [], StopsAtUnsupportedEmailAddress: true)
-            : new LeafNames(ListNames(leaf, dnsNames, emailAddresses), dnsNames.Count > 0 ? [] : ListEveryCommonName(leaf));
+            ? new LeafNames(CheckOneByOne(subjectNames), [], StopsAtUnsupportedEmailAddress: true)
+            : new LeafNames(
+                CheckOneByOne(subjectNames.Concat(ListAlternativeNames(leaf, ConstrainedNameTags))),
+                hasDnsName ? [] : ListEveryCommonName(leaf));
     }
+
+    private static List<List<(Asn1Tag Tag, byte[] Value)>> CheckOneByOne(IEnumerable<(Asn1Tag Tag, byte[] Value)> names) =>
+        names.Select(name => new List<(Asn1Tag Tag, byte[] Value)> { name }).ToList();
 
     private static bool IsIa5String(byte[] encoded) =>
         Asn1Tag.Decode(encoded, out _).HasSameClassAndValue(new Asn1Tag(UniversalTagNumber.IA5String));
 
-    private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf, List<string> dnsNames, List<string> subjectEmailAddresses)
+    private static List<(Asn1Tag Tag, byte[] Value)> ListSchannelNames(X509Certificate2 leaf, List<string> dnsNames)
     {
         var names = dnsNames.Select(DnsName).ToList();
         names.AddRange(leaf.Extensions.OfType<X509SubjectAlternativeNameExtension>()
@@ -152,8 +176,8 @@ internal static class CertificateNameConstraints
 
         // directoryName, rfc822Name and URI names are constrained too; the subject counts as a directoryName (BL-5436)
         // and its emailAddress attributes as rfc822Names (RFC 5280 Â§4.2.1.10, BL-5804).
-        names.AddRange(ListSubjectNames(leaf, subjectEmailAddresses));
-        names.AddRange(ListOtherAlternativeNames(leaf));
+        names.AddRange(ListSubjectNames(leaf, ListSingleValuedAttributes(leaf, EmailAddressOid)));
+        names.AddRange(ListAlternativeNames(leaf, SchannelOtherNameTags));
         return names;
     }
 
@@ -171,7 +195,8 @@ internal static class CertificateNameConstraints
         return names;
     }
 
-    private static List<(Asn1Tag Tag, byte[] Value)> ListOtherAlternativeNames(X509Certificate2 leaf)
+    // The alternative names of the kinds asked for, in the order the extension holds them.
+    private static List<(Asn1Tag Tag, byte[] Value)> ListAlternativeNames(X509Certificate2 leaf, Asn1Tag[] kinds)
     {
         var names = new List<(Asn1Tag, byte[])>();
         var extension = leaf.Extensions[AlternativeNameOid];
@@ -184,13 +209,9 @@ internal static class CertificateNameConstraints
         while (reader.HasData)
         {
             var tag = reader.PeekTag();
-            if (tag == DirectoryNameTag)
+            if (kinds.Contains(tag))
             {
-                names.Add((tag, reader.ReadSequence(tag).ReadEncodedValue().ToArray()));
-            }
-            else if (tag == EmailTag || tag == UriTag)
-            {
-                names.Add((tag, reader.ReadOctetString(tag)));
+                names.Add((tag, ReadNameValue(reader, tag)));
             }
             else
             {
@@ -200,6 +221,10 @@ internal static class CertificateNameConstraints
 
         return names;
     }
+
+    // A directoryName is an explicitly tagged Name; every other constrained kind is a primitive string or octet string.
+    private static byte[] ReadNameValue(AsnReader reader, Asn1Tag tag) =>
+        tag == DirectoryNameTag ? reader.ReadSequence(tag).ReadEncodedValue().ToArray() : reader.ReadOctetString(tag);
 
     // OpenSSL's NAME_CONSTRAINTS_check_CN takes the CNs in order and stops at the first it refuses. It
     // drops trailing NULs, refuses a NUL inside a CN whatever the constraints' kinds, and checks a CN
@@ -301,7 +326,9 @@ internal static class CertificateNameConstraints
             (tag.TagValue == 0 ? permitted : excluded).AddRange(ReadSubtrees(subtrees));
         }
 
-        var violation = FindViolation(permitted, excluded, names.Names);
+        var violation = names.CheckedTogether
+            .Select(together => FindViolation(permitted, excluded, together))
+            .FirstOrDefault(found => found != 0);
         return violation != 0 ? violation
             : names.StopsAtUnsupportedEmailAddress ? UnsupportedNameSyntax
             : FindCommonNameViolation(permitted, excluded, names.OpenSslCommonNames);
@@ -318,13 +345,9 @@ internal static class CertificateNameConstraints
         {
             var subtree = subtrees.ReadSequence();
             var tag = subtree.PeekTag();
-            if (tag == DirectoryNameTag)
+            if (ConstrainedNameTags.Contains(tag))
             {
-                read.Add((tag, subtree.ReadSequence(tag).ReadEncodedValue().ToArray()));
-            }
-            else if (OctetNameTags.Contains(tag))
-            {
-                read.Add((tag, subtree.ReadOctetString(tag)));
+                read.Add((tag, ReadNameValue(subtree, tag)));
             }
         }
 
