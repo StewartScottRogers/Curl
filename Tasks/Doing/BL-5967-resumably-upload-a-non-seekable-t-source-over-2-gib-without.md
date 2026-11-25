@@ -33,3 +33,4 @@ A resumable upload of a non-seekable `-T` source (`-T -`) over 2 GiB either uplo
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 423d1023 12e4f3af c1c4a64e.
