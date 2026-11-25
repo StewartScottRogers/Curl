@@ -29,7 +29,7 @@ Measured in BL-5941 with `Record-CurlExchange.ps1 -ListenAddress <WSL gateway> -
 
 - `Http2StreamConnection.EndedWithEmptyData` records that END_STREAM came on a HEADERS frame (head or trailer), or on a DATA frame of a response with no body bytes; `ReportEmptyStreamData` in `HttpProtocolHandler.ResponseBody.cs` reports the empty data after the trailers. An ignored body never reaches it, and a `-I` response ended at a DATA frame does not set the property, so nothing is reported twice.
 - Measured beyond the four cases, curl 8.18.0 (nghttp2, WSL), `-sS -v`, and matched because curl does the same: a GET 204 or 304 ending on HEADERS or empty DATA, and `content-length: 0` or `content-length: 3` with data ended by a trailer, each write `{ [0 bytes data]` (after the trailer). Data ended by an empty DATA writes only `{ [3 bytes data]` on `-v`, so no event is added there.
-- No `content-length`, no body, ended by a trailer: curl writes the line after the trailer; Curl writes it before, from the body reader, whose file BL-5948 held. Filed as BL-5954.
+- No `content-length`, no body, ended by a trailer: curl writes the line after the trailer; Curl writes it before, from the body reader, whose file BL-5948 held. Filed as BL-5956.
 - `HttpStreamOpenedLines.cs` and `HttpProtocolHandler.IgnoredBody.cs` needed no change.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary`, 0 failing members. Built curl against the recorder (data then trailer) writes the same lines as real curl.
 - CI on Linux and macOS: the change and its tests use no platform-dependent behaviour.

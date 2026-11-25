@@ -1,5 +1,5 @@
 ---
-id: BL-5954
+id: BL-5956
 title: Report empty HTTP/2 data once, after the trailer, for a response with no length and no body
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5954 — Report empty HTTP/2 data once, after the trailer, for a response with no length and no body
+# BL-5956 — Report empty HTTP/2 data once, after the trailer, for a response with no length and no body
 
 ## Goal
 
