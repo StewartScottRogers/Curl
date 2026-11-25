@@ -31,3 +31,4 @@ Left by BL-5974 (ADR-1405), which writes `Connection #0 to host ... left intact`
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: c10e1646 90bdb073 3d836d5e.
