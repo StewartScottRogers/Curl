@@ -1,5 +1,5 @@
 ---
-id: BL-5925
+id: BL-5928
 title: Write an xmpp / xmpps disco answer with the same line ends on every platform
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5925 — Write an xmpp / xmpps disco answer with the same line ends on every platform
+# BL-5928 — Write an xmpp / xmpps disco answer with the same line ends on every platform
 
 ## Goal
 

@@ -42,7 +42,7 @@ become the body. An `XmlWriter` with `NewLineHandling.Entitize` writes CR as `&#
 - Forbidden character: `XmppProtocolHandlerTests` (body U+0001) still passes with exit 43.
 - 2026-11-24: build 0 warnings, fast tests green (Xmpp 82 passed); `Measure-CodeQuality.ps1 -Library
   Curl.Extended.Protocol.Xmpp.UnitLibrary`: 0 failing members.
-- Filed BL-5925: the disco answer written to the output still uses the platform's newline.
+- Filed BL-5928: the disco answer written to the output still uses the platform's newline.
 
 ## Log
 
