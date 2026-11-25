@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
+touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-24
 ---
 # BL-5829 — Fix fitness finding STD-179: Linux, intermediate anchor: name constraints are applied to a dotless subject CN (CryptoAPI rule); OpenSSL curl ignores it
 
@@ -42,11 +42,24 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the first four commands exit 0 with `hello` and `0`; a leaf with `CN=www.example.com` under `excluded;DNS:example.com` still exits 60 with `(48)`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first four commands exit 0 with `hello` and `0`; a leaf with `CN=www.example.com` under `excluded;DNS:example.com` still exits 60 with `(48)`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Lane run 2026-11-24 (ADR-1349): reproduced in code (`ListNames` applied the CryptoAPI CN rule in both builds).
+  `FindViolation` now takes `matchesSchannelBuild`; the OpenSSL rule (a CN counts only when it looks like a
+  dotted host name) is the default, so `ServerCertificateVerification.CaCertificates.cs`, held by BL-5879,
+  needed no edit (its call serves `--capath`, which only the OpenSSL build reads).
+- `touches` widened to `ServerCertificateVerification.ChainErrors.cs` (the two callers that must pass the
+  build) and the name constraint tests; no other task in Doing names either.
+- The Linux commands were not run live (lanes are Windows only). They are pinned by unit tests that drive the
+  OpenSSL build's verification with generated certificates: `--cacert` and `--proxy-cacert` share
+  `VerifyPeer`, `--capath` goes through `VerifyChain`, and the dotted CN gives exit 60 `(48)`. REF2's
+  answers are the finding's measurements; the CN rule is OpenSSL's `cn2dnsid`.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
+- Follow-up: BL-5903 (a CN holding a NUL is 47 here, 53 in OpenSSL; CNs in multi-valued names).
 
 Re-reported in fitness review 2026-11-24T0708 (commit `1e5d591`, the `preview` release binaries) as `Linux, intermediate anchor: name constraints are applied to a dotless subject CN; OpenSSL curl ignores it (STILL OPEN, unchanged)`. Where it differs from the Context above, this report wins:
 
@@ -70,3 +83,4 @@ Re-reported in fitness review 2026-11-24T0708 (commit `1e5d591`, the `preview` r
 - 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
 - 2026-11-24: Notes updated from fitness review 2026-11-24T0708.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 82fc63dd 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. The OpenSSL build checks only a dotted host-name CN against DNS name constraints, so a dotless CN under an intermediate anchor is accepted
