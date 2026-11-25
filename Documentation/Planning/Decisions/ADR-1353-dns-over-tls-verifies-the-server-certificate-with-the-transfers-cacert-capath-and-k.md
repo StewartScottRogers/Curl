@@ -1,4 +1,4 @@
-# ADR-1347: --dns-over-tls verifies the server certificate with the transfer's --cacert, --capath and -k
+# ADR-1353: --dns-over-tls verifies the server certificate with the transfer's --cacert, --capath and -k
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5872).
 

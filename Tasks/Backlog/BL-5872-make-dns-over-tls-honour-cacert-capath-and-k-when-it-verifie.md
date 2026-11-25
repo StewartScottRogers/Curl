@@ -31,7 +31,7 @@ Repro: `surl -v --cert server.pem --key server.key --dns-transport tls dns://127
 
 ## Notes
 
-- Done and committed (ADR-1347): `--dns-over-tls` gets the transfer's `-k`, `--cacert`, `--capath` through `ExtensionOptionValues.TlsTrust`; option help and CLAUDE.md say so. Build clean; Measure-CodeQuality for Abstractions and EncryptedDns: 0 failing members, its 69 test projects passed.
+- Done and committed (ADR-1353): `--dns-over-tls` gets the transfer's `-k`, `--cacert`, `--capath` through `ExtensionOptionValues.TlsTrust`; option help and CLAUDE.md say so. Build clean; Measure-CodeQuality for Abstractions and EncryptedDns: 0 failing members, its 69 test projects passed.
 - Touches widened: the hook had no way to see the transfer's options; no other task in Doing named these files.
 - Left: criteria 1 and 2. `DnsOverTlsTrustTests` pins only the mapping to `TlsClientOptions`. Add unit tests that resolve through a test-double DoT server over an in-memory duplex `IConnection` (server side `SslStream`, certificate from a private CA): resolves with `--cacert`, resolves with `-k` and an untrusted certificate, fails without either. `DnsOverTlsResolver` takes the connector, so inject a fake one and `new SslStreamTlsProvider(hook.TlsOptions, TimeProvider.System)`. Check whether Linux/macOS chain building answers the same.
 - `--dns-over-quic` does not read `TlsTrust`; outside this task.

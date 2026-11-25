@@ -10,7 +10,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
 - `ExtensionOptionValues` is what one option group gave those options, which the extension reads at
   transfer time: `IsGiven` and `ValueOf` (the empty string for a flag, the last value given wins).
   Its `TlsTrust` (`ExtensionTlsTrust`: `-k`, `--cacert`, `--capath`) is what an extension opening a TLS
-  connection of its own verifies the server with (ADR-1347).
+  connection of its own verifies the server with (ADR-1353).
 - `Transfer/ITransferHook` is what an activated extension does to one transfer: request headers added
   after curl's, a stream the response body passes through before curl's output, and the finished
   `TransferResult` (status, headers, timings). `TransferHooks.ActivatedBy` keeps the hooks whose option
