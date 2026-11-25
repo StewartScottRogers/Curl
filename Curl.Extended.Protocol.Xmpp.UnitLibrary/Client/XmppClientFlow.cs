@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Xml;
@@ -23,6 +24,8 @@ internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsPro
 
     /// <summary>The closing tag of the client's stream.</summary>
     internal const string StreamClose = "</stream:stream>";
+
+    private static readonly XmlWriterSettings SentXmlSettings = new() { OmitXmlDeclaration = true, NewLineHandling = NewLineHandling.Entitize };
 
     private readonly IConnection plaintext = connection;
 
@@ -223,11 +226,21 @@ internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsPro
         }
     }
 
+    /// <summary>
+    /// Serialises an element to send, writing each CR in it as <c>&amp;#xD;</c> and each LF in its text as itself, so
+    /// the server's XML line-end normalisation (XML 1.0, 2.11) gives back the characters it held.
+    /// </summary>
     private static string Encode(XElement element)
     {
         try
         {
-            return element.ToString(SaveOptions.DisableFormatting);
+            using StringWriter text = new(CultureInfo.InvariantCulture);
+            using (XmlWriter writer = XmlWriter.Create(text, SentXmlSettings))
+            {
+                element.WriteTo(writer);
+            }
+
+            return text.ToString();
         }
         catch (ArgumentException)
         {

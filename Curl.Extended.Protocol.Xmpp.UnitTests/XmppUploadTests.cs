@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Xml.Linq;
 using Curl.Core;
 using Curl.Extended.Protocol.Xmpp.Client;
 using Curl.Protocol.Abstractions;
@@ -30,6 +31,23 @@ public sealed class XmppUploadTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         Assert.Contains(MessageWithBody("café � \U0001F600"), connection.WrittenText);
+    }
+
+    [TestMethod]
+    [DataRow(true, DisplayName = "-T")]
+    [DataRow(false, DisplayName = "-d")]
+    public async Task ExecuteAsync_BodyHoldingCrAndLf_ParsesBackFromTheSentStanzaUnchanged(bool asUpload)
+    {
+        const string body = "a\r\nb\rc\nd";
+        byte[] bytes = Encoding.UTF8.GetBytes(body);
+        ScriptedXmppConnection connection = LoggedInConnection();
+
+        TransferResult result = await SendAsync(connection, asUpload ? bytes : null, asUpload ? null : bytes);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        string stanza = connection.WrittenText.Single(text => text.StartsWith("<message", StringComparison.Ordinal));
+        Assert.AreEqual(MessageWithBody("a&#xD;\nb&#xD;c\nd"), stanza);
+        Assert.AreEqual(body, XElement.Parse(stanza).Value);
     }
 
     [TestMethod]
