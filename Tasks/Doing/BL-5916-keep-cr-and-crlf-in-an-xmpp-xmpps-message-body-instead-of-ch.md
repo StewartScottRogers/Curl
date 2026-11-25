@@ -36,3 +36,4 @@ become the body. An `XmlWriter` with `NewLineHandling.Entitize` writes CR as `&#
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 5049e5b3 9d0eb0c1 3d836d5e.
