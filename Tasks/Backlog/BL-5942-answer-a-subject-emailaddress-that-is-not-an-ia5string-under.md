@@ -18,7 +18,7 @@ In the OpenSSL build, a leaf whose subject emailAddress is not an IA5String unde
 
 ## Context
 
-Found during BL-5940 (ADR-1384). OpenSSL's `NAME_CONSTRAINTS_check` (`crypto/x509/v3_ncons.c`) returns `X509_V_ERR_UNSUPPORTED_NAME_SYNTAX` (53) for a subject emailAddress that is not an IA5String; `CertificateNameConstraints` decodes any character string type and checks it as an rfc822Name. Read from the source, not yet measured: measure OpenSSL curl first (`openssl req` forces IA5String, so build the certificate another way). The Schannel build's answers must not change.
+Found during BL-5940 (ADR-1387). OpenSSL's `NAME_CONSTRAINTS_check` (`crypto/x509/v3_ncons.c`) returns `X509_V_ERR_UNSUPPORTED_NAME_SYNTAX` (53) for a subject emailAddress that is not an IA5String; `CertificateNameConstraints` decodes any character string type and checks it as an rfc822Name. Read from the source, not yet measured: measure OpenSSL curl first (`openssl req` forces IA5String, so build the certificate another way). The Schannel build's answers must not change.
 
 ## Acceptance criteria
 

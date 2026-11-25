@@ -1,4 +1,4 @@
-# ADR-1384: The OpenSSL build reads every subject emailAddress against name constraints (BL-5940)
+# ADR-1387: The OpenSSL build reads every subject emailAddress against name constraints (BL-5940)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1383.
 

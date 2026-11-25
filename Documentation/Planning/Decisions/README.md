@@ -1428,4 +1428,4 @@ Each option and the specific reason it lost.
 | [1384](ADR-1384-data-past-the-length-on-an-unwanted-http2-body-closes-the-connection.md) | DATA past the length on an unwanted HTTP/2 body closes the connection without failing (BL-5938) | Accepted | 2026-11-25 |
 | [1385](ADR-1385-state-files-are-replaced-by-rename-on-windows-too.md) | The cookie jar, HSTS and alt-svc files are replaced by rename on Windows too, retrying a refused rename for a second (BL-5933) | Accepted | 2026-11-25 |
 | [1386](ADR-1386-a-write-checks-the-socket-first-only-on-windows.md) | A write checks the socket first only where aborts are reported as resets (BL-5939) | Accepted | 2026-11-25 |
-| [1384](ADR-1384-the-openssl-build-reads-every-subject-email-address-against-name-constraints.md) | The OpenSSL build reads every subject emailAddress, multi-valued relative names included, against name constraints (BL-5940) | Accepted | 2026-11-25 |
+| [1387](ADR-1387-the-openssl-build-reads-every-subject-email-address-against-name-constraints.md) | The OpenSSL build reads every subject emailAddress, multi-valued relative names included, against name constraints (BL-5940) | Accepted | 2026-11-25 |
