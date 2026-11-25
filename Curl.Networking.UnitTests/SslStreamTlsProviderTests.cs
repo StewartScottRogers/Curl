@@ -749,9 +749,7 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     [DataRow("empty")]
     [DataRow("text")]
-    [DataRow("corrupt")]
-    [DataRow("undecodable")]
-    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingNoParsableCertificateInTheSchannelBuild_ReportsAnUntrustedRoot(
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingNoCertificateBlockInTheSchannelBuild_ReportsAnUntrustedRoot(
         string caFileContent)
     {
         var caFile = WriteUnusableCaFile(caFileContent);
@@ -785,16 +783,46 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingTheServerCertificateAndACorruptBlockInTheSchannelBuild_Succeeds()
+    [DataRow("corrupt")]
+    [DataRow("undecodable")]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingABlockThatYieldsNoCertificateInTheSchannelBuild_FailsWithSslCacertBadfile(
+        string caFileContent)
+    {
+        var caFile = WriteUnusableCaFile(caFileContent);
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None, SchannelBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual($"schannel: failed to extract certificate from CA file '{caFile}': Cannot find the requested object.", result.Result.ErrorMessage);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingTheServerCertificateAndACorruptBlockInTheSchannelBuild_FailsWithSslCacertBadfile()
     {
         var caFile = WriteCaFile("mixed.pem", s_serverCertificate.ExportCertificatePem() + "\n" + CorruptCertificatePem);
 
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None, SchannelBuild);
 
-        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
-        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
-        await result.Result.Connection!.DisposeAsync();
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual($"schannel: failed to extract certificate from CA file '{caFile}': Cannot find the requested object.", result.Result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateBlobHoldingAnUnterminatedBlockInTheSchannelBuild_NamesTheMemoryBlob()
+    {
+        var blob = System.Text.Encoding.ASCII.GetBytes(s_serverCertificate.ExportCertificatePem() + "\n-----BEGIN CERTIFICATE-----\n");
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateBlob: blob), CertificateHost, SslProtocols.None, SchannelBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual("schannel: CA file '(memory blob)' is not correctly formatted", result.Result.ErrorMessage);
     }
 
     [TestMethod]

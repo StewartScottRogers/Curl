@@ -165,7 +165,8 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     /// <exception cref="IOException">The <c>--cacert</c> file cannot be read.</exception>
     /// <exception cref="UnauthorizedAccessException">The <c>--cacert</c> file cannot be opened.</exception>
     /// <exception cref="CryptographicException">
-    /// The OpenSSL build refuses the <c>--cacert</c> file's contents, or, as
+    /// Either build refuses the <c>--cacert</c> file's contents (the Schannel build as
+    /// <see cref="SchannelCaCertificateFileException" />), or, as
     /// <see cref="CertificateRevocationListFileException" />, the <c>--crlfile</c>.
     /// </exception>
     internal (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore, CertificateRevocationListFile? RevocationLists) ReadTrustAnchors()
@@ -182,14 +183,18 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
 
     /// <summary>
     /// The build's exit code and message for trust anchors <see cref="ReadTrustAnchors" /> could
-    /// not read: exit 82 for the <c>--crlfile</c>, exit 77 for the <c>--cacert</c> file.
+    /// not read: exit 82 for the <c>--crlfile</c>, exit 77 for the <c>--cacert</c> file, with the Schannel build's
+    /// refusal of its contents as <see cref="SchannelCaCertificateFileException" /> carries it.
     /// </summary>
     /// <param name="exception">What <see cref="ReadTrustAnchors" /> threw.</param>
     /// <returns>The exit code and the message curl prints.</returns>
     internal (CurlExitCode ExitCode, string Message) TrustAnchorsUnusable(Exception exception) =>
-        exception is CertificateRevocationListFileException
-            ? (CurlExitCode.SslCrlBadfile, TlsFailureMessages.OpenSslRevocationListFileUnusable(options.CertificateRevocationListFile!))
-            : (CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable());
+        exception switch
+        {
+            CertificateRevocationListFileException => (CurlExitCode.SslCrlBadfile, TlsFailureMessages.OpenSslRevocationListFileUnusable(options.CertificateRevocationListFile!)),
+            SchannelCaCertificateFileException refusal => (CurlExitCode.SslCacertBadfile, refusal.Message),
+            _ => (CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable()),
+        };
 
     /// <summary>
     /// Verifies a chain apart from any handshake (ADR-1052): reads the trust anchors as a
