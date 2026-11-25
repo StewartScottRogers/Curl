@@ -31,4 +31,4 @@ The rule lives in the SMTP handler, which already holds the transfer's mail opti
 
 `AUTH=DIGEST-MD5` with an empty user, and `-u :` the same way, sends nothing after the
 challenge in curl's SSPI build (exit 67). That rule is not SMTP's:
-`Curl.Authentication.UnitLibrary` applies it (BL-5968, ADR-1398).
+`Curl.Authentication.UnitLibrary` applies it (BL-5968, ADR-1400).

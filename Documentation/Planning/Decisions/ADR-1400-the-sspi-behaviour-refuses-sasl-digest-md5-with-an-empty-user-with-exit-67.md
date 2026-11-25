@@ -1,4 +1,4 @@
-# ADR-1398: The SSPI behaviour refuses SASL DIGEST-MD5 with an empty user with exit 67
+# ADR-1400: The SSPI behaviour refuses SASL DIGEST-MD5 with an empty user with exit 67
 
 - Status: Accepted
 - Date: 2026-11-25

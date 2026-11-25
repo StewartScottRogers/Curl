@@ -31,7 +31,7 @@ Found in BL-5963. Measured with `Record-CurlExchange.ps1 -Smtp -SmtpReply 'EHLO=
 
 - 2026-11-25: `SaslAuthenticator` refuses the empty user before reading the challenge: no
   answer and no cancel reason, which the SMTP, POP3 and IMAP handlers end as exit 67 with
-  nothing sent (ADR-1398). `SaslDigestMd5.cs` needed no change. The old test that expected
+  nothing sent (ADR-1400). `SaslDigestMd5.cs` needed no change. The old test that expected
   an SSPI answer without a credential now covers the curl build only
   (`Begin_DigestMd5EmptyUserCurlBuild_AnswersWithAnEmptyUser`); the SSPI side is
   `Begin_DigestMd5EmptyUserSspi_GivesNoAnswerAndNoCancelReason`.
