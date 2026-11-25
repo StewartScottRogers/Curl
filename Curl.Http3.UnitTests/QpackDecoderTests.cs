@@ -130,7 +130,7 @@ public sealed class QpackDecoderTests
     }
 
     [TestMethod]
-    public void CancelStream_WithNoDynamicTable_WritesNothing()
+    public void CancelStream_WithNoDynamicTable_WritesTheCancellationAsNghttp3Does()
     {
         var decoder = new QpackDecoder(0, 0);
         Diagnostics.Arrange("decoder", "maximum capacity 0, maximum blocked streams 0");
@@ -140,9 +140,9 @@ public sealed class QpackDecoderTests
         var cancelled = decoder.TakeDecoderStreamBytes();
         Diagnostics.Bytes("decoder stream", cancelled);
         Diagnostics.Act("decoder stream length", cancelled.Length);
-        Diagnostics.Assert("decoder stream length", 0, cancelled.Length);
+        Diagnostics.Assert("decoder stream length", 1, cancelled.Length);
 
-        Assert.IsEmpty(cancelled);
+        CollectionAssert.AreEqual(new byte[] { 0x44 }, cancelled);
     }
 
     [TestMethod]
