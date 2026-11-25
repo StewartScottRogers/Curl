@@ -31,3 +31,4 @@ BL-5924 did this for the FTP stand-in only: `FtpServerConnector` wraps each cont
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 2c5471be 1201ce2f 3d836d5e.
