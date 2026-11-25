@@ -38,7 +38,7 @@ Command: `curl -sS -f --http2-prior-knowledge --digest -u tester:secret -w %{htt
     RST_STREAM STREAM_CLOSED (not CANCEL) only when `-m 3` gives up. So the Context's
     "still resets with CANCEL" does not happen upstream, and Curl now waits too.
   - h2c upgrade, Digest 401, DATA END_STREAM: RST_STREAM STREAM_CLOSED (as BL-970): kept.
-- Fix (ADR-1350): `AbandonResponseAsync` reads a stream whose request has ended to its end;
+- Fix (ADR-1357): `AbandonResponseAsync` reads a stream whose request has ended to its end;
   an upgraded stream, or one whose request has not ended (unmeasured), is still reset.
 - The built Curl against the first case sends the same frame types and streams as curl, except
   curl's RST_STREAM on the unanswered stream 3 at the timeout: filed as BL-5922.

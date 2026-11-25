@@ -35,7 +35,7 @@ any HTTP/2 session so the next URL continues it, and `-v` ends with `left intact
 is opened half closed (`Http2Connection.OpenUpgradedStream`) and read to its end, so it
 closes with its response; a body the handler ignores (the 401 before a retry) on it is not
 read but reset with STREAM_CLOSED (BL-970, ADR-0343). On any other stream whose request has
-ended, an ignored body is read to its end and the stream is not reset (BL-5906, ADR-1350);
+ended, an ignored body is read to its end and the stream is not reset (BL-5906, ADR-1357);
 one whose request has not ended is reset with STREAM_CLOSED. The first stream
 opened after the upgrade is preceded by curl's extra SETTINGS, INITIAL_WINDOW_SIZE 65536.
 

@@ -1,4 +1,4 @@
-# ADR-1350 — An ignored HTTP/2 body is read to its end, except on an upgraded or unsent stream
+# ADR-1357 — An ignored HTTP/2 body is read to its end, except on an upgraded or unsent stream
 
 - **Status:** Accepted
 - **Date:** 2026-11-24
