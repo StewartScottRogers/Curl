@@ -192,8 +192,54 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
         Assert.StartsWith(expectedStart, Encoding.Latin1.GetString(sent));
     }
 
+    [TestMethod]
+    [DataRow(TimestampGreeting, "AUTH=*", "CAPA\r\nAPOP  ", DisplayName = "AUTH=* sends APOP for an empty user")]
+    [DataRow(Greeting, "AUTH=*", "CAPA\r\nUSER \r\n", DisplayName = "AUTH=* sends USER for an empty user")]
+    public async Task ExecuteAsync_BearerTokenWithoutUserAndAuthOption_LogsInWithEmptyCredential(string greeting, string loginOptions, string expectedStart)
+    {
+        // Measured with curl 8.22.0: --oauth2-bearer, no -u and AUTH=* send APOP with an empty user (BL-5962).
+        (_, _, byte[] sent) = await RunAsync(greeting + "+OK\r\nUSER\r\n.\r\n-ERR no\r\n", null, "tok", loginOptions);
+
+        Assert.StartsWith(expectedStart, Encoding.Latin1.GetString(sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenWithoutUserAndUnbuiltMechanism_ReportsItNotBuiltIn()
+    {
+        // Measured with curl 8.22.0: --oauth2-bearer, no -u and AUTH=SCRAM-SHA-1 offered (BL-5962).
+        (TransferResult result, RecordingTransferEvents events, byte[] sent) = await RunAsync(
+            Greeting + "+OK\r\nSASL SCRAM-SHA-1\r\n.\r\n", null, "tok", "AUTH=SCRAM-SHA-1");
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("CAPA\r\n", Encoding.Latin1.GetString(sent));
+        CollectionAssert.Contains(events.Info, "SASL: SCRAM-SHA-1 not builtin");
+    }
+
+    [TestMethod]
+    [DataRow(TimestampGreeting, DefaultCapa, DisplayName = "SASL PLAIN LOGIN, USER and a timestamp")]
+    [DataRow(Greeting, "+OK\r\nUSER\r\n.\r\n", DisplayName = "USER only")]
+    public async Task ExecuteAsync_BearerTokenWithheldByRedirectAndNoAuthOption_SendsNothingAfterCapa(string greeting, string capaReply)
+    {
+        // Measured with curl 8.22.0: after a redirect to pop3://v@host withholds the token, curl
+        // sends nothing after CAPA and exits 67 (BL-5962).
+        (TransferResult result, _, byte[] sent) = await RunAsync(greeting + capaReply, "v", null, null, password: string.Empty, bearerTokenWithheld: true);
+
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("CAPA\r\n", Encoding.Latin1.GetString(sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenWithheldByRedirectAndAuthPlain_AuthenticatesWithPlain()
+    {
+        // Measured with curl 8.22.0: AUTH=PLAIN after the redirect sends AUTH PLAIN (BL-5962).
+        (_, _, byte[] sent) = await RunAsync(Greeting + DefaultCapa + "-ERR no\r\n", "v", null, "AUTH=PLAIN", password: string.Empty, bearerTokenWithheld: true);
+
+        Assert.StartsWith("CAPA\r\nAUTH PLAIN", Encoding.Latin1.GetString(sent));
+    }
+
     private async Task<(TransferResult Result, RecordingTransferEvents Events, byte[] Sent)> RunAsync(
-        string replies, string? user, string? bearerToken, string? loginOptions, string path = "1", string password = "secret")
+        string replies, string? user, string? bearerToken, string? loginOptions, string path = "1", string password = "secret", bool bearerTokenWithheld = false)
     {
         var events = new RecordingTransferEvents();
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(replies));
@@ -203,7 +249,7 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
             Output = Stream.Null,
             Events = events,
             Credentials = user is null ? null : new NetworkCredential(user, password),
-            Mail = new MailRequestOptions { BearerToken = bearerToken, LoginOptions = loginOptions },
+            Mail = new MailRequestOptions { BearerToken = bearerToken, LoginOptions = loginOptions, BearerTokenWithheld = bearerTokenWithheld },
         };
         // As curl's, the authenticator offers PLAIN for a user name and XOAUTH2 for a bearer token.
         var sasl = new ScriptedSaslAuthenticator((bearerToken is null ? "PLAIN" : "XOAUTH2", ["\0user\0secret"]));
