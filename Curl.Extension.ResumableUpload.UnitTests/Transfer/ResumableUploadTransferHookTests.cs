@@ -69,6 +69,9 @@ public sealed class ResumableUploadTransferHookTests
     [DataRow(CurlExitCode.RecvError, "3", "lo")]
     [DataRow(CurlExitCode.SendError, "5", "")]
     [DataRow(CurlExitCode.GotNothing, "0", "hello")]
+    [DataRow(CurlExitCode.Http2Stream, "2", "llo")]
+    [DataRow(CurlExitCode.Http2, "1", "ello")]
+    [DataRow(CurlExitCode.PartialFile, "4", "o")]
     public async Task ExecuteAsync_TusPatchBroken_RetrievesTheOffsetWithHeadAndPatchesFromIt(CurlExitCode broken, string offset, string rest)
     {
         // tus 1.0 "Core Protocol": after a broken PATCH the client sends HEAD and resumes from its Upload-Offset, the
