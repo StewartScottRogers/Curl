@@ -15,12 +15,14 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
 {
     private static readonly byte[] RecordDelimiter = [(byte)'\n'];
 
-    private const int MetadataAttempts = 10;
+    private const int LeaderRetries = 9;
     private const short UnknownTopicOrPartition = 3;
     private const short LeaderNotAvailable = 5;
-    private static readonly TimeSpan MetadataRetryDelay = TimeSpan.FromMilliseconds(250);
+    private const short NotLeaderOrFollower = 6;
+    private static readonly TimeSpan LeaderRetryDelay = TimeSpan.FromMilliseconds(250);
 
     private int correlationId;
+    private int leaderRetries;
 
     /// <summary>The bytes written to the output so far.</summary>
     internal long BytesWritten { get; private set; }
@@ -75,35 +77,63 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     }
 
     /// <summary>
-    /// Sends Metadata for the address's topic and gives the host and port of the broker that leads its partition; a
-    /// UNKNOWN_TOPIC_OR_PARTITION or LEADER_NOT_AVAILABLE (a broker that auto-creates the topic has no leader for it yet) is
-    /// asked again up to ten times, 250 ms apart on the transfer's time provider, within the transfer's cancellation; any other
+    /// Sends Metadata for the address's topic and gives the host and port of the broker that leads its partition; an error
+    /// saying no leader is ready is asked about again while <see cref="WaitForLeaderAsync"/> has a retry left; any other
     /// topic or partition error, or a partition with no leader among the brokers, ends with exit 8 naming the error.
     /// </summary>
     internal async ValueTask<KafkaMetadataLeader> FindLeaderAsync(KafkaAddress address)
     {
-        for (int attempt = 1; ; attempt++)
+        while (true)
         {
             ReadOnlyMemory<byte> body = await ExchangeAsync("Metadata", id => KafkaRequests.Metadata(id, address.Topic)).ConfigureAwait(false);
             KafkaMetadataLeader leader = Decoded(() => KafkaMetadataResponse.ReadLeader(body, address.Partition));
-            if (!IsLeaderPending(leader.ErrorCode) || attempt >= MetadataAttempts)
+            if (!await WaitForLeaderAsync(leader.ErrorCode).ConfigureAwait(false))
             {
                 ThrowOnError(leader.ErrorCode, address);
                 return leader;
             }
-
-            await Task.Delay(MetadataRetryDelay, timeProvider, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private static bool IsLeaderPending(short errorCode) => errorCode is UnknownTopicOrPartition or LeaderNotAvailable;
+    /// <summary>
+    /// When <paramref name="errorCode"/> is UNKNOWN_TOPIC_OR_PARTITION, LEADER_NOT_AVAILABLE or NOT_LEADER_OR_FOLLOWER (a
+    /// broker that auto-creates a topic has no leader ready for it yet) and a retry is left, waits 250 ms on the transfer's
+    /// time provider, within the transfer's cancellation, and gives <see langword="true"/>. Metadata and Produce share the
+    /// connection's nine retries (ADR-1369).
+    /// </summary>
+    private async ValueTask<bool> WaitForLeaderAsync(short errorCode)
+    {
+        if (errorCode is not (UnknownTopicOrPartition or LeaderNotAvailable or NotLeaderOrFollower) || leaderRetries >= LeaderRetries)
+        {
+            return false;
+        }
 
-    /// <summary>Produces one record whose value is <paramref name="value"/> to the address's partition.</summary>
+        leaderRetries++;
+        await Task.Delay(LeaderRetryDelay, timeProvider, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>
+    /// Produces one record whose value is <paramref name="value"/> to the address's partition. A broker that answers that no
+    /// leader is ready has not stored the record, so while <see cref="WaitForLeaderAsync"/> has a retry left, Metadata is
+    /// asked again and the same record is sent again over this connection.
+    /// </summary>
     internal async ValueTask ProduceAsync(KafkaAddress address, ReadOnlyMemory<byte> value, long timestampMilliseconds)
     {
         byte[] batch = KafkaRecordBatch.Encode(value.Span, timestampMilliseconds);
-        ReadOnlyMemory<byte> body = await ExchangeAsync("Produce", id => KafkaRequests.Produce(id, address.Topic, address.Partition, batch)).ConfigureAwait(false);
-        ThrowOnError(Decoded(() => KafkaResponses.ReadProduce(body)).ErrorCode, address);
+        while (true)
+        {
+            ReadOnlyMemory<byte> body = await ExchangeAsync("Produce", id => KafkaRequests.Produce(id, address.Topic, address.Partition, batch)).ConfigureAwait(false);
+            short errorCode = Decoded(() => KafkaResponses.ReadProduce(body)).ErrorCode;
+            if (!await WaitForLeaderAsync(errorCode).ConfigureAwait(false))
+            {
+                ThrowOnError(errorCode, address);
+                break;
+            }
+
+            await FindLeaderAsync(address).ConfigureAwait(false);
+        }
+
         progress.ReportUploaded(value.Length, value.Length);
     }
 

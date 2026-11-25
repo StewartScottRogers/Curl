@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Kafka.Client;
 
-/// <summary>Checks that Metadata is asked again while an auto-created topic has no leader yet, within a bound.</summary>
+/// <summary>Checks that Metadata and Produce are tried again while an auto-created topic has no leader ready, within a shared bound.</summary>
 [TestClass]
 public sealed class KafkaLeaderRetryTests
 {
@@ -42,6 +42,66 @@ public sealed class KafkaLeaderRetryTests
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         StringAssert.Contains(result.ErrorMessage, "UNKNOWN_TOPIC_OR_PARTITION");
         Assert.AreEqual(10, connection.Writes.Count);
+        Assert.AreEqual(9, time.TimersCreated);
+    }
+
+    [TestMethod]
+    [DataRow((short)3)]
+    [DataRow((short)5)]
+    [DataRow((short)6)]
+    public async Task ExecuteAsync_ProduceFindsNoReadyLeader_AsksMetadataAgainAndSendsTheSameRecord(short pendingError)
+    {
+        ScriptedKafkaConnection connection = new(
+            KafkaTestBytes.MetadataLeader(1, "broker", 9092),
+            KafkaTestBytes.ProduceResponse(2, pendingError),
+            KafkaTestBytes.MetadataLeader(3, "broker", 9092),
+            KafkaTestBytes.ProduceResponse(4, 0, 17));
+        ImmediateTimeProvider time = new();
+
+        TransferResult result = await RunAsync(connection, time);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(4, connection.Writes.Count);
+        CollectionAssert.AreEqual(KafkaRequests.Metadata(3, "new"), connection.Writes[2]);
+        CollectionAssert.AreEqual(KafkaRequests.Produce(4, "new", 0, KafkaRecordBatch.Encode("A"u8, Now.ToUnixTimeMilliseconds())), connection.Writes[3]);
+        Assert.AreEqual(1, time.TimersCreated);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ProduceNeverFindsAReadyLeader_StopsAfterTenSendingsWithTheBrokerError()
+    {
+        // Odd correlation ids answer the Metadata requests, even ones the Produce requests.
+        byte[][] answers = Enumerable.Range(1, 20)
+            .Select(id => id % 2 == 1 ? KafkaTestBytes.MetadataLeader(id, "broker", 9092) : KafkaTestBytes.ProduceResponse(id, 6))
+            .ToArray();
+        ScriptedKafkaConnection connection = new(answers);
+        ImmediateTimeProvider time = new();
+
+        TransferResult result = await RunAsync(connection, time);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage, "NOT_LEADER_OR_FOLLOWER");
+        Assert.AreEqual(20, connection.Writes.Count);
+        Assert.AreEqual(9, time.TimersCreated);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MetadataUsedEveryRetry_ProduceErrorIsNotRetried()
+    {
+        byte[][] answers =
+        [
+            .. Enumerable.Range(1, 9).Select(id => KafkaTestBytes.MetadataResponse(id, 5, Brokers, (5, 0, -1))),
+            KafkaTestBytes.MetadataLeader(10, "broker", 9092),
+            KafkaTestBytes.ProduceResponse(11, 6),
+        ];
+        ScriptedKafkaConnection connection = new(answers);
+        ImmediateTimeProvider time = new();
+
+        TransferResult result = await RunAsync(connection, time);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage, "NOT_LEADER_OR_FOLLOWER");
+        Assert.AreEqual(11, connection.Writes.Count);
         Assert.AreEqual(9, time.TimersCreated);
     }
 
