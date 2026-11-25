@@ -31,3 +31,4 @@ Follow-up of BL-5902 (ADR-1370). `KafkaClientFlow.ProduceAsync` asks Metadata ag
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: df78a778 12fff96b 3d836d5e.
