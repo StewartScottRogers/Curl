@@ -29,7 +29,7 @@ Found in BL-5922. `Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2Fr
 ## Notes
 
 - Measured, curl 8.18.0 (nghttp2, WSL), `Record-CurlExchange.ps1 -Http2Origin prior-knowledge`: `-I` with non-empty DATA (with or without `content-length`) prints `* nghttp2 shuts down connection with error 1: PROTOCOL_ERROR`, sends `GOAWAY` error 1, prints `* shutting down connection #0`, exits 0, and a second URL opens a new connection. Empty DATA ending the stream, and `-I -X GET` with DATA within `content-length`, leave the connection intact and close with `GOAWAY` `shutdown`; `-I -X GET` with DATA past it behaves as the first case.
-- So the trigger is DATA past the promised length (none for HEAD), not any DATA (ADR-1382). `Http2Session.AcceptsNewStreams` is false once this client sent a `GOAWAY`. Curl's `-v` lines and `GOAWAY` matched curl's in an end-to-end run with two URLs.
+- So the trigger is DATA past the promised length (none for HEAD), not any DATA (ADR-1384). `Http2Session.AcceptsNewStreams` is false once this client sent a `GOAWAY`. Curl's `-v` lines and `GOAWAY` matched curl's in an end-to-end run with two URLs.
 - `touches` widened to `HttpStreamOpenedLines.cs` (the `-v` line) and `Http2StreamAbortTests.cs` (its BL-5922 `-I` test expected the `shutdown` GOAWAY); no task in Doing named either.
 - Fast tests: 58045 passed, 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary`: 0 failing members.
 

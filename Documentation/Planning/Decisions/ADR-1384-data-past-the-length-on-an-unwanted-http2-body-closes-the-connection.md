@@ -1,4 +1,4 @@
-# ADR-1382 — DATA past the length on an unwanted HTTP/2 body closes the connection without failing
+# ADR-1384 — DATA past the length on an unwanted HTTP/2 body closes the connection without failing
 
 - **Status:** Accepted
 - **Date:** 2026-11-25
