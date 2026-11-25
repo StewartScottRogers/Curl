@@ -39,3 +39,4 @@ Measure whether a Digest or `--anyauth` retry at `--max-redirs 0` ends the same 
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: e09fbb4d 164d3fb1 3d836d5e.
