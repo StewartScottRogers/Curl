@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Mqtt.UnitLibrary/MqttSession.cs, Curl.Original.Protocol.Mqtt.UnitLibrary/MqttProtocolHandler.cs]
+touches: [Curl.Original.Protocol.Mqtt.UnitLibrary/MqttSession.cs, Curl.Original.Protocol.Mqtt.UnitLibrary/MqttProtocolHandler.cs, Curl.Original.Protocol.Mqtt.UnitTests/MqttProtocolHandlerTimeoutByteCountTests.cs, Curl.Original.Protocol.Mqtt.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5895 — Fix fitness finding STD-214: MQTT subscribe timeout message shows the wrong "out of" total
 
@@ -36,13 +36,28 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro's timeout message shows the same two numbers as REF.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro's timeout message shows the same two numbers as REF.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced and measured against curl 8.22.0 (Schannel, Windows) with `Record-CurlExchange.ps1 -Script`, `-m 1`:
+  PUBLISH bodies of 20 then 13 bytes print `13 out of 13`; 20 then 5 of 13 print `5 out of 13`; 20 then the header
+  `30 0d` alone prints `20 out of 20` (curl resets `req.bytecount` and `req.size` only when body bytes are read).
+  Built Curl prints the same three pairs (the header-only case replayed with `-m 3`: at `-m 1` the debug build
+  timed out before the first message arrived).
+- Fix: `MqttSession.PublishBytesWritten` counts the latest PUBLISH body and the handler's timeout message uses it.
+  `%{size_download}`, the output and the progress sink's running total are unchanged. No ADR: no design choice.
+- Direct run rather than subagent stages: a two-line behaviour change. Added the new test file and the library's
+  CLAUDE.md to `touches`; no other task in Doing named an MQTT path.
+- Gates: `dotnet build` clean; fast tests green (the one failure of the full run was this task's new test, whose
+  fake cancelled inside the handler's look-ahead read; fixed and the MQTT test project rerun, 183 passed,
+  5 platform skips); `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Mqtt.UnitLibrary`: 0 failing members;
+  `dotnet format --verify-no-changes` clean on the changed C# files. Tests are platform-neutral.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 4c475da1 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. MQTT -m timeout message counts the latest PUBLISH body, as curl 8.22.0 does

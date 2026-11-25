@@ -111,6 +111,9 @@ internal sealed class MqttSession(
     /// <summary>The body length of the PUBLISH being written, reported as the expected download size.</summary>
     private long publishLength;
 
+    /// <summary><see cref="BytesWritten" /> as it stood when the PUBLISH being written began.</summary>
+    private long bytesWrittenBeforePublish;
+
     /// <summary>
     /// Whether the last run of a PUBLISH body stopped short because the connection's next
     /// read was still pending, so the next run finds nothing waiting, as curl's next socket
@@ -129,8 +132,20 @@ internal sealed class MqttSession(
     /// </summary>
     internal long BytesSent { get; private set; }
 
-    /// <summary>Gets the size the last PUBLISH announced, as the progress sink was told; <see langword="null" /> before any.</summary>
+    /// <summary>
+    /// Gets the body length of the latest PUBLISH any of whose body reached the output, as the
+    /// progress sink was told; <see langword="null" /> before any. curl's <c>req.size</c>, the
+    /// <c>out of</c> number of its timeout message.
+    /// </summary>
     internal long? ExpectedTotal { get; private set; }
+
+    /// <summary>
+    /// Gets how many bytes of that PUBLISH's body reached the output: curl's
+    /// <c>req.bytecount</c>, which starts again at each PUBLISH, so its timeout message counts
+    /// one body while <see cref="BytesWritten" /> counts them all (measured, BL-5895). A
+    /// PUBLISH header with no body yet leaves both numbers on the one before, as curl does.
+    /// </summary>
+    internal long PublishBytesWritten { get; private set; }
 
     /// <summary>
     /// Runs the session to its end.
@@ -419,6 +434,7 @@ internal sealed class MqttSession(
     private async ValueTask WritePublishAsync(MqttFixedHeader header)
     {
         publishLength = header.RemainingLength;
+        bytesWrittenBeforePublish = BytesWritten;
         events.ReportInfo(MqttTransferMessages.RemainingLength(header.RemainingLength));
         if (maxFileSize is > 0 and long limit && header.RemainingLength > limit)
         {
@@ -526,6 +542,7 @@ internal sealed class MqttSession(
 
         BytesWritten += slice.Length;
         ExpectedTotal = publishLength;
+        PublishBytesWritten = BytesWritten - bytesWrittenBeforePublish;
         progress.ReportDownloaded(BytesWritten, publishLength);
     }
 
