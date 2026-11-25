@@ -38,7 +38,7 @@ under it, which may need another file in `touches`).
   reads its answer. After a first read that check peeks one byte from a readable socket; on Linux
   the peek of a reset socket fails with the pending `ECONNRESET` and clears it, so the first
   reply's send got `EPIPE`. Nothing in the TELNET handler was at fault.
-- Fix: the check runs only under `ReportsAbortedReadAsReset` (Windows). ADR-1383.
+- Fix: the check runs only under `ReportsAbortedReadAsReset` (Windows). ADR-1386.
 - `touches` widened to the three `Curl.Networking` files: no other task in Doing on
   `origin/work/dark-factory` named any of them.
 - Measured 2026-11-25 in WSL Ubuntu: Curl published for `linux-x64` (self-contained,
@@ -56,4 +56,4 @@ under it, which may need another file in `touches`).
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: e86cae23 681bf664 3d836d5e.
-- 2026-11-25: Doing -> Done. On Linux and macOS a write no longer peeks the socket first, so the first TELNET reply a reset refuses reports 104 as curl does (ADR-1383).
+- 2026-11-25: Doing -> Done. On Linux and macOS a write no longer peeks the socket first, so the first TELNET reply a reset refuses reports 104 as curl does (ADR-1386).

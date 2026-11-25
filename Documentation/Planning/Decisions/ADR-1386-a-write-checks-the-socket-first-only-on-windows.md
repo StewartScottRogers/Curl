@@ -1,4 +1,4 @@
-# ADR-1383: A write checks the socket first only where aborts are reported as resets (BL-5939)
+# ADR-1386: A write checks the socket first only where aborts are reported as resets (BL-5939)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-0708 and ADR-0878.
 

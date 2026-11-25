@@ -144,7 +144,7 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     /// The checks before the write run only under <see cref="ReportsAbortedReadAsReset" />, which
     /// alone uses their answer. On Linux a peek at a reset connection takes the socket's pending
     /// error, so the write would fail with EPIPE where curl's <c>send</c> fails with ECONNRESET
-    /// (ADR-1383, BL-5939).
+    /// (ADR-1386, BL-5939).
     /// </remarks>
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
