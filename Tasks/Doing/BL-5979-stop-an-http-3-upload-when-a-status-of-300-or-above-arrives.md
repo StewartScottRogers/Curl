@@ -30,3 +30,4 @@ Found by BL-5973 (ADR-1409), which stops an HTTP/2 upload there and leaves HTTP/
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 6ba8ef1f 3d836d5e.
