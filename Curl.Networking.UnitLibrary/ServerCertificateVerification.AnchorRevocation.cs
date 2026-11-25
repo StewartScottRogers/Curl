@@ -24,8 +24,9 @@ internal sealed partial class ServerCertificateVerification
     /// <summary>
     /// Downloads a certificate revocation list from the address a certificate's CRL distribution
     /// point names, or throws (an <see cref="IOException" />, <see cref="HttpRequestException" />,
-    /// <see cref="OperationCanceledException" /> or <see cref="InvalidOperationException" />, its
-    /// message the reason) when it cannot be had. It must stop when the token is cancelled. A test seam.
+    /// <see cref="OperationCanceledException" />, <see cref="InvalidOperationException" />,
+    /// <see cref="UriFormatException" /> or <see cref="ArgumentException" />, its message the reason)
+    /// when it cannot be had. It must stop when the token is cancelled. A test seam.
     /// </summary>
     internal Func<Uri, CancellationToken, byte[]> FetchRevocationList { get; init; } = RevocationListDownload.Fetch;
 
@@ -196,7 +197,8 @@ internal sealed partial class ServerCertificateVerification
             budget.ThrowIfCancellationRequested();
             return fetch(uri, budget);
         }
-        catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException or InvalidOperationException)
+        // UriFormatException and ArgumentException: HttpClient follows a redirect to a file or opaque address and fails opening it (STD-205).
+        catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException or InvalidOperationException or UriFormatException or ArgumentException)
         {
             if (RevocationDiagnosticLog.IsEnabled(DiagnosticLogLevel.Warning))
             {

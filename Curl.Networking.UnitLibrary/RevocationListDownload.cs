@@ -23,6 +23,8 @@ internal static class RevocationListDownload
     /// <param name="cancellation">Cuts the fetch short: while waiting for headers, and while a body read waits for bytes (cancelling disposes the response, which aborts the blocked read).</param>
     /// <returns>The response body.</returns>
     /// <exception cref="IOException">The server did not answer with success, or the body passed <see cref="MaximumBodyBytes" />.</exception>
+    /// <exception cref="UriFormatException">The server redirected to an address naming no host, such as <c>file:///list.crl</c>.</exception>
+    /// <exception cref="ArgumentException">The server redirected to an address with a host but no port, such as <c>file://host/list.crl</c>.</exception>
     internal static byte[] Fetch(Uri uri, CancellationToken cancellation)
     {
         using var handler = CreateHandler();
