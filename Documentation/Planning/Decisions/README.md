@@ -1430,3 +1430,4 @@ Each option and the specific reason it lost.
 | [1386](ADR-1386-a-write-checks-the-socket-first-only-on-windows.md) | A write checks the socket first only where aborts are reported as resets (BL-5939) | Accepted | 2026-11-25 |
 | [1387](ADR-1387-the-openssl-build-reads-every-subject-email-address-against-name-constraints.md) | The OpenSSL build reads every subject emailAddress, multi-valued relative names included, against name constraints (BL-5940) | Accepted | 2026-11-25 |
 | [1388](ADR-1388-http-transfers-carry-the-mail-options-for-a-redirect-to-mail.md) | An HTTP transfer carries the mail options, for a redirect followed to a mail URL (BL-5936) | Accepted | 2026-11-25 |
+| [1388](ADR-1388-the-openssl-build-refuses-a-subject-email-address-that-is-not-an-ia5string.md) | The OpenSSL build refuses a subject emailAddress that is not an IA5String under name constraints with verify result 53 (BL-5942) | Accepted | 2026-11-25 |

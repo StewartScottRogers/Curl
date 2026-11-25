@@ -15,7 +15,8 @@ internal static class CertificateNameConstraints
 {
     /// <summary>
     /// Schannel's <c>CERT_TRUST_HAS_NOT_SUPPORTED_NAME_CONSTRAINT</c>: here only the OpenSSL build's
-    /// refusal of a subject CN holding a NUL (<c>X509_V_ERR_UNSUPPORTED_NAME_SYNTAX</c>).
+    /// refusal of a subject CN holding a NUL, or of a subject emailAddress that is not an IA5String
+    /// (<c>X509_V_ERR_UNSUPPORTED_NAME_SYNTAX</c>).
     /// </summary>
     internal const int UnsupportedNameSyntax = 0x1000;
 
@@ -111,8 +112,10 @@ internal static class CertificateNameConstraints
         return anchor == 0 ? elements.Count : anchor;
     }
 
-    // The leaf's names checked together, and the subject CNs the OpenSSL build checks after them, one by one.
-    private sealed record LeafNames(List<(Asn1Tag Tag, byte[] Value)> Names, List<string> OpenSslCommonNames);
+    // The leaf's names checked together, the subject CNs the OpenSSL build checks after them, one by one, and
+    // whether the names stop short at a subject emailAddress the OpenSSL build refuses to check.
+    private sealed record LeafNames(
+        List<(Asn1Tag Tag, byte[] Value)> Names, List<string> OpenSslCommonNames, bool StopsAtUnsupportedEmailAddress = false);
 
     // Both builds check the subject CN as a DNS name when the leaf has no dNSName SAN (BL-5432, BL-5829).
     private static LeafNames ReadLeafNames(X509Certificate2 leaf, bool matchesSchannelBuild)
@@ -120,12 +123,25 @@ internal static class CertificateNameConstraints
         var dnsNames = leaf.Extensions.OfType<X509SubjectAlternativeNameExtension>()
             .SelectMany(extension => extension.EnumerateDnsNames())
             .ToList();
-        var hasDnsName = dnsNames.Count > 0;
         return matchesSchannelBuild
             ? new LeafNames(
-                ListNames(leaf, hasDnsName ? dnsNames : ListSingleValuedAttributes(leaf, CommonNameOid), ListSingleValuedAttributes(leaf, EmailAddressOid)), [])
-            : new LeafNames(ListNames(leaf, dnsNames, ListEveryAttribute(leaf, EmailAddressOid)), hasDnsName ? [] : ListEveryCommonName(leaf));
+                ListNames(leaf, dnsNames.Count > 0 ? dnsNames : ListSingleValuedAttributes(leaf, CommonNameOid), ListSingleValuedAttributes(leaf, EmailAddressOid)), [])
+            : ReadOpenSslLeafNames(leaf, dnsNames);
     }
+
+    // OpenSSL's NAME_CONSTRAINTS_check takes the subject's directoryName, then each subject emailAddress, and
+    // stops at one that is not an IA5String, before any alternative name or CN (BL-5942).
+    private static LeafNames ReadOpenSslLeafNames(X509Certificate2 leaf, List<string> dnsNames)
+    {
+        var encodedEmailAddresses = ListEveryEncodedAttribute(leaf, EmailAddressOid);
+        var emailAddresses = encodedEmailAddresses.TakeWhile(IsIa5String).SelectMany(value => DecodeCharacterString(value)).ToList();
+        return emailAddresses.Count < encodedEmailAddresses.Count
+            ? new LeafNames(ListSubjectNames(leaf, emailAddresses), [], StopsAtUnsupportedEmailAddress: true)
+            : new LeafNames(ListNames(leaf, dnsNames, emailAddresses), dnsNames.Count > 0 ? [] : ListEveryCommonName(leaf));
+    }
+
+    private static bool IsIa5String(byte[] encoded) =>
+        Asn1Tag.Decode(encoded, out _).HasSameClassAndValue(new Asn1Tag(UniversalTagNumber.IA5String));
 
     private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf, List<string> dnsNames, List<string> subjectEmailAddresses)
     {
@@ -227,10 +243,13 @@ internal static class CertificateNameConstraints
     /// <returns>The CN values.</returns>
     internal static List<string> ListEveryCommonName(X509Certificate2 certificate) => ListEveryAttribute(certificate, CommonNameOid);
 
+    private static List<string> ListEveryAttribute(X509Certificate2 certificate, string oid) =>
+        ListEveryEncodedAttribute(certificate, oid).SelectMany(value => DecodeCharacterString(value)).ToList();
+
     // OpenSSL's NAME_CONSTRAINTS_check and its CN check read every attribute of a type, multi-valued relative names included (BL-5940).
-    private static List<string> ListEveryAttribute(X509Certificate2 certificate, string oid)
+    private static List<byte[]> ListEveryEncodedAttribute(X509Certificate2 certificate, string oid)
     {
-        var values = new List<string>();
+        var values = new List<byte[]>();
         var relativeNames = new AsnReader(certificate.SubjectName.RawData, AsnEncodingRules.BER).ReadSequence();
         while (relativeNames.HasData)
         {
@@ -240,7 +259,7 @@ internal static class CertificateNameConstraints
                 var pair = attributes.ReadSequence();
                 if (pair.ReadObjectIdentifier() == oid)
                 {
-                    values.AddRange(DecodeCharacterString(pair.ReadEncodedValue().Span));
+                    values.Add(pair.ReadEncodedValue().ToArray());
                 }
             }
         }
@@ -283,7 +302,9 @@ internal static class CertificateNameConstraints
         }
 
         var violation = FindViolation(permitted, excluded, names.Names);
-        return violation != 0 ? violation : FindCommonNameViolation(permitted, excluded, names.OpenSslCommonNames);
+        return violation != 0 ? violation
+            : names.StopsAtUnsupportedEmailAddress ? UnsupportedNameSyntax
+            : FindCommonNameViolation(permitted, excluded, names.OpenSslCommonNames);
     }
 
     private static int FindViolation(

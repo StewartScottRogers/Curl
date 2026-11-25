@@ -646,10 +646,15 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
     private const string OrganizationalUnit = "2.5.4.11";
 
+    private const string Organization = "2.5.4.10";
+
     private const string EmailAddress = "1.2.840.113549.1.9.1";
 
     // A subject of UTF8String attributes (IA5String emailAddresses, as OpenSSL requires), each array one relative name.
-    private static X500DistinguishedName Subject(params (string Type, string Value)[][] relativeNames)
+    private static X500DistinguishedName Subject(params (string Type, string Value)[][] relativeNames) =>
+        SubjectWithEmailType(UniversalTagNumber.IA5String, relativeNames);
+
+    private static X500DistinguishedName SubjectWithEmailType(UniversalTagNumber emailType, params (string Type, string Value)[][] relativeNames)
     {
         var writer = new AsnWriter(AsnEncodingRules.DER);
         using (writer.PushSequence())
@@ -663,7 +668,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
                         using (writer.PushSequence())
                         {
                             writer.WriteObjectIdentifier(type);
-                            writer.WriteCharacterString(type == EmailAddress ? UniversalTagNumber.IA5String : UniversalTagNumber.UTF8String, value);
+                            writer.WriteCharacterString(type == EmailAddress ? emailType : UniversalTagNumber.UTF8String, value);
                         }
                     }
                 }
@@ -781,6 +786,80 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    // curl 8.18.0's OpenSSL build (BL-5942): a subject emailAddress that is not an IA5String answers 53, whatever the constraints' kinds.
+    [TestMethod]
+    [DataRow(UniversalTagNumber.UTF8String)]
+    [DataRow(UniversalTagNumber.BMPString)]
+    [DataRow(UniversalTagNumber.PrintableString)]
+    public void FindViolation_OpenSslBuildSubjectEmailAddressThatIsNoIa5String_IsUnsupportedNameSyntax(UniversalTagNumber stringType) =>
+        Assert.AreEqual(
+            CertificateNameConstraints.UnsupportedNameSyntax,
+            FindViolationOfSubject(SubjectWithEmailType(stringType, [(EmailAddress, "example.com")]), Constraints(excluded: "other.org")));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildUtf8StringEmailAddressUnderAnExcludedDirectoryName_ReportsTheDirectoryNameFirst() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(
+                SubjectWithEmailType(UniversalTagNumber.UTF8String, [(Organization, "Evil")], [(EmailAddress, "a@example.com")]),
+                Constraints(excludedName: DirectoryName("O=Evil"))));
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildUtf8StringEmailAddressBesideAnExcludedDnsName_IsUnsupportedNameSyntax() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.UnsupportedNameSyntax,
+            FindViolationOfSubject(
+                SubjectWithEmailType(UniversalTagNumber.UTF8String, [(EmailAddress, "a@example.com")]),
+                Constraints(excluded: "example.com"),
+                alternativeNames: AlternativeNames(GeneralName(2, "www.example.com"))));
+
+    [TestMethod]
+    [DataRow(true, CertificateNameConstraints.Excluded)]
+    [DataRow(false, CertificateNameConstraints.UnsupportedNameSyntax)]
+    public void FindViolation_OpenSslBuildTwoEmailAddresses_StopsAtTheFirstRefused(bool ia5First, int expected)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            (UniversalTagNumber Type, string Value)[] emailAddresses =
+                [(UniversalTagNumber.IA5String, "evil@other.org"), (UniversalTagNumber.UTF8String, "a@example.com")];
+            foreach (var (type, value) in ia5First ? emailAddresses : emailAddresses.Reverse())
+            {
+                using (writer.PushSetOf())
+                using (writer.PushSequence())
+                {
+                    writer.WriteObjectIdentifier(EmailAddress);
+                    writer.WriteCharacterString(type, value);
+                }
+            }
+        }
+
+        Assert.AreEqual(
+            expected,
+            FindViolationOfSubject(new X500DistinguishedName(writer.Encode()), Constraints(excludedName: GeneralName(1, "other.org"))));
+    }
+
+    [TestMethod]
+    public void FindViolation_SchannelBuildUtf8StringEmailAddressInsideThePermittedDomain_IsNotRefused() =>
+        Assert.AreEqual(
+            0,
+            FindViolationOfSubject(
+                SubjectWithEmailType(UniversalTagNumber.UTF8String, [(EmailAddress, "a@example.com")]),
+                Constraints(permittedName: GeneralName(1, "example.com")),
+                matchesSchannelBuild: true));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildUtf8StringEmailAddressUnderNameConstraints_IsUnsupportedNameSyntax()
+    {
+        var failure = Verify(
+            Constraints(permittedName: GeneralName(1, "example.com")), Host, true, matchesSchannelBuild: false,
+            subjectName: SubjectWithEmailType(UniversalTagNumber.UTF8String, [(EmailAddress, "a@example.com")], [(CommonName, Host)]));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: unsupported or invalid name syntax (53)", failure?.Message);
     }
 
     private static int FindViolationOfCommonName(string commonName, byte[] constraints, bool matchesSchannelBuild = false)
