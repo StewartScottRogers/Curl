@@ -71,3 +71,4 @@ The finding, verbatim:
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: ca22b4f3 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waits for BL-5915, which holds Curl.Engine.UnitTests; diagnosed and planned in Notes, no code changed.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: ca22b4f3 69116afe 3d836d5e.
