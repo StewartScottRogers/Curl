@@ -1426,4 +1426,4 @@ Each option and the specific reason it lost.
 | [1382](ADR-1382-a-reset-telnet-session-exits-56-on-linux-and-macos.md) | A reset TELNET session exits 56 on Linux and macOS (BL-5918) | Accepted | 2026-11-25 |
 | [1383](ADR-1383-the-openssl-build-answers-53-for-a-cn-holding-a-nul-and-reads-every-cn.md) | The OpenSSL build answers 53 for a CN holding a NUL, `illegal cert name field` when it is the matched CN, and reads every subject CN (BL-5921) | Accepted | 2026-11-25 |
 | [1384](ADR-1384-data-past-the-length-on-an-unwanted-http2-body-closes-the-connection.md) | DATA past the length on an unwanted HTTP/2 body closes the connection without failing (BL-5938) | Accepted | 2026-11-25 |
-| [1376](ADR-1376-state-files-are-replaced-by-rename-on-windows-too.md) | The cookie jar, HSTS and alt-svc files are replaced by rename on Windows too, retrying a refused rename for a second (BL-5933) | Accepted | 2026-11-25 |
+| [1385](ADR-1385-state-files-are-replaced-by-rename-on-windows-too.md) | The cookie jar, HSTS and alt-svc files are replaced by rename on Windows too, retrying a refused rename for a second (BL-5933) | Accepted | 2026-11-25 |

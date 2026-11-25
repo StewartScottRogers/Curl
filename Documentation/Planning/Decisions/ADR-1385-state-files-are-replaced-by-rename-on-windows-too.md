@@ -1,4 +1,4 @@
-# ADR-1376: The cookie jar, HSTS and alt-svc files are replaced by rename on Windows too
+# ADR-1385: The cookie jar, HSTS and alt-svc files are replaced by rename on Windows too
 
 - Status: Accepted
 - Date: 2026-11-25

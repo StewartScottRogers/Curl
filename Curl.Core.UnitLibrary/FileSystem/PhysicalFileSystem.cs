@@ -61,7 +61,7 @@ namespace Curl.Core.FileSystem;
 /// On Windows a <see cref="FileWriteMode.Replace" /> open of an existing file never opens
 /// it: it writes the temporary file beside it and renames that over the path, retrying a
 /// refused rename for <see cref="WindowsRenameRetryWindow" /> when the stream closes
-/// asynchronously, as curl's <c>curlx_rename</c> does (ADR-1376). So a symbolic link, a hard
+/// asynchronously, as curl's <c>curlx_rename</c> does (ADR-1385). So a symbolic link, a hard
 /// link's other names and a hidden attribute are left behind, and a file that is read-only
 /// or still held open after that second keeps its content. A path naming nothing yet, a
 /// directory or a device is opened as a truncating open does.

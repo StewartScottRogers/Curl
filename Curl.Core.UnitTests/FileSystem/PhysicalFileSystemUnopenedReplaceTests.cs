@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Core.UnitTests.FileSystem;
 
 /// <summary>
-/// ADR-1376: on Windows a <see cref="FileWriteMode.Replace" /> open of an existing file writes a
+/// ADR-1385: on Windows a <see cref="FileWriteMode.Replace" /> open of an existing file writes a
 /// temporary file and renames it over the path without opening it, retrying a refused rename
 /// for a second, as curl's Windows build does with the cookie jar, the HSTS cache and the
 /// alt-svc cache.

@@ -28,7 +28,7 @@ BL-5888 made the three files be replaced by rename off Windows and left Windows 
 
 ## Notes
 
-- Measured 2026-11-25: Git for Windows curl 8.21.0 and 8.22.0 and System32 curl 8.23.0 replace all three files by temporary file and rename, retrying the rename for 1 s (table in ADR-1376). A scratch script ran each case over a loopback HTTP server; Curl.exe then matched curl 8.22.0 in all 33 cases (11 per file: file ID, attributes, content, leftovers, exit code, stderr).
+- Measured 2026-11-25: Git for Windows curl 8.21.0 and 8.22.0 and System32 curl 8.23.0 replace all three files by temporary file and rename, retrying the rename for 1 s (table in ADR-1385). A scratch script ran each case over a loopback HTTP server; Curl.exe then matched curl 8.22.0 in all 33 cases (11 per file: file ID, attributes, content, leftovers, exit code, stderr).
 - A `file://` transfer saved none of the three files in curl 8.21.0. That is when they are saved, not how, so it was left out of this task.
 - touches widened (no other task in Doing named either): `FileWriteMode.cs` said Windows truncates, and ADR-1368 gained a superseded note. The FileWriteMode.cs change is a doc comment only, so no quality run for Abstractions.
 - Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary found one member: lines 180-182 of ReplacementFileStream.TryRename (the IOException catch) were uncovered. Added Dispose_TemporaryFileGone_ThrowsAndKeepsTheOld, which reaches it; Curl.Core.UnitTests pass. The 45-minute quality run was not repeated.
@@ -38,4 +38,4 @@ BL-5888 made the three files be replaced by rename off Windows and left Windows 
 
 - 2026-11-24: Created.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: ed061db0 15eca511 3d836d5e.
-- 2026-11-25: Doing -> Done. On Windows the -c, --hsts and --alt-svc files are replaced by rename with a one-second retry, as measured of curl 8.21.0 to 8.23.0 (ADR-1376)
+- 2026-11-25: Doing -> Done. On Windows the -c, --hsts and --alt-svc files are replaced by rename with a one-second retry, as measured of curl 8.21.0 to 8.23.0 (ADR-1385)
