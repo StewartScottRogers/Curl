@@ -1605,7 +1605,8 @@ internal sealed class CurlCommandRunner(
             parsesAsQuicBuild,
             parsesAsEchBuild,
             actsAsCAresBuild: false,
-            ParsedExtensionOptions);
+            ParsedExtensionOptions,
+            ExtensionsAreOn);
 
     /// <summary>
     /// Gives <paramref name="arguments" /> with each extension expander's option and value replaced by the
@@ -1616,7 +1617,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The arguments the parser reads.</returns>
     /// <exception cref="ArgumentExpansionException">An expander could not expand its option's value.</exception>
     private IReadOnlyList<string> ExpandedArguments(IReadOnlyList<string> arguments) =>
-        EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) == "0"
+        EnvironmentVariables(ExtensionSwitch.Variable) == "0"
             ? arguments
             : ArgumentExpansion.Expand(arguments, argumentExpanders ?? ExtensionArgumentExpanderCatalogue.Entries, new ArgumentExpansionContext(EnvironmentVariables, ReadExpansionFile));
 
@@ -1632,7 +1633,7 @@ internal sealed class CurlCommandRunner(
     /// the runner was given, else every registered extension's.
     /// </summary>
     private IReadOnlyList<CommandLineExtensionOption> ParsedExtensionOptions =>
-        EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) == "0"
+        EnvironmentVariables(ExtensionSwitch.Variable) == "0"
             ? []
             : ToParserOptions(extensionOptions ?? ExtensionCommandLineOptions.For(EnvironmentVariables, IsCurlLongOption), ExpanderOptionNames);
 
@@ -6385,7 +6386,7 @@ internal sealed class CurlCommandRunner(
     ];
 
     /// <summary>Whether <c>CURL_EXTENSIONS</c> is anything but <c>0</c>: under <c>0</c> the help pages are curl's own.</summary>
-    private bool ExtensionsAreOn => EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) != "0";
+    private bool ExtensionsAreOn => EnvironmentVariables(ExtensionSwitch.Variable) != "0";
 
     /// <summary>
     /// The lines <see cref="InformationLines" /> gives for the rest: <see cref="ExtensionListing" />'s for

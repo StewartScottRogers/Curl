@@ -1,11 +1,11 @@
 using Curl.Engine;
 using Curl.Extension.Composition;
-using Curl.Protocol.Abstractions;
 using Curl.Mcp.Protocol.Model;
 using Curl.Mcp.Protocol.Resources;
 using Curl.Mcp.Protocol.Server;
 using Curl.Mcp.Protocol.Tools;
 using Curl.Mcp.Tools;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Mcp;
 
@@ -67,7 +67,7 @@ internal static class CurlMcpHost
     /// <returns>The five handlers.</returns>
     internal static IEnumerable<IMcpMethodHandler> CreateHandlers(McpConfinementRoot root, McpResponseCap cap, Func<string, string?> readEnvironmentVariable, Action<string> logFailure)
     {
-        McpServerRegistry registry = CreateRegistry(root, cap, readEnvironmentVariable, ExtensionProtocolHandlers.Create);
+        McpServerRegistry registry = CreateRegistry(root, cap, readEnvironmentVariable, ExtendedProtocolHandlers.Create);
         return [new ToolsListHandler(registry), new ToolsCallHandler(registry, logFailure), new ResourcesListHandler(registry), new ResourcesReadHandler(registry), new LoggingSetLevelMcpHandler()];
     }
 
@@ -95,7 +95,7 @@ internal static class CurlMcpHost
         Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>> extensionHandlers)
     {
         // One engine for the process, shared by the transfer, version and URL tools.
-        ManagedCurlEngine engine = new(ExtensionProtocolHandlers.For(readEnvironmentVariable) is null ? null : extensionHandlers);
+        ManagedCurlEngine engine = new(ExtendedProtocolHandlers.For(readEnvironmentVariable) is null ? null : extensionHandlers);
         IReadOnlyList<string> extendedSchemes = ExtensionListing.Schemes(readEnvironmentVariable);
         McpUrlTool urlTool = new(engine.CreateUrl, extendedSchemes);
         McpServerRegistry registry = new();

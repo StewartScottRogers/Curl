@@ -18,8 +18,8 @@ libcurl, which has no extensions.
   (`Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>?`). The production dispatcher passes it
   to `EngineComposition.CreateProtocolHandlers`, which adds the handlers after curl's own, as for the
   `curl` tool. The engine still references no extension project; the host passes the factory in.
-- `CurlClient.Create(options)` and the MCP host's registry pass `ExtensionProtocolHandlers.Create`,
-  unless `CURL_EXTENSIONS` is `0` (read through `ExtensionProtocolHandlers.For`, the switch the
+- `CurlClient.Create(options)` and the MCP host's registry pass `ExtendedProtocolHandlers.Create`,
+  unless `CURL_EXTENSIONS` is `0` (read through `ExtendedProtocolHandlers.For`, the switch the
   `curl` tool already uses), when they pass none and an extension's scheme is refused as any unknown
   scheme (`CURLE_UNSUPPORTED_PROTOCOL`). The MCP host reads the variable through the same injected
   reader as its other variables. `CurlClient.Create(engine, options)` keeps the engine the caller gives.

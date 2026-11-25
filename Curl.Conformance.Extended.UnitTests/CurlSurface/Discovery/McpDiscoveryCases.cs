@@ -92,7 +92,7 @@ public sealed class McpDiscoveryCases
             });
 
     private static McpServerRegistry Registry(IReadOnlyDictionary<string, string> environment) =>
-        CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap, name => environment.GetValueOrDefault(name), ExtensionProtocolHandlers.Create);
+        CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap, name => environment.GetValueOrDefault(name), ExtendedProtocolHandlers.Create);
 
     private static async Task<McpToolCallResult> CallAsync(McpServerRegistry registry, string tool, string arguments)
     {

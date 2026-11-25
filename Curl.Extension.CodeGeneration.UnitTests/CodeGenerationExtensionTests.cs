@@ -42,7 +42,7 @@ public sealed class CodeGenerationExtensionTests
     public void Composition_RegistersBothOptionsOnlyWhileExtensionsAreOn()
     {
         var on = ExtensionCommandLineOptions.For(_ => null, _ => false);
-        var off = ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false);
+        var off = ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false);
 
         Assert.Contains(CodeGenerationExtension.CSharpOption, on);
         Assert.Contains(CodeGenerationExtension.PowerShellOption, on);

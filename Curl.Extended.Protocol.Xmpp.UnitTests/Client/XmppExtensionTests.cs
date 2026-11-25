@@ -26,9 +26,9 @@ public sealed class XmppExtensionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => XmppExtension.CreateHandler(null!));
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeXmppAndXmpps()
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeXmppAndXmpps()
     {
-        ProtocolDispatcher dispatcher = new(ExtensionProtocolHandlers.For(_ => null)!(Services));
+        ProtocolDispatcher dispatcher = new(ExtendedProtocolHandlers.For(_ => null)!(Services));
 
         Assert.IsTrue(dispatcher.Serves("xmpp"));
         Assert.IsTrue(dispatcher.Serves("xmpps"));
@@ -46,7 +46,7 @@ public sealed class XmppExtensionTests
     [DataRow("xmpps")]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string scheme)
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://example.com/q"), Output = new MemoryStream() });

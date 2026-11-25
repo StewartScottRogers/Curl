@@ -9,14 +9,11 @@ namespace Curl.Extension.Composition;
 /// handlers over the same transports as curl's own and puts them after curl's, so a scheme
 /// both claim fails composition loudly rather than replacing curl's handler.
 /// </summary>
-public static class ExtensionProtocolHandlers
+public static class ExtendedProtocolHandlers
 {
-    /// <summary>The environment variable that turns every extension off when set to <c>0</c>.</summary>
-    public const string SwitchVariable = "CURL_EXTENSIONS";
-
     /// <summary>
     /// Gives the factory a host passes to the engine, or <see langword="null" /> when
-    /// <see cref="SwitchVariable" /> is <c>0</c>, which leaves exactly upstream curl's handlers.
+    /// <see cref="ExtensionSwitch.Variable" /> is <c>0</c>, which leaves exactly upstream curl's handlers.
     /// The factory gives every extension <paramref name="readEnvironmentVariable" /> as the services'
     /// <see cref="ProtocolHandlerServices.ReadEnvironmentVariable" />, so a handler reads the run's environment (BL-4534).
     /// </summary>
@@ -32,7 +29,7 @@ public static class ExtensionProtocolHandlers
         IReadOnlyList<Func<ProtocolHandlerServices, IProtocolHandler>> factories)
     {
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
-        return readEnvironmentVariable(SwitchVariable) == "0"
+        return readEnvironmentVariable(ExtensionSwitch.Variable) == "0"
             ? null
             : services => CreateFrom(factories, services with { ReadEnvironmentVariable = readEnvironmentVariable });
     }

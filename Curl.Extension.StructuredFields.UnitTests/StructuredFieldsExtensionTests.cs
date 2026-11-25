@@ -24,7 +24,7 @@ public sealed class StructuredFieldsExtensionTests
     public void Composition_RegistersTheOptionOnlyWhileExtensionsAreOn()
     {
         Assert.Contains(StructuredFieldsExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
-        Assert.DoesNotContain(StructuredFieldsExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+        Assert.DoesNotContain(StructuredFieldsExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
         Assert.AreEqual(ExtensionOptionArgument.None, StructuredFieldsExtension.Option.Argument);
     }
 

@@ -20,7 +20,7 @@ public sealed class WebSocketExtendedConnectExtensionTests
     {
         // With CURL_EXTENSIONS=0 the option is not registered, so the command line refuses it as curl refuses an unknown option (exit 2).
         Assert.Contains(WebSocketExtendedConnectExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
-        Assert.DoesNotContain(WebSocketExtendedConnectExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+        Assert.DoesNotContain(WebSocketExtendedConnectExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
     }
 
     [TestMethod]

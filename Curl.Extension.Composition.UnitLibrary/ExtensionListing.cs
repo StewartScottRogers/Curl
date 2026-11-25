@@ -6,7 +6,7 @@ namespace Curl.Extension.Composition;
 /// <summary>
 /// What <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> print, built from every registered
 /// extension's <see cref="ExtensionDescription" /> (ADR-1008). With
-/// <see cref="ExtensionProtocolHandlers.SwitchVariable" /> set to <c>0</c> both say that extensions are off.
+/// <see cref="ExtensionSwitch.Variable" /> set to <c>0</c> both say that extensions are off.
 /// </summary>
 public static class ExtensionListing
 {
@@ -96,6 +96,6 @@ public static class ExtensionListing
     private static bool AreOff(Func<string, string?> readEnvironmentVariable)
     {
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
-        return readEnvironmentVariable(ExtensionProtocolHandlers.SwitchVariable) == "0";
+        return readEnvironmentVariable(ExtensionSwitch.Variable) == "0";
     }
 }

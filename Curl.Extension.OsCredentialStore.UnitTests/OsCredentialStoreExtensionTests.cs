@@ -22,7 +22,7 @@ public sealed class OsCredentialStoreExtensionTests
     public void Composition_RegistersTheOptionOnlyWhileExtensionsAreOn()
     {
         var on = ExtensionCommandLineOptions.For(_ => null, _ => false);
-        var off = ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false);
+        var off = ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false);
 
         Assert.Contains(OsCredentialStoreExtension.UserFromKeychainOption, on);
         Assert.DoesNotContain(OsCredentialStoreExtension.UserFromKeychainOption, off);

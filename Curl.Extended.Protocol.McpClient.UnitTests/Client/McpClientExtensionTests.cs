@@ -57,8 +57,8 @@ public sealed class McpClientExtensionTests
     [DataRow("mcp")]
     [DataRow("mcps")]
     [DataRow("mcp+stdio")]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeTheScheme(string scheme) =>
-        Assert.IsTrue(new ProtocolDispatcher(ExtensionProtocolHandlers.For(_ => null)!(Services)).Serves(scheme));
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeTheScheme(string scheme) =>
+        Assert.IsTrue(new ProtocolDispatcher(ExtendedProtocolHandlers.For(_ => null)!(Services)).Serves(scheme));
 
     [TestMethod]
     public void ExtensionListing_WithExtensionsOn_ListsMcpInBothForms()
@@ -70,7 +70,7 @@ public sealed class McpClientExtensionTests
     [TestMethod]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme()
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("mcp://example.com/mcp"), Output = new MemoryStream() });

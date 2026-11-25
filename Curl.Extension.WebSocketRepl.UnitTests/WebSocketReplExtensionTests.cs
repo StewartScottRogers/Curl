@@ -38,7 +38,7 @@ public sealed class WebSocketReplExtensionTests
         Assert.Contains(WebSocketReplExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
         Assert.DoesNotContain(
             WebSocketReplExtension.Option,
-            ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+            ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
     }
 
     // Without --ws-repl no hook is activated, so every transfer runs unchanged.

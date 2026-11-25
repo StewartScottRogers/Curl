@@ -27,7 +27,7 @@ public sealed class SigstoreExtensionTests
     public void Composition_RegistersTheOptionsOnlyWhileExtensionsAreOn()
     {
         var on = ExtensionCommandLineOptions.For(_ => null, _ => false);
-        var off = ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false);
+        var off = ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false);
 
         foreach (var option in new[] { SigstoreExtension.BundleOption, SigstoreExtension.IdentityOption, SigstoreExtension.IssuerOption, SigstoreExtension.RootOption })
         {

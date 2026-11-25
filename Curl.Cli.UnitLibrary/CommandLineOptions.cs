@@ -344,6 +344,9 @@ public sealed class CommandLineOptions
     /// <summary>The extensions' long options <see cref="CommandLineParser"/> reads beyond curl's own, by name (ADR-1006).</summary>
     internal IReadOnlyDictionary<string, CommandLineExtensionOption> ExtensionOptions { get => globals.ExtensionOptions; set => globals.ExtensionOptions = value; }
 
+    /// <summary>Whether <see cref="CommandLineParser"/> reads the options only Curl has; <see langword="false"/> when the host's extensions are off (BL-4937).</summary>
+    internal bool KnowsPortOnlyOptions { get => globals.KnowsPortOnlyOptions; set => globals.KnowsPortOnlyOptions = value; }
+
     /// <summary>
     /// The value this group gave each extension option (<see cref="CommandLineExtensionOption"/>), by long name:
     /// the last value given, or the empty string for a flag (ADR-1006).

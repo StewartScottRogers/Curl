@@ -80,8 +80,8 @@ public sealed class DnsQueryExtensionTests
     }
 
     [TestMethod]
-    public void ExtensionProtocolHandlers_WithExtensionsOn_ServeDns() =>
-        Assert.IsTrue(new ProtocolDispatcher(ExtensionProtocolHandlers.For(_ => null)!(Services)).Serves("dns"));
+    public void ExtendedProtocolHandlers_WithExtensionsOn_ServeDns() =>
+        Assert.IsTrue(new ProtocolDispatcher(ExtendedProtocolHandlers.For(_ => null)!(Services)).Serves("dns"));
 
     [TestMethod]
     public void ExtensionListing_WithExtensionsOn_ListsDnsInBothForms()
@@ -95,7 +95,7 @@ public sealed class DnsQueryExtensionTests
     [TestMethod]
     public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme()
     {
-        Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
+        Assert.IsNull(ExtendedProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
         TransferResult result = await dispatcher.DispatchAsync(ContextOf("dns://192.0.2.53/example.com?type=A"));

@@ -28,13 +28,13 @@ public sealed partial class CurlClient
     public static CurlClient Create(CurlClientOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        return Create(options, Environment.GetEnvironmentVariable, ExtensionProtocolHandlers.Create);
+        return Create(options, Environment.GetEnvironmentVariable, ExtendedProtocolHandlers.Create);
     }
 
     /// <summary>
     /// A client over a new <see cref="ManagedCurlEngine"/> whose transfers reach the handlers
     /// <paramref name="extensionHandlers"/> builds, unless <paramref name="readEnvironmentVariable"/>
-    /// turns the extensions off (<see cref="ExtensionProtocolHandlers.For"/>).
+    /// turns the extensions off (<see cref="ExtendedProtocolHandlers.For"/>).
     /// </summary>
     /// <param name="options">The defaults applied to every easy handle the client creates.</param>
     /// <param name="readEnvironmentVariable">Reads <c>CURL_EXTENSIONS</c>.</param>
@@ -44,7 +44,7 @@ public sealed partial class CurlClient
         CurlClientOptions options,
         Func<string, string?> readEnvironmentVariable,
         Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>> extensionHandlers) =>
-        ExtensionProtocolHandlers.For(readEnvironmentVariable) is null
+        ExtendedProtocolHandlers.For(readEnvironmentVariable) is null
             ? new(new ManagedCurlEngine(null), options, ownsEngine: true)
             : new(new ManagedCurlEngine(extensionHandlers, ExtensionTransferHooksFor), options, ownsEngine: true) { AcceptsExtensionOptions = true };
 

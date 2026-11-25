@@ -24,7 +24,7 @@ public sealed class OpenTelemetryExtensionTests
     public void Composition_RegistersTheOptionOnlyWhileExtensionsAreOn()
     {
         Assert.Contains(OpenTelemetryExtension.Option, ExtensionCommandLineOptions.For(_ => null, _ => false));
-        Assert.DoesNotContain(OpenTelemetryExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false));
+        Assert.DoesNotContain(OpenTelemetryExtension.Option, ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false));
         Assert.AreEqual(ExtensionOptionArgument.Value, OpenTelemetryExtension.Option.Argument);
     }
 

@@ -41,7 +41,7 @@ public sealed class ObliviousHttpExtensionTests
     public void Composition_RegistersTheOptionsOnlyWhileExtensionsAreOn()
     {
         IReadOnlyList<ExtensionOption> on = ExtensionCommandLineOptions.For(_ => null, _ => false);
-        IReadOnlyList<ExtensionOption> off = ExtensionCommandLineOptions.For(name => name == ExtensionProtocolHandlers.SwitchVariable ? "0" : null, _ => false);
+        IReadOnlyList<ExtensionOption> off = ExtensionCommandLineOptions.For(name => name == ExtensionSwitch.Variable ? "0" : null, _ => false);
 
         Assert.Contains(ObliviousHttpExtension.RelayOption, on);
         Assert.Contains(ObliviousHttpExtension.KeysOption, on);
