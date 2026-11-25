@@ -1,4 +1,4 @@
-# ADR-1359: A deflate zlib stream holds its first decoded bytes until the piece decodes
+# ADR-1365: A deflate zlib stream holds its first decoded bytes until the piece decodes
 
 - Status: Accepted
 - Date: 2026-11-24

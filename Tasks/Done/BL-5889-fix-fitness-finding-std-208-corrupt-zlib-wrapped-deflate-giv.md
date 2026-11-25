@@ -45,7 +45,7 @@ The finding, verbatim:
 - Delivered directly in one pass (small, single-file fix; budget): no architect or sub-agent stages.
 - Added the new test file to `touches`; no task in Doing on origin/work/dark-factory names Http.UnitTests files.
 - Cause: `FeedLengths` feeds the first 8 bytes singly, so `The q` was decoded and written before the corrupt byte.
-- Fix: a `deflate` zlib stream holds its first decoded bytes until the piece decodes (ADR-1359, which records the multi-block limit). `HttpContentDecoder.cs` needed no change.
+- Fix: a `deflate` zlib stream holds its first decoded bytes until the piece decodes (ADR-1365, which records the multi-block limit). `HttpContentDecoder.cs` needed no change.
 - Measured 2026-11-24 with `Record-CurlExchange.ps1`, Git's curl 8.22.0 Schannel and the built Curl, on the pangram zlib-compressed with eight bytes inserted after byte 10. Bytes 0x05: both exit 61 `invalid stored block lengths`, no `o.txt`. Bytes 0xFF: both exit 61 `incorrect data check`, `o.txt` created.
 - Quality: `Measure-CodeQuality.ps1` found one member over the gate (`ReadAll`, 16); split it, then confirmed with a Cobertura run of Http.UnitTests that every `HttpContentCodingDecoder` member is at most 10 with 100% line and branch coverage. The full script was not rerun.
 ## Log
