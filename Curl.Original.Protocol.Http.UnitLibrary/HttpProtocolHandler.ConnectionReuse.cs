@@ -12,7 +12,9 @@ public sealed partial class HttpProtocolHandler
     /// <see cref="HttpConnectionPersistence" /> says (ADR-0050), for a head the peer closed among
     /// its headers as for one with no body, since curl 8.21.0 decides that a body runs until the
     /// server closes only at the head's empty line and leaves such a connection intact
-    /// (measured, BL-483 Notes).
+    /// (measured, BL-483 Notes). Over HTTP/1.x it also cannot after bytes followed the body
+    /// (<paramref name="foundExcess" />), nor after body bytes nobody asked for
+    /// (<see cref="ReceivedUnwantedBody" />).
     /// </summary>
     /// <remarks>
     /// Over HTTP/2 and HTTP/3 the stream, not the connection, ends with the response, so the connection
@@ -22,7 +24,16 @@ public sealed partial class HttpProtocolHandler
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams, bool foundExcess) =>
         DeliveredWhole(head, upload, headReader, delivery)
             && (streams?.AcceptsNewStreams
-                ?? (!foundExcess && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options))));
+                ?? (!foundExcess && !ReceivedUnwantedBody(plan, head) && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options))));
+
+    /// <summary>
+    /// Decides whether body bytes arrived with the head of a response to <c>-I</c>, which wants
+    /// none: curl 8.22.0 then shuts the connection down whatever the head says, a
+    /// <c>Content-Length</c> or none, a <c>204</c> or HTTP/1.0's <c>keep-alive</c> (measured,
+    /// BL-5948 Notes).
+    /// </summary>
+    private static bool ReceivedUnwantedBody(HttpRequestPlan plan, HttpResponseHead head) =>
+        plan.Context.NoBody && !head.BodyPrefix.IsEmpty;
 
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it
