@@ -65,3 +65,4 @@ The finding, verbatim:
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 3cabc559 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waits on BL-5915: typed -d café on Windows reaches xmpp as ANSI bytes; the invalid-UTF-8 refusal is committed
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 3cabc559 69116afe 3d836d5e.
