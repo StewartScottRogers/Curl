@@ -33,3 +33,4 @@ Cases: `test1072` "HTTP chunked PUT to HTTP 1.0 server with authorization" (`htt
 ## Log
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 29.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 8c155b65 fcdae5ab 3d836d5e.
