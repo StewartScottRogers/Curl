@@ -33,3 +33,4 @@ When a `-I` HTTP/2 response carries DATA past its promised length and the GOAWAY
 ## Log
 
 - 2026-11-25: Created by the shift-end review (ADR-0710).
+- 2026-11-25: Backlog -> Doing. Criteria at claim: c679fb5c ec314102 5e699e0a.
