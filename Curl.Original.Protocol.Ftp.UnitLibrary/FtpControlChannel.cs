@@ -263,6 +263,10 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
             }
 
             byte next = buffer[bufferStart++];
+
+            // A byte is here, so a read WaitForBytesAsync started has delivered: kept, it would
+            // answer the next fill without reading and a stale buffer byte would be taken.
+            pendingFill = null;
             if (next == (byte)'\n')
             {
                 line.Add(next);
