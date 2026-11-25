@@ -6,7 +6,7 @@ namespace Curl.Original.Protocol.Ldap;
 /// Binds as curl's OpenLDAP build does when the auth mask or <c>--login-options AUTH=</c> asks for
 /// SASL instead of a simple bind (BL-5435): reads <c>supportedSASLMechanisms</c> from the rootDSE,
 /// then runs the mechanism an <see cref="ISaslAuthenticator" /> picks among those offered and allowed
-/// (BL-5907, ADR-1359). A refused bind is never retried as a simple bind.
+/// (BL-5907, ADR-1362). A refused bind is never retried as a simple bind.
 /// </summary>
 internal static class LdapOpenLdapSaslBind
 {

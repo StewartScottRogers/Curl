@@ -1,4 +1,4 @@
-# ADR-1359: The OpenLDAP SASL bind runs the shared SASL authenticator
+# ADR-1362: The OpenLDAP SASL bind runs the shared SASL authenticator
 
 - **Status:** Accepted
 - **Date:** 2026-11-24

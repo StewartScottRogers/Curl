@@ -35,7 +35,7 @@ What decides: curl 8.21.0 manual (`--login-options`, `-u`), RFC 4513 section 5.2
 
 ## Notes
 
-- ADR-1359. The OpenLDAP SASL bind now runs the shared `ISaslAuthenticator` (given by `EngineComposition`), so CRAM-MD5, NTLM, OAUTHBEARER, XOAUTH2, EXTERNAL, GSSAPI and LOGIN bind; DIGEST-MD5 keeps the LDAP exchange.
+- ADR-1362. The OpenLDAP SASL bind now runs the shared `ISaslAuthenticator` (given by `EngineComposition`), so CRAM-MD5, NTLM, OAUTHBEARER, XOAUTH2, EXTERNAL, GSSAPI and LOGIN bind; DIGEST-MD5 keeps the LDAP exchange.
 - What still reproduced on this branch: L-1 (every mechanism but DIGEST-MD5 and PLAIN was refused); L-3's first request was already the rootDSE search, but it carried time limit 120 where upstream sends 0; the DIGEST-MD5 first bind carried an empty credentials field upstream omits; L-2 already exited 67.
 - `touches` widened to the files above: none is named by another task in Doing on origin/work/dark-factory (BL-5915 names `Curl.Engine.UnitTests`, not changed). The LDAP tests now reference `Curl.Authentication.UnitLibrary` so they pin the real mechanism bytes.
 - Measured upstream: curl 8.18.0, OpenLDAP 2.6.10 (WSL Ubuntu; the only OpenLDAP build here, not 8.21.0), `Record-CurlExchange.ps1 -Script`, user `u`, password `p`. Every first request is the rootDSE search `30 3e 02 01 01 63 39 04 00 0a 01 00 0a 01 00 02 01 00 02 01 00 01 01 00 87 0b "objectclass" 30 19 04 17 "supportedSASLMechanisms"` (Surl's `0x3E`). First binds (msgid 2):
@@ -54,4 +54,4 @@ What decides: curl 8.21.0 manual (`--login-options`, `-u`), RFC 4513 section 5.2
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 26.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 7e74135a ca39b51d 3d836d5e.
-- 2026-11-24: Doing -> Done. OpenLDAP SASL binds run every curl mechanism with upstream's request bytes and exit codes (ADR-1359)
+- 2026-11-24: Doing -> Done. OpenLDAP SASL binds run every curl mechanism with upstream's request bytes and exit codes (ADR-1362)

@@ -39,7 +39,7 @@ internal static partial class EngineComposition
     /// and <c>mqtts</c>, <c>imap</c> and <c>imaps</c>, <c>pop3</c> and <c>pop3s</c>, <c>smtp</c> and <c>smtps</c> (the mail schemes authenticating with
     /// <see cref="CreateSaslAuthenticator" />'s authenticator and upgrading with
     /// <paramref name="tlsProvider" /> after <c>STARTTLS</c> or <c>STLS</c>), <c>ldap</c> and <c>ldaps</c>
-    /// answering as WinLDAP's build on Windows and as the OpenLDAP build elsewhere (ADR-0166), the latter's SASL bind running that authenticator too (ADR-1359), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
+    /// answering as WinLDAP's build on Windows and as the OpenLDAP build elsewhere (ADR-0166), the latter's SASL bind running that authenticator too (ADR-1362), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
     /// authenticator, answering a forward proxy with <paramref name="proxyAuthSchemes" /> (ADR-0239),
     /// and keeping cookies in <paramref name="cookieStore" />; <c>ws</c> and <c>wss</c>
