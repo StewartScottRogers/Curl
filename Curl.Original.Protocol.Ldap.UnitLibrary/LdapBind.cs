@@ -111,7 +111,7 @@ internal static class LdapBind
 
     /// <summary>
     /// Binds as curl's <c>openldap.c</c> does: with <paramref name="version" />, and once more as
-    /// LDAPv2 when an LDAPv3 bind is answered <c>protocolError</c> (BL-5908, ADR-1363). Any other
+    /// LDAPv2 when an LDAPv3 bind is answered <c>protocolError</c> (BL-5908, ADR-1366). Any other
     /// answer but <c>success</c>, a reply that is not a BindResponse included, sends an
     /// UnbindRequest and fails with <see cref="OpenLdapMappedFailure" />'s result, else exit 38. A
     /// server that closes first fails with exit 7, as <c>libldap</c>'s

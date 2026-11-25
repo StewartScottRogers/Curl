@@ -1,4 +1,4 @@
-# ADR-1363: OpenLDAP StartTLS and simple bind failures follow curl 8.21.0
+# ADR-1366: OpenLDAP StartTLS and simple bind failures follow curl 8.21.0
 
 - **Status:** Accepted
 - **Date:** 2026-11-24

@@ -7,7 +7,7 @@ namespace Curl.Original.Protocol.Ldap;
 /// curl's OpenLDAP build does for <c>--ssl</c> and <c>--ssl-reqd</c> before it binds (BL-3542).
 /// </summary>
 /// <remarks>
-/// As measured against curl 8.21.0 with OpenLDAP 2.6.15 (BL-5908, ADR-1363): when the server
+/// As measured against curl 8.21.0 with OpenLDAP 2.6.15 (BL-5908, ADR-1366): when the server
 /// refuses StartTLS, <c>--ssl</c> goes on to bind in plaintext, as LDAPv2 after
 /// <c>protocolError</c>, and <c>--ssl-reqd</c> fails with what <c>openldap.c</c> maps the result
 /// code to after an UnbindRequest. A server that closes instead of answering fails either with

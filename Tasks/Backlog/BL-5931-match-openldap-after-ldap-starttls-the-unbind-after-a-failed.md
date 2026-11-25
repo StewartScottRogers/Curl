@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-On the OpenLDAP dialect, `ldap://` StartTLS sends the bytes and gives the exit codes of curl 8.21.0 in the three cases BL-5908 left out (ADR-1363).
+On the OpenLDAP dialect, `ldap://` StartTLS sends the bytes and gives the exit codes of curl 8.21.0 in the three cases BL-5908 left out (ADR-1366).
 
 ## Context
 

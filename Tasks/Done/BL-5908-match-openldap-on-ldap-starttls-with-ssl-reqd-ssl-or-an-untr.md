@@ -40,7 +40,7 @@ What decides: curl 8.21.0 manual (`--ssl`, `--ssl-reqd`, exit codes 1, 60 and 64
 
 - Reproduction on this branch: `--ssl-reqd` without a certificate (exit 1) and the untrusted certificate (exit 64) were already fixed after Surl's port commit (ADR-0892's correction, STD-172). Only the `--ssl` LDAPv2 bind still differed. All three are pinned in `LdapStartTlsOpenLdapMeasuredTests`.
 - Measured with `/mnt/c/UpstreamCurl/openldap-curl-8.21.0-linux-x86_64/curl` (Surl's pinned 8.21.0 + OpenLDAP 2.6.15 build) under WSL against a `socat` script sending scripted replies; `Record-CurlExchange.ps1` runs the Windows build and WSL has no `pwsh` on its PATH, so it was not used.
-- The same measurements showed other StartTLS differences, fixed here and recorded in ADR-1363: refused `--ssl-reqd` codes (52 etc. exit 64, 49 exit 67, 50 exit 9), a server closing instead of answering (exit 7), any handshake failure (exit 64), and the simple bind's LDAPv2 retry and result-code mapping.
+- The same measurements showed other StartTLS differences, fixed here and recorded in ADR-1366: refused `--ssl-reqd` codes (52 etc. exit 64, 49 exit 67, 50 exit 9), a server closing instead of answering (exit 7), any handshake failure (exit 64), and the simple bind's LDAPv2 retry and result-code mapping.
 - Left to BL-5931: the unbind after a failed handshake, no bind after StartTLS without `-u`, and a non-ExtendedResponse reply.
 - Touches widened to `LdapBind.cs`, `LdapProtocolHandler.cs` (the bind version has to reach the bind), `Cgr013Tests.cs` (three BL-3542 tests pinned answers 8.21.0 does not give; removed, replaced by the new class) and ADR-0892 (its "Amended by" line). No other task in Doing on `origin/work/dark-factory` named them. The WinLDAP tests in `Cgr013Tests` are unchanged.
 - `--ai-help`: no option added or changed. Platform: scripted connections only, no OS-dependent output.
@@ -49,4 +49,4 @@ What decides: curl 8.21.0 manual (`--ssl`, `--ssl-reqd`, exit codes 1, 60 and 64
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 27.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: a9e74800 545cbb75 3d836d5e.
-- 2026-11-24: Doing -> Done. ldap StartTLS and OpenLDAP bind failures match curl 8.21.0 (ADR-1363)
+- 2026-11-24: Doing -> Done. ldap StartTLS and OpenLDAP bind failures match curl 8.21.0 (ADR-1366)

@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
-/// <c>ldap://</c> StartTLS on the OpenLDAP dialect against a scripted server (BL-5908, ADR-1363): refusals,
+/// <c>ldap://</c> StartTLS on the OpenLDAP dialect against a scripted server (BL-5908, ADR-1366): refusals,
 /// closes and binds as curl 8.21.0 with OpenLDAP 2.6.15 answered them; the two non-ExtendedResponse
 /// cases pin the port's own answer, not curl's.
 /// </summary>

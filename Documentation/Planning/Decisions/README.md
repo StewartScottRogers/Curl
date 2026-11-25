@@ -1407,4 +1407,4 @@ Each option and the specific reason it lost.
 | [1363](ADR-1363-openssl-build-honours-trusted-certificate-settings-in-capath.md) | The OpenSSL build honours TRUSTED CERTIFICATE settings in --capath (BL-5917) | Accepted | 2026-11-24 |
 | [1364](ADR-1364-below-an-anchor-a-crl-may-be-rsassa-pss-signed-and-may-name-no-nextupdate.md) | Below an anchor a CRL may be RSASSA-PSS signed and may name no nextUpdate (BL-5878) | Accepted | 2026-11-24 |
 | [1365](ADR-1365-a-deflate-zlib-stream-holds-its-first-decoded-bytes-until-the-piece-decodes.md) | A deflate zlib stream holds its first decoded bytes until the piece decodes (BL-5889) | Accepted | 2026-11-24 |
-| [1363](ADR-1363-openldap-starttls-and-simple-bind-failures-follow-curl-8-21-0.md) | OpenLDAP StartTLS and simple bind failures follow curl 8.21.0 (BL-5908) | Accepted | 2026-11-24 |
+| [1366](ADR-1366-openldap-starttls-and-simple-bind-failures-follow-curl-8-21-0.md) | OpenLDAP StartTLS and simple bind failures follow curl 8.21.0 (BL-5908) | Accepted | 2026-11-24 |
