@@ -44,7 +44,7 @@ The finding, verbatim:
 
 - Confirmed on the branch by reading the code, then fixed by the finding's second outcome: the combination fails with exit 2 and
   `OAuth2TransferHook.DpopProofMessage`, before any endpoint is asked (ADR-1347). Binding the token needs token-request proofs,
-  a `DPoP` token type, the cache and a seam between two extensions that may not reference each other: filed as BL-5905.
+  a `DPoP` token type, the cache and a seam between two extensions that may not reference each other: filed as BL-5911.
 - The repro, run with the built `curl.exe` and a generated P-256 key, writes that message and exits 2; `--extended-help` says so.
 - `DpopProof.cs` needed no change. `touches` widened to the tests, `DpopExtension.cs` (its description) and both `CLAUDE.md`s;
   no other task in Doing names them.
@@ -55,4 +55,4 @@ The finding, verbatim:
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 37c06683 69116afe 3d836d5e.
-- 2026-11-24: Doing -> Done. --dpop with an --oauth2-* flow now fails with exit 2 naming the combination (ADR-1347); binding the token is BL-5905.
+- 2026-11-24: Doing -> Done. --dpop with an --oauth2-* flow now fails with exit 2 naming the combination (ADR-1347); binding the token is BL-5911.
