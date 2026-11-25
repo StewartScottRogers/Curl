@@ -34,3 +34,4 @@ answers before the verify result.
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: c0ee5d25 3d836d5e.
