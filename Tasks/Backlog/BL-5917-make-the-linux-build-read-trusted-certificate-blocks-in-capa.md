@@ -1,5 +1,5 @@
 ---
-id: BL-5903
+id: BL-5917
 title: Make the Linux build read TRUSTED CERTIFICATE blocks in --capath files as OpenSSL does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5903 — Make the Linux build read TRUSTED CERTIFICATE blocks in --capath files as OpenSSL does
+# BL-5917 — Make the Linux build read TRUSTED CERTIFICATE blocks in --capath files as OpenSSL does
 
 ## Goal
 

@@ -55,7 +55,7 @@ The finding, verbatim:
   Doing on `origin/work/dark-factory` named any of them.
 - Quality run: 100% line and branch; its two methods at complexity 12 were split, then checked at 6 and 4 from a
   cobertura run of `Curl.Networking.UnitTests`.
-- `--capath` files in the trusted format are left to BL-5903.
+- `--capath` files in the trusted format are left to BL-5917.
 
 ## Log
 
