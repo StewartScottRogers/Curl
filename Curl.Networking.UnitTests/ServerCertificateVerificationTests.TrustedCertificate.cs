@@ -13,7 +13,8 @@ namespace Curl.Networking;
 /// <summary>
 /// Pins how the OpenSSL build reads <c>TRUSTED CERTIFICATE</c> blocks of a <c>--cacert</c> file
 /// and their trust and reject settings, each verdict as <c>openssl verify -partial_chain
-/// -purpose sslserver</c> 3.5 gives it (BL-5879, STD-198).
+/// -purpose sslserver</c> 3.5 gives it (BL-5879, STD-198), and of <c>--capath</c> hashed files,
+/// as curl 8.18.0 on OpenSSL 3.5.5 gives it (BL-5917).
 /// </summary>
 [TestClass]
 public sealed class ServerCertificateVerificationTrustedCertificateTests
@@ -25,6 +26,8 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
     private const string Rejected = "SSL certificate OpenSSL verify result: certificate rejected (28)";
 
     private static readonly Asn1Tag RejectTag = new(TagClass.ContextSpecific, 0, isConstructed: true);
+
+    private readonly List<string> _directories = [];
 
     [TestMethod]
     [DataRow(ServerAuthentication, null, true)]
@@ -133,6 +136,185 @@ public sealed class ServerCertificateVerificationTrustedCertificateTests
 
         Assert.AreEqual(28L, observed.VerifyResult);
         Assert.AreEqual((CurlExitCode.PeerFailedVerification, Rejected), failure);
+    }
+
+    [TestMethod]
+    [DataRow(ServerAuthentication, null, true)]
+    [DataRow(null, ServerAuthentication, false)]
+    public void VerifyChain_CaDirectoryRootWithTrustSettings_IsAcceptedOrRejected(string? trusted, string? rejected, bool accepted)
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, Trusted(chain.Root, trusted, rejected));
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        AssertVerdict(accepted, verdict);
+    }
+
+    [TestMethod]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    public void VerifyChain_TwoCopiesInOneCaDirectory_TheFirstWins(bool rejectedFirst, bool accepted)
+    {
+        using var chain = IssuedChain.Create();
+        string[] copies = [Trusted(chain.Root, null, ServerAuthentication), Plain(chain.Root)];
+        var directory = Directory(chain.Root, rejectedFirst ? copies : [copies[1], copies[0]]);
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        AssertVerdict(accepted, verdict);
+    }
+
+    [TestMethod]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    public void VerifyChain_TwoCaDirectories_TheFirstWins(bool rejectedFirst, bool accepted)
+    {
+        using var chain = IssuedChain.Create();
+        var rejecting = Directory(chain.Root, Trusted(chain.Root, null, ServerAuthentication));
+        var plain = Directory(chain.Root, Plain(chain.Root));
+        string[] directories = rejectedFirst ? [rejecting, plain] : [plain, rejecting];
+
+        var verdict = VerifyDirectory(string.Join(Path.PathSeparator, directories), chain);
+
+        AssertVerdict(accepted, verdict);
+    }
+
+    [TestMethod]
+    [DataRow(false, true, true)]
+    [DataRow(true, false, false)]
+    public void VerifyChain_RootInCaFileAndCaDirectory_TheFileWins(bool fileRejects, bool directoryRejects, bool accepted)
+    {
+        using var chain = IssuedChain.Create();
+        string Copy(bool rejects) => rejects ? Trusted(chain.Root, null, ServerAuthentication) : Plain(chain.Root);
+        var directory = Directory(chain.Root, Copy(directoryRejects));
+
+        var verdict = VerifyDirectory(directory, chain, Copy(fileRejects));
+
+        AssertVerdict(accepted, verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_RejectedCaDirectoryRootBesideAnotherCaFile_IsRejected()
+    {
+        using var chain = IssuedChain.Create();
+        using var other = IssuedChain.Create();
+        var directory = Directory(chain.Root, Trusted(chain.Root, null, ServerAuthentication));
+
+        var verdict = VerifyDirectory(directory, chain, Plain(other.Leaf));
+
+        AssertVerdict(false, verdict);
+    }
+
+    [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(true, true)]
+    public void VerifyChain_RejectedCaDirectoryLeaf_DecidesOnlyWithNothingListedAboveIt(bool listsRoot, bool accepted)
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Leaf, Trusted(chain.Leaf, null, ServerAuthentication));
+        if (listsRoot)
+        {
+            Write(directory, chain.Root, Plain(chain.Root));
+        }
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        AssertVerdict(accepted, verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_UndecodableBlockAfterARejectedRootInACaDirectoryFile_KeepsTheRoot()
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, Trusted(chain.Root, null, ServerAuthentication) + Undecodable);
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        AssertVerdict(false, verdict);
+    }
+
+    [TestMethod]
+    public void VerifyChain_UndecodableBlockBeforeTheRootInACaDirectoryFile_AddsNothing()
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, Undecodable + Plain(chain.Root));
+
+        var verdict = VerifyDirectory(directory, chain);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, verdict.ExitCode, verdict.ErrorMessage);
+        Assert.AreNotEqual(Rejected, verdict.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow(true, true)]
+    [DataRow(false, false)]
+    public void Judge_RejectedCaDirectoryCertificateInASoundSystemChain_CountsUnlessItIsTheRoot(bool rejectsRoot, bool accepted)
+    {
+        using var chain = IssuedChain.Create();
+        var certificate = rejectsRoot ? chain.Root : chain.Intermediate;
+        var directory = Directory(certificate, Trusted(certificate, null, ServerAuthentication));
+        var verification = new ServerCertificateVerification(
+            new TlsClientOptions(CaCertificateDirectory: directory), matchesSchannelBuild: false, TimeProvider.System);
+        var (_, anchors, _) = verification.ReadTrustAnchors();
+
+        // Stands for the system store's chain: built without fault up to its root.
+        using var sound = new X509Chain();
+        sound.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        sound.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        sound.ChainPolicy.CustomTrustStore.Add(chain.Root);
+        sound.ChainPolicy.ExtraStore.Add(chain.Intermediate);
+        Assert.IsTrue(sound.Build(chain.Leaf));
+
+        var (_, failure) = verification.Judge(SslPolicyErrors.None, sound, Host, anchors, null, chain.Sent);
+
+        Assert.AreEqual(accepted ? null : Rejected, failure?.Message);
+    }
+
+    [TestMethod]
+    public void Judge_RejectedCaDirectoryRootAndNoChain_DoesNotReportARejection()
+    {
+        using var chain = IssuedChain.Create();
+        var directory = Directory(chain.Root, Trusted(chain.Root, null, ServerAuthentication));
+        var verification = new ServerCertificateVerification(
+            new TlsClientOptions(CaCertificateDirectory: directory), matchesSchannelBuild: false, TimeProvider.System);
+        var (_, anchors, _) = verification.ReadTrustAnchors();
+
+        var (_, failure) = verification.Judge(SslPolicyErrors.RemoteCertificateNotAvailable, null, Host, anchors, null, []);
+
+        Assert.AreNotEqual(Rejected, failure?.Message);
+    }
+
+    private const string Undecodable = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
+
+    // A new CA directory holding the certificate's hashed files, one per content, <hash>.0 first.
+    private string Directory(X509Certificate2 certificate, params string[] contents)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "curl-capath-trusted-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(directory);
+        _directories.Add(directory);
+        Write(directory, certificate, contents);
+        return directory;
+    }
+
+    private static void Write(string directory, X509Certificate2 certificate, params string[] contents)
+    {
+        var hash = OpenSslSubjectNameHash.Of(certificate.SubjectName);
+        for (var number = 0; number < contents.Length; number++)
+        {
+            File.WriteAllText(Path.Combine(directory, $"{hash}.{number}"), contents[number]);
+        }
+    }
+
+    [TestCleanup]
+    public void DeleteDirectories() => _directories.ForEach(directory => System.IO.Directory.Delete(directory, recursive: true));
+
+    private static ServerCertificateChainVerdict VerifyDirectory(string directory, IssuedChain chain, string? caFile = null)
+    {
+        var options = new TlsClientOptions(
+            CaCertificateBlob: caFile is null ? null : (ReadOnlyMemory<byte>?)Encoding.ASCII.GetBytes(caFile),
+            CaCertificateDirectory: directory);
+        return new ServerCertificateVerification(options, matchesSchannelBuild: false, TimeProvider.System).VerifyChain(chain.Sent, Host);
     }
 
     private static ServerCertificateVerification Verification(string pem, bool matchesSchannelBuild) =>

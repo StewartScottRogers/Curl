@@ -5,14 +5,15 @@ using System.Security.Cryptography.X509Certificates;
 namespace Curl.Networking;
 
 /// <summary>
-/// A <c>--cacert</c> file as curl's OpenSSL build reads it: its <c>CERTIFICATE</c> blocks and its
-/// <c>TRUSTED CERTIFICATE</c> blocks, each a certificate followed by OpenSSL's <c>X509_CERT_AUX</c>
-/// settings, which can distrust the certificate for server authentication.
+/// The certificates of a <c>--cacert</c> file or <c>--capath</c> directory as curl's OpenSSL build
+/// reads them: <c>CERTIFICATE</c> blocks and <c>TRUSTED CERTIFICATE</c> blocks, each of the latter
+/// a certificate followed by OpenSSL's <c>X509_CERT_AUX</c> settings, which can distrust the
+/// certificate for server authentication.
 /// </summary>
-/// <param name="Certificates">Every certificate of the file, in file order.</param>
+/// <param name="Certificates">Every certificate read, in the order read.</param>
 /// <param name="RejectedForServerAuthentication">
-/// The thumbprints of the certificates whose settings, where the file first lists them, refuse
-/// server authentication.
+/// The thumbprints of the certificates whose settings, where first listed, refuse server
+/// authentication.
 /// </param>
 internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IReadOnlySet<string> RejectedForServerAuthentication)
 {
@@ -31,7 +32,7 @@ internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IR
     /// </exception>
     internal static OpenSslCaFile Read(string pem)
     {
-        var file = ReadBlocks(pem);
+        var file = Of(ReadBlocks(pem));
 
         // PemEncoding skips a block whose body is not base64, so the blocks read are counted
         // against the blocks begun.
@@ -44,21 +45,44 @@ internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IR
         return file;
     }
 
-    private static OpenSslCaFile ReadBlocks(string pem)
+    /// <summary>
+    /// Reads a <c>--capath</c> file as OpenSSL's hashed directory lookup does: the certificate
+    /// blocks before the first one that cannot be decoded; blocks with other labels are skipped.
+    /// </summary>
+    /// <param name="pem">The file's text.</param>
+    /// <returns>Each certificate and whether its settings refuse server authentication, in file order.</returns>
+    internal static IReadOnlyList<(X509Certificate2 Certificate, bool Rejects)> ReadUpToAnUndecodableBlock(string pem)
+    {
+        var blocks = new List<(X509Certificate2 Certificate, bool Rejects)>();
+        try
+        {
+            foreach (var block in ReadBlocks(pem))
+            {
+                blocks.Add(block);
+            }
+        }
+        catch (CryptographicException)
+        {
+            // The rest of the file adds nothing.
+        }
+
+        return blocks;
+    }
+
+    /// <summary>
+    /// The certificates in the order OpenSSL's store lists them; of two copies of one certificate
+    /// the first one's settings count.
+    /// </summary>
+    /// <param name="blocks">Each certificate and whether its settings refuse server authentication.</param>
+    /// <returns>The certificates and which of them are rejected.</returns>
+    internal static OpenSslCaFile Of(IEnumerable<(X509Certificate2 Certificate, bool Rejects)> blocks)
     {
         var certificates = new X509Certificate2Collection();
         var listed = new HashSet<string>(StringComparer.Ordinal);
         var rejected = new HashSet<string>(StringComparer.Ordinal);
-        for (var rest = pem.AsMemory(); PemEncoding.TryFind(rest.Span, out var fields); rest = rest[fields.Location.End..])
+        foreach (var (certificate, rejects) in blocks)
         {
-            if (ReadBlock(rest.Span, fields) is not var (certificate, rejects))
-            {
-                continue;
-            }
-
             certificates.Add(certificate);
-
-            // OpenSSL's store keeps the first of two copies of a certificate, settings and all.
             if (listed.Add(certificate.Thumbprint) && rejects)
             {
                 rejected.Add(certificate.Thumbprint);
@@ -66,6 +90,32 @@ internal sealed record OpenSslCaFile(X509Certificate2Collection Certificates, IR
         }
 
         return new OpenSslCaFile(certificates, rejected);
+    }
+
+    /// <summary>
+    /// This file's certificates, then the <c>--capath</c> ones: a certificate both hold keeps this
+    /// file's settings, as OpenSSL loads the file before it looks in the directory.
+    /// </summary>
+    /// <param name="directory">The certificates of the <c>--capath</c> directories.</param>
+    /// <returns>All the certificates and which of them are rejected.</returns>
+    internal OpenSslCaFile FollowedBy(OpenSslCaFile directory)
+    {
+        var rejected = directory.RejectedForServerAuthentication
+            .Except(Certificates.Select(certificate => certificate.Thumbprint))
+            .Union(RejectedForServerAuthentication)
+            .ToHashSet(StringComparer.Ordinal);
+        return new OpenSslCaFile([.. Certificates, .. directory.Certificates], rejected);
+    }
+
+    private static IEnumerable<(X509Certificate2 Certificate, bool Rejects)> ReadBlocks(string pem)
+    {
+        for (var rest = pem.AsMemory(); PemEncoding.TryFind(rest.Span, out var fields); rest = rest[fields.Location.End..])
+        {
+            if (ReadBlock(rest.Span, fields) is { } block)
+            {
+                yield return block;
+            }
+        }
     }
 
     private static int BlocksBegun(string pem, string label) => pem.AsSpan().Count($"-----BEGIN {label}-----");

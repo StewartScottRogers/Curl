@@ -13,8 +13,8 @@ namespace Curl.Networking;
 /// </summary>
 internal sealed partial class ServerCertificateVerification
 {
-    // The thumbprints of the --cacert certificates whose OpenSSL settings refuse server
-    // authentication; empty in the Schannel build and under -k.
+    // The thumbprints of the --cacert and --capath certificates whose OpenSSL settings refuse
+    // server authentication; empty in the Schannel build and under -k.
     private IReadOnlySet<string> rejectedCaCertificates = new HashSet<string>();
 
     private const long CertificateRejectedVerifyResult = 28;
@@ -25,7 +25,8 @@ internal sealed partial class ServerCertificateVerification
     // CERTIFICATE block in it parses and there is at least one. The Schannel build trusts
     // whatever CERTIFICATE blocks parse.
     // A CURLOPT_CAINFO_BLOB is read as the file would be, and wins over it (ADR-0704).
-    private X509Certificate2Collection ReadCaCertificates()
+    // The --cacert certificates, then the --capath ones.
+    private X509Certificate2Collection ReadCaCertificates(OpenSslCaFile directory)
     {
         var pem = options.CaCertificateBlob is { } blob
             ? Encoding.ASCII.GetString(blob.Span)
@@ -37,18 +38,43 @@ internal sealed partial class ServerCertificateVerification
             return certificates;
         }
 
-        var file = OpenSslCaFile.Read(pem);
-        rejectedCaCertificates = file.RejectedForServerAuthentication;
-        return file.Certificates;
+        var trusted = OpenSslCaFile.Read(pem).FollowedBy(directory);
+        rejectedCaCertificates = trusted.RejectedForServerAuthentication;
+        return trusted.Certificates;
     }
 
     // OpenSSL, with partial chains allowed as curl sets it, stops at the lowest certificate above
     // the server's own that the trust store lists, else at the server's own, and fails the chain
-    // when that one's settings refuse server authentication (BL-5879).
-    private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateRefusal(X509Chain? chain) =>
-        chain is { ChainElements.Count: > 0 } && rejectedCaCertificates.Contains(DecidingCertificate(chain).Thumbprint)
+    // when that one's settings refuse server authentication (BL-5879). With --capath roots beside
+    // the system store the trust store listing them is that of the chain rebuilt against them
+    // (BL-5917).
+    private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateRefusal(X509Chain? chain, X509Certificate2Collection anchorsBesideSystemStore) =>
+        IsDecidedByARejectedCertificate(chain, anchorsBesideSystemStore)
             ? (CurlExitCode.PeerFailedVerification, OpenSslCertificateRejectedRefusal)
             : null;
+
+    private bool IsDecidedByARejectedCertificate(X509Chain? chain, X509Certificate2Collection anchorsBesideSystemStore)
+    {
+        if (rejectedCaCertificates.Count == 0 || chain is not { ChainElements.Count: > 0 })
+        {
+            return false;
+        }
+
+        using var anchored = RebuildAgainstAnchors(chain, anchorsBesideSystemStore, requireServerAuthentication: false, out _);
+        return anchored is null
+            ? IsRejected(DecidingCertificate(chain))
+            : IsRejectedBesideTheSystemStore(DecidingCertificate(anchored), chain);
+    }
+
+    private bool IsRejected(X509Certificate2 certificate) => rejectedCaCertificates.Contains(certificate.Thumbprint);
+
+    private bool IsRejectedBesideTheSystemStore(X509Certificate2 certificate, X509Chain systemChain) =>
+        IsRejected(certificate) && !IsRootOfASoundChain(systemChain, certificate);
+
+    // A root the system store's chain ends at without fault is in OpenSSL's default CA file, which
+    // it loads before it looks in the --capath, so the file's copy and not the directory's counts.
+    private static bool IsRootOfASoundChain(X509Chain chain, X509Certificate2 certificate) =>
+        chain.ChainStatus.Length == 0 && chain.ChainElements[^1].Certificate.Thumbprint == certificate.Thumbprint;
 
     private static X509Certificate2 DecidingCertificate(X509Chain chain) =>
         chain.ChainElements
@@ -64,25 +90,18 @@ internal sealed partial class ServerCertificateVerification
             ? throw new FileNotFoundException("The CA certificate file name is empty.")
             : File.ReadAllText(path);
 
-    private X509Certificate2Collection ReadCaCertificateDirectory()
-    {
-        var certificates = new X509Certificate2Collection();
-        var directories = options.CaCertificateDirectory;
-        if (matchesSchannelBuild || directories is null)
-        {
-            return certificates;
-        }
+    // The OpenSSL build reads a --capath file's TRUSTED CERTIFICATE blocks and their settings as
+    // it reads --cacert's, an earlier directory's or file's copy winning (BL-5917).
+    private OpenSslCaFile ReadCaCertificateDirectory() =>
+        OpenSslCaFile.Of(CaCertificateDirectories().SelectMany(ReadHashedDirectory));
 
-        foreach (var directory in directories.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            foreach (var subjectHash in SubjectHashesNamedIn(directory))
-            {
-                ImportHashedCertificates(certificates, directory, subjectHash);
-            }
-        }
+    private string[] CaCertificateDirectories() =>
+        matchesSchannelBuild || options.CaCertificateDirectory is not { } directories
+            ? []
+            : directories.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
 
-        return certificates;
-    }
+    private static IEnumerable<(X509Certificate2 Certificate, bool Rejects)> ReadHashedDirectory(string directory) =>
+        SubjectHashesNamedIn(directory).SelectMany(subjectHash => ReadHashedCertificates(directory, subjectHash));
 
     // OpenSSL's hashed directory lookup (by_dir.c, ADR-0836) opens only files named
     // <subject hash>.<n>, as c_rehash and openssl rehash name them; any other file adds nothing
@@ -103,13 +122,18 @@ internal sealed partial class ServerCertificateVerification
 
     // OpenSSL reads <hash>.0, <hash>.1 and on until a number is missing, and finds in them only
     // the certificates whose subject has that hash.
-    private static void ImportHashedCertificates(X509Certificate2Collection certificates, string directory, string subjectHash)
+    private static IEnumerable<(X509Certificate2 Certificate, bool Rejects)> ReadHashedCertificates(string directory, string subjectHash)
     {
         for (var number = 0; File.Exists(Path.Combine(directory, $"{subjectHash}.{number}")); number++)
         {
-            var inFile = new X509Certificate2Collection();
-            ImportParsableCertificates(inFile, ReadTextOrNothing(Path.Combine(directory, $"{subjectHash}.{number}")));
-            certificates.AddRange(inFile.Where(certificate => OpenSslSubjectNameHash.Of(certificate.SubjectName) == subjectHash).ToArray());
+            var text = ReadTextOrNothing(Path.Combine(directory, $"{subjectHash}.{number}"));
+            foreach (var block in OpenSslCaFile.ReadUpToAnUndecodableBlock(text))
+            {
+                if (OpenSslSubjectNameHash.Of(block.Certificate.SubjectName) == subjectHash)
+                {
+                    yield return block;
+                }
+            }
         }
     }
 
