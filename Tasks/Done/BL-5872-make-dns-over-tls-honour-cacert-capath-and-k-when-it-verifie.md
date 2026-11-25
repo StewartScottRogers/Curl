@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.EncryptedDns.UnitLibrary/DnsOverTls, Curl.Extension.EncryptedDns.UnitTests/DnsOverTls, Curl.Extension.EncryptedDns.UnitLibrary/EncryptedDnsExtension.cs, Curl.Extension.EncryptedDns.UnitLibrary/CLAUDE.md, Curl.Extension.Abstractions.UnitLibrary/ExtensionOptionValues.cs, Curl.Extension.Abstractions.UnitLibrary/ExtensionTlsTrust.cs, Curl.Extension.Abstractions.UnitLibrary/CLAUDE.md, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/ExtensionCommandLineOptionTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-25
 ---
 # BL-5872 — Make --dns-over-tls honour --cacert, --capath and -k when it verifies the DNS-over-TLS server's certificate
 
@@ -47,3 +47,4 @@ Repro: `surl -v --cert server.pem --key server.key --dns-transport tls dns://127
 - 2026-11-24: Backlog -> Doing. Criteria at claim: d597ab5e 5829f2b6 3f81e2b0 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Code committed; left: end-to-end DoT handshake unit tests (criteria 1-2) and --ai-help trust text (criterion 3), see Notes
 - 2026-11-24: Backlog -> Doing. Criteria at claim: d597ab5e 5829f2b6 3f81e2b0 3d836d5e.
+- 2026-11-25: Doing -> Done. DoT resolves through a private-CA test server with --cacert (+ --ssl-no-revoke on Schannel) or -k, fails without; ai-help says so
