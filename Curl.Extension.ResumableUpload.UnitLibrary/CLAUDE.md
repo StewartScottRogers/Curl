@@ -13,7 +13,9 @@ another extension.
   handler (ADR-1103): `OPTIONS` picks `TusUploadProtocol` or `IetfUploadProtocol`, `ResumableUploadFlow`
   creates the upload, appends, and after a broken connection retrieves the offset and appends from it,
   `ResumableUploadSession` sends each request through the rest of curl's transfer (`next`, with a
-  `ResumableUploadRequestContext`), so `-v`, `--trace`, `--har` and `--record` see it (ADR-1379), and `ResumableUploadOutcome` makes
+  `ResumableUploadRequestContext`), so `-v`, `--trace`, `--har` and `--record` see it (ADR-1379); a request's content is
+  an `UploadRemainderStream`, a read-only window over the upload from its offset, so nothing of it is copied into memory.
+  `ResumableUploadOutcome` makes
   the last response the transfer's. Its constructor takes how many resumptions to allow.
 
 - `Fields/` holds one type per header field: `Ietf*Field` for draft-ietf-httpbis-resumable-upload's
