@@ -35,3 +35,4 @@ default for the stanzas sent. This is an extended protocol, so decide the line e
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: de46569f ce8c1752 3d836d5e.
