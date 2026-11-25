@@ -39,3 +39,4 @@ With `-f` and a `417`, both write no upload line. Start at `HttpProtocolHandler.
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 9cea44d2 71b88799 3d836d5e.
