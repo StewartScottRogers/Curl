@@ -30,3 +30,4 @@ Found by BL-5917 (ADR-1363). ADR-1351 and VerifyChain_RejectedRootAndAnotherHost
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 29c5d753 645f4828.
