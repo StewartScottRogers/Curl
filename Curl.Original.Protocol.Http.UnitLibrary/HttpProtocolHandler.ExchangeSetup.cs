@@ -15,7 +15,7 @@ public sealed partial class HttpProtocolHandler
     private IConnection ResponseConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection timedConnection) =>
         (plan.Framing.AwaitsContinue, plan.Framing.Body is StreamBody && requestStream is null) switch
         {
-            (true, _) => new HttpContinueWaitConnection(timedConnection) { ContinueWait = plan.Options.ContinueWait, WaitBegins = ContinueWaitBegins, WaitEnds = ContinueWaitEnds },
+            (true, _) => new HttpContinueWaitConnection(timedConnection) { ContinueWait = plan.Options.ContinueWait, WaitBegins = ContinueWaitBegins, WaitEnds = ContinueWaitEnds, IsMultiplexedStream = requestStream is not null },
             (false, true) => new HttpEarlyResponseConnection(timedConnection),
             _ => timedConnection,
         };

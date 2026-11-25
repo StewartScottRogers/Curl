@@ -12,15 +12,17 @@ namespace Curl.Original.Protocol.Http;
 /// <remarks>
 /// curl 8.21.0 sends the body when <c>100 Continue</c> arrives or when the wait runs out
 /// with nothing received, and leaves it unsent when any other reply arrives first (BL-175
-/// Notes), except a final 2xx: curl 8.22.0 still waits the time out after one, reports
-/// <see cref="HttpConnectionInfoLines.DoneWaitingForContinue" /> and sends the body (measured,
-/// CGR-067, BL-3596 Notes). The read the wait started keeps running after the wait runs out,
-/// so a status of 300 or above that arrives while the body is sent is seen in time to stop sending it
-/// (<see cref="SendUnlessStoppedAsync" />, BL-319 and BL-395 Notes); the next read waits
-/// for it. Disposing this does nothing: the connection it wraps belongs to the handler.
+/// Notes). When that reply is a final status over HTTP/1.x, the wait keeps running while the
+/// response is read (<see cref="HoldsBody" />): curl 8.22.0 sends the body when it runs out,
+/// during a read or after the response, unless the response stops the upload first (measured,
+/// CGR-067, BL-3596 and BL-5960 Notes). The read the wait started keeps running after the wait
+/// runs out, so a status of 300 or above that arrives while the body is sent is seen in time to
+/// stop sending it (<see cref="SendUnlessStoppedAsync" />, BL-319 and BL-395 Notes); the next
+/// read waits for it. Disposing this only ends a wait still holding the body: the connection it
+/// wraps belongs to the handler.
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
-internal sealed class HttpContinueWaitConnection(IConnection connection) : IConnection
+internal sealed class HttpContinueWaitConnection(IConnection connection) : IConnection, IDisposable
 {
     /// <summary>
     /// The longest wait a .NET timer accepts, about 49.7 days; a longer
@@ -43,10 +45,37 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     internal Action<TimeSpan>? WaitBegins { get; init; }
 
     /// <summary>
-    /// Gets what <see cref="WaitForContinueAsync" /> tells when its wait ends, however it ends, or
-    /// <see langword="null" /> for nothing (BL-3864).
+    /// Gets what is told when the wait ends, however it ends - for a held body, when it is sent
+    /// or given up - or <see langword="null" /> for nothing (BL-3864).
     /// </summary>
     internal Action? WaitEnds { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether this stands for an HTTP/2 or HTTP/3 stream, where no body
+    /// is held: a final 2xx is waited out before the response is read.
+    /// </summary>
+    internal bool IsMultiplexedStream { get; init; }
+
+    /// <summary>Gets or sets what sends a held body once the wait runs out; nothing by default.</summary>
+    internal Func<CancellationToken, ValueTask> SendBody { get; set; } = _ => ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Gets or sets the send failure of a held body, kept so the response is delivered first, as
+    /// curl 8.22.0 does (BL-4909); <see langword="null" /> for none.
+    /// </summary>
+    internal HttpTransferException? HeldSendFailure { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether a final status arrived during the wait and the body still
+    /// waits for the wait to run out, or to be given up (<see cref="Dispose" />).
+    /// </summary>
+    internal bool HoldsBody => heldWaitTimer is not null;
+
+    private CancellationTokenSource? heldWaitTimer;
+
+    private Task? heldWaitEnd;
+
+    private bool sendsHeldBody;
 
     private readonly byte[] received = new byte[HttpLineReader.MaximumLineLength];
 
@@ -70,9 +99,9 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// <param name="timeProvider">The clock <see cref="ContinueWait" /> runs on.</param>
     /// <param name="cancellationToken">Cancels the wait.</param>
     /// <returns>
-    /// <see langword="true" /> when the wait ran out, after nothing or after a final 2xx, or
-    /// the first status line received is informational; <see langword="false" /> when any
-    /// other reply, or the end of the connection, came first.
+    /// <see langword="true" /> to send the body now: the wait ran out, or the first status line
+    /// received is informational; <see langword="false" /> when any other reply, or the end of
+    /// the connection, came first, a final status leaving the body held (<see cref="HoldsBody" />).
     /// </returns>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
     internal async ValueTask<bool> WaitForContinueAsync(TimeProvider timeProvider, CancellationToken cancellationToken)
@@ -84,8 +113,49 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
         }
         finally
         {
+            TellWaitEndsUnlessHolding();
+        }
+    }
+
+    /// <summary>Tells <see cref="WaitEnds" />, unless the wait goes on for a held body.</summary>
+    private void TellWaitEndsUnlessHolding()
+    {
+        if (!HoldsBody)
+        {
             WaitEnds?.Invoke();
         }
+    }
+
+    /// <summary>
+    /// Waits out what is left of a held body's wait, then sends the body through
+    /// <see cref="SendBody" />; a status of 300 or above no longer stops it.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns>A task that completes once the body has been sent.</returns>
+    /// <exception cref="OperationCanceledException">The wait or the send was cancelled.</exception>
+    internal async ValueTask SendHeldBodyAsync(CancellationToken cancellationToken)
+    {
+        await heldWaitEnd!.ConfigureAwait(false);
+        sendsHeldBody = true;
+        Dispose();
+        await SendBody(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends a wait still holding the body, which is then not sent unless
+    /// <see cref="SendHeldBodyAsync" /> is sending it; nothing when none is held.
+    /// </summary>
+    public void Dispose()
+    {
+        if (heldWaitTimer is not { } timer)
+        {
+            return;
+        }
+
+        heldWaitTimer = null;
+        timer.Cancel();
+        timer.Dispose();
+        WaitEnds?.Invoke();
     }
 
     /// <summary>Tells <see cref="WaitBegins" /> the wait's length, when the wait is a timed one.</summary>
@@ -101,32 +171,50 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     private async Task<bool> WaitForStatusLineOrTimeoutAsync(TimeProvider timeProvider, CancellationToken cancellationToken)
     {
         statusLineRead = ReadStatusLineAsync(cancellationToken);
-        using CancellationTokenSource waitEnded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        CancellationTokenSource waitEnded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task wait = Task.Delay(ContinueWait > LongestTimedWait ? Timeout.InfiniteTimeSpan : ContinueWait, timeProvider, waitEnded.Token);
         Task first = await WhenWaitEndsAsync(statusLineRead, wait).ConfigureAwait(false);
-        await waitEnded.CancelAsync().ConfigureAwait(false);
+        await HoldOrEndWaitAsync(first != wait, wait, waitEnded).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         WaitRanOut = first == wait;
         return WaitRanOut || (statusLineRead.IsCompletedSuccessfully && statusLineRead.Result);
     }
 
     /// <summary>
+    /// Keeps <paramref name="wait" /> running to hold the body when a final status over HTTP/1.x
+    /// ended the caller's wait, and otherwise cancels it.
+    /// </summary>
+    private async ValueTask HoldOrEndWaitAsync(bool answered, Task wait, CancellationTokenSource waitEnded)
+    {
+        if (answered && !IsMultiplexedStream && firstStatusCode >= 200)
+        {
+            heldWaitTimer = waitEnded;
+            heldWaitEnd = wait;
+            return;
+        }
+
+        await waitEnded.CancelAsync().ConfigureAwait(false);
+        waitEnded.Dispose();
+    }
+
+    /// <summary>
     /// Waits for the first status line or the end of <paramref name="wait" />, whichever comes
-    /// first, and on past a final 2xx to the end of <paramref name="wait" />: curl 8.22.0 still
-    /// waits the time out after one and then sends the body (measured, CGR-067, BL-3596 Notes).
+    /// first, and on a stream (<see cref="IsMultiplexedStream" />) on past a final 2xx to the end
+    /// of <paramref name="wait" />: curl 8.22.0 still waits the time out after one and then sends
+    /// the body (measured, CGR-067, BL-3596 Notes).
     /// </summary>
     /// <returns><paramref name="wait" /> when the wait ended it; otherwise <paramref name="read" />.</returns>
     private async Task<Task> WhenWaitEndsAsync(Task<bool> read, Task wait)
     {
         Task first = await Task.WhenAny(read, wait).ConfigureAwait(false);
-        return first != wait && read.IsCompletedSuccessfully && firstStatusCode is >= 200 and < 300
+        return IsMultiplexedStream && first != wait && AnsweredWithFinal2xx
             ? await Task.WhenAny(wait).ConfigureAwait(false)
             : first;
     }
 
     /// <summary>
     /// Gets a value indicating whether <see cref="WaitForContinueAsync" /> ran out of time
-    /// before any status line arrived, or after a final 2xx did, after which curl 8.21.0 reports
+    /// before any status line arrived, or on a stream after a final 2xx did, after which curl 8.21.0 reports
     /// <see cref="HttpConnectionInfoLines.DoneWaitingForContinue" /> (measured, BL-449 Notes).
     /// </summary>
     internal bool WaitRanOut { get; private set; }
@@ -136,9 +224,10 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// has a status of 300 or above, which stops curl 8.21.0 sending the body: a
     /// <c>417 Expectation Failed</c> (BL-319 Notes) or any other redirect or error
     /// (<c>HTTP error before end of send, stop sending</c>, BL-395 Notes). A 1xx or 2xx lets
-    /// the body go on.
+    /// the body go on, and so does any status that held the body until the wait ran out
+    /// (<see cref="SendHeldBodyAsync" />).
     /// </summary>
-    internal bool StopsSending => statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300;
+    internal bool StopsSending => !sendsHeldBody && statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300;
 
     /// <summary>
     /// Gets a value indicating whether the first status line received is a 1xx one, the
@@ -203,13 +292,30 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
 
         if (replayed == receivedLength)
         {
-            return await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return await ReadConnectionAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
 
         int length = Math.Min(buffer.Length, receivedLength - replayed);
         received.AsSpan(replayed, length).CopyTo(buffer.Span);
         replayed += length;
         return length;
+    }
+
+    /// <summary>Reads the connection, sending a held body when its wait runs out first.</summary>
+    private async ValueTask<int> ReadConnectionAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        if (!HoldsBody)
+        {
+            return await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+
+        Task<int> read = connection.ReadAsync(buffer, cancellationToken).AsTask();
+        if (await Task.WhenAny(read, heldWaitEnd!).ConfigureAwait(false) != read)
+        {
+            await SendHeldBodyAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return await read.ConfigureAwait(false);
     }
 
     /// <inheritdoc />

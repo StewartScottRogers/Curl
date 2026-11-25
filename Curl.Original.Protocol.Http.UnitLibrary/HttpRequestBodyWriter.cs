@@ -201,6 +201,19 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     internal bool CutShort { get; private set; }
 
+    /// <summary>Gets a value indicating whether <see cref="StopBeforeSending" /> cut the body short.</summary>
+    internal bool StoppedBeforeSending { get; private set; }
+
+    /// <summary>
+    /// Cuts the body short before any of it is sent, as a status of 300 or above does to one
+    /// still waiting for <c>100 Continue</c>.
+    /// </summary>
+    internal void StopBeforeSending()
+    {
+        CutShort = true;
+        StoppedBeforeSending = true;
+    }
+
     /// <summary>
     /// Gets the message an <see cref="IUploadRewinder" /> gave when <see cref="Rewound" /> failed
     /// to take the body back to its start, which fails the resend with exit 65 before it connects;

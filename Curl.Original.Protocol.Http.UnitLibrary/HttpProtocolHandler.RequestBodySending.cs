@@ -7,8 +7,8 @@ public sealed partial class HttpProtocolHandler
 {
     /// <summary>
     /// Sends the request body as <see cref="SendBodyAsync" /> does, and holds a send failure after a
-    /// final 2xx answered the wait for <c>100 Continue</c> instead of throwing it, so that response is
-    /// read and delivered first, as curl 8.22.0 does (measured, BL-4909).
+    /// final 2xx answered a request that waited for <c>100 Continue</c> instead of throwing it, so that
+    /// response is read and delivered first, as curl 8.22.0 does (measured, BL-4909).
     /// </summary>
     /// <returns>
     /// Whether the body was left unsent, as <see cref="SendBodyAsync" /> gives it, and the send
@@ -33,8 +33,8 @@ public sealed partial class HttpProtocolHandler
     }
 
     /// <summary>
-    /// Throws the send failure <see cref="SendBodyBefore2xxAsync" /> held once the 2xx that answered
-    /// the wait for <c>100 Continue</c> has been delivered, unless that response names
+    /// Throws a send failure held by <see cref="SendBodyBefore2xxAsync" /> or by a held body's send
+    /// once the response has been delivered, unless that response names
     /// <c>Connection: close</c>: curl 8.22.0 then ends the transfer with the response, exit 0, and
     /// otherwise reports <c>Send failure</c>, exit 55, after it (measured, BL-4909).
     /// </summary>
@@ -55,8 +55,10 @@ public sealed partial class HttpProtocolHandler
     /// been answered with a final status instead.
     /// </summary>
     /// <returns>
-    /// <see langword="true" /> when a final status arrived during the wait and the body was left
-    /// unsent; <see langword="false" /> when the body was sent or there is none.
+    /// <see langword="true" /> when a final status, or the end of the connection, came during the
+    /// wait and the body has not been sent (over HTTP/1.x a final status leaves it held,
+    /// <see cref="HttpContinueWaitConnection.HoldsBody" />); <see langword="false" /> when the
+    /// body was sent or there is none.
     /// </returns>
     private static async ValueTask<bool> SendBodyAsync(
         ITransferContext context,
@@ -75,6 +77,7 @@ public sealed partial class HttpProtocolHandler
         if (responseConnection is HttpContinueWaitConnection waiting)
         {
             await upload.WriteHeadBeforeContinueAsync(requestBody, cancellationToken).ConfigureAwait(false);
+            waiting.SendBody = token => SendHeldBodyAsync(context.Events, framing, upload, requestBody, waiting, token);
             if (!await waiting.WaitForContinueAsync(context.TimeProvider, cancellationToken).ConfigureAwait(false))
             {
                 return true;
@@ -90,6 +93,112 @@ public sealed partial class HttpProtocolHandler
         await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
         return false;
     }
+
+    /// <summary>
+    /// Sends a body held until the wait for <c>100 Continue</c> ran out after a final status, with
+    /// curl 8.22.0's lines around it (measured, BL-5960 Notes), and keeps a send failure for after
+    /// the response (<see cref="FinishSendingBodyAsync" />).
+    /// </summary>
+    private static async ValueTask SendHeldBodyAsync(
+        ITransferEvents events,
+        HttpRequestFraming framing,
+        HttpRequestBodyWriter upload,
+        HttpRequestBody requestBody,
+        HttpContinueWaitConnection waiting,
+        CancellationToken cancellationToken)
+    {
+        events.ReportInfo(HttpConnectionInfoLines.DoneWaitingForContinue);
+        try
+        {
+            await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
+            ReportRequestSent(events, framing, upload, bodyLeftUnsent: false);
+        }
+        catch (HttpTransferException failure) when (failure.ExitCode == CurlExitCode.SendError)
+        {
+            waiting.HeldSendFailure = failure;
+        }
+    }
+
+    /// <summary>
+    /// Settles a held body once the final status's head is read, as curl 8.22.0 does (measured,
+    /// BL-5960 Notes): a response answered with a resend gives it up; a status of 300 or above on
+    /// a connection that stays open stops the upload, which shuts the connection down
+    /// (<see cref="ReportUploadStopped" />); any other response leaves it held while it is read.
+    /// </summary>
+    private static void SettleHeldBodyAtHead(HttpRequestPlan plan, HttpResponseHead head, HttpRequestPlan? retry, HttpRequestBodyWriter upload, IConnection responseConnection)
+    {
+        if (responseConnection is HttpContinueWaitConnection { HoldsBody: true } waiting)
+        {
+            StopOrKeepHolding(plan, head, retry, upload, waiting);
+        }
+    }
+
+    /// <summary>Gives up a held body that a resend or the response's status stops, and else leaves it held.</summary>
+    private static void StopOrKeepHolding(HttpRequestPlan plan, HttpResponseHead head, HttpRequestPlan? retry, HttpRequestBodyWriter upload, HttpContinueWaitConnection waiting)
+    {
+        bool stops = retry is null && StopsHeldUpload(plan, head);
+        if (stops)
+        {
+            upload.StopBeforeSending();
+        }
+
+        if (stops || retry is not null)
+        {
+            waiting.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Finishes sending the body once the response is read: the rest of one kept sending past an
+    /// error; a body still held, which goes out when its wait runs out on a connection that stays
+    /// open, and is given up with curl 8.22.0's lines on one that closes (measured, BL-5960
+    /// Notes); and then any send failure kept for after the response.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The send failed and the response does not close the connection (exit 55).</exception>
+    private static async ValueTask FinishSendingBodyAsync(
+        HttpRequestPlan plan,
+        HttpResponseHead head,
+        HttpRequestBodyWriter upload,
+        IConnection responseConnection,
+        HttpTransferException? sendFailedAfter2xx,
+        CancellationToken cancellationToken)
+    {
+        await upload.WriteRestAfterResponseAsync(cancellationToken).ConfigureAwait(false);
+        if (responseConnection is HttpContinueWaitConnection waiting)
+        {
+            await SettleHeldBodyAfterResponseAsync(plan, head, waiting, cancellationToken).ConfigureAwait(false);
+            sendFailedAfter2xx ??= waiting.HeldSendFailure;
+        }
+
+        ThrowIfSendFailedUnlessClosing(sendFailedAfter2xx, head);
+    }
+
+    /// <summary>Sends or gives up a body still held once the response is read.</summary>
+    private static async ValueTask SettleHeldBodyAfterResponseAsync(HttpRequestPlan plan, HttpResponseHead head, HttpContinueWaitConnection waiting, CancellationToken cancellationToken)
+    {
+        if (!waiting.HoldsBody)
+        {
+            return;
+        }
+
+        if (KeepsConnectionOpen(plan, head))
+        {
+            await waiting.SendHeldBodyAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        plan.Context.Events.ReportInfo(HttpConnectionInfoLines.DoneReadingStopSending);
+        plan.Context.Events.ReportInfo(HttpConnectionInfoLines.AbortUpload(0));
+        waiting.Dispose();
+    }
+
+    /// <summary>Tells whether <paramref name="head" /> stops a held upload: a status of 300 or above that leaves the connection open.</summary>
+    private static bool StopsHeldUpload(HttpRequestPlan plan, HttpResponseHead head) =>
+        head.StatusLine.StatusCode >= 300 && KeepsConnectionOpen(plan, head);
+
+    /// <summary>Tells whether <paramref name="head" /> leaves its connection open.</summary>
+    private static bool KeepsConnectionOpen(HttpRequestPlan plan, HttpResponseHead head) =>
+        HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options));
 
     /// <summary>
     /// Reports <c>Done waiting for 100-continue</c> before the body when the wait for

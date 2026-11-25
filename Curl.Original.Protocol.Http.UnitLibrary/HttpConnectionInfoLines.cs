@@ -181,6 +181,12 @@ internal static class HttpConnectionInfoLines
     internal const string StopSendingBeforeEndOfSend = "HTTP error before end of send, stop sending";
 
     /// <summary>
+    /// The line written after a response that closes its connection was read while the request
+    /// body still waited for <c>100 Continue</c> (measured, BL-5960 Notes).
+    /// </summary>
+    internal const string DoneReadingStopSending = "we are done reading and this is set to close, stop send";
+
+    /// <summary>
     /// The line written before a head's empty line when a redirect <c>-L</c> follows arrived while
     /// the request body was being sent (measured, BL-1527 Notes).
     /// </summary>

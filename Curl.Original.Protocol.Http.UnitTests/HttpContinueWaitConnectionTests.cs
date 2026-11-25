@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 using Curl.Original.Protocol.Http.Fakes;
 using Curl.Testing;
 
@@ -290,6 +291,48 @@ public sealed class HttpContinueWaitConnectionTests
         OperationCanceledException thrown = await Assert.ThrowsAsync<OperationCanceledException>(async () => await wait);
         Diagnostics.Act("thrown", thrown.GetType().Name);
         Diagnostics.Assert("cancelled", true, wait.IsCanceled || wait.IsFaulted);
+    }
+
+    [TestMethod]
+    public async Task WaitForContinueAsync_Final2xxOnAMultiplexedStream_WaitsItOutAndHoldsNoBody()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        HttpContinueWaitConnection connection = new(Connection("HTTP/2 200 \r\n\r\n", 65536)) { IsMultiplexedStream = true };
+        Diagnostics.Arrange("response on a stream", "HTTP/2 200");
+
+        Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
+        bool endedBeforeTheWaitRanOut = wait.IsCompleted;
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
+        bool sends = await wait;
+
+        Diagnostics.Assert("sends the body, holds it", "True, False", $"{sends}, {connection.HoldsBody}");
+        Assert.IsFalse(endedBeforeTheWaitRanOut);
+        Assert.IsTrue(sends);
+        Assert.IsFalse(connection.HoldsBody);
+    }
+
+    [TestMethod]
+    public async Task SendHeldBodyAsync_AfterA500_SendsOnceTheWaitRunsOutAndNoLongerStopsSending()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        int waitsEnded = 0;
+        HttpContinueWaitConnection connection = new(Connection("HTTP/1.1 500 No\r\n\r\n", 65536)) { WaitEnds = () => waitsEnded++ };
+        await connection.WaitForContinueAsync(time, CancellationToken.None);
+        bool stoppedWhileHeld = connection.StopsSending;
+        Diagnostics.Arrange("response", "500 during the wait");
+
+        Task sending = connection.SendHeldBodyAsync(CancellationToken.None).AsTask();
+        bool sentBeforeTheWaitRanOut = sending.IsCompleted;
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
+        await sending;
+        connection.Dispose();
+
+        Diagnostics.Assert("stops sending after, waits ended", "False, 1", $"{connection.StopsSending}, {waitsEnded}");
+        Assert.IsTrue(stoppedWhileHeld);
+        Assert.IsFalse(sentBeforeTheWaitRanOut);
+        Assert.IsFalse(connection.StopsSending);
+        Assert.IsFalse(connection.HoldsBody);
+        Assert.AreEqual(1, waitsEnded);
     }
 
     [TestMethod]
