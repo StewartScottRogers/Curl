@@ -30,3 +30,4 @@ Found during BL-5940 (ADR-1387). OpenSSL's `NAME_CONSTRAINTS_check` (`crypto/x50
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: a1374463 3d836d5e.
