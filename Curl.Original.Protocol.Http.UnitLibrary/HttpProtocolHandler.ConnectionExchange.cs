@@ -38,8 +38,10 @@ public sealed partial class HttpProtocolHandler
         Http2Session? unheldSession = UnheldHttp2Session(streams, connection);
         (HttpAttemptOutcome outcome, Http2Session? upgradedSession) = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, streams).ConfigureAwait(false);
         unheldSession ??= UnheldHttp2Session(upgradedSession, connection);
-        SkipClosingGoAwayWhenGivenUp(outcome, streams ?? upgradedSession);
-        SettleConnection(plan, connection, streams ?? upgradedSession, outcome);
+        IHttpStreamSession? used = streams ?? upgradedSession;
+        outcome.RanOnHttp2Stream = used is Http2Session;
+        SkipClosingGoAwayWhenGivenUp(outcome, used);
+        SettleConnection(plan, connection, used, outcome);
         await ShutDownAsync(unheldSession).ConfigureAwait(false);
         return outcome;
     }

@@ -1446,3 +1446,4 @@ Each option and the specific reason it lost.
 | [1402](ADR-1402-the-parser-takes-from-its-host-whether-curls-own-options-are-read.md) | The command-line parser takes from its host whether it reads the options only Curl has; `CURL_EXTENSIONS` is defined once, as `ExtensionSwitch.Variable` (BL-5971) | Accepted | 2026-11-25 |
 | [1403](ADR-1403-an-http-2-or-http-3-request-waits-for-100-continue-when-h-asks-for-it.md) | An HTTP/2 or HTTP/3 request waits for 100 Continue when -H asks for it (BL-5970) | Accepted | 2026-11-25 |
 | [1404](ADR-1404-a-stopped-http-2-upload-resets-its-stream-and-a-held-body-sent-to-an-ended-stream-exits-55.md) | A stopped HTTP/2 upload resets its stream, and a held body sent to an ended stream exits 55 (BL-5972) | Accepted | 2026-11-25 |
+| [1405](ADR-1405-a-timed-out-http-2-transfer-reports-its-connection-left-intact.md) | A timed-out HTTP/2 transfer reports its connection left intact (BL-5974) | Accepted | 2026-11-25 |

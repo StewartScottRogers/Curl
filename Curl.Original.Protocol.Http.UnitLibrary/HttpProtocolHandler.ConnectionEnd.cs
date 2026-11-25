@@ -9,7 +9,9 @@ public sealed partial class HttpProtocolHandler
     /// Reports what became of the connection once it is disposed, as curl 8.21.0's <c>-v</c>
     /// does (ADR-0050): left intact when marked reusable, closed when the transfer failed, and
     /// shut down otherwise - its response did not persist, it died before its response, or only
-    /// <c>--fail-with-body</c> failed it once its body was read. When
+    /// <c>--fail-with-body</c> failed it once its body was read. A transfer that times out on an
+    /// HTTP/2 stream reports it left intact too, as curl 8.18.0's nghttp2 build does (measured,
+    /// BL-5974), though Curl then closes it. When
     /// the request goes out again on a new connection - after it died, or as a retry such as the
     /// resend after a 417 (measured, BL-1446 Notes) - the line saying so follows. A connection left intact
     /// that another transfer still shares, on a stream of its own, is reported by the last
@@ -19,7 +21,7 @@ public sealed partial class HttpProtocolHandler
     private static void ReportConnectionEnd(ITransferContext context, ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome)
     {
         // curl 8.21.0 reports a multiplexed connection left intact only when its last transfer ends (measured, BL-717 Notes).
-        if (!(outcome.ReportsLeftIntact && connect.Connection!.IsSharedWithAnotherTransfer))
+        if (!(SaysLeftIntact(outcome) && connect.Connection!.IsSharedWithAnotherTransfer))
         {
             context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
             if (outcome.Retry is not null)
@@ -42,10 +44,17 @@ public sealed partial class HttpProtocolHandler
     private static string ConnectionEndLine(ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome) =>
         outcome switch
         {
-            { ReportsLeftIntact: true } => LeftIntactLine(target, connect),
+            _ when SaysLeftIntact(outcome) => LeftIntactLine(target, connect),
             { DiedBeforeResponse: false, FailedAfterBody: false } when ClosesTheConnection(outcome.Result.ExitCode) => HttpConnectionInfoLines.Closing(connect.ConnectionNumber),
             _ => HttpConnectionInfoLines.ShuttingDown(connect.ConnectionNumber),
         };
+
+    /// <summary>
+    /// Tells whether <c>-v</c> says the connection was left intact: it is one
+    /// (<see cref="HttpAttemptOutcome.ReportsLeftIntact" />), or only its HTTP/2 stream timed out.
+    /// </summary>
+    private static bool SaysLeftIntact(HttpAttemptOutcome outcome) =>
+        outcome.ReportsLeftIntact || outcome.TimedOutOnHttp2Stream;
 
     /// <summary>
     /// Tells whether a failure that came once a response began ends with <c>closing connection

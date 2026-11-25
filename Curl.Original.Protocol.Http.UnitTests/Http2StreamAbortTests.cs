@@ -10,7 +10,8 @@ namespace Curl.Original.Protocol.Http;
 
 /// <summary>
 /// The frames an HTTP/2 connection closes with: curl 8.18.0 resets the stream of a transfer
-/// that <c>-m</c> aborts with STREAM_CLOSED before its GOAWAY (measured, BL-5906 Notes).
+/// that <c>-m</c> aborts with STREAM_CLOSED before its GOAWAY (measured, BL-5906 Notes), and
+/// reports the connection left intact (measured, BL-5974 Notes).
 /// </summary>
 [TestClass]
 public sealed class Http2StreamAbortTests
@@ -26,6 +27,8 @@ public sealed class Http2StreamAbortTests
 
     /// <summary>The type, flags and stream 1 of any RST_STREAM on stream 1.</summary>
     private const string StreamOneResetHeader = "000004030000000001";
+
+    private const string LeftIntact = "Connection #0 to host example.com:80 left intact";
 
     private const string SwitchingProtocolsHead = "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: h2c\r\n\r\n";
 
@@ -55,6 +58,55 @@ public sealed class Http2StreamAbortTests
         Diagnostics.Assert("ends with RST_STREAM then GOAWAY", true, written.EndsWith(StreamOneClosedReset + ShutdownGoAway, StringComparison.Ordinal));
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         StringAssert.EndsWith(written, StreamOneClosedReset + ShutdownGoAway, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    [DataRow(HttpVersionPreference.Http2PriorKnowledge, "", "200")]
+    [DataRow(HttpVersionPreference.Http2PriorKnowledge, "", "100")]
+    [DataRow(HttpVersionPreference.Http2, SwitchingProtocolsHead, "200")]
+    public async Task ExecuteAsync_MaxTimePassesOnAStream_ReportsTheConnectionLeftIntact(HttpVersionPreference version, string upgrade, string status)
+    {
+        byte[] response = [.. Encoding.Latin1.GetBytes(upgrade), .. ServerFrames(Head(isEndStream: false, status))];
+        StalledConnection stalled = new(response, 65536);
+        RecordingTransferEvents events = new();
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        TransferContext context = Context(version, time, TimeSpan.FromSeconds(1), events: events);
+        Diagnostics.Arrange("version, status, max time", $"{version}, {status}, 1000 ms; the server stalls after the head of stream 1");
+
+        Task<TransferResult> transfer = Handler(stalled).ExecuteAsync(context).AsTask();
+        await stalled.Stalled;
+        time.Advance(TimeSpan.FromSeconds(1));
+        TransferResult result = await transfer;
+
+        string info = string.Join('|', events.Info);
+        Diagnostics.Act("exit code, -v info lines", $"{result.ExitCode}, {info}");
+        Diagnostics.Assert("last info line", LeftIntact, events.Info[^1]);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual(LeftIntact, events.Info[^1], info);
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("closing", StringComparison.Ordinal)), info);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MaxTimePassesOnASharedConnection_LeavesTheLineToItsLastTransfer()
+    {
+        StalledConnection stalled = new(ServerFrames(Head(isEndStream: false)), 65536);
+        RecordingConnection connection = new(stalled) { IsSharedWithAnotherTransfer = true };
+        RecordingTransferEvents events = new();
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        TransferContext context = Context(HttpVersionPreference.Http2PriorKnowledge, time, TimeSpan.FromSeconds(1), events: events);
+        Diagnostics.Arrange("connection", "shared with another transfer; the server stalls after the head of stream 1");
+
+        Task<TransferResult> transfer = Handler(connection).ExecuteAsync(context).AsTask();
+        await stalled.Stalled;
+        time.Advance(TimeSpan.FromSeconds(1));
+        TransferResult result = await transfer;
+
+        string info = string.Join('|', events.Info);
+        Diagnostics.Act("exit code, -v info lines", $"{result.ExitCode}, {info}");
+        Diagnostics.Assert("says nothing of the connection's end", false, events.Info.Contains(LeftIntact));
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        CollectionAssert.DoesNotContain(events.Info, LeftIntact);
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("closing", StringComparison.Ordinal)), info);
     }
 
     [TestMethod]
@@ -135,7 +187,7 @@ public sealed class Http2StreamAbortTests
 
     private static HttpProtocolHandler Handler(IConnection connection) => new(QueueConnector.For(connection), new SilentAuthenticator());
 
-    private static TransferContext Context(HttpVersionPreference version, TimeProvider? time = null, TimeSpan? maxTime = null, bool noBody = false) =>
+    private static TransferContext Context(HttpVersionPreference version, TimeProvider? time = null, TimeSpan? maxTime = null, bool noBody = false, RecordingTransferEvents? events = null) =>
         new()
         {
             Url = CurlUrl.Parse("http://example.com/"),
@@ -144,10 +196,11 @@ public sealed class Http2StreamAbortTests
             TimeProvider = time ?? TimeProvider.System,
             MaxTime = maxTime,
             NoBody = noBody,
+            Events = events ?? new RecordingTransferEvents(),
         };
 
-    private static Http2Frame Head(bool isEndStream) =>
-        Http2FrameFactory.CreateHeaders(1, new HpackEncoder().Encode([new(":status", "200")]), isEndStream, isEndHeaders: true);
+    private static Http2Frame Head(bool isEndStream, string status = "200") =>
+        Http2FrameFactory.CreateHeaders(1, new HpackEncoder().Encode([new(":status", status)]), isEndStream, isEndHeaders: true);
 
     /// <summary>Gives a server's empty SETTINGS followed by <paramref name="frame" />.</summary>
     private static byte[] ServerFrames(Http2Frame frame) =>
@@ -159,6 +212,8 @@ public sealed class Http2StreamAbortTests
         private readonly MemoryStream written = new();
 
         public string WrittenHex => Convert.ToHexString(written.ToArray());
+
+        public bool IsSharedWithAnotherTransfer { get; init; }
 
         public bool IsSecure => false;
 
