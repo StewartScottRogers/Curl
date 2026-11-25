@@ -29,6 +29,6 @@ The rule lives in the SMTP handler, which already holds the transfer's mail opti
 
 ## Consequences
 
-`AUTH=DIGEST-MD5` with an empty user still differs on Windows: curl's SSPI build sends nothing
-after the challenge (exit 67), while Curl's authenticator answers it. `-u :` does the same, so
-it belongs to `Curl.Authentication.UnitLibrary` and has its own task.
+`AUTH=DIGEST-MD5` with an empty user, and `-u :` the same way, sends nothing after the
+challenge in curl's SSPI build (exit 67). That rule is not SMTP's:
+`Curl.Authentication.UnitLibrary` applies it (BL-5968, ADR-1398).

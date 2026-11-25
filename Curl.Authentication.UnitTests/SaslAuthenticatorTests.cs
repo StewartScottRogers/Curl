@@ -423,16 +423,19 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
-    [DataRow(true)]
-    [DataRow(false)]
-    public async Task Begin_DigestMd5WithoutCredential_SendsAnEmptyUser(bool answerAsSspi)
+    [DataRow(null, null, DisplayName = "No credential")]
+    [DataRow("", "", DisplayName = "-u :")]
+    [DataRow("", "p", DisplayName = "-u :p")]
+    public async Task Begin_DigestMd5EmptyUserCurlBuild_AnswersWithAnEmptyUser(string? user, string? password)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("mechanism", "DIGEST-MD5");
-        diagnostics.Arrange("answer as SSPI", answerAsSspi);
-        diagnostics.Arrange("credentials", "(none)");
+        diagnostics.Arrange("answer as SSPI", false);
+        diagnostics.Arrange("credentials", user is null ? "(none)" : user + ":" + password);
         diagnostics.Arrange("server challenge", "nonce=\"n\",qop=\"auth\",algorithm=md5-sess");
-        ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerAsSspi, securityContexts: null).Begin("DIGEST-MD5", Request(null));
+        NetworkCredential? credential = user is null ? null : new NetworkCredential(user, password);
+        ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerDigestMd5AsSspi: false, securityContexts: null)
+            .Begin("DIGEST-MD5", Request(credential));
 
         byte[]? answer = await RespondAsync(exchange, "nonce=\"n\",qop=\"auth\",algorithm=md5-sess"u8);
 
@@ -440,6 +443,34 @@ public sealed class SaslAuthenticatorTests
         diagnostics.Act("answer", Windows1252.GetString(answer!));
         diagnostics.Assert("answer starts with", "username=\"\",", Windows1252.GetString(answer!));
         StringAssert.StartsWith(Windows1252.GetString(answer!), "username=\"\",");
+    }
+
+    // BL-5968: curl 8.22.0's Schannel build exits 67, sending nothing after these challenges
+    // when the user is empty; no answer and no cancel reason is what the handlers exit 67 for.
+    [TestMethod]
+    [DataRow(null, null, "nonce=\"n\",qop=\"auth\",algorithm=md5-sess", DisplayName = "No credential")]
+    [DataRow("", "", "nonce=\"n\",qop=\"auth\",algorithm=md5-sess", DisplayName = "-u :")]
+    [DataRow("", "p", "nonce=\"n\",qop=\"auth\",algorithm=md5-sess", DisplayName = "-u :p")]
+    [DataRow("", "", "realm=\"localhost\",qop=\"auth\",algorithm=md5-sess", DisplayName = "-u : and a challenge with no nonce")]
+    public async Task Begin_DigestMd5EmptyUserSspi_GivesNoAnswerAndNoCancelReason(string? user, string? password, string challenge)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanism", "DIGEST-MD5");
+        diagnostics.Arrange("answer as SSPI", true);
+        diagnostics.Arrange("credentials", user is null ? "(none)" : user + ":" + password);
+        diagnostics.Arrange("server challenge", challenge);
+        NetworkCredential? credential = user is null ? null : new NetworkCredential(user, password);
+        ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerDigestMd5AsSspi: true, securityContexts: null)
+            .Begin("DIGEST-MD5", Request(credential));
+
+        byte[]? answer = await RespondAsync(exchange, Encoding.ASCII.GetBytes(challenge));
+
+        diagnostics.Act("answer", answer);
+        diagnostics.Act("cancel reason", exchange.CancelReason);
+        diagnostics.Assert("answer", null, answer);
+        diagnostics.Assert("cancel reason", null, exchange.CancelReason);
+        Assert.IsNull(answer);
+        Assert.IsNull(exchange.CancelReason);
     }
 
     [TestMethod]
