@@ -31,3 +31,4 @@ Follow-up from BL-5879 (ADR-1351), which honours these settings in `--cacert` on
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 35866a3d fba95e32 ea3ceb06.
