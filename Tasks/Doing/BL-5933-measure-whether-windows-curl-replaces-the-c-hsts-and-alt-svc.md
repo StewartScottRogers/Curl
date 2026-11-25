@@ -31,3 +31,4 @@ BL-5888 made the three files be replaced by rename off Windows and left Windows 
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: ed061db0 15eca511 3d836d5e.
