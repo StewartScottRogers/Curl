@@ -8,7 +8,7 @@ depends-on: [BL-5915]
 touches: [Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppRequests.cs, Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppClientMessages.cs, Curl.Extended.Protocol.Xmpp.UnitTests/XmppUploadTests.cs, Documentation/Conformance/Extended/Xmpp.md]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-24
 ---
 # BL-5899 — Fix fitness finding EXT-124: xmpp / xmpps silently replace invalid UTF-8 in the -T / --data-binary message body with U+FFFD and exit 0
 
@@ -39,7 +39,7 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits 43 with a message naming invalid UTF-8 and nothing is stored for carol; `-d 'café'` (valid UTF-8) still delivers `café`.
+- [x] the repro exits 43 with a message naming invalid UTF-8 and nothing is stored for carol; `-d 'café'` (valid UTF-8) still delivers `café`.
 - [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
 - [x] `dotnet build` is clean and the fast tests pass.
 
@@ -59,6 +59,10 @@ The finding, verbatim:
 - `touches` widened to `XmppClientMessages.cs`, `XmppUploadTests.cs` and `Xmpp.md` (the message, the test and the
   document of this change); no other task in Doing named them.
 - Also filed BL-5916: CR and CR LF in a body look to be changed to LF by the stanza serialiser.
+- Second claim (BL-5915 Done): measured with the built curl.exe on Windows. `-T` Latin-1 `caf� latin1` exits 43,
+  `curl: (43) XMPP message body is not valid UTF-8`, before any connection, so nothing can be stored for carol; typed
+  `-d 'café'` now passes the check and goes on to connect (exit 7 with no server listening). `XmppUploadTests` pins that valid
+  UTF-8 `café` reaches the `<body/>` unchanged. No Prosody was run. XMPP unit tests: 82 passed.
 
 ## Log
 
@@ -66,3 +70,4 @@ The finding, verbatim:
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 3cabc559 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Waits on BL-5915: typed -d café on Windows reaches xmpp as ANSI bytes; the invalid-UTF-8 refusal is committed
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 3cabc559 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Done. xmpp/xmpps refuse a body that is not valid UTF-8 with exit 43; typed -d café passes as UTF-8
