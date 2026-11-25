@@ -7,9 +7,16 @@
     { "key": "options:--proxy-http2:no-form", "platform": "windows", "reason": "decided:ADR-0786" },
     { "key": "options:--http3", "platform": "windows", "reason": "decided:ADR-1282" },
     { "key": "options:--http3-only", "platform": "windows", "reason": "decided:ADR-1282" },
+    { "key": "features:HTTP3", "platform": "windows", "reason": "decided:ADR-1282" },
     { "key": "options:--http3", "platform": "linux", "reason": "decided:ADR-1282" },
     { "key": "options:--http3-only", "platform": "linux", "reason": "decided:ADR-1282" },
+    { "key": "features:HTTP3", "platform": "linux", "reason": "decided:ADR-1282" },
+    { "key": "behaviour:test2500", "platform": "linux", "reason": "decided:ADR-1282" },
+    { "key": "behaviour:test2503", "platform": "linux", "reason": "decided:ADR-1282" },
     { "key": "options:--http3", "platform": "macos", "reason": "decided:ADR-1282" },
-    { "key": "options:--http3-only", "platform": "macos", "reason": "decided:ADR-1282" }
+    { "key": "options:--http3-only", "platform": "macos", "reason": "decided:ADR-1282" },
+    { "key": "features:HTTP3", "platform": "macos", "reason": "decided:ADR-1282" },
+    { "key": "behaviour:test2500", "platform": "macos", "reason": "decided:ADR-1282" },
+    { "key": "behaviour:test2503", "platform": "macos", "reason": "decided:ADR-1282" }
   ]
 }
