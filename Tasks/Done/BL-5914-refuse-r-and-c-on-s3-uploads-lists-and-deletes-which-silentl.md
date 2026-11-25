@@ -28,7 +28,7 @@ Left by BL-5897. Downloads send a `Range` header (BL-5873), but `S3ProtocolHandl
 
 ## Notes
 
-- `S3ByteRangeRefusal` refuses before any connection (ADR-1372), message `s3:// does not support <option> on an upload, list or delete; only a download sends a range`. `-C 0` is let through; `-C -` on an upload is refused, as for `az://` (ADR-1348).
+- `S3ByteRangeRefusal` refuses before any connection (ADR-1375), message `s3:// does not support <option> on an upload, list or delete; only a download sends a range`. `-C 0` is let through; `-C -` on an upload is refused, as for `az://` (ADR-1348).
 - Pinned by `S3ByteRangeRefusalTests`. Fast tests green; S3 library 100% line and branch coverage, 0 failing members.
 - `--ai-help` unchanged: no option was added or changed in the command line.
 

@@ -4,7 +4,7 @@ namespace Curl.Extended.Protocol.S3.Client;
 
 /// <summary>
 /// Refuses <c>-r</c>/<c>--range</c> and <c>-C</c>/<c>--continue-at</c> on an <c>s3://</c> upload, list or delete
-/// (ADR-1372), none of which sends a <c>Range</c> header; a download sends one, so it is let through.
+/// (ADR-1375), none of which sends a <c>Range</c> header; a download sends one, so it is let through.
 /// </summary>
 internal static class S3ByteRangeRefusal
 {

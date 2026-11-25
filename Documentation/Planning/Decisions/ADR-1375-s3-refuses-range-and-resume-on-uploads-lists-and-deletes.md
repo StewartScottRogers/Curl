@@ -1,4 +1,4 @@
-# ADR-1372: s3:// refuses -r and -C on uploads, lists and deletes with exit 4 (BL-5914)
+# ADR-1375: s3:// refuses -r and -C on uploads, lists and deletes with exit 4 (BL-5914)
 
 Status: Accepted. Decided by Claude under Stewart's delegation.
 

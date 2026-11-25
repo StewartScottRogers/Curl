@@ -1416,4 +1416,4 @@ Each option and the specific reason it lost.
 | [1372](ADR-1372-a-host-name-mismatch-outranks-a-rejected-certificate-in-the-openssl-build.md) | A host name mismatch outranks a rejected certificate in the OpenSSL build (BL-5926) | Accepted | 2026-11-24 |
 | [1373](ADR-1373-stdin-needs-a-rewind-only-once-read-and-a-redirected-file-rewinds.md) | Stdin needs a rewind only once read, and a file redirected into it rewinds (BL-5910) | Accepted | 2026-11-24 |
 | [1374](ADR-1374-blowfish-and-cast128-downloads-continue-where-macos-libssh2-crashes.md) | SFTP and SCP keep downloading over `blowfish-cbc` and `cast128-cbc` where the macOS libssh2 build crashes (BL-5909) | Accepted | 2026-11-24 |
-| [1372](ADR-1372-s3-refuses-range-and-resume-on-uploads-lists-and-deletes.md) | s3:// refuses -r and -C on uploads, lists and deletes with exit 4 (BL-5914) | Accepted | 2026-11-24 |
+| [1375](ADR-1375-s3-refuses-range-and-resume-on-uploads-lists-and-deletes.md) | s3:// refuses -r and -C on uploads, lists and deletes with exit 4 (BL-5914) | Accepted | 2026-11-24 |
