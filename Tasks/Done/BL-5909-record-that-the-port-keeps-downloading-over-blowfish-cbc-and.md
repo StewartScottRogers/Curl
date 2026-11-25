@@ -31,7 +31,7 @@ Decided by Claude under Stewart's delegation (2026-11-24, while filing): keep th
 
 ## Notes
 
-- The ADR is ADR-1370 (`ADR-1370-blowfish-and-cast128-downloads-continue-where-macos-libssh2-crashes.md`),
+- The ADR is ADR-1374 (`ADR-1374-blowfish-and-cast128-downloads-continue-where-macos-libssh2-crashes.md`),
   numbered after the highest on `origin/work/dark-factory`. The file name in `touches` carries no
   number; a new ADR needs no `touches`.
 - The upstream and port results are Surl's measurement (run 45412760425), cited, not repeated: lanes
@@ -39,7 +39,7 @@ Decided by Claude under Stewart's delegation (2026-11-24, while filing): keep th
 - The Context's "The Linux and Windows upstream builds download over these ciphers" holds for the
   OpenSSL builds. The Windows reference build (WinCNG) does not offer them, nor does the port on
   Windows (ADR-1278); the ADR says so.
-- "Tells Surl": this lane writes nothing in Surl's repository (outside this checkout). ADR-1370's
+- "Tells Surl": this lane writes nothing in Surl's repository (outside this checkout). ADR-1374's
   Consequences names the two cases Surl's Phase 7 listing can mark as an accepted known difference;
   that listing is still to be changed on Surl's side.
 - Documents only: no product code changed. `dotnet build` is clean (0 warnings) and the fast tests pass.
@@ -48,4 +48,4 @@ Decided by Claude under Stewart's delegation (2026-11-24, while filing): keep th
 
 - 2026-11-24: Created from Surl Port-Board-Handoff.md entry 28.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: b2ec7a2b 6ec06177.
-- 2026-11-24: Doing -> Done. ADR-1370 records that the port keeps downloading over blowfish-cbc and cast128-cbc where macOS libssh2 crashes
+- 2026-11-24: Doing -> Done. ADR-1374 records that the port keeps downloading over blowfish-cbc and cast128-cbc where macOS libssh2 crashes

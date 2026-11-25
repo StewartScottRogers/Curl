@@ -1,4 +1,4 @@
-# ADR-1370: SFTP and SCP keep downloading over `blowfish-cbc` and `cast128-cbc` where the macOS libssh2 build crashes
+# ADR-1374: SFTP and SCP keep downloading over `blowfish-cbc` and `cast128-cbc` where the macOS libssh2 build crashes
 
 - Status: Accepted
 - Date: 2026-11-24
