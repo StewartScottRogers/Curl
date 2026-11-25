@@ -18,7 +18,7 @@ A status of 300 or above that arrives on an HTTP/2 stream while the body is bein
 
 ## Context
 
-Found by BL-5970 (ADR-1402). `HttpContinueWaitConnection.StopsSending` is false on a stream, so a status arriving after the wait ran out lets the whole body go. `HttpProtocolHandler.KeepsAlive` treats a cut upload as ending the connection, which is HTTP/1.x behaviour. `Record-CurlExchange.ps1 -Http2Frames` answers as soon as the HEADERS arrive, so measuring this needs a delayed answer added to it.
+Found by BL-5970 (ADR-1403). `HttpContinueWaitConnection.StopsSending` is false on a stream, so a status arriving after the wait ran out lets the whole body go. `HttpProtocolHandler.KeepsAlive` treats a cut upload as ending the connection, which is HTTP/1.x behaviour. `Record-CurlExchange.ps1 -Http2Frames` answers as soon as the HEADERS arrive, so measuring this needs a delayed answer added to it.
 
 ## Acceptance criteria
 

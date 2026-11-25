@@ -1,4 +1,4 @@
-# ADR-1402: An HTTP/2 or HTTP/3 request waits for 100 Continue when -H asks for it
+# ADR-1403: An HTTP/2 or HTTP/3 request waits for 100 Continue when -H asks for it
 
 - Status: Accepted. Decided by Claude under Stewart's delegation.
 - Date: 2026-11-25
