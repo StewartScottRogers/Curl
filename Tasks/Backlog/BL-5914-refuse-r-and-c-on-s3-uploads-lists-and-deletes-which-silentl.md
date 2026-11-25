@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Left by BL-5897. Downloads send a `Range` header (BL-5873), but `S3ProtocolHandler` passes `ResumeFrom` and `RangeText` only to `DownloadAsync`, so the other operations ignore them. ADR-1347 decides the same refusal for `az://`.
+Left by BL-5897. Downloads send a `Range` header (BL-5873), but `S3ProtocolHandler` passes `ResumeFrom` and `RangeText` only to `DownloadAsync`, so the other operations ignore them. ADR-1348 decides the same refusal for `az://`.
 
 ## Acceptance criteria
 

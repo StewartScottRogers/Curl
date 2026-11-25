@@ -14,7 +14,7 @@ or another extension. It is registered in `ExtensionCatalogue.cs` and `Extension
   `error` body); every other failure is an
   `AzureStorageTransferException` carrying its exit code. Before any connection the handler refuses with
   exit 4 what it cannot send: `-I` and an unsendable `-X` (`AzureStorageRequestMethod`, ADR-1249), and
-  `-r` and `-C` (`AzureStorageByteRangeRefusal`, ADR-1347).
+  `-r` and `-C` (`AzureStorageByteRangeRefusal`, ADR-1348).
 
 - `Http/AzureStorageHttpClientConnection` sends one HTTP/1.1 request at a time over an `IConnection`
   (RFC 9112) and returns an `AzureStorageHttpResponse` whose body is a stream framed by

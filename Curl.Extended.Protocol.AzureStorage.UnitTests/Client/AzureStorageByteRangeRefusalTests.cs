@@ -4,7 +4,7 @@ namespace Curl.Extended.Protocol.AzureStorage.Client;
 
 /// <summary>
 /// Checks that an <c>az://</c> or <c>abfs://</c> transfer refuses <c>-r</c> and <c>-C</c> with exit 4 before it connects
-/// or writes, and lets a whole transfer through (ADR-1347).
+/// or writes, and lets a whole transfer through (ADR-1348).
 /// </summary>
 [TestClass]
 public sealed class AzureStorageByteRangeRefusalTests

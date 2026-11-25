@@ -4,7 +4,7 @@ namespace Curl.Extended.Protocol.AzureStorage.Client;
 
 /// <summary>
 /// Refuses <c>-r</c>/<c>--range</c> and <c>-C</c>/<c>--continue-at</c> on an <c>az://</c>, <c>abfs://</c> or
-/// <c>abfss://</c> transfer (ADR-1347), which moves only whole blobs and files, so a resumed download never appends
+/// <c>abfss://</c> transfer (ADR-1348), which moves only whole blobs and files, so a resumed download never appends
 /// the whole blob to the partial file.
 /// </summary>
 internal static class AzureStorageByteRangeRefusal

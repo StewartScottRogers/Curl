@@ -1,4 +1,4 @@
-# ADR-1347: az:// and abfs[s]:// refuse -r and -C with exit 4 (BL-5897)
+# ADR-1348: az:// and abfs[s]:// refuse -r and -C with exit 4 (BL-5897)
 
 Status: Accepted. Decided by Claude under Stewart's delegation.
 

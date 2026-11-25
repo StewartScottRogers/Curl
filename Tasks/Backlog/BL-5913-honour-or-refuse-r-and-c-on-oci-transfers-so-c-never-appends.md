@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Left by BL-5897 (fitness finding EXT-122, which says oci:// probably shares the gap). No file under `Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client` reads `Range`, `RangeText` or `ResumeFrom`. Models: `S3Operations.DownloadAsync` (honours, BL-5873) and `AzureStorageByteRangeRefusal` (refuses, ADR-1347).
+Left by BL-5897 (fitness finding EXT-122, which says oci:// probably shares the gap). No file under `Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client` reads `Range`, `RangeText` or `ResumeFrom`. Models: `S3Operations.DownloadAsync` (honours, BL-5873) and `AzureStorageByteRangeRefusal` (refuses, ADR-1348).
 
 ## Acceptance criteria
 

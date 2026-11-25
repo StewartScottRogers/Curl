@@ -52,7 +52,7 @@ The finding, verbatim:
   and `-C` on downloads. Checked with the built binary against a recorded loopback server: `-C -` onto 300 bytes sent
   `range: bytes=300-` and left 1000 bytes; `-r 10-19` sent `range: bytes=10-19` and wrote 10 bytes.
   `S3RangeDownloadTests` already pins it, so no S3 code changed.
-- `az://`/`abfs[s]://` now refuse `-r` and `-C` (other than offset 0) with exit 4 (ADR-1347, Claude's decision).
+- `az://`/`abfs[s]://` now refuse `-r` and `-C` (other than offset 0) with exit 4 (ADR-1348, Claude's decision).
   Built binary: `-C -`, `-C 300` and `-r 10-19` exit 4 and leave the 300-byte partial file untouched.
   The refusal is its own class (`AzureStorageByteRangeRefusal`) because a range is not a request method, so
   `touches` was widened to the Azure `Client` folders, its `CLAUDE.md` and its conformance matrix (no other task in
