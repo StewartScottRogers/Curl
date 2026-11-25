@@ -122,7 +122,8 @@ internal sealed partial class ServerCertificateVerification
 
     private BelowAnchorRevocation ListRevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        // CryptoAPI stops at the first usable list (STD-163): a later point is never asked, so its answer cannot overrule it.
+        // CryptoAPI stops at the first usable list: a later address, in the same point (STD-206) or a later
+        // one (STD-163), is never asked, so its answer cannot overrule it.
         var first = CrlDistributionPointUris(certificate)
             .Select(uri => UsableRevocationList(uri, certificate, issuer, budget))
             .OfType<CertificateRevocationList>()
