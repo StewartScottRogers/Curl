@@ -1395,3 +1395,4 @@ Each option and the specific reason it lost.
 | [1351](ADR-1351-openssl-build-honours-trusted-certificate-settings-in-cacert.md) | The OpenSSL build honours TRUSTED CERTIFICATE settings in --cacert (BL-5879) | Accepted | 2026-11-24 |
 | [1352](ADR-1352-telnet-read-failing-during-option-negotiation-exits-56.md) | A TELNET read that fails during the option negotiation exits 56 (BL-5882) | Accepted | 2026-11-24 |
 | [1353](ADR-1353-dns-over-tls-verifies-the-server-certificate-with-the-transfers-cacert-capath-and-k.md) | --dns-over-tls verifies the server certificate with the transfer's --cacert, --capath and -k (BL-5872) | Accepted | 2026-11-24 |
+| [1349](ADR-1349-the-openssl-build-checks-only-a-host-name-like-cn-against-dns-name-constraints.md) | The OpenSSL build checks only a host-name-like CN against DNS name constraints (BL-5829) | Accepted | 2026-11-24 |

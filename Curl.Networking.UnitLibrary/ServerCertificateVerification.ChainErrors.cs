@@ -115,7 +115,7 @@ internal sealed partial class ServerCertificateVerification
     // is named by Schannel's trust error (BL-5375); 0 for any other failure.
     private static int ConstraintViolationOf(SslPolicyErrors errors, X509Chain? chain) =>
         errors.HasFlag(SslPolicyErrors.RemoteCertificateChainErrors) && chain is not null
-            ? CertificateNameConstraints.FindViolation(chain)
+            ? CertificateNameConstraints.FindViolation(chain, matchesSchannelBuild: true)
             : 0;
 
     // The chain's errors do not count when it leads to a --capath root trusted beside the
@@ -144,7 +144,7 @@ internal sealed partial class ServerCertificateVerification
         && chain.ChainElements.Count > 0
         && HasOnlyMissingRootOrAnchorRevocationStatus(chain)
         && ListsAnAnchorCandidate(chain)
-        && CertificateNameConstraints.FindViolation(chain) == 0;
+        && CertificateNameConstraints.FindViolation(chain, matchesSchannelBuild) == 0;
 
     // With revocation checking on, a chain ending at a non-self-signed anchor also carries
     // RevocationStatusUnknown / OfflineRevocation, for the anchor has no issuer to ask (BL-5317):
