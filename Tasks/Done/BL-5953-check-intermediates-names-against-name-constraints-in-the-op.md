@@ -8,7 +8,7 @@ depends-on: [BL-5950]
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs, Curl.Networking.UnitLibrary/OpenSslVerifyResult.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs, Curl.Networking.UnitTests/NameConstraintVerifyResultTests.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5953 — Check intermediates' names against name constraints in the OpenSSL build, and report the first refusal when the chain engine flags several
 
@@ -24,13 +24,24 @@ Found during BL-5950 (ADR-1391). Two gaps remain:
 
 ## Acceptance criteria
 
-- [ ] With `matchesSchannelBuild` false, an intermediate breaking the root's constraint above a leaf breaking the intermediate's gives the verify result measured from OpenSSL curl, pinned by a unit test.
-- [ ] With the OpenSSL build and a self-signed root as `--cacert`, a chain flagged both 47 and 48 reports the verify result measured from OpenSSL curl, pinned by a unit test.
-- [ ] The Schannel build's answers do not change, and `dotnet build` is clean and the fast tests pass.
+- [x] With `matchesSchannelBuild` false, an intermediate breaking the root's constraint above a leaf breaking the intermediate's gives the verify result measured from OpenSSL curl, pinned by a unit test.
+- [x] With the OpenSSL build and a self-signed root as `--cacert`, a chain flagged both 47 and 48 reports the verify result measured from OpenSSL curl, pinned by a unit test.
+- [x] The Schannel build's answers do not change, and `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured with curl 8.18.0 and OpenSSL 3.5.5 (WSL); the table is in ADR-1393.
+- `CertificateNameConstraints` now walks the certificates from the top down in the OpenSSL build,
+  self-issued ones skipped unless the leaf, CN check for the leaf only.
+- .NET's chain engine keeps per-element status flags with no order among them, so
+  `OpenSslVerifyResult.KeepFirstNameConstraintRefusal` re-evaluates a chain flagged with two or more
+  name-constraint kinds and keeps the first refusal. The Linux behaviour is not run here; the
+  flag-level test is platform-neutral and the end-to-end one excludes macOS.
+- `dotnet build` clean, fast tests pass (115 projects), `Measure-CodeQuality.ps1 -Library
+  Curl.Networking.UnitLibrary` reports 0 failing members.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: b2112e5a e3771298 403a4f6f.
+- 2026-11-25: Doing -> Done. The OpenSSL build checks intermediates' names against name constraints and reports the first refusal when several are flagged
