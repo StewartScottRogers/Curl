@@ -33,3 +33,4 @@ Lanes test only on Windows, so reproduce with `gh run view 45537178112 --log-fai
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Deferred. already fixed, CI green on bedb8f4a2
