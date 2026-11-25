@@ -1422,3 +1422,4 @@ Each option and the specific reason it lost.
 | [1378](ADR-1378-xmpp-disco-output-holds-lf-line-ends-and-entitized-cr-on-every-platform.md) | An XMPP disco answer is written with LF line ends and entitized CR on every platform (BL-5928) | Accepted | 2026-11-25 |
 | [1379](ADR-1379-resumable-upload-sends-its-requests-through-curls-transfer.md) | Resumable upload sends its requests through curl's transfer (BL-5869) | Accepted | 2026-11-25 |
 | [1380](ADR-1380-openssl-build-reads-x509-certificate-ca-blocks.md) | The OpenSSL build reads X509 CERTIFICATE blocks in --cacert and --capath (BL-5927) | Accepted | 2026-11-24 |
+| [1374](ADR-1374-an-http2-session-resets-unfinished-streams-when-it-shuts-down.md) | An HTTP/2 session resets its unfinished streams when it shuts down (BL-5922) | Accepted | 2026-11-24 |

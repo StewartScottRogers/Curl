@@ -1563,7 +1563,9 @@ public sealed class HttpProtocolHandler(
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
-            return OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
+            HttpAttemptOutcome timedOutOutcome = OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
+            timedOutOutcome.UpgradedSession = UpgradedSessionOf(connection);
+            return timedOutOutcome;
         }
         catch (OperationCanceledException canceled)
         {

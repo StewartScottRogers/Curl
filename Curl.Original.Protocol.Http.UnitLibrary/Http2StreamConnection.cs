@@ -36,7 +36,7 @@ namespace Curl.Original.Protocol.Http;
 internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength, HttpStreamOpenedLines? openedLines = null, HttpFrameLog? frameLog = null, Http2FrameTrace? frameTrace = null) : IHttpStreamConnection
 {
     /// <summary>The length of an RST_STREAM frame's payload: its error code.</summary>
-    private const int ResetPayloadLength = 4;
+    internal const int ResetPayloadLength = 4;
 
     private readonly Queue<ReadOnlyMemory<byte>> received = new();
 
@@ -92,6 +92,12 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// it has not yet taken.
     /// </summary>
     internal bool HasReceived => !inbox.IsEmpty;
+
+    /// <summary>
+    /// Gets a value indicating whether the stream is done with its response: it has read the end,
+    /// or ended it here as <c>-I</c> does at the first DATA frame (<see cref="EndsAtFinalHead" />).
+    /// </summary>
+    internal bool IsResponseEnded => isResponseEnded;
 
     /// <summary>Gets the stream's identifier, 0 until its head is written.</summary>
     internal int StreamId => streamId;
