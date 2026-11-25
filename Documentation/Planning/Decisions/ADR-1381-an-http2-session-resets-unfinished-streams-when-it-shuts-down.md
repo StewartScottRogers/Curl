@@ -1,4 +1,4 @@
-# ADR-1374 — An HTTP/2 session resets its unfinished streams when it shuts down
+# ADR-1381 — An HTTP/2 session resets its unfinished streams when it shuts down
 
 - **Status:** Accepted
 - **Date:** 2026-11-24

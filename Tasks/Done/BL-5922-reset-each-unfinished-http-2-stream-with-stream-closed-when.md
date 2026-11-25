@@ -28,7 +28,7 @@ Found in BL-5906. `Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2Fr
 
 ## Notes
 
-- `Http2Session.ShutDownAsync` resets every stream whose response is unfinished, lowest first, before its `GOAWAY` (ADR-1374). Both the `-m` path and the pool's close go through it. A stream the server reset is now dropped from the open streams when the reset is the reading stream's own.
+- `Http2Session.ShutDownAsync` resets every stream whose response is unfinished, lowest first, before its `GOAWAY` (ADR-1381). Both the `-m` path and the pool's close go through it. A stream the server reset is now dropped from the open streams when the reset is the reading stream's own.
 - `HttpProtocolHandler`: a timed-out transfer on an h2c-upgraded connection now hands its session on, so it too is reset and shut down; before, it sent neither frame.
 - Measured, curl 8.18.0 (nghttp2), `--http2-prior-knowledge -sS -m 3` against `Record-CurlExchange.ps1 -Http2Origin prior-knowledge`: a head `200` with no DATA (exit 28) and `-f` on a head `404` with no DATA (exit 22) both close with `RST_STREAM stream 1 error 5`, then `GOAWAY error 0 debug shutdown`; Curl's closing frames now match.
 - Same setup with `-I` and a DATA frame after the head: curl sends no `RST_STREAM`, so a response `-I` ended is not reset. curl's `GOAWAY` there is PROTOCOL_ERROR, which Curl did not send before this task either: filed as BL-5938.
