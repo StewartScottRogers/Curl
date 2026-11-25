@@ -4,7 +4,7 @@ namespace Curl.Extension.ResumableUpload.Transfer;
 
 /// <summary>
 /// Gives a <c>-T</c> upload as a stream that can be read again from any offset, as a resumable upload needs: both
-/// protocols announce the upload's length on creation and a resumption sends again from the server's offset (ADR-1400).
+/// protocols announce the upload's length on creation and a resumption sends again from the server's offset (ADR-1401).
 /// </summary>
 internal static class RereadableUpload
 {

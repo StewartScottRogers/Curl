@@ -30,7 +30,7 @@ A resumable upload of a non-seekable `-T` source (`-T -`) over 2 GiB either uplo
 
 ## Notes
 
-- Decided (ADR-1400): upload it. Up to 16 MiB in memory, past that a delete-on-close temporary file; exit 26 if the source cannot be read, 23 if the file cannot be written. No curl behaviour to match: resumable upload is an extension.
+- Decided (ADR-1401): upload it. Up to 16 MiB in memory, past that a delete-on-close temporary file; exit 26 if the source cannot be read, 23 if the file cannot be written. No curl behaviour to match: resumable upload is an extension.
 - A seekable upload already read part way is now sent through a window over it instead of being copied.
 - `touches` widened: the new `RereadableUpload.cs` keeps the copying out of the hook, the library `CLAUDE.md` described the old behaviour, and ADR-1103 gained an "Amended by" line. No other task in Doing named them.
 - Tests drive the spill with a small `memoryLimit` and an injected spool stream, so nothing near 2 GiB is held. `Curl.Extension.ResumableUpload.UnitTests`: 114 passed; library 100% line and branch, 0 failing members.

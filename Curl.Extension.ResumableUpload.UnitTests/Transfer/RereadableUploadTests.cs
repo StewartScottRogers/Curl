@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.ResumableUpload.Transfer;
 
 /// <summary>
-/// Pins what a resumable upload rereads (ADR-1400): a window over a seekable upload, otherwise a copy in memory up to
+/// Pins what a resumable upload rereads (ADR-1401): a window over a seekable upload, otherwise a copy in memory up to
 /// the limit and in a spool file past it, with curl's exit codes when the copy cannot be made.
 /// </summary>
 [TestClass]

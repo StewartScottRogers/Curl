@@ -1,4 +1,4 @@
-# ADR-1400: Resumable upload spools a long non-seekable upload to a temporary file
+# ADR-1401: Resumable upload spools a long non-seekable upload to a temporary file
 
 - Status: Accepted
 - Date: 2026-11-25

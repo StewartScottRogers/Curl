@@ -167,7 +167,7 @@ public sealed class ResumableUploadTransferHookTests
     [TestMethod]
     public async Task ExecuteAsync_UnseekableUploadTooLargeForTheBuffer_IsSpooledResumedFromTheOffsetAndTheSpoolDisposed()
     {
-        // BL-5967, ADR-1400: past the memory limit the upload goes to a spool file, so no length is too long for it.
+        // BL-5967, ADR-1401: past the memory limit the upload goes to a spool file, so no length is too long for it.
         var spool = new MemoryStream();
         var next = new ScriptedNext(PlainOptions, IetfCreated, Failure(CurlExitCode.RecvError), Response(204, "", "Upload-Offset: 2"), IetfAppended);
         var upload = new UnseekableUpload(Encoding.ASCII.GetBytes("hello"));

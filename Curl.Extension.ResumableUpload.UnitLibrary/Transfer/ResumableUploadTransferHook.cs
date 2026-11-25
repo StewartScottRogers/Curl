@@ -12,7 +12,7 @@ namespace Curl.Extension.ResumableUpload.Transfer;
 /// <remarks>
 /// Both protocols announce the upload's length on creation and a resumption sends again from the server's offset, so a
 /// non-seekable upload is copied first: into memory up to a limit, past it into a temporary file deleted when the
-/// transfer ends (ADR-1400). It ends with <see cref="CurlExitCode.ReadError" /> when the upload cannot be read and
+/// transfer ends (ADR-1401). It ends with <see cref="CurlExitCode.ReadError" /> when the upload cannot be read and
 /// <see cref="CurlExitCode.WriteError" /> when the temporary file cannot be written. A seekable upload is sent from
 /// where it stands without a copy.
 /// </remarks>
