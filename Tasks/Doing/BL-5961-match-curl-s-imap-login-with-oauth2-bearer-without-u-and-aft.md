@@ -42,3 +42,4 @@ The stashed change gives an empty credential with `--oauth2-bearer` and no `-u`,
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 9e9f2782 63065152 000323c1 3d836d5e.
