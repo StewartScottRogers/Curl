@@ -1,5 +1,5 @@
 ---
-id: BL-5961
+id: BL-5970
 title: Read the status of an HTTP/2 or HTTP/3 response during the 100 Continue wait, not an assumed 200
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5961 — Read the status of an HTTP/2 or HTTP/3 response during the 100 Continue wait, not an assumed 200
+# BL-5970 — Read the status of an HTTP/2 or HTTP/3 response during the 100 Continue wait, not an assumed 200
 
 ## Goal
 
