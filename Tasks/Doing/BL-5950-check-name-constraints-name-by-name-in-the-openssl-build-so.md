@@ -31,3 +31,4 @@ Found during BL-5942 (ADR-1389). `CertificateNameConstraints.FindViolation` chec
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 06797fe2 280569d4 3d836d5e.
