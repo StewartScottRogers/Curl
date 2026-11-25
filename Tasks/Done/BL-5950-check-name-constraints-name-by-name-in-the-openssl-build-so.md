@@ -28,7 +28,7 @@ Found during BL-5942 (ADR-1389). `CertificateNameConstraints.FindViolation` chec
 
 ## Notes
 
-- Measured curl 8.18.0 / OpenSSL 3.5.5 (WSL Ubuntu, `openssl s_server`); table and decision in ADR-1390. Excluded subject directoryName beside an email not permitted is 48; the upper CA's refusal wins.
+- Measured curl 8.18.0 / OpenSSL 3.5.5 (WSL Ubuntu, `openssl s_server`); table and decision in ADR-1391. Excluded subject directoryName beside an email not permitted is 48; the upper CA's refusal wins.
 - OpenSSL also takes the alternative names in the extension's order (not DNS first), so the OpenSSL path now reads them in that order. Schannel's name list and CA order are unchanged, pinned by `matchesSchannelBuild` true data rows.
 - Checks: `dotnet build` 0 warnings, fast tests exit 0, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 0 failing members. Linux and macOS: tests are platform-neutral (certificates made in the test, verify result tests excluded on macOS like their neighbours).
 - Filed BL-5953: intermediates' own names are not checked, and below a self-signed `--cacert` root the platform chain engine's flags answer 47 whenever both 47 and 48 are set.

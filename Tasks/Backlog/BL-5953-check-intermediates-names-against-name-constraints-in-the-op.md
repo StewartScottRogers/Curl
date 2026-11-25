@@ -18,7 +18,7 @@ In the OpenSSL build, an intermediate whose own name breaks a higher CA's constr
 
 ## Context
 
-Found during BL-5950 (ADR-1390). Two gaps remain:
+Found during BL-5950 (ADR-1391). Two gaps remain:
 - `CertificateNameConstraints.FindViolation` checks only the leaf's names. OpenSSL's `check_name_constraints` (`crypto/x509/x509_vfy.c`) checks every certificate that is not self-issued (the leaf always) against the CAs above it, from the top certificate down, the CN check for the leaf only. Measured with curl 8.18.0 and OpenSSL 3.5.5 (WSL): root excluding email `bad.org`, intermediate permitting DNS `other.org` and holding subject emailAddress `ca@bad.org`, leaf `DNS:localhost`: 48 with the root as `--cacert`, 47 with the intermediate.
 - `OpenSslVerifyResult.StatusOf` consults `FindViolation` only for a partial chain. With a self-signed root as `--cacert` the platform's chain engine reports the flags itself, and `OfExtensionsOrSignature` answers 47 whenever both 47 and 48 are flagged; OpenSSL answered 48 for a root excluding DNS `localhost` above an intermediate permitting DNS `other.org`. Check what .NET's Linux chain engine puts in each element's `ChainElementStatus`.
 

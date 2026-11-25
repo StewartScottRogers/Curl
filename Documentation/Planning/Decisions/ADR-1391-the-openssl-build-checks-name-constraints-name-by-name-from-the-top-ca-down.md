@@ -1,4 +1,4 @@
-# ADR-1390: The OpenSSL build checks name constraints name by name, from the top CA down (BL-5950)
+# ADR-1391: The OpenSSL build checks name constraints name by name, from the top CA down (BL-5950)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1389.
 
