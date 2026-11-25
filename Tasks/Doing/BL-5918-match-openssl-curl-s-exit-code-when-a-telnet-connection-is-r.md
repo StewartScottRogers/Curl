@@ -31,3 +31,4 @@ BL-5882 and ADR-1352 pin the Windows behaviour: a reset exits 0 unless it strike
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 0dac2e19 2625c88a 3d836d5e.
