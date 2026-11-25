@@ -27,7 +27,8 @@ references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers 
   provider through `Quic/DnsQuicCertificateVerifier`) and `Https/DnsHttpsTransport` (DNS over HTTPS, RFC 8484: port 443,
   the TLS provider's handshake offering ALPN `h2` then `http/1.1`; under `h2` `DohHttp2Exchange` POSTs the query on one HTTP/2 stream over `DohConnectionStream`, otherwise `DohRequest`'s HTTP/1.1 POST to `/dns-query` and `DohResponseReader`'s read of the
   200 `application/dns-message` body, chunked, by `Content-Length` or to the connection's end; `DohResponseHead` parses
-  the status line and headers).
+  the status line and headers). A DoH connection that fails is worded as `DnsTcpTransport` words it, exit 55 on a
+  write or flush and 56 on a read, through `DohFailureWordingConnection` and `DohConnectionException`.
 
 Registered in `ExtensionCatalogue.cs`, `ExtensionDescriptionCatalogue.cs`, `ExtensionOptionCatalogue.cs` and
 `ExtensionTransferHookCatalogue.cs`. Held to the four quality gates in the root `CLAUDE.md`.
