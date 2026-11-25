@@ -1,5 +1,5 @@
 ---
-id: BL-5925
+id: BL-5932
 title: Write curl's -v lines around a finished NTLM handshake: NTLM auth restarted, and the auth using lines as curl 8.22.0 writes them
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-24
 completed:
 ---
-# BL-5925 — Write curl's -v lines around a finished NTLM handshake: NTLM auth restarted, and the auth using lines as curl 8.22.0 writes them
+# BL-5932 — Write curl's -v lines around a finished NTLM handshake: NTLM auth restarted, and the auth using lines as curl 8.22.0 writes them
 
 ## Goal
 

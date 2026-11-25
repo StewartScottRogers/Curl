@@ -52,13 +52,13 @@ The finding, verbatim:
   `origin/work/dark-factory` named either (BL-5889 holds only the content decoder files).
 - No ADR: no design choice, the requests are the ones measured from curl.
 - Measured 2026-11-24 with `Record-CurlExchange.ps1` standing in for proxy and origin on one
-  connection (the cycle is written out in BL-5925). Real curl 8.22.0 and this build both: exit
+  connection (the cycle is written out in BL-5932). Real curl 8.22.0 and this build both: exit
   47, `curl: (47) Maximum (50) redirects followed`, `%{http_code}` 407, `%{num_redirects}` 50,
   and the same requests once the NTLM tokens are cut to their message type.
 - A proxy that instead forwards a request with no `Proxy-Authorization` gets the origin's 401
   from curl too (bare `NTLM`: "NTLM handshake rejected", exit 0), so the finding's mock must
   answer such a request with 407.
-- `-v` still differs in `NTLM auth restarted` and some `auth using` lines: filed as BL-5925.
+- `-v` still differs in `NTLM auth restarted` and some `auth using` lines: filed as BL-5932.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary` reported
   0 failing members. Fast tests: exit 0 across all test projects, `dotnet build` 0 warnings.
 - Platform: the test drives scripted bytes and scripted tokens, so it is the same on Linux and macOS.
