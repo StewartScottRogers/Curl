@@ -308,3 +308,4 @@ index 7587629f52..dcf5ebb0b6 100644
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 9fb27cdc 25665222.
