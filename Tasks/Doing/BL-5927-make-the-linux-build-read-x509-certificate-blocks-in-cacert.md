@@ -31,3 +31,4 @@ Found by BL-5917 (ADR-1363). WSL curl 8.18.0 (OpenSSL 3.5.5) with --capath holdi
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 49d5ed85 a5658766 85214380.
