@@ -100,7 +100,7 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
             return null;
         }
 
-        List<string> remaining = [.. offered];
+        List<string> remaining = MechanismsToTry(options, offered);
         bool cancelled = false;
         while (ChooseMechanism(request, options, remaining) is { } chosen)
         {
@@ -250,6 +250,21 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     private bool PrefersBearerAlone(SaslRequest request, ImapLoginOptions options) =>
         !options.NamesMechanisms && (request.BearerToken is not null || context.Mail is { BearerTokenWithheld: true });
 
+    /// <summary>
+    /// The offered mechanisms the authenticator may choose among: none when a redirect withheld
+    /// the token and no <c>AUTH=</c> option names a mechanism, otherwise every one offered.
+    /// </summary>
+    private List<string> MechanismsToTry(ImapLoginOptions options, IReadOnlyList<string> offered) =>
+        WithholdsEveryMechanism(options) ? [] : [.. offered];
+
+    /// <summary>
+    /// Whether a redirect withheld the <c>--oauth2-bearer</c> token and no <c>AUTH=</c> option
+    /// names a mechanism: curl still prefers the bearer mechanisms alone, which it cannot use
+    /// without the token, so it chooses none (measured with curl 8.22.0, BL-5961).
+    /// </summary>
+    private bool WithholdsEveryMechanism(ImapLoginOptions options) =>
+        !options.NamesMechanisms && context.Mail is { BearerTokenWithheld: true };
+
     private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
 
     // An answer to a challenge: as Encode, except that an exchange whose empty answer is curl's
@@ -302,7 +317,7 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     {
         MailRequestOptions mail = context.Mail ?? new MailRequestOptions();
         return new SaslRequest(
-            context.Credentials,
+            context.Credentials ?? (mail.BearerToken is null ? null : new System.Net.NetworkCredential()),
             mail.SaslAuthorizationIdentity,
             mail.BearerToken,
             RequiredMechanism: null,
