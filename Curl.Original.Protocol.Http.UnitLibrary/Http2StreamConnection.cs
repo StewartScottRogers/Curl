@@ -338,6 +338,33 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
+    /// Resets the stream of a transfer that timed out with STREAM_CLOSED, unless it has ended
+    /// both ways, as curl does before it sends the next transfer on the connection (measured,
+    /// BL-5976 Notes). Nothing is sent before the stream is open, or on a connection that takes
+    /// no new stream, whose closing resets it
+    /// (<see cref="Http2Session.ShutDownAsync" />); a connection that fails the write takes none
+    /// from then on.
+    /// </summary>
+    /// <returns>A task that completes when any reset is sent.</returns>
+    internal async ValueTask ResetTimedOutAsync()
+    {
+        if (streamId == 0 || (isRequestEnded && isResponseEnded) || !session.AcceptsNewStreams)
+        {
+            return;
+        }
+
+        try
+        {
+            // The transfer's own token is cancelled: its time limit is what brought it here.
+            await ResetAsClosedAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            session.MarkPeerGone();
+        }
+    }
+
+    /// <summary>
     /// Lets the request's remaining DATA go out although the response has ended, as curl sends a
     /// body it held for <c>100 Continue</c> (measured, BL-5972 Notes).
     /// </summary>

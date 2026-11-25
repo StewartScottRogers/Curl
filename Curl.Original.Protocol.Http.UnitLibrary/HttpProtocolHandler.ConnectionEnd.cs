@@ -11,7 +11,7 @@ public sealed partial class HttpProtocolHandler
     /// shut down otherwise - its response did not persist, it died before its response, or only
     /// <c>--fail-with-body</c> failed it once its body was read. A transfer that times out on an
     /// HTTP/2 stream reports it left intact too, as curl 8.18.0's nghttp2 build does (measured,
-    /// BL-5974), though Curl then closes it. When
+    /// BL-5974). When
     /// the request goes out again on a new connection - after it died, or as a retry such as the
     /// resend after a 417 (measured, BL-1446 Notes) - the line saying so follows. A connection left intact
     /// that another transfer still shares, on a stream of its own, is reported by the last

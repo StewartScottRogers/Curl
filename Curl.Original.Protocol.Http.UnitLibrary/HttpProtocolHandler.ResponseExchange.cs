@@ -112,6 +112,7 @@ public sealed partial class HttpProtocolHandler
         {
             HttpAttemptOutcome timedOutOutcome = OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
             timedOutOutcome.UpgradedSession = UpgradedSessionOf(connection);
+            await ResetTimedOutStreamAsync(TrailerStreamOf(requestStream, connection)).ConfigureAwait(false);
             return timedOutOutcome;
         }
         catch (OperationCanceledException canceled)

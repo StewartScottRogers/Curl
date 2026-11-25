@@ -68,12 +68,12 @@ public sealed partial class HttpProtocolHandler
         unheldSession?.ShutDownAsync(CancellationToken.None) ?? ValueTask.CompletedTask;
 
     /// <summary>
-    /// Marks the connection reusable when the last response is reported left intact over
-    /// HTTP/1.x or HTTP/2, or over HTTP/3 while the session takes new requests, so a pool keeps it (BL-735), or reports that a pooled connection that died is being given up.
+    /// Marks the connection reusable when it can carry the next transfer
+    /// (<see cref="CarriesNextTransfer" />), so a pool keeps it (BL-735), or reports that a pooled connection that died is being given up.
     /// </summary>
     private static void SettleConnection(HttpRequestPlan plan, IConnection connection, IHttpStreamSession? streams, HttpAttemptOutcome outcome)
     {
-        if (outcome.ReportsLeftIntact && TakesNewRequests(streams))
+        if (CarriesNextTransfer(streams, outcome))
         {
             connection.MarkReusable();
         }
@@ -85,11 +85,23 @@ public sealed partial class HttpProtocolHandler
     }
 
     /// <summary>
-    /// Tells whether a connection can carry another request once its response is left intact:
-    /// always over HTTP/1.x and HTTP/2, and over HTTP/3 while the session takes new streams.
+    /// Tells whether the connection can carry the next transfer: its response is reported left
+    /// intact over HTTP/1.x or HTTP/2, or over HTTP/3 while the session takes new streams; or
+    /// the transfer timed out on a stream of an HTTP/2 session that still takes new ones, as
+    /// curl ends only the stream then (BL-5976).
     /// </summary>
-    private static bool TakesNewRequests(IHttpStreamSession? streams) =>
-        streams is not Http3Session { AcceptsNewStreams: false };
+    private static bool CarriesNextTransfer(IHttpStreamSession? streams, HttpAttemptOutcome outcome) =>
+        outcome.TimedOutOnHttp2Stream
+            ? ((Http2Session)streams!).AcceptsNewStreams
+            : outcome.ReportsLeftIntact && streams is not Http3Session { AcceptsNewStreams: false };
+
+    /// <summary>
+    /// Resets a timed-out exchange's HTTP/2 stream
+    /// (<see cref="Http2StreamConnection.ResetTimedOutAsync" />); nothing on any other
+    /// connection.
+    /// </summary>
+    private static ValueTask ResetTimedOutStreamAsync(IHttpStreamConnection? stream) =>
+        stream is Http2StreamConnection http2 ? http2.ResetTimedOutAsync() : ValueTask.CompletedTask;
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,

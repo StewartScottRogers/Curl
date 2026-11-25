@@ -136,6 +136,57 @@ public sealed class ReadAheadConnectionStreamTests
     }
 
     [TestMethod]
+    public async Task ReadTowardsNextFrameAsync_AFrameInPieces_KeepsEveryByteAcrossACancelledWait()
+    {
+        PushedBytesConnection connection = new();
+        ReadAheadConnectionStream stream = new(connection);
+        byte[] first = [0, 0, 0, 4, 1, 0, 0, 0, 0];
+        byte[] second = [0, 0, 2, 0, 0, 0, 0, 0, 1, 7, 8];
+        connection.Push([.. first, .. second[..3]]);
+        Diagnostics.Arrange("pushed", "one whole frame and 3 bytes of the next");
+        await stream.ReadTowardsNextFrameAsync(CancellationToken.None);
+        await stream.ReadExactlyAsync(new byte[first.Length], CancellationToken.None);
+        bool hadFrameAtThreeBytes = stream.HasFrameOrEnded;
+        using CancellationTokenSource cancellation = new();
+        Task waiting = stream.ReadTowardsNextFrameAsync(cancellation.Token);
+        await cancellation.CancelAsync();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => waiting);
+
+        connection.Push(second[3..10]);
+        await stream.ReadTowardsNextFrameAsync(CancellationToken.None);
+        bool hadFrameShortOfOneByte = stream.HasFrameOrEnded;
+        connection.Push(second[10..]);
+        await stream.ReadTowardsNextFrameAsync(CancellationToken.None);
+        byte[] read = new byte[second.Length];
+        await stream.ReadExactlyAsync(read, CancellationToken.None);
+
+        Diagnostics.Diff("second frame", second, read);
+        Diagnostics.Assert("read count", 3, connection.ReadCount);
+        Assert.IsFalse(hadFrameAtThreeBytes);
+        Assert.IsFalse(hadFrameShortOfOneByte);
+        CollectionAssert.AreEqual(second, read);
+        Assert.AreEqual(3, connection.ReadCount);
+    }
+
+    [TestMethod]
+    public async Task ReadTowardsNextFrameAsync_AFrameTooLongToAccept_NeedsOnlyItsHeader()
+    {
+        PushedBytesConnection connection = new();
+        ReadAheadConnectionStream stream = new(connection);
+        connection.Push("HTTP/1.1 "u8.ToArray());
+        Diagnostics.Arrange("pushed", "9 bytes of an HTTP/1.1 reply");
+
+        await stream.ReadTowardsNextFrameAsync(CancellationToken.None);
+        Task again = stream.ReadTowardsNextFrameAsync(CancellationToken.None);
+
+        Diagnostics.Act("has frame or ended", stream.HasFrameOrEnded);
+        Diagnostics.Assert("read count", 1, connection.ReadCount);
+        Assert.IsTrue(stream.HasFrameOrEnded);
+        Assert.IsTrue(again.IsCompletedSuccessfully);
+        Assert.AreEqual(1, connection.ReadCount);
+    }
+
+    [TestMethod]
     public async Task WriteAsyncAndFlushAsync_PassStraightThrough()
     {
         PushedBytesConnection connection = new();

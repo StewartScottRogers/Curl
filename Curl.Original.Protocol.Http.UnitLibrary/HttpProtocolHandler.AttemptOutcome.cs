@@ -69,8 +69,9 @@ public sealed partial class HttpProtocolHandler
 
         /// <summary>
         /// Gets a value indicating whether the exchange timed out on an HTTP/2 stream: curl ends
-        /// only the stream and reports the connection left intact. The connection is not marked
-        /// reusable, so it does not count towards <see cref="ReportsLeftIntact" />.
+        /// only the stream, reports the connection left intact and keeps it for the next
+        /// transfer. No retry may follow on it, so it does not count towards
+        /// <see cref="ReportsLeftIntact" />.
         /// </summary>
         public bool TimedOutOnHttp2Stream => RanOnHttp2Stream && Result.ExitCode == CurlExitCode.OperationTimedOut;
 

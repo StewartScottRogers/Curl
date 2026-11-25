@@ -134,10 +134,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
     /// <summary>
     /// Gets a value indicating whether the connection can carry another request: neither side
-    /// has sent a GOAWAY, the peer has not closed it, and no write found the peer gone
-    /// (<see cref="MarkPeerGone" />).
+    /// has sent a GOAWAY, the peer has not closed it, no write found the peer gone
+    /// (<see cref="MarkPeerGone" />), and no write was cancelled part way.
     /// </summary>
-    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsGoAwaySent && !Frames.IsClosedByPeer && !isPeerGone;
+    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsGoAwaySent && !Frames.IsClosedByPeer && !isPeerGone && !incoming.IsWriteCancelled;
 
     /// <summary>
     /// Gets how many transfers the connection carries at once: the peer's
@@ -366,26 +366,27 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     }
 
     /// <summary>
-    /// Waits for the connection's next bytes, then, unless another stream has read them or
-    /// already handed <paramref name="receiver" /> a frame, reads one frame and hands it to the
-    /// stream it belongs to: the header blocks of every stream are decoded here, in the order
-    /// they arrive, as HPACK requires, and frames for a stream no longer open are dropped. A
-    /// reset of another stream goes to that stream while it is open, and is dropped after.
+    /// Waits for more of the connection's next frame, then, once it is whole and unless another
+    /// stream has read it or already handed <paramref name="receiver" /> a frame, reads it and
+    /// hands it to the stream it belongs to: the header blocks of every stream are decoded here,
+    /// in the order they arrive, as HPACK requires, and frames for a stream no longer open are
+    /// dropped. A reset of another stream goes to that stream while it is open, and is dropped
+    /// after.
     /// </summary>
     /// <param name="receiver">The stream reading, or <see langword="null" /> for none.</param>
-    /// <param name="cancellationToken">Cancels the wait and the read.</param>
-    /// <returns>A task that completes when a frame was read, or when there was none to read.</returns>
+    /// <param name="cancellationToken">Cancels the wait and the read; a frame not yet whole stays to be read.</param>
+    /// <returns>A task that completes when a frame was read, or when there was none to read yet.</returns>
     /// <exception cref="Http2StreamResetException">The peer reset <paramref name="receiver" />'s stream.</exception>
     /// <exception cref="HttpTransferException">A header block did not decode (exit 16).</exception>
     internal async ValueTask ReceiveAsync(Http2StreamConnection? receiver, CancellationToken cancellationToken)
     {
         connectionFailure?.Throw();
-        await incoming.WaitForBytesAsync(cancellationToken).ConfigureAwait(false);
+        await incoming.ReadTowardsNextFrameAsync(cancellationToken).ConfigureAwait(false);
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             connectionFailure?.Throw();
-            if (incoming.HasBytesOrEnded && receiver?.HasReceived != true)
+            if (incoming.HasFrameOrEnded && receiver?.HasReceived != true)
             {
                 await ReadAndRouteFrameAsync(receiver, cancellationToken).ConfigureAwait(false);
             }
@@ -412,7 +413,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
         if (isUpgradeSettingsDue)
         {
-            await Connection.WriteAsync(UpgradedStreamSettingsFrame, cancellationToken).ConfigureAwait(false);
+            await incoming.WriteAsync(UpgradedStreamSettingsFrame, cancellationToken).ConfigureAwait(false);
             receiver.FrameTrace?.FrameSent(UpgradedStreamSettings);
             isUpgradeSettingsDue = false;
         }

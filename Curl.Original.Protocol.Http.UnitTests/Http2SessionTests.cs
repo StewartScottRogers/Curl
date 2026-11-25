@@ -340,8 +340,9 @@ public sealed class Http2SessionTests
         byte[] frame = Http2FrameCodec.Serialize(Headers(server, 1, isEndStream: true));
         Diagnostics.Arrange("frame bytes pushed before cancelling", "first 5 of a HEADERS 1 end frame");
         Diagnostics.Bytes("pushed bytes", frame[..5]);
-        connection.Push(frame[..5]);
+        connection.Push([.. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings([])), .. frame[..5]]);
         using CancellationTokenSource cancellation = new();
+        await session.ReceiveAsync(stream, cancellation.Token);
         Task receiving = session.ReceiveAsync(stream, cancellation.Token).AsTask();
         await connection.ReadsAskedAsync(2);
 
@@ -351,6 +352,12 @@ public sealed class Http2SessionTests
         Diagnostics.Act("cancellation", failure.GetType().Name);
         Diagnostics.Assert("stream received", false, stream.HasReceived);
         Assert.IsFalse(stream.HasReceived);
+
+        connection.Push(frame[5..]);
+        await session.ReceiveAsync(stream, CancellationToken.None);
+
+        Diagnostics.Assert("stream received after the rest arrived", true, stream.HasReceived);
+        Assert.IsTrue(stream.HasReceived);
     }
 
     [TestMethod]
