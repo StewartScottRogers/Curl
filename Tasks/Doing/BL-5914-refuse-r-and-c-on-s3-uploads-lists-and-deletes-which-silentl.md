@@ -31,3 +31,4 @@ Left by BL-5897. Downloads send a `Range` header (BL-5873), but `S3ProtocolHandl
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 24a0115f aa739c66 3d836d5e.
