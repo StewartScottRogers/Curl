@@ -646,7 +646,9 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
     private const string OrganizationalUnit = "2.5.4.11";
 
-    // A subject of UTF8String attributes, each array one relative name.
+    private const string EmailAddress = "1.2.840.113549.1.9.1";
+
+    // A subject of UTF8String attributes (IA5String emailAddresses, as OpenSSL requires), each array one relative name.
     private static X500DistinguishedName Subject(params (string Type, string Value)[][] relativeNames)
     {
         var writer = new AsnWriter(AsnEncodingRules.DER);
@@ -661,7 +663,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
                         using (writer.PushSequence())
                         {
                             writer.WriteObjectIdentifier(type);
-                            writer.WriteCharacterString(UniversalTagNumber.UTF8String, value);
+                            writer.WriteCharacterString(type == EmailAddress ? UniversalTagNumber.IA5String : UniversalTagNumber.UTF8String, value);
                         }
                     }
                 }
@@ -745,6 +747,37 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     public void VerifyPeer_OpenSslBuildSubjectEmailAddressInTheExcludedEmailDomain_IsExcludedSubtreeViolation()
     {
         var failure = Verify(Constraints(excludedName: GeneralName(1, "other.org")), Host, true, subject: "E=evil@other.org, CN=localhost", matchesSchannelBuild: false);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    // curl 8.18.0's OpenSSL build (BL-5940): every subject emailAddress is checked, multi-valued relative names included.
+    [TestMethod]
+    [DataRow(true, "other.org", CertificateNameConstraints.Excluded)]
+    [DataRow(false, "example.com", CertificateNameConstraints.NotPermitted)]
+    [DataRow(false, "other.org", 0)]
+    public void FindViolation_OpenSslBuildSubjectEmailAddressInAMultiValuedRelativeName_FollowsTheConstraint(bool excluded, string constraint, int expected)
+    {
+        var email = GeneralName(1, constraint);
+        var constraints = excluded ? Constraints(excludedName: email) : Constraints(permittedName: email);
+
+        Assert.AreEqual(expected, FindViolationOfSubject(Subject([(EmailAddress, "evil@other.org"), (OrganizationalUnit, "Unit")]), constraints));
+    }
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildSecondEmailAddressOfOneRelativeNameInTheExcludedDomain_IsExcluded() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(Subject([(EmailAddress, "a@example.com"), (EmailAddress, "evil@other.org")]), Constraints(excludedName: GeneralName(1, "other.org"))));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildSubjectEmailAddressInAMultiValuedRelativeNameInTheExcludedEmailDomain_IsExcludedSubtreeViolation()
+    {
+        var failure = Verify(
+            Constraints(excludedName: GeneralName(1, "other.org")), Host, true, matchesSchannelBuild: false,
+            subjectName: Subject([(EmailAddress, "evil@other.org"), (OrganizationalUnit, "Unit")], [(CommonName, Host)]));
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);

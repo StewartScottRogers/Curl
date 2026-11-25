@@ -56,6 +56,7 @@ internal static class CertificateNameConstraints
     /// <param name="matchesSchannelBuild">
     /// Whether every subject CN of a leaf with no dNSName is checked as a DNS name, as curl's Schannel
     /// build (CryptoAPI) does; otherwise only a CN that looks like a host name is, as in the OpenSSL build.
+    /// Subject CNs and emailAddresses in a multi-valued relative name are read in the OpenSSL build only.
     /// </param>
     /// <returns>
     /// <see cref="NotPermitted" />, <see cref="Excluded" />, <see cref="UnsupportedNameSyntax" /> (the
@@ -121,11 +122,12 @@ internal static class CertificateNameConstraints
             .ToList();
         var hasDnsName = dnsNames.Count > 0;
         return matchesSchannelBuild
-            ? new LeafNames(ListNames(leaf, hasDnsName ? dnsNames : ListSingleValuedCommonNames(leaf)), [])
-            : new LeafNames(ListNames(leaf, dnsNames), hasDnsName ? [] : ListEveryCommonName(leaf));
+            ? new LeafNames(
+                ListNames(leaf, hasDnsName ? dnsNames : ListSingleValuedAttributes(leaf, CommonNameOid), ListSingleValuedAttributes(leaf, EmailAddressOid)), [])
+            : new LeafNames(ListNames(leaf, dnsNames, ListEveryAttribute(leaf, EmailAddressOid)), hasDnsName ? [] : ListEveryCommonName(leaf));
     }
 
-    private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf, List<string> dnsNames)
+    private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf, List<string> dnsNames, List<string> subjectEmailAddresses)
     {
         var names = dnsNames.Select(DnsName).ToList();
         names.AddRange(leaf.Extensions.OfType<X509SubjectAlternativeNameExtension>()
@@ -134,14 +136,14 @@ internal static class CertificateNameConstraints
 
         // directoryName, rfc822Name and URI names are constrained too; the subject counts as a directoryName (BL-5436)
         // and its emailAddress attributes as rfc822Names (RFC 5280 Â§4.2.1.10, BL-5804).
-        names.AddRange(ListSubjectNames(leaf));
+        names.AddRange(ListSubjectNames(leaf, subjectEmailAddresses));
         names.AddRange(ListOtherAlternativeNames(leaf));
         return names;
     }
 
     private static (Asn1Tag Tag, byte[] Value) DnsName(string name) => (DnsNameTag, System.Text.Encoding.ASCII.GetBytes(name));
 
-    private static List<(Asn1Tag Tag, byte[] Value)> ListSubjectNames(X509Certificate2 leaf)
+    private static List<(Asn1Tag Tag, byte[] Value)> ListSubjectNames(X509Certificate2 leaf, List<string> emailAddresses)
     {
         var names = new List<(Asn1Tag, byte[])>();
         if (leaf.SubjectName.RawData.Length > EmptyNameLength)
@@ -149,16 +151,9 @@ internal static class CertificateNameConstraints
             names.Add((DirectoryNameTag, leaf.SubjectName.RawData));
         }
 
-        names.AddRange(ListSubjectEmailAddresses(leaf).Select(address => (EmailTag, System.Text.Encoding.ASCII.GetBytes(address))));
+        names.AddRange(emailAddresses.Select(address => (EmailTag, System.Text.Encoding.ASCII.GetBytes(address))));
         return names;
     }
-
-    private static List<string> ListSubjectEmailAddresses(X509Certificate2 leaf) =>
-        leaf.SubjectName.EnumerateRelativeDistinguishedNames()
-            .Where(rdn => !rdn.HasMultipleElements && rdn.GetSingleElementType().Value == EmailAddressOid)
-            .Select(rdn => rdn.GetSingleElementValue())
-            .OfType<string>()
-            .ToList();
 
     private static List<(Asn1Tag Tag, byte[] Value)> ListOtherAlternativeNames(X509Certificate2 leaf)
     {
@@ -216,9 +211,9 @@ internal static class CertificateNameConstraints
         && label[^1] != '-'
         && label.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
 
-    private static List<string> ListSingleValuedCommonNames(X509Certificate2 leaf) =>
+    private static List<string> ListSingleValuedAttributes(X509Certificate2 leaf, string oid) =>
         leaf.SubjectName.EnumerateRelativeDistinguishedNames()
-            .Where(rdn => !rdn.HasMultipleElements && rdn.GetSingleElementType().Value == CommonNameOid)
+            .Where(rdn => !rdn.HasMultipleElements && rdn.GetSingleElementType().Value == oid)
             .Select(rdn => rdn.GetSingleElementValue())
             .OfType<string>()
             .ToList();
@@ -230,9 +225,12 @@ internal static class CertificateNameConstraints
     /// </summary>
     /// <param name="certificate">The certificate whose subject is read.</param>
     /// <returns>The CN values.</returns>
-    internal static List<string> ListEveryCommonName(X509Certificate2 certificate)
+    internal static List<string> ListEveryCommonName(X509Certificate2 certificate) => ListEveryAttribute(certificate, CommonNameOid);
+
+    // OpenSSL's NAME_CONSTRAINTS_check and its CN check read every attribute of a type, multi-valued relative names included (BL-5940).
+    private static List<string> ListEveryAttribute(X509Certificate2 certificate, string oid)
     {
-        var commonNames = new List<string>();
+        var values = new List<string>();
         var relativeNames = new AsnReader(certificate.SubjectName.RawData, AsnEncodingRules.BER).ReadSequence();
         while (relativeNames.HasData)
         {
@@ -240,25 +238,25 @@ internal static class CertificateNameConstraints
             while (attributes.HasData)
             {
                 var pair = attributes.ReadSequence();
-                if (pair.ReadObjectIdentifier() == CommonNameOid)
+                if (pair.ReadObjectIdentifier() == oid)
                 {
-                    commonNames.AddRange(DecodeCharacterString(pair.ReadEncodedValue().Span));
+                    values.AddRange(DecodeCharacterString(pair.ReadEncodedValue().Span));
                 }
             }
         }
 
-        return commonNames;
+        return values;
     }
 
     /// <summary>
-    /// Decodes an encoded CN value without validating its characters.
+    /// Decodes an encoded subject attribute value without validating its characters.
     /// </summary>
     /// <param name="encoded">The value's tag, length and content.</param>
     /// <returns>The decoded string alone, or nothing for a value that is not a character string.</returns>
     internal static string[] DecodeCharacterString(ReadOnlySpan<byte> encoded)
     {
         var tag = AsnDecoder.ReadEncodedValue(encoded, AsnEncodingRules.BER, out var offset, out var length, out _);
-        if (tag.TagClass != TagClass.Universal || !CommonNameTagValues.Contains(tag.TagValue))
+        if (tag.TagClass != TagClass.Universal || !CharacterStringTagValues.Contains(tag.TagValue))
         {
             return [];
         }
@@ -401,8 +399,8 @@ internal static class CertificateNameConstraints
 
     private const int BmpStringTagValue = 30;
 
-    // StringTagValues and NumericString and VisibleString, which a CN may use too.
-    private static readonly int[] CommonNameTagValues = [12, 18, 19, 20, 22, 26, UniversalStringTagValue, BmpStringTagValue];
+    // StringTagValues and NumericString and VisibleString, which a subject attribute may use too.
+    private static readonly int[] CharacterStringTagValues = [12, 18, 19, 20, 22, 26, UniversalStringTagValue, BmpStringTagValue];
 
     // UTF8String, PrintableString, TeletexString, IA5String, UniversalString, BMPString.
     private static readonly int[] StringTagValues = [12, 19, 20, 22, UniversalStringTagValue, 30];
