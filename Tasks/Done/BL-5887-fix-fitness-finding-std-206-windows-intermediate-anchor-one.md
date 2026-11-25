@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs, Curl.Networking.UnitTests/IntermediateOnlyProxyCacertTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-25
 ---
 # BL-5887 — Fix fitness finding STD-206: Windows, intermediate anchor: one distribution point with two URIs, the first a clean CRL and the second a revoking one, is refused as revoked
 
@@ -38,13 +38,28 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- No longer reproduced on this branch: BL-5807 (STD-163, commit 5fd8d5a117), which landed after the reviewed commit
+  1e5d591, made `ListRevocationOf` stop at the first usable CRL across every address of every point, so the
+  behaviour needed no further change. No new ADR for the same reason.
+- Verified end to end with a C# file-based app in a temporary directory (root -> intermediate used as `--cacert` ->
+  leaf with one DistributionPoint naming two URIs; CRLs and TLS served on 127.0.0.1; fresh ports, CRL cache entries
+  deleted afterwards). Clean list first: this Curl and Git for Windows curl 8.21.0 Schannel both exit 0 and fetch
+  only the first URI. Control with the revoking list first: both exit 60 `... has been revoked`.
+- BL-5807's tests built two points (`BuildCrlDistributionPointExtension` writes one point per URI), so the one-point
+  shape was unpinned. Added `VerifyPeer_OnePointNamingACleanListThenARevokingList_AcceptsWithoutFetchingTheSecond`
+  and added its file to `touches` (no other task in Doing names it). The only production change is the comment on
+  `ListRevocationOf`, which now says it covers URIs of one point too.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line and branch, 0 failing members.
+- The test stubs the fetch and chain status, so it is platform-neutral.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 079e799e 69116afe 3d836d5e.
+- 2026-11-25: Doing -> Done. Already fixed by BL-5807; one-point two-URI case verified against real curl and pinned by a unit test
