@@ -56,7 +56,7 @@ public sealed class Cgr107NumConnectsTests
     {
         TransferResult result = await ExecuteOpeningAsync(0, TransferResult.Success(3));
 
-        Assert.IsNull(result.Report);
+        Assert.AreEqual(0, result.Report!.ConnectionCount);
     }
 
     [TestMethod]
@@ -91,7 +91,7 @@ public sealed class Cgr107NumConnectsTests
 
         TransferResult result = await handler.ExecuteAsync(ContextOf("dict://127.0.0.1/"));
 
-        Assert.IsNull(result.Report);
+        Assert.AreEqual(0, result.Report!.ConnectionCount);
     }
 
     [TestMethod]

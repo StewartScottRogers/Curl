@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs, Curl.Cli.UnitTests]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2Row.cs, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-23
 completed:
@@ -57,6 +57,8 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 
 - 2026-11-02 (lane 13): Re-claimed after the 11-02 bulk return. Measured again: the Schannel curl 8.22.0 here still answers `--http2` with exit 2 "the installed libcurl version does not support this", so criteria 1-4 still mean refusing the HTTP/2 options on Windows, reversing ADR-0871 (reconfirmed by Stewart in ADR-0929 on 10-26). Undoing Stewart's own decision is outside the delegation, so no code changed. BL-3569 was Blocked today on the same question. Remove the block once Stewart reverses ADR-0871 (then implement the refusal in CommandLineOptionTable.HttpVersionRows.cs) or rules that GF-0099 closes on the platform exclusion (then defer or close as won't-change).
 
+- 2026-11-24 (lane 3): Claimed after Stewart's 2026-11-24 bulk undeferral ("to give the idle lanes work"), which does not reverse ADR-0871. ADR-0871 and ADR-0929 are still Accepted, and Stewart ruled on 10-23, 11-02 and 11-22 to keep HTTP/2 on for Windows; criteria 1-4 (exit 2, as the Schannel reference gives) would undo that, and the delegation does not cover reversing it. No code changed and nothing re-measured. Deferred again, as BL-3569 was today (13a181e196). GF-0099 is already closed on the ADR-0871 platform exclusion. Revisit only if Stewart reverses ADR-0871; the fix is then refusing the three rows in CommandLineOptionTable.HttpVersionRows.cs, with tests and `--ai-help`.
+
 ## Log
 
 - 2026-10-23: Created.
@@ -67,3 +69,9 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 4f192eea 3314e1db ca72db98 7fbbecd2 1fd5de8c 28346828.
 - 2026-11-02: Doing -> Blocked. Stewart: GF-0099 needs --http2/--http2-prior-knowledge/--proxy-http2 refused on Windows (exit 2), reversing ADR-0871 you upheld 10-26 (ADR-0929); reverse ADR-0871, or close GF-0099 on the platform exclusion?
 - 2026-11-02: Blocked -> Deferred. Stewart 2026-11-02 ('keep 0871'): ADR-0871 stays - --http2, --http2-prior-knowledge and --proxy-http2 keep running HTTP/2 on Windows; the exit-2 criterion would undo it. Closed as an accepted platform difference, listed in the handoff's known differences. GF-0098 and GF-0099 are already closed on the ADR-0871 exclusion.
+- 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs
+- 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/2 stays on for Windows (ADR-0871, ADR-0929); doing this would make --http2 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.
+- 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 4f192eea 3314e1db ca72db98 7fbbecd2 1fd5de8c 28346828.
+- 2026-11-24: Doing -> Deferred. ADR-0871 and ADR-0929 (Stewart's 'keep HTTP/2 on') are still Accepted; the exit-2 criteria would undo them. Revisit only if Stewart reverses ADR-0871.

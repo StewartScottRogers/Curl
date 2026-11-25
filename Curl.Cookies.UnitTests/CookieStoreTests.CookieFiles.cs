@@ -238,7 +238,7 @@ public sealed partial class CookieStoreTests
 
         public ValueTask<FileOpenResult> OpenForWriteAsync(string path, FileWriteMode mode, UnixFileMode createMode, CancellationToken cancellationToken)
         {
-            Assert.AreEqual(FileWriteMode.Truncate, mode);
+            Assert.AreEqual(FileWriteMode.Replace, mode);
             OpenedPath = path;
             CreateMode = createMode;
             return ValueTask.FromResult(

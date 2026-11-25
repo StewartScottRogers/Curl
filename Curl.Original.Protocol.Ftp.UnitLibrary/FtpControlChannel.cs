@@ -43,6 +43,14 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     /// <summary>Where reply lines are written: <c>dumpHeaderOutput</c> until <see cref="StopReporting" />, nowhere after.</summary>
     private Stream? dumping = dumpHeaderOutput;
 
+    private bool recordsColonLines = true;
+
+    /// <summary>
+    /// The reply lines read before <see cref="StopReporting" /> that contain a colon, split at
+    /// the first one: curl counts each as a header in <c>%{num_headers}</c> (BL-5470).
+    /// </summary>
+    public List<KeyValuePair<string, string>> ColonReplyLines { get; } = [];
+
     /// <summary>
     /// Reports and writes nothing more: curl sends <c>QUIT</c> as it closes the connection,
     /// where neither <c>-v</c>, its <c>[TCP]</c> trace lines, nor the <c>-D</c> file sees it or its reply.
@@ -52,6 +60,7 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
         reporting = NoTransferEvents.Instance;
         connectEvents.StopInfoLines();
         dumping = null;
+        recordsColonLines = false;
     }
 
     private const int ReadBufferSize = 4096;
@@ -175,12 +184,64 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
             firstLine ??= line;
             if (TryParseLastLine(line, out int code))
             {
-                diagnostics.ReplyRead(code, firstLine);
+                if (heldLines is null)
+                {
+                    diagnostics.ReplyRead(code, firstLine);
+                }
+                else
+                {
+                    heldFirstLine = firstLine;
+                }
+
                 return new FtpReply(code, line) { ByteCount = replyByteCount };
             }
         }
 
         return null;
+    }
+
+    /// <summary>The lines of the reply <see cref="ReadReplyHeldAsync" /> is reading, shown by none until released.</summary>
+    private List<byte[]>? heldLines;
+
+    private string? heldFirstLine;
+
+    /// <summary>
+    /// Reads the next complete reply without showing it on <c>-v</c>, <c>--trace</c> or in the
+    /// <c>-D</c> file: <see cref="ReleaseHeldReplyAsync" /> shows it, and a reply it never
+    /// releases is never shown, as curl never reads a reply it has already decided to ignore.
+    /// </summary>
+    /// <returns>The reply, or <see langword="null" /> as <see cref="ReadReplyAsync" /> returns.</returns>
+    public async ValueTask<FtpReply?> ReadReplyHeldAsync()
+    {
+        heldLines = [];
+        heldFirstLine = null;
+        return await ReadReplyAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Forgets what <see cref="ReadReplyHeldAsync" /> read, showing none of it, and reads normally again.</summary>
+    public void DiscardHeldReply() => heldLines = null;
+
+    /// <summary>
+    /// Shows the reply <see cref="ReadReplyHeldAsync" /> read as <see cref="ReadReplyAsync" /> would have.
+    /// </summary>
+    /// <param name="reply">The reply <see cref="ReadReplyHeldAsync" /> returned.</param>
+    public async ValueTask ReleaseHeldReplyAsync(FtpReply reply)
+    {
+        List<byte[]> lines = heldLines!;
+        heldLines = null;
+        foreach (byte[] line in lines)
+        {
+            await ReportLineAsync(line).ConfigureAwait(false);
+        }
+
+        diagnostics.ReplyRead(reply.Code, heldFirstLine!);
+    }
+
+    private async ValueTask ReportLineAsync(byte[] bytes)
+    {
+        reporting.ReportResponseHeader(bytes);
+        RecordColonLine(bytes);
+        await WriteToDumpHeaderOutputAsync(bytes).ConfigureAwait(false);
     }
 
     private static bool TryParseLastLine(string line, out int code)
@@ -202,6 +263,10 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
             }
 
             byte next = buffer[bufferStart++];
+
+            // A byte is here, so a read WaitForBytesAsync started has delivered: kept, it would
+            // answer the next fill without reading and a stale buffer byte would be taken.
+            pendingFill = null;
             if (next == (byte)'\n')
             {
                 line.Add(next);
@@ -212,8 +277,15 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
                 }
 
                 replyByteCount += bytes.Length;
-                reporting.ReportResponseHeader(bytes);
-                await WriteToDumpHeaderOutputAsync(bytes).ConfigureAwait(false);
+                if (heldLines is null)
+                {
+                    await ReportLineAsync(bytes).ConfigureAwait(false);
+                }
+                else
+                {
+                    heldLines.Add(bytes);
+                }
+
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1).TrimEnd('\r');
             }
 
@@ -221,6 +293,16 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
         }
 
         return null;
+    }
+
+    private void RecordColonLine(byte[] line)
+    {
+        int colon = Array.IndexOf(line, (byte)':');
+        if (recordsColonLines && colon >= 0)
+        {
+            string text = Encoding.Latin1.GetString(line);
+            ColonReplyLines.Add(new(text[..colon], text[(colon + 1)..].Trim()));
+        }
     }
 
     private async ValueTask WriteToDumpHeaderOutputAsync(byte[] line)

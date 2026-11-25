@@ -151,6 +151,7 @@ public sealed class DohResponseReaderTests
     [DataRow("closed after a chunk's data", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3\r\nABC")]
     [DataRow("chunk cut short", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n9\r\nABC")]
     [DataRow("chunks over curl's buffer", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nBB9\r\nABC")]
+    [DataRow("an oversize chunk whose data reads as a last chunk", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nBB9\r\n0\r\n\r\n")]
     [DataRow("closed in the trailer", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nA\r\n0\r\nX-Trailer: 1\r\n")]
     public async Task ReadBodyAsync_WithAResponseCurlFailsToReceive_ReturnsNull(string reason, string response)
     {

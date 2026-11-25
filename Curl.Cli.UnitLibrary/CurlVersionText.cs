@@ -22,21 +22,21 @@ public static class CurlVersionText
     /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>rtsp</c>, <c>scp</c>/<c>sftp</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c> —
     /// and <c>ipfs</c>/<c>ipns</c>, which the tool serves by rewriting to a gateway as curl does and which
     /// every curl 8.21.0 build lists (ADR-0021 amendment, BL-1417). The same line on every platform.
-    /// No <c>smb</c> or <c>smbs</c>: neither the Schannel reference build nor the OpenSSL reference build of
-    /// curl 8.22.0 lists them, and <c>smb://</c> and <c>smbs://</c> URLs are refused as disabled (ADR-0453, ADR-0523, ADR-0835).
+    /// <c>smb</c> and <c>smbs</c> are served by <c>Curl.Original.Protocol.Smb.UnitLibrary</c>, as the OpenSSL reference build lists them,
+    /// on every platform (ADR-1281, superseding ADR-0835).
     /// </summary>
-    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss";
+    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss";
 
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case): the line for Linux and macOS, the OpenSSL reference build. <see cref="WindowsFeaturesLine"/>
-    /// is the Windows line, which drops <c>GSS-API</c>, <c>HTTP2</c> and <c>SSLS-EXPORT</c>
+    /// is the Windows line, which drops <c>GSS-API</c> and <c>SSLS-EXPORT</c>
     /// and adds <c>SSPI</c>. ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
-    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> off Windows
-    /// now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c> off Windows, and
+    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c>
+    /// now that curl offers h2 by ALPN by default (ADR-1274), and <c>GSS-API</c> off Windows, and
     /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform, now that <c>--negotiate</c> is answered
     /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181).
-    /// No <c>HTTP3</c>: the OpenSSL reference build has no QUIC library, so it lists no <c>HTTP3</c> and refuses <c>--http3</c> and <c>--http3-only</c>, as Curl does unless the parse reads as a QUIC build (ADR-0144, ADR-0451, ADR-0521, ADR-0540, BL-2330, BL-2332).
+    /// <c>HTTP3</c> on every platform, as curl 8.21.0 built with ngtcp2 and nghttp3 lists it, because Curl speaks HTTP/3 over its hand-built QUIC and accepts <c>--http3</c> and <c>--http3-only</c> (ADR-1282, superseding ADR-0540, ADR-0521 and ADR-0451, BL-5289).
     /// No <c>TLS-SRP</c>: curl 8.22.0 dropped TLS-SRP, so its <c>lib/version.c</c> lists it no more (ADR-0480, BL-2152).
     /// BL-1417's audit added <c>alt-svc</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>IDN</c>,
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment). No <c>HTTPSRR</c>: neither reference build lists it, though Curl's HTTPS records still work when asked for (ADR-0856, ADR-0957).
@@ -47,7 +47,7 @@ public static class CurlVersionText
     /// <c>--ssl-sessions</c> loads and saves TLS session tickets there (ADR-0319, ADR-0519, BL-2331); the
     /// Schannel build refuses <c>--ssl-sessions</c> (ADR-0397), so <see cref="WindowsFeaturesLine"/> leaves it out.
     /// </summary>
-    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
 
     /// <summary>
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
@@ -55,12 +55,9 @@ public static class CurlVersionText
     /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796), and without <c>ECH</c>, which
     /// the Schannel reference build does not list, refusing <c>--ech</c> as it does (ADR-0448, ADR-0918), and
     /// without <c>GSS-API</c>, which the Schannel reference build does not list because Negotiate and
-    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), without <c>HTTP2</c>, which the
-    /// Schannel reference build does not list, though Curl's own HTTP/2 still works there (ADR-0808, BL-3359), and without
-    /// <c>HTTP3</c>, which the Schannel reference build does not list, though <c>--http3</c> still works
-    /// (ADR-0451, BL-1825).
+    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), with <c>HTTP2</c>, as the port speaks HTTP/2 by ALPN by default (ADR-1274), and with <c>HTTP3</c> (ADR-1282).
     /// </summary>
-    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
+    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTP2 HTTP3 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>

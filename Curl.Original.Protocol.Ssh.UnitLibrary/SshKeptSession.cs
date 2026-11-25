@@ -12,7 +12,7 @@ namespace Curl.Original.Protocol.Ssh;
 /// cache, as curl 8.22.0 leaves an <c>scp</c> or <c>sftp</c> connection intact and reuses it
 /// for the next URL of the same login (CGR-130, ADR-0865): the transport, its SFTP session
 /// and home directory, and the login it serves. Shut down when the cache closes the
-/// connection, it closes the SFTP channel and sends <c>DISCONNECT</c> 11 <c>Shutdown</c>.
+/// connection, it sends <c>DISCONNECT</c> 11 <c>Shutdown</c> with the SFTP channel still open and sends no channel close, as libssh2 does (BL-5280).
 /// </summary>
 /// <param name="transport">The authenticated transport.</param>
 /// <param name="connection">The connection the transport reads and writes.</param>
@@ -70,7 +70,6 @@ internal sealed class SshKeptSession(SshTransport transport, SshSessionConnectio
         }
 
         isShutDown = true;
-        await sftp.CloseIgnoringFailureAsync(cancellationToken).ConfigureAwait(false);
         await SshProtocolHandler.DisconnectIgnoringFailureAsync(transport, cancellationToken).ConfigureAwait(false);
     }
 }

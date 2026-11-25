@@ -9,7 +9,7 @@ public static class KafkaExtension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "kafka",
-        "Produces and consumes Kafka records: kafka://host/topic[/partition] with -d produces one record whose value is the data, otherwise it consumes the partition from ?offset=N (default 0) to its end and writes each record value and a newline; kafkas:// adds TLS.",
+        "Produces and consumes Kafka records: kafka://host/topic[/partition] with -d produces one record whose value is the data, otherwise it consumes the partition from ?offset=N (default 0) to its end and writes each record value and a newline; kafkas:// adds TLS. With -u it logs in with SASL PLAIN, or with SCRAM-SHA-512 or SCRAM-SHA-256 when the broker does not enable PLAIN but offers one (the strongest offered), and a refused login ends with exit 67.",
         ["kafka", "kafkas"],
         [],
         new Uri("https://kafka.apache.org/protocol"));

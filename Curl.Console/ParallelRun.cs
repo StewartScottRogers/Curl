@@ -143,6 +143,12 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     internal async Task<bool> StartHeldAsync()
     {
         setupsLeftInFirstBatch = 0;
+        if (fatalSetupFailure is { } fatal)
+        {
+            await AbandonFirstBatchOnFatalFailureAsync(fatal).ConfigureAwait(false);
+            return true;
+        }
+
         (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held = [.. heldTransfers];
         heldTransfers.Clear();
         bool hasEnded = false;
@@ -161,17 +167,114 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// </summary>
     /// <param name="failure">The setup failure.</param>
     /// <returns>A task that completes when the held transfers are reported.</returns>
-    internal async Task AbandonFirstBatchAsync(TransferResult failure)
+    /// <param name="reportsOnlyFirst">Whether only the first held transfer is reported, as curl 8.22.0 does for a
+    /// <c>-F</c> file that cannot be opened (STD-123, BL-5812).</param>
+    /// <param name="startsOthersWhenExtraFails">Whether, when the failing transfer is the batch's extra one (past
+    /// <c>--parallel-max</c>), the others start and only it is reported, as curl 8.22.0 has started them by then
+    /// (STD-169, BL-5817).</param>
+    internal async Task AbandonFirstBatchAsync(
+        TransferResult failure,
+        bool reportsOnlyFirst = false,
+        bool startsOthersWhenExtraFails = false)
     {
         setupsLeftInFirstBatch = 0;
+        if (startsOthersWhenExtraFails && heldTransfers.Count - 1 >= maxRunning)
+        {
+            int failingIndex = heldTransfers.Count - 1;
+            (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held = [.. heldTransfers];
+            heldTransfers.Clear();
+            await StartHeldWithinMaxExceptAsync(held, failingIndex).ConfigureAwait(false);
+            RecordSetupFailure(failure, endsTheRun: true);
+            await held[failingIndex].Abandon(failure).ConfigureAwait(false);
+            return;
+        }
+
         RecordSetupFailure(failure, endsTheRun: true);
         foreach ((_, Func<TransferResult, Task> abandon) in heldTransfers)
         {
             await abandon(failure).ConfigureAwait(false);
+            if (reportsOnlyFirst)
+            {
+                break;
+            }
         }
 
         heldTransfers.Clear();
     }
+
+    /// <summary>
+    /// Records a fatal setup failure (exit 43 or 48) of the first batch's last-held transfer, the first one only;
+    /// the run is ended later by <see cref="AbandonFirstBatchOnFatalFailureAsync" />.
+    /// </summary>
+    /// <param name="failure">The fatal setup failure of the last transfer held.</param>
+    internal void NoteFatalSetupFailureOfLastHeld(TransferResult failure)
+    {
+        if (fatalSetupFailure is null)
+        {
+            fatalSetupFailure = failure;
+            fatalSetupFailureIndex = heldTransfers.Count - 1;
+        }
+    }
+
+    /// <summary>
+    /// Ends the run at a fatal setup failure (exit 43 or 48) of the first batch's last-held transfer, as curl 8.22.0
+    /// finds it while setting the transfers up: nothing starts, the failing transfer is reported first with its own
+    /// message and every other held one as aborted by a critical error in another transfer (STD-074, BL-5469).
+    /// </summary>
+    /// <param name="failure">The fatal setup failure of the last transfer held.</param>
+    /// <returns>A task that completes when the held transfers are reported.</returns>
+
+    private async Task AbandonFirstBatchOnFatalFailureAsync(TransferResult failure)
+    {
+        // The batch holds --parallel-max transfers and one more. When the failing one is that extra one, the
+        // others have started by then and run on; otherwise nothing starts and those within --parallel-max are
+        // aborted. The extra one, failing or not, is reported with the failure (STD-183, BL-5851).
+        (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held = [.. heldTransfers];
+        heldTransfers.Clear();
+        bool startsTheOthers = fatalSetupFailureIndex >= maxRunning;
+        if (startsTheOthers)
+        {
+            await StartHeldWithinMaxExceptAsync(held, fatalSetupFailureIndex).ConfigureAwait(false);
+        }
+
+        RecordSetupFailure(failure, endsTheRun: true);
+        FirstFailure ??= failure;
+        for (int index = 0; index < held.Length; index++)
+        {
+            TransferResult? reported = ResultReportedFor(index, failure, startsTheOthers);
+            if (reported is not null)
+            {
+                await held[index].Abandon(reported).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task StartHeldWithinMaxExceptAsync(
+        (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held,
+        int exceptIndex)
+    {
+        for (int index = 0; index < held.Length && index < maxRunning; index++)
+        {
+            if (index != exceptIndex)
+            {
+                await held[index].Start().ConfigureAwait(false);
+            }
+        }
+    }
+
+    private TransferResult? ResultReportedFor(int index, TransferResult failure, bool startsTheOthers)
+    {
+        if (index >= maxRunning || index == fatalSetupFailureIndex)
+        {
+            return failure;
+        }
+
+        return startsTheOthers ? null : AbortedResult;
+    }
+
+    private TransferResult? fatalSetupFailure;
+
+    private int fatalSetupFailureIndex;
 
     /// <summary>
     /// Records a failure to set a transfer up, whose code becomes the run's (<see cref="SetupFailure" />).

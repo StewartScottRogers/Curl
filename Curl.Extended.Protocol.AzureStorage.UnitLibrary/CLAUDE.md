@@ -7,12 +7,14 @@ or another extension. It is registered in `ExtensionCatalogue.cs` and `Extension
 
 - `Client/` is the handler (ADR-1105). `AzureStorageExtension` gives the description and creates
   `AzureStorageProtocolHandler`, which maps the URL, chooses the credential and hands `az` to
-  `AzureBlobOperations` (Get Blob, Put Blob, Put Block and Put Block List from 8 MiB, List Blobs) and
+  `AzureBlobOperations` (Get Blob, Put Blob, Put Block and Put Block List from 8 MiB, Delete Blob with `-X DELETE`, List Blobs) and
   `abfs`/`abfss` to `AzureDataLakeOperations` (Path Read, Path Create, Path Update append and flush,
   Path List). `AzureStorageClient` sends one request per connection over HTTPS on 443 and turns a status
   of 300 or above into exit 22 naming the `Error` code (the XML `Error` body, else the DFS JSON
   `error` body); every other failure is an
-  `AzureStorageTransferException` carrying its exit code.
+  `AzureStorageTransferException` carrying its exit code. Before any connection the handler refuses with
+  exit 4 what it cannot send: `-I` and an unsendable `-X` (`AzureStorageRequestMethod`, ADR-1249), and
+  `-r` and `-C` (`AzureStorageByteRangeRefusal`, ADR-1348).
 
 - `Http/AzureStorageHttpClientConnection` sends one HTTP/1.1 request at a time over an `IConnection`
   (RFC 9112) and returns an `AzureStorageHttpResponse` whose body is a stream framed by
@@ -30,8 +32,8 @@ or another extension. It is registered in `ExtensionCatalogue.cs` and `Extension
 - `Requests/AzureStorageUrlMapping` maps `az://account/container/blob` to the Blob endpoint and
   `abfs[s]://filesystem@account.dfs.core.windows.net/path` to the DFS endpoint (a bare account name gets
   `.blob.core.windows.net` or `.dfs.core.windows.net`). `AzureStorageCredential.Choose` takes
-  `--oauth2-bearer`, then `AZURE_STORAGE_BEARER_TOKEN`, then `AZURE_STORAGE_SAS_TOKEN`, else anonymous.
-  `AzureStorageRequestAuthorizer` appends a SAS token to the query or sends `Authorization: Bearer`, and
+  `--oauth2-bearer`, then `-u account:key` (a Shared Key), then `AZURE_STORAGE_BEARER_TOKEN`, then `AZURE_STORAGE_SAS_TOKEN`, else anonymous.
+  `AzureStorageRequestAuthorizer` appends a SAS token to the query, sends `Authorization: Bearer`, or signs with Shared Key (`AzureStorageSharedKeyStringToSign`, `AzureStorageSharedKeySigner`; BL-5569), and
   always sends `Host`, `x-ms-version` (`2025-01-05`) and `x-ms-date` from its `TimeProvider`. Every failure
-  is an `AzureStorageRequestException` naming an `AzureStorageRequestFailure`. Shared Key signing is not
-  done (BL-4290's Notes).
+  is an `AzureStorageRequestException` naming an `AzureStorageRequestFailure`. A bad account key is
+  `InvalidSharedKey`, exit 67.

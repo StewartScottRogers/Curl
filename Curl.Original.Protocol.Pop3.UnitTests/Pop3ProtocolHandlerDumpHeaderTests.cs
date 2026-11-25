@@ -103,8 +103,7 @@ public sealed class Pop3ProtocolHandlerDumpHeaderTests
             Credentials = new NetworkCredential("u", "p"),
         };
 
-        TransferResult result = await ExecuteAsync(context, Opening, RetrStatus + StuffedMessage, Bye);
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(context, Opening, RetrStatus + StuffedMessage, Bye));
         Assert.AreEqual(Message, Encoding.Latin1.GetString(output.ToArray()));
         Diagnostics.AssertValues("result", TransferResult.Success(Message.Length), result);
         Assert.AreEqual(TransferResult.Success(Message.Length), result);
@@ -124,8 +123,7 @@ public sealed class Pop3ProtocolHandlerDumpHeaderTests
 
         Diagnostics.Arrange("credentials", credential is null ? "(none)" : credential.UserName);
 
-        TransferResult result = await ExecuteAsync(context, reads);
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(context, reads));
         var run = new DumpRun(result, Encoding.Latin1.GetString(output.ToArray()), Encoding.Latin1.GetString(dumped.ToArray()));
         Diagnostics.Act("output", Pop3Diagnostics.Show(run.Output));
         Diagnostics.Act("dumped", Pop3Diagnostics.Show(run.Dumped));
@@ -138,7 +136,7 @@ public sealed class Pop3ProtocolHandlerDumpHeaderTests
         var connector = new QueuedConnector(ConnectResult.Connected(connection));
         var sasl = new ScriptedSaslAuthenticator(("PLAIN", ["\0u\0p"]), ("LOGIN", ["u", "p"]));
         Diagnostics.ArrangeRun(context.Url.ToString(), connection.Script, context.SslLevel);
-        TransferResult result = await new Pop3ProtocolHandler(connector, new QueuedTlsProvider(), sasl).ExecuteAsync(context);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, new QueuedTlsProvider(), sasl).ExecuteAsync(context));
         Diagnostics.ActResult(result);
         Diagnostics.Act("sent", Pop3Diagnostics.Show(Encoding.Latin1.GetString(connection.Sent)));
         return result;

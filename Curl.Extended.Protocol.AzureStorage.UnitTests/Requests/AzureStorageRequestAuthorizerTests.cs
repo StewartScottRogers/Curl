@@ -44,6 +44,15 @@ public sealed class AzureStorageRequestAuthorizerTests
     }
 
     [TestMethod]
+    public void Authorize_SasHoldingTilde_IsAccepted()
+    {
+        // '~' is the highest printable ASCII character and an unreserved query character, so it is not refused.
+        var request = Authorizer().Authorize(Blob, Sas("sv=2025-01-05&sig=a~b"));
+
+        Assert.AreEqual("/mycontainer/myblob?sv=2025-01-05&sig=a~b", request.Target);
+    }
+
+    [TestMethod]
     public void Authorize_SasWithExistingQuery_JoinsWithAmpersand()
     {
         var endpoint = Blob with { Query = "comp=metadata" };

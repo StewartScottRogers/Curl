@@ -11,7 +11,8 @@ namespace Curl.Extended.Protocol.SignalR.Client;
 /// </summary>
 /// <param name="connector">Opens each connection, with TLS for <c>https</c> and <c>wss</c>.</param>
 /// <param name="randomSource">The source of the <c>Sec-WebSocket-Key</c> and each frame's mask.</param>
-public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRandomSource randomSource) : IProtocolHandler
+/// <param name="timeProvider">The clock of the keep-alive Ping; the system clock when <see langword="null"/>.</param>
+public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRandomSource randomSource, TimeProvider? timeProvider = null) : IProtocolHandler
 {
     private const string SecureScheme = "signalrs";
 
@@ -91,13 +92,13 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
             // Past connect: curl sends the negotiate POST as the transfer's request, so -m during it is "Operation timed out".
             context.Progress.ReportTransferStarted();
             return negotiation;
-        }, requestFields);
+        }, requestFields, context.Http?.SendsCredentialsToOtherOrigins ?? false);
         NegotiatedWebSocketEndpoint endpoint = await negotiator.NegotiateAsync(EndpointUrlOf(context.Url), context.CancellationToken);
         await using IConnection connection = await OpenAsync(endpoint.WebSocketUrl, context, context.CancellationToken);
         SignalRWebSocketSession session = await SignalRWebSocketUpgrade.UpgradeAsync(
-            connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken, requestFields);
+            connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken, endpoint.RequestFields);
         context.Progress.ReportTransferStarted();
-        return await new SignalRHubSession(session, callRecord, context.Output, context.Progress).RunAsync(context.CancellationToken);
+        return await new SignalRHubSession(session, callRecord, context.Output, context.Progress, timeProvider ?? TimeProvider.System).RunAsync(context.CancellationToken);
     }
 
     private async ValueTask<IConnection> OpenAsync(Uri url, ITransferContext context, CancellationToken cancellationToken)

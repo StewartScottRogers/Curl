@@ -215,6 +215,26 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    public async Task Remove_OneOfTwoFinishedTransfers_KeepsTheOtherUnreadMessageOnly()
+    {
+        await using ManagedCurlEngine engine = new();
+        await using IMultiTransfer multi = engine.CreateMulti();
+        ControlledEasyTransfer removed = new(), kept = new();
+        multi.Add(removed);
+        multi.Add(kept);
+        await multi.PerformAsync(CancellationToken.None);
+        removed.Finish(CurlCode.Ok);
+        kept.Finish(CurlCode.Ok);
+        await multi.PerformAsync(CancellationToken.None);
+
+        multi.Remove(removed);
+
+        Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? message, out int remaining));
+        Assert.AreSame(kept, message!.Transfer);
+        Assert.AreEqual(0, remaining);
+    }
+
+    [TestMethod]
     public async Task Remove_TransferInNoMultiHandle_ReturnsOk()
     {
         await using ManagedCurlEngine engine = new();

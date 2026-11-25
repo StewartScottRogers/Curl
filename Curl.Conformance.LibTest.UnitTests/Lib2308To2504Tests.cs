@@ -41,6 +41,19 @@ public sealed class Lib2308To2504Tests
     }
 
     [TestMethod]
+    public async Task Lib2405_WhenTheMultiInitFails_StopsAtItWithoutRunningAnyTransfer()
+    {
+        CurlLibrary library = await PortRun.CleanedUpLibraryAsync();
+        var run = new PortRun(new FakeCurlEngine(), 2405, "http://x/");
+
+        await Lib2405.TestAsync(run.Context, run.Steps, library, CancellationToken.None);
+
+        Assert.AreEqual(LibTestErrorCodes.Multi, run.Steps.Result);
+        Assert.AreEqual(1, run.Error.ToString().Split("curl_multi_init() failed").Length - 1);
+        Assert.AreEqual(1, run.Error.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
+    }
+
+    [TestMethod]
     public async Task EveryPort_OnACleanedUpLibrary_StopsAtItsInit()
     {
         CurlLibrary library = await PortRun.CleanedUpLibraryAsync();
@@ -210,6 +223,7 @@ public sealed class Lib2308To2504Tests
 
         Assert.AreEqual(0, result.ExitCode, run.Error.ToString());
         Assert.AreEqual(HttpVersion.Http11, engine.Multi.Added!.Options.Http.HttpVersion);
+        Assert.IsEmpty(engine.Multi.OptionsWritten, "HTTP/1 runs must not enable multiplexing.");
     }
 
     [TestMethod]
@@ -227,6 +241,8 @@ public sealed class Lib2308To2504Tests
 
         Assert.AreEqual(0, result.ExitCode, run.Error.ToString());
         Assert.IsTrue(engine.Multi.Added!.Options.Http.PipeWait);
+        Assert.HasCount(1, engine.Multi.OptionsWritten, "only the multiplexed run sets the multi option.");
+        Assert.AreEqual(Lib2405.PipeMultiplex, (long)engine.Multi.Options.Pipelining);
     }
 
     [TestMethod]
@@ -523,6 +539,20 @@ public sealed class Lib2308To2504Tests
 
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual("There are no file descriptors to wait for\n", run.Error.ToString());
+    }
+
+    [TestMethod]
+    public async Task Lib2412_TraceCallback_StartsEachLineWithTheTime()
+    {
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 2412, "http://x/2412");
+        var time = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        _ = await new Lib2412(time).RunAsync(run.Context, CancellationToken.None);
+
+        int answer = engine.Multi.Added!.Options.Callbacks.Debug!(CurlInfoType.Text, "hi\n"u8);
+
+        Assert.AreEqual(0, answer);
+        StringAssert.EndsWith(run.Error.ToString(), "00:00:00.000000 == Info: hi\n");
     }
 
     [TestMethod]

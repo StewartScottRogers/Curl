@@ -7,13 +7,16 @@
     nothing but this package.
   -->
   <PropertyGroup>
-    <PackageId>Libcurl</PackageId>
+    <PackageId>Surly.Libcurl</PackageId>
     <Version>0.2.0</Version>
     <Authors>Stewart Scott Rogers</Authors>
-    <Description>Curl's libcurl-shaped interface in C#: easy, multi, share and URL handles over the managed curl engine. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.</Description>
-    <PackageTags>curl; libcurl; http; easy; multi</PackageTags>
+    <Description>A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, behaves like curl 8.22.0. Curl's libcurl-shaped interface in C#: easy, multi, share and URL handles over the managed curl engine. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.</Description>
+    <PackageTags>curl; libcurl; http; easy; multi; managed; reimplementation; no-native; aot</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <Title>Surly Libcurl (managed libcurl API)</Title>
+    <PackageLicenseExpression>curl</PackageLicenseExpression>
+    <PackageIcon>SurlyIcon.png</PackageIcon>
+    <Copyright>Copyright (c) 2026, Stewart Scott Rogers, and many contributors.</Copyright>
     <PackageProjectUrl>https://github.com/StewartScottRogers/Curl</PackageProjectUrl>
     <RepositoryUrl>https://github.com/StewartScottRogers/Curl</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -22,7 +25,8 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
-    <None Include="..\LICENSE.txt" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="build\Surly.Libcurl.props" Pack="true" PackagePath="build/" />
+    <None Include="..\SurlyIcon.png" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>
 
   <Target Name="BundleReferencedProjectAssemblies" DependsOnTargets="ResolveReferences">

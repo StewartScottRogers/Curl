@@ -18,8 +18,7 @@ public sealed class Cgr219Tests
             SmtpProtocolHandlerTwoUrlTests.Read("500 no\r\n"), SmtpProtocolHandlerTwoUrlTests.Read("221 Bye\r\n"));
         var handler = new SmtpProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection, null)), new QueuedTlsProvider());
 
-        TransferResult result = await handler.ExecuteAsync(SmtpProtocolHandlerTwoUrlTests.Context());
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(SmtpProtocolHandlerTwoUrlTests.Context()));
         Assert.AreEqual(CurlExitCode.RemoteAccessDenied, result.ExitCode);
         Assert.AreEqual(500, result.Report?.ResponseCode);
     }

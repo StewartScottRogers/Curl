@@ -1,8 +1,8 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Options.Protocols;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -127,6 +127,27 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         }
 
         return usable == CurlCode.Ok ? await DeliverWholeFrameAsync(live!, buffer).ConfigureAwait(false) : new CurlWebSocketReceiveResult(usable, 0, default);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask WaitForDataAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (runs.Count > 0 || streamFailure is not null || UsableConnection(out IConnection? live) != CurlCode.Ok)
+        {
+            return;
+        }
+
+        pendingRead ??= StartRead(live!);
+        try
+        {
+            await pendingRead.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // A failed read ends the wait and a cancellation ends it too; the check below throws for the latter and the next receive answers RecvError for the former.
+        }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     /// <summary>

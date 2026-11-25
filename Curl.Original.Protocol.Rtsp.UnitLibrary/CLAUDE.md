@@ -28,7 +28,7 @@ body output (`RtspStreamInterleaveSink`). A sink that takes too few bytes fails 
 reply's `Transport: ...interleaved=a-b` set up (`RtspSessionState.AcceptTransport`, libcurl's `rtp_channel_mask`) is a
 frame; a `$` on another is a stray byte. Frames after a reply's body go to the sink, and a frame cut off by a read is
 kept as `RtspSessionState.CarriedBytes` for the connection's next request. A `RECEIVE` takes one read and stops unless a
-frame is left incomplete (BL-2787).
+frame is left incomplete (BL-2787). A libcurl `RECEIVE` leaves its connection in the pool and reports the session ID and `CSeq` counters (BL-5291).
 
 libcurl requests (BL-2751, ADR-0691): `RtspProtocolHandler` takes optional `RtspRequestSettings`
 (kind, stream URI, `Transport`, session ID, client `CSeq`, body) and an `RtspSessionState` the

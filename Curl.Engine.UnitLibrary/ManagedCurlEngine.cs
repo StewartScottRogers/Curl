@@ -9,10 +9,10 @@ using Curl.Api.Options.Protocols;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Imap;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -47,6 +47,20 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <param name="extensionHandlers">Builds the extensions' handlers over the transfer's transports; <see langword="null" /> for curl's alone.</param>
     public ManagedCurlEngine(Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers)
         : this(TimeProvider.System, null, extensionHandlers: extensionHandlers)
+    {
+    }
+
+    /// <summary>
+    /// Creates the engine as <see cref="ManagedCurlEngine(Func{ProtocolHandlerServices, IEnumerable{IProtocolHandler}})" /> does, and
+    /// puts each transfer's handlers through the transfer hooks <paramref name="extensionTransferHooksFor" /> gives for the
+    /// transfer's <see cref="EasyOptions.ExtensionOptions" /> (BL-5617, ADR-1319).
+    /// </summary>
+    /// <param name="extensionHandlers">Builds the extensions' handlers over the transfer's transports; <see langword="null" /> for curl's alone.</param>
+    /// <param name="extensionTransferHooksFor">Gives what wraps a handler for the extension option values a transfer sets, or <see langword="null" /> when they activate no hook; <see langword="null" /> for no hooks at all.</param>
+    public ManagedCurlEngine(
+        Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers,
+        Func<IReadOnlyDictionary<string, string>, Func<IProtocolHandler, IProtocolHandler>?>? extensionTransferHooksFor)
+        : this(TimeProvider.System, null, extensionHandlers: extensionHandlers, extensionTransferHooksFor: extensionTransferHooksFor)
     {
     }
 
@@ -109,6 +123,10 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Builds the handlers a host's extensions add after curl's own in the production dispatcher (ADR-0999);
     /// <see langword="null" /> for curl's alone. Ignored when <paramref name="createDispatcher" /> is given.
     /// </param>
+    /// <param name="extensionTransferHooksFor">
+    /// Gives the transfer hooks a transfer's <see cref="EasyOptions.ExtensionOptions" /> activate (BL-5617);
+    /// <see langword="null" /> for none. Ignored when <paramref name="createDispatcher" /> is given.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
@@ -121,12 +139,13 @@ public sealed class ManagedCurlEngine : ICurlEngine
         bool stopsFirstFtpTransferBeforePwd = false,
         Func<string>? createFormBoundary = null,
         Stream? standardError = null,
-        Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null)
+        Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null,
+        Func<IReadOnlyDictionary<string, string>, Func<IProtocolHandler, IProtocolHandler>?>? extensionTransferHooksFor = null)
     {
         shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd), createFormBoundary, readEnvironmentVariable is not null && EngineComposition.LearnsHstsOverHttp(honoursHstsHttpVariable: true, readEnvironmentVariable));
         handleHost = HandleHostOf(standardInput, readEnvironmentVariable, standardError);
         this.createDispatcher = createDispatcher is null
-            ? (options, state, cookies, pushSink, rtspSession, webSocketPerformConnection) => CreateDispatcher(options, state, cookies, pushSink, rtspSession, webSocketPerformConnection, extensionHandlers)
+            ? (options, state, cookies, pushSink, rtspSession, webSocketPerformConnection) => CreateDispatcher(options, state, cookies, pushSink, rtspSession, webSocketPerformConnection, extensionHandlers, extensionTransferHooksFor)
             : (options, state, cookies, _, _, _) => createDispatcher(options, state, cookies);
     }
 
@@ -233,8 +252,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <param name="rtspSession">The handle's RTSP state, whose settings and session the RTSP handler sends (BL-2704), or <see langword="null" /> for the curl tool's <c>OPTIONS *</c>.</param>
     /// <param name="webSocketPerformConnection">The handle's WebSocket perform connection, which <c>curl_ws_send</c> from a write callback writes to (BL-2710), or <see langword="null" /> for none.</param>
     /// <param name="extensionHandlers">Builds the handlers a host's extensions add after curl's own (ADR-0999), or <see langword="null" /> for curl's alone.</param>
+    /// <param name="extensionTransferHooksFor">Gives the transfer hooks the transfer's <see cref="EasyOptions.ExtensionOptions" /> activate, or <see langword="null" /> for none.</param>
     /// <returns>The dispatcher.</returns>
-    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null, HandleRtspSession? rtspSession = null, WsPerformConnection? webSocketPerformConnection = null, Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null)
+    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null, HandleRtspSession? rtspSession = null, WsPerformConnection? webSocketPerformConnection = null, Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null, Func<IReadOnlyDictionary<string, string>, Func<IProtocolHandler, IProtocolHandler>?>? extensionTransferHooksFor = null)
     {
         CurlTransports transports = CreateTransports(options, shared);
         IConnector connector = PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
@@ -260,8 +280,16 @@ public sealed class ManagedCurlEngine : ICurlEngine
             webSocketRandomSource: shared.WebSocketRandomSource,
             ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true,
             socketWait: shared.SocketWait,
-            extensionHandlers: extensionHandlers));
+            extensionHandlers: extensionHandlers,
+            extensionTransferHooks: ExtensionTransferHooksOf(options, extensionTransferHooksFor)));
     }
+
+    /// <summary>The transfer hooks <paramref name="options" />'s extension options activate (BL-5617).</summary>
+    /// <param name="options">The transfer's options.</param>
+    /// <param name="extensionTransferHooksFor">Gives the hooks for a set of extension option values, or <see langword="null" /> for none.</param>
+    /// <returns>What wraps a handler, or <see langword="null" /> when no hook is activated.</returns>
+    private static Func<IProtocolHandler, IProtocolHandler>? ExtensionTransferHooksOf(EasyOptions options, Func<IReadOnlyDictionary<string, string>, Func<IProtocolHandler, IProtocolHandler>?>? extensionTransferHooksFor) =>
+        extensionTransferHooksFor?.Invoke(options.ExtensionOptions);
 
     /// <summary>
     /// Gives whether <c>CURLOPT_WS_OPTIONS</c> holds <c>CURLWS_RAW_MODE</c>, under which a WebSocket transfer that

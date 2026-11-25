@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Quic;
@@ -248,7 +249,7 @@ public sealed class QuicConnection : IMultiplexedConnection, IDatagramCarryingCo
                 await ReceiveOrTimeOutAsync(buffer).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        catch (Exception error) when (stop.IsCancellationRequested && IsAbortedRead(error))
         {
             // CloseAsync stopped the loop.
         }
@@ -291,15 +292,19 @@ public sealed class QuicConnection : IMultiplexedConnection, IDatagramCarryingCo
                 await ReceiveAsync(buffer.AsMemory(0, received.Length)).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException) when (!stop.IsCancellationRequested && timer.IsCancellationRequested)
+        catch (Exception error) when (!stop.IsCancellationRequested && timer.IsCancellationRequested && IsAbortedRead(error))
         {
             await RunDueTimersAsync().ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!stop.IsCancellationRequested)
+        catch (Exception error) when (!stop.IsCancellationRequested && linked.IsCancellationRequested && IsAbortedRead(error))
         {
             // A stream change woke the loop; the next turn sends what it queued.
         }
     }
+
+    // A receive the loop itself cancelled (stop, wake or timer) ends as a cancellation or, on a socket, as an aborted
+    // operation (Windows reports SocketError.OperationAborted when the cancel races the read); neither is a channel failure (BL-5565).
+    private static bool IsAbortedRead(Exception error) => error is OperationCanceledException or SocketException { SocketErrorCode: SocketError.OperationAborted };
 
     // Runs the loss detection timer and the idle timer, whichever is due: probes and
     // keep-alives go out, and an idle timeout fails the connection.

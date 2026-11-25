@@ -35,6 +35,7 @@ internal static class SshOptionsMapping
             HostPublicKeyMd5 = ssh.HostPublicKeyMd5,
             HostPublicKeySha256 = ssh.HostPublicKeySha256,
             Compression = ssh.Compression,
+            AuthenticationMask = (uint)ssh.AuthenticationTypes,
         };
 
     /// <summary>

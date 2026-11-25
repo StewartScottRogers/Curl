@@ -16,15 +16,21 @@ public sealed class TransferMcpToolTests
         {"type":"object","properties":{
         "url":{"description":"The absolute URL to transfer, e.g. https://example.com/; file: URLs are refused.","type":"string"},
         "method":{"description":"The request method, sent as given; GET when omitted.","type":"string","default":"GET"},
-        "headers":{"description":"Extra request headers, in the order sent; an empty value sends the header empty.","type":["array","null"],
-          "items":{"type":["object","null"],"properties":{"name":{"type":["string","null"]},"value":{"type":["string","null"]}},"required":["name","value"]},"default":null},
+        "headers":{"description":"Extra request headers, in the order sent. An empty value removes the header, including a default one such as Accept, as curl -H 'Accept:' does; an empty value with sendEmpty true sends the header empty, as curl -H 'Accept;' does.","type":["array","null"],
+          "items":{"type":["object","null"],"properties":{"name":{"type":["string","null"]},"value":{"type":["string","null"]},"sendEmpty":{"type":"boolean","default":false}},"required":["name","value"]},"default":null},
         "body":{"description":"The request body: inline text sent as UTF-8, or base64 when isBase64 is true. Never a file.","type":["object","null"],
           "properties":{"content":{"type":["string","null"]},"isBase64":{"type":"boolean"}},"required":["content","isBase64"],"default":null},
         "followRedirects":{"description":"Whether redirects are followed, as curl -L follows them.","type":"boolean","default":false},
         "timeoutSeconds":{"description":"The longest the whole transfer may take, in seconds; omit or 0 for no limit.","type":["number","null"],"default":null},
         "insecure":{"description":"Whether the server's certificate goes unverified, as curl -k leaves it.","type":"boolean","default":false},
         "proxy":{"description":"The proxy to use, as curl -x takes it; the environment's when omitted.","type":["string","null"],"default":null},
-        "userAgent":{"description":"The User-Agent header; none is sent when omitted.","type":["string","null"],"default":null}},
+        "userAgent":{"description":"The User-Agent header; none is sent when omitted.","type":["string","null"],"default":null},
+        "minTlsVersion":{"description":"The lowest TLS version to accept, as curl --tlsv1.2 sets it: 1.0, 1.1, 1.2 or 1.3; the default when omitted.","type":["string","null"],"enum":["1.0","1.1","1.2","1.3",null],"default":null},
+        "caFile":{"description":"A CA certificate file to verify the server with, as curl --cacert takes it, e.g. for a self-signed server; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.","type":["string","null"],"default":null},
+        "proxyUser":{"description":"The proxy login as user:password, as curl --proxy-user takes it; never logged or traced.","type":["string","null"],"default":null},
+        "proxyCaFile":{"description":"A CA certificate file to verify an HTTPS proxy with, as curl --proxy-cacert takes it; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.","type":["string","null"],"default":null},
+        "resolve":{"description":"Host pins, each host:port:address as curl --resolve takes it.","type":["array","null"],"items":{"type":"string"},"default":null},
+        "maxBodyBytes":{"description":"The most response body bytes returned, 1 to 67108864 (64 MiB); the default is the server's limit, 1048576 (1 MiB) unless CURL_MCP_MAX_RESPONSE_BYTES sets another; a larger value is refused; when that variable is set below 64 MiB, a value above it is cut to it. A longer body is cut with isTruncated true.","type":["integer","null"],"default":null}},
         "required":["url"]}
         """;
 
@@ -53,7 +59,7 @@ public sealed class TransferMcpToolTests
         };
 
         McpToolCallResult result = await CallAsync(transfer, """
-            {"url":"https://example.test/","method":"PUT","headers":[{"name":"X-One","value":"1"},{"name":"X-Empty","value":""}],
+            {"url":"https://example.test/","method":"PUT","headers":[{"name":"X-One","value":"1"},{"name":"X-Empty","value":"","sendEmpty":true},{"name":"Accept","value":""}],
              "body":{"content":"payload","isBase64":false},"followRedirects":true,"timeoutSeconds":3,"insecure":true,
              "proxy":"http://proxy.test:3128","userAgent":"agent/1"}
             """);
@@ -62,7 +68,7 @@ public sealed class TransferMcpToolTests
         Assert.AreEqual("https://example.test/", transfer.Options.Network.Url);
         Assert.AreEqual("PUT", transfer.Options.Transfer.CustomRequest);
         Assert.AreEqual(TimeSpan.FromSeconds(3), transfer.Options.Transfer.Timeout);
-        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty;" }, transfer.Options.Http.HttpHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty;", "Accept:" }, transfer.Options.Http.HttpHeaders.ToArray());
         CollectionAssert.AreEqual(Encoding.UTF8.GetBytes("payload"), transfer.Options.Http.PostFields!.Value.ToArray());
         Assert.AreEqual("agent/1", transfer.Options.Http.UserAgent);
         Assert.AreEqual("http://proxy.test:3128", transfer.Options.Proxy.Proxy);

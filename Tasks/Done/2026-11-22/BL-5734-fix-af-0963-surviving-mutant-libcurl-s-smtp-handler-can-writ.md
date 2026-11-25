@@ -1,0 +1,46 @@
+---
+id: BL-5734
+title: Fix AF-0963: Surviving mutant: libcurl's SMTP handler can write --trace-config smtp state lines by default (tracesSmtp = false -> true)
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Engine.UnitLibrary/EngineComposition.cs]
+requirement: none
+created: 2026-11-22
+completed: 2026-11-22
+---
+# BL-5734 — Fix AF-0963: Surviving mutant: libcurl's SMTP handler can write --trace-config smtp state lines by default (tracesSmtp = false -> true)
+
+## Goal
+
+The defect the audit office reported as AF-0963 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0963 (High, quality auditor), which Stewart accepted. The finding's file is on the audit office's paths, which a dark factory lane may not read or run; everything this task needs is below.
+
+Location: `Curl.Engine.UnitLibrary/EngineComposition.cs:146`
+
+Location: `Curl.Engine.UnitLibrary/EngineComposition.cs:146`
+
+Seeded sample (seed 51850, -MaxMutants 40): the mutant at EngineComposition.cs:146 operator 'false' survived. Original: 'bool tracesSmtp = false,'; mutated: 'bool tracesSmtp = true,'. The value feeds 'new SmtpProtocolHandler(...) { TracesStateMachine = tracesSmtp }' (line 196). ManagedCurlEngine.CreateDispatcher (ManagedCurlEngine.cs:261) and CurlComposition.cs:1015 call CreateProtocolHandlers without tracesSmtp, so they rely on the default. With the mutant, every libcurl SMTP transfer under verbose or a debug callback writes '* [SMTP] state change ...' lines that curl writes only under --trace-config smtp. No Engine test pins the SMTP verbose lines of a transfer made without the trace setting. This changes output bytes.
+
+Reproduction: the audit office's mutation test changed `Curl.Engine.UnitLibrary/EngineComposition.cs line 146` as the evidence above describes (the mutant operator is `false`), and every test still passed. Check it by hand, not with the audit tools: make that one change, run the library's `.UnitTests` project, see a test fail, and revert the change. The audit office reruns its mutation test on the re-audit.
+
+The finding closes only when a later re-audit by the quality auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineComposition.cs line 146`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+The mutant (`tracesSmtp = true` at EngineComposition.cs:146) is killed by the new `EngineCompositionSmtpTraceTests.CreateProtocolHandlers_SmtpTransferWithoutTheTraceArgument_WritesNoSmtpLines`, which builds the handlers without the argument and expects no `[SMTP]` info lines. Applied by hand: that test failed; reverted: all 3140 Engine fast tests pass. No production change, so no quality run. The test lives in Curl.Engine.UnitTests (outside `touches`, a test-only addition).
+
+## Log
+
+- 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 7cb71a48 9742157d.
+- 2026-11-22: Doing -> Done. Mutant killed by new EngineCompositionSmtpTraceTests test

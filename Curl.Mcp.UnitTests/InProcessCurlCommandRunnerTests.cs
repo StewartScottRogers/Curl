@@ -36,4 +36,18 @@ public sealed class InProcessCurlCommandRunnerTests
 
         Assert.ThrowsExactly<InvalidOperationException>(() => new InProcessCurlCommandRunner().RunAsync(["--version"], new MemoryStream(), new MemoryStream(), new MemoryStream(), elsewhere, CancellationToken.None));
     }
+
+    [TestMethod]
+    [DataRow("--no-such-option-bl5761", "http://h/", "-s")]
+    [DataRow("-S", "http://", "-s")]
+    public async Task RunAsync_FailingArguments_GiveAnExitCodeWithoutThrowing(string first, string second, string third)
+    {
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+
+        int exitCode = await new InProcessCurlCommandRunner().RunAsync([first, second, third], new MemoryStream(), standardOutput, standardError, null, CancellationToken.None);
+
+        Assert.AreNotEqual(0, exitCode);
+        Assert.IsGreaterThan(0, standardError.Length);
+    }
 }

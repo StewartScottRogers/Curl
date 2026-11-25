@@ -403,11 +403,11 @@ public sealed class SmbProtocolHandlerTests
         TransferResult result = await RunAsync(connection, UploadContext(new MemoryStream(Upload)));
 
         Diagnostics.AssertResult(CurlExitCode.RemoteFileNotFound, "Remote file not found", result);
-        Diagnostics.Assert("report", "none", result.Report is null ? "none" : "present");
+        Diagnostics.Assert("report upload size", 0L, result.Report?.UploadSize);
         Diagnostics.DiffSentEnding(Concat(SmbRecordedExchange.UploadOpenRequest, SmbRecordedExchange.TreeDisconnectRequest), connection.Sent);
         Assert.AreEqual(CurlExitCode.RemoteFileNotFound, result.ExitCode);
         Assert.AreEqual("Remote file not found", result.ErrorMessage);
-        Assert.IsNull(result.Report);
+        Assert.AreEqual(0L, result.Report!.UploadSize);
         Assert.IsTrue(connection.Sent.AsSpan().EndsWith(
             Concat(SmbRecordedExchange.UploadOpenRequest, SmbRecordedExchange.TreeDisconnectRequest)));
     }

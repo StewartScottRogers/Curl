@@ -113,7 +113,7 @@ internal static class Socks5Handshake
     {
         // Without user name and password allowed, curl forgets the credential (measured).
         var credential = authentication.AllowUserNameAndPassword ? proxy.Credential : null;
-        await SocksProxyTunnel.SendAsync(connection, Greeting(authentication.AllowGssapi, credential is not null), cancellationToken).ConfigureAwait(false);
+        await SocksProxyTunnel.SendAsync(connection, Greeting(authentication.AllowGssapi, credential is not null), CurlProxyCode.SendRequest, "Unable to send initial SOCKS5 request.", cancellationToken).ConfigureAwait(false);
         SocksProxyTunnel.Trace(trace, "adjust pollset in (7)");
 
         return await SocksProxyTunnel.ReadReplyAsync(connection, 2, cancellationToken).ConfigureAwait(false) switch
@@ -162,7 +162,7 @@ internal static class Socks5Handshake
             return failure;
         }
 
-        await SocksProxyTunnel.SendAsync(connection, request, cancellationToken).ConfigureAwait(false);
+        await SocksProxyTunnel.SendAsync(connection, request, CurlProxyCode.SendAuthentication, "Failed to send SOCKS5 sub-negotiation request.", cancellationToken).ConfigureAwait(false);
         return await SocksProxyTunnel.ReadReplyAsync(connection, 2, cancellationToken).ConfigureAwait(false) switch
         {
             null => SocksProxyTunnel.Failed(CurlProxyCode.Closed, SocksProxyTunnel.ProxyClosedMessage),
@@ -213,7 +213,7 @@ internal static class Socks5Handshake
             ? string.Create(CultureInfo.InvariantCulture, $"SOCKS5 connect to {host}:{port} (remotely resolved)")
             : string.Create(CultureInfo.InvariantCulture, $"SOCKS5 connect to {PrintableAddress(address)}:{port} (locally resolved)"));
         byte[] request = [5, 1, 0, .. address, (byte)(port >> 8), (byte)port];
-        await SocksProxyTunnel.SendAsync(connection, request, cancellationToken).ConfigureAwait(false);
+        await SocksProxyTunnel.SendAsync(connection, request, CurlProxyCode.SendConnect, "Failed to send SOCKS5 connect request.", cancellationToken).ConfigureAwait(false);
         SocksProxyTunnel.Trace(trace, "adjust pollset in (15)");
         var result = await ReadConnectReplyAsync(connection, host, cancellationToken).ConfigureAwait(false);
         if (result is null)

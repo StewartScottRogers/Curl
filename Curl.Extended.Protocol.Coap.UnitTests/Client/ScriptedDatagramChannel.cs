@@ -21,6 +21,12 @@ internal sealed class ScriptedDatagramChannel(Func<int, CoapMessage, IEnumerable
     /// <summary>Gets a value indicating whether the channel was disposed.</summary>
     public bool IsDisposed { get; private set; }
 
+    /// <summary>Gets a value indicating whether the channel was connected to its server.</summary>
+    public bool IsConnected { get; private set; }
+
+    /// <inheritdoc />
+    public void ConnectToServer() => IsConnected = true;
+
     /// <inheritdoc />
     public EndPoint ServerEndPoint { get; init; } = new IPEndPoint(IPAddress.Loopback, 5683);
 

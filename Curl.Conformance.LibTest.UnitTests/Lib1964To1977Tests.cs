@@ -1,4 +1,5 @@
 using Curl.Api.Codes;
+using Curl.Api.Info;
 using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
 using Libcurl.Global;
@@ -188,7 +189,7 @@ public sealed class Lib1964To1977Tests
     public async Task Lib1977_WritesEachTransfersEffectiveUrl()
     {
         var handles = new List<object?>();
-        var engine = new FakeCurlEngine { Performing = o => { handles.Add(o.Network.UrlHandle); return CurlCode.Ok; } };
+        var engine = new FakeCurlEngine { Performing = o => { handles.Add(o.Network.UrlHandle); return CurlCode.Ok; }, Info = new TransferInfo { EffectiveUrl = "http://x/1977" } };
         var run = new PortRun(engine, 1977, "http://127.0.0.1:8990/1977");
 
         LibTestResult result = await new Lib1977().RunAsync(run.Context, CancellationToken.None);
@@ -197,7 +198,7 @@ public sealed class Lib1964To1977Tests
         Assert.HasCount(3, handles);
         Assert.AreNotSame(handles[0], handles[1]);
         Assert.AreSame(handles[1], handles[2]);
-        Assert.AreEqual(3, run.OutputText.Split('\n', StringSplitOptions.RemoveEmptyEntries).Count(line => line.StartsWith("effective URL: ", StringComparison.Ordinal)));
+        Assert.AreEqual("effective URL: http://x/1977\neffective URL: http://x/1977\neffective URL: http://x/1977\n", run.OutputText.Replace("\r\n", "\n"));
     }
 
     [TestMethod]

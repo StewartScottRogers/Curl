@@ -238,7 +238,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         DiffSent(run, Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n");
         Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.HasCount(2, sasl.Choices);
-        Assert.IsNull(sasl.Begun.Single().RequiredMechanism);
+        Assert.AreEqual("*", sasl.Begun.Single().RequiredMechanism);
     }
 
     [TestMethod]
@@ -415,6 +415,46 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         Assert.DoesNotContain("LOGOUT", run.Sent);
         AssertResult(run, TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied));
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenAndNoAuthOptionWithoutAnOAuthMechanism_SendsNoPassword()
+    {
+        // curl 8.22.0 prefers only the bearer mechanisms here, so no LOGIN either (BL-5880).
+        var sasl = new FakeSaslAuthenticator("XOAUTH2", Latin1("token"));
+        var mail = new MailRequestOptions { BearerToken = "tok" };
+
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4rev1 AUTH=PLAIN"), sasl, mail: mail);
+
+        Assert.AreEqual(Capability, run.Sent);
+        Assert.IsNull(sasl.Choices.Single().Request.RequiredMechanism);
+        AssertResult(run, TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied));
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("AUTH=PLAIN", DisplayName = "named-mechanism")]
+    [DataRow("AUTH=*", DisplayName = "any-mechanism")]
+    public async Task ExecuteAsync_BearerTokenAndAuthOption_AuthenticatesWithTheMechanismItAllows(string loginOptions)
+    {
+        var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
+        var mail = new MailRequestOptions { BearerToken = "tok", LoginOptions = loginOptions };
+
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4rev1 AUTH=PLAIN"), sasl, mail: mail);
+
+        Assert.StartsWith(Capability + "A002 AUTHENTICATE PLAIN\r\n", run.Sent);
+        Assert.AreEqual("*", sasl.Choices[0].Request.RequiredMechanism);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerTokenAndAuthAnyWithoutSaslMechanisms_SendsLogin()
+    {
+        var sasl = new FakeSaslAuthenticator("XOAUTH2", Latin1("token"));
+        var mail = new MailRequestOptions { BearerToken = "tok", LoginOptions = "AUTH=*" };
+
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4rev1"), sasl, user: "u", password: "p", mail: mail);
+
+        Assert.StartsWith(Capability + "A002 LOGIN u p\r\n", run.Sent);
     }
 
     [TestMethod]

@@ -123,13 +123,16 @@ public sealed class CurlContentTests
     }
 
     [TestMethod]
-    public async Task SendAsync_PutWithAStream_KeepsPutAsACustomMethod()
+    public async Task SendAsync_PutWithAStream_UploadsItWithNoContentTypeOrCustomMethod()
     {
         using ScriptedStream stream = new(Hello);
 
         UploadingEasyTransfer easy = await SendAsync(new(HttpMethod.Put, "http://example/") { Body = CurlContent.FromStream(stream) });
 
-        Assert.AreEqual("PUT", easy.PerformedOptions!.Transfer.CustomRequest);
+        Assert.IsNull(easy.PerformedOptions!.Transfer.CustomRequest);
+        Assert.IsTrue(easy.PerformedOptions.Transfer.Upload);
+        Assert.IsFalse(easy.PerformedOptions.Http.Post);
+        Assert.IsFalse(easy.PerformedOptions.Http.HttpHeaders.Any(h => h.StartsWith("Content-Type", StringComparison.OrdinalIgnoreCase)));
         CollectionAssert.AreEqual(Hello, easy.Uploads.Single());
     }
 
@@ -144,11 +147,13 @@ public sealed class CurlContentTests
     }
 
     [TestMethod]
-    public void ImplicitConversion_NullArray_Throws()
+    public void ImplicitConversion_NullArray_IsNoBody()
     {
-        byte[] bytes = null!;
+        byte[]? bytes = null;
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => { CurlContent content = bytes; });
+        CurlContent? content = bytes;
+
+        Assert.IsNull(content);
     }
 
     [TestMethod]

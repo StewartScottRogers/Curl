@@ -73,7 +73,7 @@ public sealed class PortUnreachableReportingDatagramChannelTests
     {
         Diagnostics.Arrange("socket error", SocketError.MessageSize);
         var failure = new SocketException((int)SocketError.MessageSize);
-        await using var channel = new PortUnreachableReportingDatagramChannel(new FailingChannel(failure), () => "unused");
+        await using var channel = new PortUnreachableReportingDatagramChannel(new FailingChannel(failure), () => "unused", [], _ => throw new InvalidOperationException());
 
         var received = await Assert.ThrowsExactlyAsync<SocketException>(async () => await channel.ReceiveAsync(new byte[1], CancellationToken.None));
         var sent = await Assert.ThrowsExactlyAsync<SocketException>(async () => await channel.SendAsync(new byte[1], Server, CancellationToken.None));
@@ -89,7 +89,7 @@ public sealed class PortUnreachableReportingDatagramChannelTests
     {
         var failure = new DatagramPortUnreachableException(SocketError.ConnectionReset, "inner text");
         Diagnostics.Arrange("inner failure", failure.Message);
-        await using var channel = new PortUnreachableReportingDatagramChannel(new FailingChannel(failure), () => "outer text");
+        await using var channel = new PortUnreachableReportingDatagramChannel(new FailingChannel(failure), () => "outer text", [], _ => throw new InvalidOperationException());
 
         var refused = await Assert.ThrowsExactlyAsync<DatagramPortUnreachableException>(
             async () => await channel.ReceiveAsync(new byte[1], CancellationToken.None));
@@ -104,7 +104,7 @@ public sealed class PortUnreachableReportingDatagramChannelTests
     {
         var inner = new AnsweringChannel();
         Diagnostics.Arrange("inner server", Server);
-        var channel = new PortUnreachableReportingDatagramChannel(inner, () => "unused");
+        var channel = new PortUnreachableReportingDatagramChannel(inner, () => "unused", [], _ => throw new InvalidOperationException());
 
         await channel.SendAsync(new byte[] { 1, 2 }, Server, CancellationToken.None);
         var received = await channel.ReceiveAsync(new byte[16], CancellationToken.None);
@@ -117,6 +117,38 @@ public sealed class PortUnreachableReportingDatagramChannelTests
         Assert.AreEqual(2, received.Length);
         Assert.IsTrue(inner.Sent);
         Assert.IsTrue(inner.Disposed);
+    }
+
+    [TestMethod]
+    public async Task ConnectToServer_ForwardsToTheInnerChannelAndToEveryAlternativeItSwitchesTo()
+    {
+        var first = new ConnectRecordingChannel(new SocketException((int)SocketError.ConnectionRefused));
+        var second = new ConnectRecordingChannel(null);
+        var channel = new PortUnreachableReportingDatagramChannel(first, () => "unused", [new IPEndPoint(IPAddress.Loopback, 2)], _ => second);
+        Diagnostics.Arrange("channel", "connected, first answers a refusal");
+
+        channel.ConnectToServer();
+        await channel.SendAsync(new byte[] { 1 }, Server, CancellationToken.None);
+        await channel.ReceiveAsync(new byte[16], CancellationToken.None);
+
+        Assert.IsTrue(first.Connected);
+        Assert.IsTrue(second.Connected);
+    }
+
+    private sealed class ConnectRecordingChannel(SocketException? receiveFailure) : IDatagramChannel
+    {
+        public bool Connected { get; private set; }
+
+        public EndPoint ServerEndPoint => Server;
+
+        public void ConnectToServer() => Connected = true;
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            receiveFailure is null ? ValueTask.FromResult(new DatagramReceived(1, Server)) : throw receiveFailure;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class AnsweringChannel : IDatagramChannel

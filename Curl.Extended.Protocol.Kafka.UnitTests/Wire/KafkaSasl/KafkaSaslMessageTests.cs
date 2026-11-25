@@ -48,7 +48,7 @@ public sealed class KafkaSaslMessageTests
     {
         KafkaSaslAuthenticateResponse response = KafkaSaslResponses.ReadAuthenticate(KafkaTestBytes.BodyOf(KafkaSaslTestBytes.AuthenticateResponse(2, 58, "Invalid username or password")));
 
-        Assert.AreEqual(new KafkaSaslAuthenticateResponse(58, "Invalid username or password"), response);
+        Assert.AreEqual((58, "Invalid username or password", 0), (response.ErrorCode, response.ErrorMessage, response.AuthBytes.Length));
     }
 
     [TestMethod]

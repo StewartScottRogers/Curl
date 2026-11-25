@@ -79,6 +79,8 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
     [DataRow("a@b\r\nDATA", DisplayName = "CR LF, upstream test2110")]
     [DataRow("a@b\nDATA", DisplayName = "LF alone")]
     [DataRow("a@b\rDATA", DisplayName = "CR alone")]
+    [DataRow("\nDATA", DisplayName = "LF at index 0")]
+    [DataRow("\r\nDATA", DisplayName = "CR LF at index 0")]
     public async Task ExecuteAsync_MailFromWithLineBreak_QuitsWithExit43BeforeMailFrom(string from)
     {
         // curl 8.22.0 (test2110): EHLO, then QUIT, and the injected command never sent.

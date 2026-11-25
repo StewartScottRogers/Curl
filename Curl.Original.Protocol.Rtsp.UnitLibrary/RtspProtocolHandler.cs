@@ -156,12 +156,14 @@ public sealed class RtspProtocolHandler(
             PoolScheme = Schemes[0],
             DiagnosticLog = context.DiagnosticLog,
         };
+        long started = context.TimeProvider.GetTimestamp();
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
+        long connectEnded = context.TimeProvider.GetTimestamp();
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
@@ -169,8 +171,8 @@ public sealed class RtspProtocolHandler(
             session.StartTransfer(requestSettings, connect.IsReused);
             plan = await plan.WithUploadAsync(context.Upload, context.CancellationToken).ConfigureAwait(false);
             TransferResult result = await RequestAsync(connection, context, session).ConfigureAwait(false);
-            ReportConnectionEnd(context.Events, target, connect, result, session.ClosesConnection);
-            return result;
+            ReportConnectionEnd(context.Events, target, connect, result, session.ClosesConnection, ReceivedSuccessfully(result));
+            return StampTimings(result, context, started, connect, connectEnded);
         }
     }
 
@@ -178,9 +180,9 @@ public sealed class RtspProtocolHandler(
     /// Hands the connection back to the pool and reports it left intact when curl 8.21.0 keeps
     /// it; otherwise reports it shut down or closed, as measured (BL-593, BL-1403).
     /// </summary>
-    private static void ReportConnectionEnd(ITransferEvents events, ConnectTarget target, ConnectResult connect, TransferResult result, bool closesConnection)
+    private static void ReportConnectionEnd(ITransferEvents events, ConnectTarget target, ConnectResult connect, TransferResult result, bool closesConnection, bool receivedOnKeptConnection)
     {
-        if (!closesConnection && RtspVerboseLines.LeavesIntact(result))
+        if (!closesConnection && (receivedOnKeptConnection || RtspVerboseLines.LeavesIntact(result)))
         {
             connect.Connection!.MarkReusable();
             events.ReportInfo(RtspVerboseLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port));
@@ -190,9 +192,12 @@ public sealed class RtspProtocolHandler(
         events.ReportInfo(RtspVerboseLines.Dropped(result, connect.ConnectionNumber));
     }
 
+    /// <summary>Tells whether the perform was a <c>RECEIVE</c> that read without failing, whose connection the next request reads on (BL-5291).</summary>
+    private bool ReceivedSuccessfully(TransferResult result) => plan.Kind == RtspRequestKind.Receive && result.IsSuccess;
+
     /// <summary>
-    /// Makes the perform's request: a <c>RECEIVE</c>, after which the connection the server closed
-    /// is not kept, or any other kind's request and reply.
+    /// Makes the perform's request: a <c>RECEIVE</c>, which keeps its connection for the next request (BL-5291),
+    /// or any other kind's request and reply.
     /// </summary>
     private async Task<TransferResult> RequestAsync(IConnection connection, ITransferContext context, RtspSessionState session)
     {
@@ -201,7 +206,6 @@ public sealed class RtspProtocolHandler(
             return await ExchangeAsync(connection, context, session).ConfigureAwait(false);
         }
 
-        session.CloseConnection();
         return await ReceiveAsync(connection, context, session).ConfigureAwait(false);
     }
 
@@ -259,7 +263,15 @@ public sealed class RtspProtocolHandler(
             byte[] carried = session.CarriedBytes;
             session.CarriedBytes = [];
             await RtspReplyReader.ReceiveFramesAsync(connection, frames, carried, context.CancellationToken).ConfigureAwait(false);
-            return TransferResult.Success(frames.BytesHanded);
+            return TransferResult.Success(frames.BytesHanded) with
+            {
+                Report = new TransferReport
+                {
+                    RtspSessionId = session.SessionId,
+                    RtspClientSequenceNumber = session.NextSequenceNumber,
+                    RtspSequenceNumberReceived = session.LastReceivedSequenceNumber,
+                },
+            };
         }
         catch (RtspTransferException failure)
         {
@@ -371,19 +383,10 @@ public sealed class RtspProtocolHandler(
         log.RequestSent(plan.MethodName, sequenceNumber);
         RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log, context.MaxFileSize, Frames(session)).ConfigureAwait(false);
         log.ReplyRead(head, session.SessionId);
-        TransferReport report = new()
-        {
-            ResponseCode = head.StatusCode,
-            HttpVersion = System.Net.HttpVersion.Version11,
-            PseudoHeaders = head.HeaderLines,
-            Method = plan.MethodName,
-            HeaderSize = head.Length,
-            RequestSize = requestSize,
-            RtspSessionId = session.SessionId,
-            RtspClientSequenceNumber = session.NextSequenceNumber,
-            RtspSequenceNumberReceived = head.SequenceNumber,
-        };
-        if (StatusFailure(head, options, context.MaxFileSize, events) is { } statusFailure)
+        session.LastReceivedSequenceNumber = head.SequenceNumber;
+        TransferReport report = ReportOf(head, session, requestSize);
+        (string? answerToChallenge, HttpRequestOptions statusOptions) = ChallengeAnswer(context, options, head, authorization);
+        if (StatusFailure(head, statusOptions, context.MaxFileSize, events) is { } statusFailure)
         {
             return new(statusFailure with { Report = report }, null);
         }
@@ -395,8 +398,33 @@ public sealed class RtspProtocolHandler(
             ? TransferResult.Success(bodyRead)
             : Fail(events, CurlExitCode.RtspCseqError, SequenceMismatch(sequenceNumber, head.SequenceNumber), bodyRead);
         result = result with { Report = report with { DownloadSize = plan.WritesReplyBody ? bodyRead : 0, ContentType = ContentTypeOf(head) } };
-        return new(result, result.IsSuccess && authorization is null ? AnswerChallenges(context, options, head) : null);
+        return new(result, result.IsSuccess ? answerToChallenge : null);
     }
+
+    /// <summary>
+    /// The answer to a <c>401</c> that the request is sent again with, and the options its status is checked
+    /// with: <c>-f</c> does not fail a <c>401</c> that is answered (BL-5287), as curl's HTTP does not.
+    /// </summary>
+    private (string? Answer, HttpRequestOptions StatusOptions) ChallengeAnswer(ITransferContext context, HttpRequestOptions options, RtspReplyHead head, string? authorization)
+    {
+        string? answer = authorization is null ? AnswerChallenges(context, options, head) : null;
+        return (answer, answer is null ? options : options with { Fail = HttpFailMode.None });
+    }
+
+    /// <summary>The report of a reply head: its status, headers and sizes, and the session's <c>CSeq</c> and ID.</summary>
+    private TransferReport ReportOf(RtspReplyHead head, RtspSessionState session, int requestSize) =>
+        new()
+        {
+            ResponseCode = head.StatusCode,
+            HttpVersion = System.Net.HttpVersion.Version11,
+            PseudoHeaders = head.HeaderLines,
+            Method = plan.MethodName,
+            HeaderSize = head.Length,
+            RequestSize = requestSize,
+            RtspSessionId = session.SessionId,
+            RtspClientSequenceNumber = session.NextSequenceNumber,
+            RtspSequenceNumberReceived = head.SequenceNumber,
+        };
 
     /// <summary>The value of the reply's last <c>Content-Type</c> header, or <see langword="null" /> when it has none (BL-4934).</summary>
     private static string? ContentTypeOf(RtspReplyHead head) =>
@@ -512,4 +540,23 @@ public sealed class RtspProtocolHandler(
     /// <param name="Result">The request's outcome.</param>
     /// <param name="AnswerAuthorization">The value to send the request again with, or <see langword="null" /> not to.</param>
     private sealed record RtspExchange(TransferResult Result, string? AnswerAuthorization);
+
+    /// <summary>
+    /// Gives a successful transfer the timings behind <c>%{time_connect}</c>, <c>%{time_pretransfer}</c>,
+    /// <c>%{time_posttransfer}</c>, <c>%{time_starttransfer}</c> and <c>%{time_total}</c> (BL-5473):
+    /// the pre- and post-transfer stamps are taken when the connect phase ended and the first byte
+    /// when the transfer completed, so <c>connect &lt;= pretransfer &lt;= starttransfer &lt;= total</c>.
+    /// A failure keeps the report it has; every success here carries one.
+    /// </summary>
+    private static TransferResult StampTimings(TransferResult result, ITransferContext context, long started, ConnectResult connected, long connectEnded)
+    {
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        long completed = context.TimeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connected.Timings, connectEnded, connectEnded, completed, completed);
+        return result with { Report = result.Report! with { Timings = timings } };
+    }
 }

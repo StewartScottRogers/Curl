@@ -67,7 +67,7 @@ public sealed class McpStdioTransferCases
         CurlRunResult result = await RunAsync(Starter(new McpStdioServerBehaviour()), null, "-w", WriteOut, Url);
 
         Assert.AreEqual(0, result.ExitCode, Text(result.StandardError));
-        Assert.AreEqual($"{Listing}0||{Url}|{Url}|mcp+stdio||-1|21|0.000000", Text(result.StandardOutput));
+        Assert.AreEqual($"{Listing}0||{Url}|{Url}|mcp+stdio||-1|21|0.000001", Text(result.StandardOutput));
         Assert.IsEmpty(result.StandardError);
     }
 

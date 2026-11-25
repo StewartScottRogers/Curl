@@ -43,14 +43,31 @@ public static class SigstoreExtension
         [BundleOption, IdentityOption, IssuerOption, RootOption],
         new Uri("https://docs.sigstore.dev/about/bundle/"));
 
-    /// <summary>Gives the extension's transfer hook when the option group gave <c>--sigstore-bundle</c>.</summary>
+    /// <summary>
+    /// Gives the extension's transfer hook when the option group gave any <c>--sigstore-*</c> option; a companion option
+    /// without <c>--sigstore-bundle</c> makes the hook refuse the transfer with exit code 2 rather than download unverified.
+    /// </summary>
     /// <param name="values">The option group's extension options.</param>
-    /// <returns>The hook, or <see langword="null" /> when <c>--sigstore-bundle</c> was not given.</returns>
+    /// <returns>The hook, or <see langword="null" /> when no <c>--sigstore-*</c> option was given.</returns>
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
         ArgumentNullException.ThrowIfNull(values);
-        return values.ValueOf(BundleOption) is { } bundlePath
-            ? new SigstoreTransferHook(new SigstoreExpectation(bundlePath, values.ValueOf(IdentityOption), values.ValueOf(IssuerOption), values.ValueOf(RootOption)))
-            : null;
+        SigstoreExpectation expectation = new(values.ValueOf(BundleOption), values.ValueOf(IdentityOption), values.ValueOf(IssuerOption), values.ValueOf(RootOption));
+        var companions = CompanionsGiven(expectation);
+        if (expectation.BundlePath is null)
+        {
+            return companions.Length == 0 ? null : throw new ArgumentException($"{companions} needs --sigstore-bundle");
+        }
+
+        if (expectation.Identity is null)
+        {
+            throw new ArgumentException(BundleNeedsCompanions);
+        }
+
+        return expectation.RootPath is null ? throw new ArgumentException(BundleNeedsCompanions) : new SigstoreTransferHook(expectation);
     }
+
+    private const string BundleNeedsCompanions = "--sigstore-bundle needs --sigstore-identity and --sigstore-root";
+    private static string CompanionsGiven(SigstoreExpectation expectation) =>
+        string.Join(", ", new[] { (expectation.Identity, "--sigstore-identity"), (expectation.RootPath, "--sigstore-root"), (expectation.Issuer, "--sigstore-issuer") }.Where(option => option.Item1 is not null).Select(option => option.Item2));
 }

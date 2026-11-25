@@ -132,9 +132,18 @@ public sealed class GcsListBucketResultParserTests
     }
 
     [TestMethod]
+    public void Parse_BodyWithoutIsTruncated_ReadsAsNotTruncated()
+    {
+        var result = GcsListBucketResultParser.Parse("<ListBucketResult><Name>gbkt</Name><Contents><Key>a.txt</Key><Size>1</Size><LastModified>2013-02-15T00:22:39Z</LastModified><ETag>e</ETag></Contents></ListBucketResult>");
+
+        Assert.IsTrue(result.Succeeded);
+        Assert.IsFalse(result.Value!.IsTruncated);
+        Assert.HasCount(1, result.Value.Objects);
+    }
+
+    [TestMethod]
     [DataRow("<ListBucketResult><IsTruncated>false</IsTruncated>", DisplayName = "not well-formed")]
     [DataRow("<Error><Code>NoSuchBucket</Code></Error>", DisplayName = "another root")]
-    [DataRow("<ListBucketResult/>", DisplayName = "no IsTruncated")]
     [DataRow("<ListBucketResult><IsTruncated>maybe</IsTruncated></ListBucketResult>", DisplayName = "IsTruncated not a boolean")]
     [DataRow("<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Size>1</Size></Contents></ListBucketResult>", DisplayName = "Contents without Key")]
     [DataRow("<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>a</Key><Size>-1</Size></Contents></ListBucketResult>", DisplayName = "Size negative")]

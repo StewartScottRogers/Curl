@@ -81,6 +81,19 @@ public sealed class SigstoreTransferHookTests
     }
 
     [TestMethod]
+    [DataRow("me@example.com", null, null, "--sigstore-identity")]
+    [DataRow(null, "root.pem", null, "--sigstore-root")]
+    [DataRow(null, null, "https://issuer", "--sigstore-issuer")]
+    [DataRow("me@example.com", "root.pem", "https://issuer", "--sigstore-identity, --sigstore-root, --sigstore-issuer")]
+    public async Task ExecuteAsync_ACompanionWithoutTheBundle_FailsWith2NamingTheBundleBeforeTransferring(string? identity, string? root, string? issuer, string named)
+    {
+        var result = await new SigstoreTransferHook(new(null, identity, issuer, root)).ExecuteAsync(Context(), NoServer);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.AreEqual(named + " needs --sigstore-bundle", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AnUnreadableOrMalformedBundle_FailsWith26BeforeTransferring()
     {
         var missing = await Hook(Path.Combine(directory, "missing.sigstore.json")).ExecuteAsync(Context(), NoServer);

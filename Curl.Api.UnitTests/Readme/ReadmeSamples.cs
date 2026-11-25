@@ -1,7 +1,9 @@
 // <sample usings>
 using System.Net;
 using Curl.Api;
+using Curl.Api.Codes;
 using Curl.Api.Errors;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
 // </sample>
 
@@ -59,6 +61,29 @@ internal static class ReadmeSamples
         // </sample>
     }
 
+    public static async Task TrustTestServerAsync(CurlClient client, byte[] testCertificateAuthorityPem, CancellationToken cancellationToken)
+    {
+        // <sample trust>
+        CurlTlsPeerOptions skipChecks = new() { VerifyPeer = false, VerifyHost = false };
+        CurlRequest insecure = new(HttpMethod.Get, "https://localhost:8443/")
+        {
+            Tls = new CurlTlsOptions { Origin = skipChecks },
+        };
+        CurlResponse first = await client.SendAsync(insecure, cancellationToken);
+        await first.Body.DisposeAsync();
+        
+        CurlRequest trusted = new(HttpMethod.Get, "https://localhost:8443/")
+        {
+            Tls = new CurlTlsOptions
+            {
+                Origin = new CurlTlsPeerOptions { CertificateAuthorityBlob = testCertificateAuthorityPem },
+            },
+        };
+        CurlResponse second = await client.SendAsync(trusted, cancellationToken);
+        await second.Body.DisposeAsync();
+        // </sample>
+    }
+
     public static async Task UploadBytesAndStreamAsync(CurlClient client, Stream file, CancellationToken cancellationToken)
     {
         // <sample upload>
@@ -93,7 +118,8 @@ internal static class ReadmeSamples
         }
         catch (CurlException failure)
         {
-            Console.WriteLine($"curl error {(int)failure.Code}: {failure.Message}");
+            CurlCode code = failure.Code;
+            Console.WriteLine($"curl error {(int)code}: {failure.Message}");
         }
         // </sample>
     }

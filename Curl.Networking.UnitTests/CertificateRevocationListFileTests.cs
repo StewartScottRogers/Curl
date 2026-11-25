@@ -207,6 +207,73 @@ public sealed class CertificateRevocationListFileTests
         Assert.AreEqual(OpenSslVerifyResult.CertificateRevocationListSignatureFailure, refusal);
     }
 
+    // curl 8.18.0 on OpenSSL 3.5.5, measured 2026-11-24 (BL-5929): any salt length and any MGF1
+    // hash verify, so the list revokes what it names and accepts the rest.
+    [TestMethod]
+    [DataRow(222, TestRevocationList.Sha256, "SHA256", DisplayName = "the longest salt")]
+    [DataRow(32, TestRevocationList.Sha1, "SHA1", DisplayName = "MGF1 over another hash")]
+    public void Refusal_WithAnRsaPssListRevokingTheCertificate_IsCertificateRevoked(int saltLength, string maskOid, string maskName)
+    {
+        var list = PssListFromRoot([[7]], saltLength, saltLength, maskOid, new(maskName));
+
+        Assert.AreEqual(OpenSslVerifyResult.CertificateRevoked, Load(list).Refusal(s_leaf, s_root, Now));
+    }
+
+    [TestMethod]
+    [DataRow(222, TestRevocationList.Sha256, "SHA256", DisplayName = "the longest salt")]
+    [DataRow(32, TestRevocationList.Sha1, "SHA1", DisplayName = "MGF1 over another hash")]
+    public void Refusal_WithAnRsaPssListNotNamingTheCertificate_IsNull(int saltLength, string maskOid, string maskName)
+    {
+        var list = PssListFromRoot([], saltLength, saltLength, maskOid, new(maskName));
+
+        Assert.IsNull(Load(list).Refusal(s_leaf, s_root, Now));
+    }
+
+    [TestMethod]
+    public void Refusal_WithAnRsaPssListSaltedOtherThanItNames_IsSignatureFailure()
+    {
+        var list = PssListFromRoot([], 221, 222, TestRevocationList.Sha256, HashAlgorithmName.SHA256);
+
+        Assert.AreEqual(OpenSslVerifyResult.CertificateRevocationListSignatureFailure, Load(list).Refusal(s_leaf, s_root, Now));
+    }
+
+    private static string PssListFromRoot(byte[][] revoked, int namedSaltLength, int saltLength, string maskOid, HashAlgorithmName maskHash) =>
+        TestRevocationList.Pem(TestRevocationList.Write(
+            s_root,
+            nextUpdate: Now.AddHours(1),
+            revokedSerialNumbers: revoked,
+            signatureAlgorithm: TestRevocationList.RsaSsaPss,
+            signatureParameters: TestRevocationList.PssParameters(TestRevocationList.Sha256, maskOid, namedSaltLength),
+            pssSaltLength: saltLength,
+            pssMaskHash: maskHash));
+
+    [TestMethod]
+    public void FirstRefusal_WithAChainEndingAtAnIntermediateAnchor_IsUnableToGetIssuerCertificate()
+    {
+        using var intermediateKey = RSA.Create(2048);
+        var intermediateRequest = new CertificateRequest("CN=STD180 Intermediate", intermediateKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        intermediateRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
+        using var intermediate = intermediateRequest.Create(s_root, Now.AddDays(-1), Now.AddDays(1), [18]);
+        using var intermediateWithKey = intermediate.CopyWithPrivateKey(intermediateKey);
+        using var leafKey = RSA.Create(2048);
+        using var leaf = new CertificateRequest("CN=std180.example", leafKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)
+            .Create(intermediateWithKey, Now.AddDays(-1), Now.AddDays(1), [19]);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.CustomTrustStore.Add(intermediate);
+        chain.Build(leaf);
+        Diagnostics.Arrange("chain length", chain.ChainElements.Count);
+
+        var refusal = Load(TestRevocationList.Pem(EmptyListFromRoot())).FirstRefusal(chain, Now);
+        Diagnostics.Act("refusal", refusal);
+
+        Diagnostics.Assert("chain length", 2, chain.ChainElements.Count);
+        Assert.AreEqual(2, chain.ChainElements.Count);
+        Diagnostics.Assert("refusal", OpenSslVerifyResult.UnableToGetIssuerCertificate, refusal);
+        Assert.AreEqual(OpenSslVerifyResult.UnableToGetIssuerCertificate, refusal);
+    }
+
     [TestMethod]
     public void FirstRefusal_WithAnIntermediateTheListDoesNotCover_RefusesTheServerCertificateFirst()
     {

@@ -8,7 +8,7 @@ namespace Curl.Original.Protocol.Http;
 
 /// <summary>
 /// Pins CGR-273 (BL-3802) on <see cref="HttpProtocolHandler" />: the trailers of an HTTP/2
-/// response count in the report's response headers (<c>%{num_headers}</c>) and reach the
+/// response count in the report's TrailerCount (<c>%{num_headers}</c>) and stay out of its response headers (BL-5392) and reach the
 /// transfer events as received header lines, which <c>-v</c> shows as <c>&lt; name: value</c>.
 /// </summary>
 [TestClass]
@@ -45,7 +45,8 @@ public sealed class Cgr273Tests
 
         Diagnostics.Act("exit code, headers, events", $"{result.ExitCode}, {result.Report?.ResponseHeaders.Count}, {string.Join('|', events.Events)}");
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(2, result.Report!.ResponseHeaders.Count);
+        Assert.AreEqual(2, result.Report!.TrailerCount);
+        Assert.IsEmpty(result.Report.ResponseHeaders);
         CollectionAssert.Contains(events.Events, "< x-trailer: yes\r\n");
         CollectionAssert.Contains(events.Events, "< grpc-status: 0\r\n");
     }

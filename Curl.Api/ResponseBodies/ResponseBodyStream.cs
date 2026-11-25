@@ -95,7 +95,7 @@ internal sealed class ResponseBodyStream : Stream
 
     /// <summary>
     /// Starts the transfer and waits until its body starts or it ends. A transfer that has ended by
-    /// then with an error throws here, with the handle already disposed; a later failure is thrown by
+    /// then with an error and no body delivered throws here, with the handle already disposed; a failure after body bytes arrived (ADR-1334), or a later one, is thrown by
     /// <see cref="ReadAsync(Memory{byte}, CancellationToken)"/>.
     /// </summary>
     /// <returns>A task that completes once the body has started or the transfer has ended.</returns>
@@ -108,9 +108,15 @@ internal sealed class ResponseBodyStream : Stream
         if (_buffer.Ended || _transfer.IsCompleted)
         {
             await _transfer.ConfigureAwait(false);
-            _buffer.ThrowIfFailed();
+            if (!_buffer.HasUnreadBody)
+            {
+                _buffer.ThrowIfFailed();
+            }
         }
     }
+
+    /// <summary>Completes when the transfer has ended or its body has filled the buffer and paused it.</summary>
+    public Task EndedOrPaused => _buffer.EndedOrPaused;
 
     /// <summary>
     /// Disposes the easy handle and every handle in <see cref="Owned"/> for a transfer that will never

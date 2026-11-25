@@ -13,8 +13,10 @@ namespace Curl.Engine;
 internal sealed class EndPointRecordingConnector(IConnector connector, ConnectionEndPointRecorder recorder) : IConnector
 {
     /// <summary>
-    /// Connects as the wrapped connector does and records the connection it opened, or a failed
-    /// connect's last socket error (BL-2374).
+    /// Connects as the wrapped connector does and records the connection it opened; a connect that
+    /// succeeds after an earlier address failed also records that address's last socket error, and
+    /// a failed connect records its last socket error and proxy error (BL-2374, BL-3328); either records the proxy
+    /// CONNECT reply status, the source of <c>%{http_connect}</c> for every scheme (BL-5893).
     /// </summary>
     /// <param name="target">Where to connect.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
@@ -22,9 +24,10 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         ConnectResult connect = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        recorder.RecordProxyConnect(connect.ProxyConnectResponseCode);
         if (connect.Connection is { } connection)
         {
-            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint, connect.IsReused);
+            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint, connect.IsReused, connect.Timings);
             recorder.RecordFailedConnect(connect.LastSocketError);
         }
         else
@@ -67,9 +70,10 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         CancellationToken cancellationToken)
     {
         ConnectResult connect = await connector.ConnectMultiplexedSessionAsync(target, openSession, cancellationToken).ConfigureAwait(false);
+        recorder.RecordProxyConnect(connect.ProxyConnectResponseCode);
         if (connect.Connection is { } connection)
         {
-            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint, connect.IsReused);
+            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint, connect.IsReused, connect.Timings);
         }
         else
         {

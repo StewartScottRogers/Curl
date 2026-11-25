@@ -9,7 +9,7 @@ public static class StompExtension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "stomp",
-        "Sends and subscribes with STOMP 1.2: with -d it SENDs the data to the URL path's destination, otherwise it SUBSCRIBEs to it and writes each MESSAGE body until the server closes; --user gives login and passcode, stomps:// adds TLS.",
+        "Sends and subscribes with STOMP 1.2: with -d it SENDs the data to the URL path's destination, otherwise it SUBSCRIBEs to it and writes each MESSAGE body until the server closes; --user gives login and passcode, -H \"host: name\" names the virtual host (default /), stomps:// adds TLS.",
         ["stomp", "stomps"],
         [],
         new Uri("https://stomp.github.io/stomp-specification-1.2.html"));

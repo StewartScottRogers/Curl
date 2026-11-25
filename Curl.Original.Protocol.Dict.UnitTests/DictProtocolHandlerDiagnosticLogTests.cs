@@ -29,11 +29,11 @@ public sealed class DictProtocolHandlerDiagnosticLogTests
 
         Run run = await RunAsync("dict://h/d:word", log, Reply);
 
-        Diagnostics.Assert("result", TransferResult.Success(Reply.Length), run.Result);
-        Diagnostics.Assert("info lines", $"[sent DEFINE ! word, transfer finished: {Reply.Length} bytes in 250 ms]", "[" + string.Join(", ", log.At(DiagnosticLogLevel.Info)) + "]");
+        Diagnostics.Assert("result", TransferResult.Success(Reply.Length), run.Result with { Report = null });
+        Diagnostics.Assert("info lines", $"[sent DEFINE ! word, transfer finished: {Reply.Length} bytes in 1000 ms]", "[" + string.Join(", ", log.At(DiagnosticLogLevel.Info)) + "]");
         Assert.AreEqual(TransferResult.Success(Reply.Length), run.Result with { Report = null });
         CollectionAssert.AreEqual(
-            new[] { "sent DEFINE ! word", $"transfer finished: {Reply.Length} bytes in 250 ms" },
+            new[] { "sent DEFINE ! word", $"transfer finished: {Reply.Length} bytes in 1000 ms" },
             log.At(DiagnosticLogLevel.Info));
         Assert.AreEqual(2, log.Lines.Count);
         Assert.IsTrue(log.Lines.All(line => line.Component == DiagnosticLogComponents.Dict));
@@ -68,8 +68,8 @@ public sealed class DictProtocolHandlerDiagnosticLogTests
 
         await RunAsync("dict://h/d:word", log);
 
-        Diagnostics.Diff("second info line", "transfer finished: 0 bytes in 250 ms", log.At(DiagnosticLogLevel.Info)[1]);
-        Assert.AreEqual("transfer finished: 0 bytes in 250 ms", log.At(DiagnosticLogLevel.Info)[1]);
+        Diagnostics.Diff("second info line", "transfer finished: 0 bytes in 1000 ms", log.At(DiagnosticLogLevel.Info)[1]);
+        Assert.AreEqual("transfer finished: 0 bytes in 1000 ms", log.At(DiagnosticLogLevel.Info)[1]);
     }
 
     [TestMethod]

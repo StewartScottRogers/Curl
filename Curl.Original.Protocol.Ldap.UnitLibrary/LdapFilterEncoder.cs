@@ -89,7 +89,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         text = filter;
         position = 0;
         setDepth = 0;
-        return filter.StartsWith('(') ? ParseTopLevel() : EncodeItem(filter);
+        return filter.StartsWith('(') || (isWinLdap && filter.TrimStart(' ').StartsWith('(')) ? ParseTopLevel() : EncodeItem(isWinLdap ? filter.TrimStart(' ') : filter);
     }
 
     private static bool IsBetween(int count, int minimum, int maximum) => count >= minimum && count <= maximum;
@@ -132,7 +132,8 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     private byte[]? ParseTopLevel()
     {
         List<byte[]> filters = [];
-        while (SkipBlanks())
+        // libldap refuses anything after its one item, blanks included.
+        while (HasMoreTopLevelText(filters.Count))
         {
             byte[]? next = filters.Count == 0 || isWinLdap ? ParseParenthesized() : null;
             if (next is null)
@@ -145,6 +146,9 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
 
         return [.. filters.SelectMany(element => element)];
     }
+
+    /// <summary>Whether text remains at the top level; <c>libldap</c> keeps blanks after its one item, so it refuses them.</summary>
+    private bool HasMoreTopLevelText(int itemCount) => isWinLdap || itemCount == 0 ? SkipBlanks() : position < text.Length;
 
     /// <summary>Skips blanks.</summary>
     /// <returns><see langword="true" /> while text remains.</returns>
@@ -176,8 +180,24 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         '&' => ParseNestedSet(AndTag, EmptySetMinimum, int.MaxValue),
         '|' => ParseNestedSet(OrTag, EmptySetMinimum, int.MaxValue),
         '!' => ParseNestedSet(NotTag, 1, NotMaximum),
-        _ => ParseSimple(),
+        _ => ParseSimpleOrDoubleParenthesized(),
     };
+
+    /// <summary>Parses a simple item, or for WinLDAP a <c>(</c> after the <c>(</c> as <c>((item))</c>.</summary>
+    private byte[]? ParseSimpleOrDoubleParenthesized() => isWinLdap && text[position] == '(' ? ParseDoubleParenthesized() : ParseSimple();
+
+    /// <summary>Parses WinLDAP's <c>((item))</c>: a parenthesized filter inside parentheses, which it takes as the inner filter.</summary>
+    private byte[]? ParseDoubleParenthesized()
+    {
+        byte[]? inner = ParseParenthesized();
+        if (inner is null || !SkipBlanks() || text[position] != ')')
+        {
+            return null;
+        }
+
+        position++;
+        return inner;
+    }
 
     /// <summary>Parses a set one level deeper, refusing it past <see cref="MaximumSetDepth" /> (ADR-0425).</summary>
     private byte[]? ParseNestedSet(Asn1Tag tag, int minimum, int maximum) =>
@@ -209,16 +229,27 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         return writer.Constructed(tag, [.. items]);
     }
 
-    /// <summary>Parses a simple item up to its <c>)</c>; a <c>\</c> hides the character after it.</summary>
+    /// <summary>Whether the character at the position ends a simple item: a <c>)</c>, or for WinLDAP outside a nested set a <c>(</c> too.</summary>
+    private bool EndsSimpleItem() => text[position] == ')' || (isWinLdap && setDepth == 0 && text[position] == '(');
+
+    /// <summary>Whether the position is past the text or at the <c>)</c> (or outside a nested set <c>(</c>) that ends the simple item with no <c>(</c> left open in its value.</summary>
+    private bool AtSimpleItemEnd(int open) => position >= text.Length || (open == 0 && EndsSimpleItem());
+
+    /// <summary>How a character changes the count of open parentheses in a value: <c>(</c> opens one, <c>)</c> closes one.</summary>
+    private static int ParenthesisChange(char character) => character == '(' ? 1 : character == ')' ? -1 : 0;
+
+    /// <summary>Parses a simple item up to its <c>)</c>; a <c>\</c> hides the character after it, and inside a nested set WinLDAP keeps balanced <c>(</c> and <c>)</c> in the value (BL-5399).</summary>
     private byte[]? ParseSimple()
     {
         int start = position;
-        while (position < text.Length && text[position] != ')')
+        int open = 0;
+        while (!AtSimpleItemEnd(open))
         {
+            open += ParenthesisChange(text[position]);
             position += text[position] == '\\' ? 2 : 1;
         }
 
-        if (position >= text.Length)
+        if (position >= text.Length || text[position] != ')')
         {
             return null;
         }
@@ -231,7 +262,14 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     private byte[]? EncodeItem(string item)
     {
         int equals = item.IndexOf('=', StringComparison.Ordinal);
-        return equals > 0 ? EncodeOperator(item[equals - 1], item[..equals], item[(equals + 1)..]) : null;
+        return equals > 0 ? EncodeOperator(item[equals - 1], item[..equals], ValueAfterEquals(item, equals)) : null;
+    }
+
+    /// <summary>The text after the <c>=</c>; WinLDAP drops the spaces that lead it for <c>=</c>, <c>~=</c>, <c>&gt;=</c> and <c>&lt;=</c> (BL-5454).</summary>
+    private string ValueAfterEquals(string item, int equals)
+    {
+        string value = item[(equals + 1)..];
+        return isWinLdap && item[equals - 1] != ':' ? value.TrimStart(' ') : value;
     }
 
     /// <summary>Encodes an item by <paramref name="operatorCharacter" />, the character before its <c>=</c>.</summary>
@@ -247,9 +285,11 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         _ => EncodeEqualityOrSubstrings(left, value),
     };
 
+    /// <summary>Encodes a <c>~=</c>, <c>&gt;=</c> or <c>&lt;=</c> match; WinLDAP refuses an empty value, <c>libldap</c> sends it (STD-170).</summary>
     private byte[]? EncodeAssertion(Asn1Tag tag, string attribute, string value)
     {
-        byte[]? assertion = IsAttribute(attribute) ? DecodeValue(value) : null;
+        bool valueAllowed = value.Length > 0 || !isWinLdap;
+        byte[]? assertion = valueAllowed && IsAttribute(attribute) ? DecodeValue(value) : null;
         return assertion is null ? null : writer.Constructed(tag, OctetString(attribute), LdapBerWriter.OctetString(Asn1Tag.PrimitiveOctetString, assertion));
     }
 
@@ -288,7 +328,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
             }
         }
 
-        return writer.Constructed(SubstringsTag, OctetString(attribute), writer.Constructed(Asn1Tag.Sequence, [.. substrings]));
+        return substrings.Count == 0 && isWinLdap ? null : writer.Constructed(SubstringsTag, OctetString(attribute), writer.Constructed(Asn1Tag.Sequence, [.. substrings]));
     }
 
     /// <summary>
@@ -326,8 +366,14 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         string[] halves = left.Split(':', 2);
         string rest = halves.Length == 2 ? halves[1] : string.Empty;
         bool dnOnly = IsDn(rest);
-        bool dnAttributes = dnOnly || rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
-        string? rule = rest.Length == 0 || dnOnly ? null : rest;
+        bool dnAfterRule = rest.EndsWith(":dn", StringComparison.OrdinalIgnoreCase);
+        bool dnAttributes = dnOnly || dnAfterRule || rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
+        if (dnAfterRule)
+        {
+            rest = rest[..^3];
+        }
+
+        string? rule = rest.Length == 0 || dnOnly || IsNamedRule(rest) ? null : rest;
         return WriteExtensible(new ExtensibleMatch(rule, halves[0], value, dnAttributes), writeFalse: true);
     }
 
@@ -351,6 +397,13 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
             : null;
     }
 
+    /// <summary>Whether WinLDAP loses the rule: a name (not an OID), with or without a leading <c>dn:</c>, is left out of the wire form (BL-5400, ADR-1298, BL-5453).</summary>
+    private static bool IsNamedRule(string rest)
+    {
+        string rule = rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase) ? rest[3..] : rest;
+        return rule.Length == 0 || !char.IsAsciiDigit(rule[0]);
+    }
+
     private bool IsOpenLdapExtensible(string attribute, string? rule) =>
         rule is null ? IsAttribute(attribute) : IsAttribute(rule) && (attribute.Length == 0 || IsAttribute(attribute));
 
@@ -359,7 +412,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     /// <param name="writeFalse">Whether to write <c>dnAttributes</c> when it is false, as WinLDAP does.</param>
     private byte[]? WriteExtensible(ExtensibleMatch match, bool writeFalse)
     {
-        byte[]? assertion = DecodeValue(match.Value);
+        byte[]? assertion = match.Value.Length == 0 && isWinLdap ? null : DecodeValue(match.Value);
         if (assertion is null)
         {
             return null;
@@ -441,6 +494,13 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
 
         if (isWinLdap)
         {
+            // WinLDAP also decodes a backslash and one hex digit not followed by another (BL-5457).
+            if (value[index] == '\\' && index + 1 < value.Length && char.IsAsciiHexDigit(value[index + 1]))
+            {
+                bytes.Add((byte)Convert.ToInt32(value[index + 1].ToString(), 16));
+                return 2;
+            }
+
             bytes.AddRange(LdapWireText.Encode(dialect, value[index].ToString()));
             return 1;
         }

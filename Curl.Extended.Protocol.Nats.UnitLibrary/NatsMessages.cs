@@ -26,4 +26,7 @@ internal static class NatsMessages
 
     /// <summary>A <c>nats://</c> URL named a server that requires TLS.</summary>
     public const string TlsRequired = "NATS server requires TLS; use natss://";
+
+    /// <summary>The server answered a request with the 503 status that says nothing is subscribed to the subject.</summary>
+    public const string NoResponders = "NATS request failed: no responders are subscribed to the subject";
 }

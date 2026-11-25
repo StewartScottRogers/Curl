@@ -5,6 +5,8 @@ namespace Libcurl.Options;
 /// table, with its number from <c>include/curl/curl.h</c> (the <c>CURLOPTTYPE_*</c> base plus the
 /// option's own number). Each name is the upstream name without <c>CURLOPT_</c>, one capital per
 /// underscore-separated word, as <see cref="Curl.Api.Codes.CurlCode"/> names <c>CURLE_*</c>.
+/// A name that upstream spells as several words run together (<c>WRITEFUNCTION</c>) is not split, but its
+/// summary gives the word-cased form (<c>WriteFunction</c>), so a text search finds it (ADR-1307).
 /// </summary>
 /// <remarks>
 /// An alias (<c>CURLOPT_FILE</c>, <c>CURLOPT_WRITEHEADER</c> and the rest flagged
@@ -16,7 +18,7 @@ public enum CurlOption
     /// <summary><c>CURLOPT_ABSTRACT_UNIX_SOCKET</c> (10264), a <c>CURLOT_STRING</c> option.</summary>
     AbstractUnixSocket = 10264,
 
-    /// <summary><c>CURLOPT_ACCEPTTIMEOUT_MS</c> (212), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_ACCEPTTIMEOUT_MS</c> (212), a <c>CURLOT_LONG</c> option. Word-cased: <c>AcceptTimeoutMs</c>.</summary>
     AccepttimeoutMs = 212,
 
     /// <summary><c>CURLOPT_ACCEPT_ENCODING</c> (10102), a <c>CURLOT_STRING</c> option.</summary>
@@ -25,22 +27,22 @@ public enum CurlOption
     /// <summary><c>CURLOPT_ADDRESS_SCOPE</c> (171), a <c>CURLOT_LONG</c> option.</summary>
     AddressScope = 171,
 
-    /// <summary><c>CURLOPT_ALTSVC</c> (10287), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_ALTSVC</c> (10287), a <c>CURLOT_STRING</c> option. Word-cased: <c>AltSvc</c>.</summary>
     Altsvc = 10287,
 
-    /// <summary><c>CURLOPT_ALTSVC_CTRL</c> (286), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_ALTSVC_CTRL</c> (286), a <c>CURLOT_LONG</c> option. Word-cased: <c>AltSvcCtrl</c>.</summary>
     AltsvcCtrl = 286,
 
     /// <summary><c>CURLOPT_APPEND</c> (50), a <c>CURLOT_LONG</c> option.</summary>
     Append = 50,
 
-    /// <summary><c>CURLOPT_AUTOREFERER</c> (58), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_AUTOREFERER</c> (58), a <c>CURLOT_LONG</c> option. Word-cased: <c>AutoReferer</c>.</summary>
     Autoreferer = 58,
 
-    /// <summary><c>CURLOPT_AWS_SIGV4</c> (10305), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_AWS_SIGV4</c> (10305), a <c>CURLOT_STRING</c> option. Word-cased: <c>AwsSigV4</c>.</summary>
     AwsSigv4 = 10305,
 
-    /// <summary><c>CURLOPT_BUFFERSIZE</c> (98), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_BUFFERSIZE</c> (98), a <c>CURLOT_LONG</c> option. Word-cased: <c>BufferSize</c>.</summary>
     Buffersize = 98,
 
     /// <summary><c>CURLOPT_CAINFO</c> (10065), a <c>CURLOT_STRING</c> option.</summary>
@@ -67,16 +69,16 @@ public enum CurlOption
     /// <summary><c>CURLOPT_CHUNK_END_FUNCTION</c> (20199), a <c>CURLOT_FUNCTION</c> option.</summary>
     ChunkEndFunction = 20199,
 
-    /// <summary><c>CURLOPT_CLOSESOCKETDATA</c> (10209), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_CLOSESOCKETDATA</c> (10209), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>CloseSocketData</c>.</summary>
     Closesocketdata = 10209,
 
-    /// <summary><c>CURLOPT_CLOSESOCKETFUNCTION</c> (20208), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_CLOSESOCKETFUNCTION</c> (20208), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>CloseSocketFunction</c>.</summary>
     Closesocketfunction = 20208,
 
-    /// <summary><c>CURLOPT_CONNECTTIMEOUT</c> (78), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_CONNECTTIMEOUT</c> (78), a <c>CURLOT_LONG</c> option. Word-cased: <c>ConnectTimeout</c>.</summary>
     Connecttimeout = 78,
 
-    /// <summary><c>CURLOPT_CONNECTTIMEOUT_MS</c> (156), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_CONNECTTIMEOUT_MS</c> (156), a <c>CURLOT_LONG</c> option. Word-cased: <c>ConnectTimeoutMs</c>.</summary>
     ConnecttimeoutMs = 156,
 
     /// <summary><c>CURLOPT_CONNECT_ONLY</c> (141), a <c>CURLOT_LONG</c> option.</summary>
@@ -97,19 +99,19 @@ public enum CurlOption
     /// <summary><c>CURLOPT_COOKIE</c> (10022), a <c>CURLOT_STRING</c> option.</summary>
     Cookie = 10022,
 
-    /// <summary><c>CURLOPT_COOKIEFILE</c> (10031), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_COOKIEFILE</c> (10031), a <c>CURLOT_STRING</c> option. Word-cased: <c>CookieFile</c>.</summary>
     Cookiefile = 10031,
 
-    /// <summary><c>CURLOPT_COOKIEJAR</c> (10082), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_COOKIEJAR</c> (10082), a <c>CURLOT_STRING</c> option. Word-cased: <c>CookieJar</c>.</summary>
     Cookiejar = 10082,
 
-    /// <summary><c>CURLOPT_COOKIELIST</c> (10135), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_COOKIELIST</c> (10135), a <c>CURLOT_STRING</c> option. Word-cased: <c>CookieList</c>.</summary>
     Cookielist = 10135,
 
-    /// <summary><c>CURLOPT_COOKIESESSION</c> (96), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_COOKIESESSION</c> (96), a <c>CURLOT_LONG</c> option. Word-cased: <c>CookieSession</c>.</summary>
     Cookiesession = 96,
 
-    /// <summary><c>CURLOPT_COPYPOSTFIELDS</c> (10165), a <c>CURLOT_OBJECT</c> option.</summary>
+    /// <summary><c>CURLOPT_COPYPOSTFIELDS</c> (10165), a <c>CURLOT_OBJECT</c> option. Word-cased: <c>CopyPostFields</c>.</summary>
     Copypostfields = 10165,
 
     /// <summary><c>CURLOPT_CRLF</c> (27), a <c>CURLOT_LONG</c> option.</summary>
@@ -121,19 +123,19 @@ public enum CurlOption
     /// <summary><c>CURLOPT_CURLU</c> (10282), a <c>CURLOT_OBJECT</c> option.</summary>
     Curlu = 10282,
 
-    /// <summary><c>CURLOPT_CUSTOMREQUEST</c> (10036), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_CUSTOMREQUEST</c> (10036), a <c>CURLOT_STRING</c> option. Word-cased: <c>CustomRequest</c>.</summary>
     Customrequest = 10036,
 
-    /// <summary><c>CURLOPT_DEBUGDATA</c> (10095), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_DEBUGDATA</c> (10095), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>DebugData</c>.</summary>
     Debugdata = 10095,
 
-    /// <summary><c>CURLOPT_DEBUGFUNCTION</c> (20094), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_DEBUGFUNCTION</c> (20094), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>DebugFunction</c>.</summary>
     Debugfunction = 20094,
 
     /// <summary><c>CURLOPT_DEFAULT_PROTOCOL</c> (10238), a <c>CURLOT_STRING</c> option.</summary>
     DefaultProtocol = 10238,
 
-    /// <summary><c>CURLOPT_DIRLISTONLY</c> (48), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_DIRLISTONLY</c> (48), a <c>CURLOT_LONG</c> option. Word-cased: <c>DirListOnly</c>.</summary>
     Dirlistonly = 48,
 
     /// <summary><c>CURLOPT_DISALLOW_USERNAME_IN_URL</c> (278), a <c>CURLOT_LONG</c> option.</summary>
@@ -160,13 +162,13 @@ public enum CurlOption
     /// <summary><c>CURLOPT_DNS_USE_GLOBAL_CACHE</c> (91), a <c>CURLOT_LONG</c> option.</summary>
     DnsUseGlobalCache = 91,
 
-    /// <summary><c>CURLOPT_DOH_SSL_VERIFYHOST</c> (307), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_DOH_SSL_VERIFYHOST</c> (307), a <c>CURLOT_LONG</c> option. Word-cased: <c>DohSslVerifyHost</c>.</summary>
     DohSslVerifyhost = 307,
 
-    /// <summary><c>CURLOPT_DOH_SSL_VERIFYPEER</c> (306), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_DOH_SSL_VERIFYPEER</c> (306), a <c>CURLOT_LONG</c> option. Word-cased: <c>DohSslVerifyPeer</c>.</summary>
     DohSslVerifypeer = 306,
 
-    /// <summary><c>CURLOPT_DOH_SSL_VERIFYSTATUS</c> (308), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_DOH_SSL_VERIFYSTATUS</c> (308), a <c>CURLOT_LONG</c> option. Word-cased: <c>DohSslVerifyStatus</c>.</summary>
     DohSslVerifystatus = 308,
 
     /// <summary><c>CURLOPT_DOH_URL</c> (10279), a <c>CURLOT_STRING</c> option.</summary>
@@ -175,19 +177,19 @@ public enum CurlOption
     /// <summary><c>CURLOPT_ECH</c> (10325), a <c>CURLOT_STRING</c> option.</summary>
     Ech = 10325,
 
-    /// <summary><c>CURLOPT_EGDSOCKET</c> (10077), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_EGDSOCKET</c> (10077), a <c>CURLOT_STRING</c> option. Word-cased: <c>EgdSocket</c>.</summary>
     Egdsocket = 10077,
 
     /// <summary><c>CURLOPT_ENCODING</c>: an alias of <c>CURLOPT_ACCEPT_ENCODING</c> (10102), a <c>CURLOT_STRING</c> option.</summary>
     Encoding = AcceptEncoding,
 
-    /// <summary><c>CURLOPT_ERRORBUFFER</c> (10010), a <c>CURLOT_OBJECT</c> option.</summary>
+    /// <summary><c>CURLOPT_ERRORBUFFER</c> (10010), a <c>CURLOT_OBJECT</c> option. Word-cased: <c>ErrorBuffer</c>.</summary>
     Errorbuffer = 10010,
 
     /// <summary><c>CURLOPT_EXPECT_100_TIMEOUT_MS</c> (227), a <c>CURLOT_LONG</c> option.</summary>
     Expect100TimeoutMs = 227,
 
-    /// <summary><c>CURLOPT_FAILONERROR</c> (45), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_FAILONERROR</c> (45), a <c>CURLOT_LONG</c> option. Word-cased: <c>FailOnError</c>.</summary>
     Failonerror = 45,
 
     /// <summary><c>CURLOPT_FILE</c>: an alias of <c>CURLOPT_WRITEDATA</c> (10001), a <c>CURLOT_CBPTR</c> option.</summary>
@@ -202,7 +204,7 @@ public enum CurlOption
     /// <summary><c>CURLOPT_FNMATCH_FUNCTION</c> (20200), a <c>CURLOT_FUNCTION</c> option.</summary>
     FnmatchFunction = 20200,
 
-    /// <summary><c>CURLOPT_FOLLOWLOCATION</c> (52), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_FOLLOWLOCATION</c> (52), a <c>CURLOT_LONG</c> option. Word-cased: <c>FollowLocation</c>.</summary>
     Followlocation = 52,
 
     /// <summary><c>CURLOPT_FORBID_REUSE</c> (75), a <c>CURLOT_LONG</c> option.</summary>
@@ -211,16 +213,16 @@ public enum CurlOption
     /// <summary><c>CURLOPT_FRESH_CONNECT</c> (74), a <c>CURLOT_LONG</c> option.</summary>
     FreshConnect = 74,
 
-    /// <summary><c>CURLOPT_FTPAPPEND</c>: an alias of <c>CURLOPT_APPEND</c> (50), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_FTPAPPEND</c>: an alias of <c>CURLOPT_APPEND</c> (50), a <c>CURLOT_LONG</c> option. Word-cased: <c>FtpAppend</c>.</summary>
     Ftpappend = Append,
 
-    /// <summary><c>CURLOPT_FTPLISTONLY</c>: an alias of <c>CURLOPT_DIRLISTONLY</c> (48), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_FTPLISTONLY</c>: an alias of <c>CURLOPT_DIRLISTONLY</c> (48), a <c>CURLOT_LONG</c> option. Word-cased: <c>FtpListOnly</c>.</summary>
     Ftplistonly = Dirlistonly,
 
-    /// <summary><c>CURLOPT_FTPPORT</c> (10017), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_FTPPORT</c> (10017), a <c>CURLOT_STRING</c> option. Word-cased: <c>FtpPort</c>.</summary>
     Ftpport = 10017,
 
-    /// <summary><c>CURLOPT_FTPSSLAUTH</c> (129), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_FTPSSLAUTH</c> (129), a <c>CURLOT_VALUES</c> option. Word-cased: <c>FtpSslAuth</c>.</summary>
     Ftpsslauth = 129,
 
     /// <summary><c>CURLOPT_FTP_ACCOUNT</c> (10134), a <c>CURLOT_STRING</c> option.</summary>
@@ -232,7 +234,7 @@ public enum CurlOption
     /// <summary><c>CURLOPT_FTP_CREATE_MISSING_DIRS</c> (110), a <c>CURLOT_LONG</c> option.</summary>
     FtpCreateMissingDirs = 110,
 
-    /// <summary><c>CURLOPT_FTP_FILEMETHOD</c> (138), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_FTP_FILEMETHOD</c> (138), a <c>CURLOT_VALUES</c> option. Word-cased: <c>FtpFileMethod</c>.</summary>
     FtpFilemethod = 138,
 
     /// <summary><c>CURLOPT_FTP_RESPONSE_TIMEOUT</c>: an alias of <c>CURLOPT_SERVER_RESPONSE_TIMEOUT</c> (112), a <c>CURLOT_LONG</c> option.</summary>
@@ -262,37 +264,37 @@ public enum CurlOption
     /// <summary><c>CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS</c> (271), a <c>CURLOT_LONG</c> option.</summary>
     HappyEyeballsTimeoutMs = 271,
 
-    /// <summary><c>CURLOPT_HAPROXYPROTOCOL</c> (274), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_HAPROXYPROTOCOL</c> (274), a <c>CURLOT_LONG</c> option. Word-cased: <c>HaProxyProtocol</c>.</summary>
     Haproxyprotocol = 274,
 
-    /// <summary><c>CURLOPT_HAPROXY_CLIENT_IP</c> (10323), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_HAPROXY_CLIENT_IP</c> (10323), a <c>CURLOT_STRING</c> option. Word-cased: <c>HaProxyClientIp</c>.</summary>
     HaproxyClientIp = 10323,
 
     /// <summary><c>CURLOPT_HEADER</c> (42), a <c>CURLOT_LONG</c> option.</summary>
     Header = 42,
 
-    /// <summary><c>CURLOPT_HEADERDATA</c> (10029), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_HEADERDATA</c> (10029), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>HeaderData</c>.</summary>
     Headerdata = 10029,
 
-    /// <summary><c>CURLOPT_HEADERFUNCTION</c> (20079), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_HEADERFUNCTION</c> (20079), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>HeaderFunction</c>.</summary>
     Headerfunction = 20079,
 
-    /// <summary><c>CURLOPT_HEADEROPT</c> (229), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_HEADEROPT</c> (229), a <c>CURLOT_VALUES</c> option. Word-cased: <c>HeaderOpt</c>.</summary>
     Headeropt = 229,
 
     /// <summary><c>CURLOPT_HSTS</c> (10300), a <c>CURLOT_STRING</c> option.</summary>
     Hsts = 10300,
 
-    /// <summary><c>CURLOPT_HSTSREADDATA</c> (10302), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_HSTSREADDATA</c> (10302), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>HstsReadData</c>.</summary>
     Hstsreaddata = 10302,
 
-    /// <summary><c>CURLOPT_HSTSREADFUNCTION</c> (20301), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_HSTSREADFUNCTION</c> (20301), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>HstsReadFunction</c>.</summary>
     Hstsreadfunction = 20301,
 
-    /// <summary><c>CURLOPT_HSTSWRITEDATA</c> (10304), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_HSTSWRITEDATA</c> (10304), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>HstsWriteData</c>.</summary>
     Hstswritedata = 10304,
 
-    /// <summary><c>CURLOPT_HSTSWRITEFUNCTION</c> (20303), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_HSTSWRITEFUNCTION</c> (20303), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>HstsWriteFunction</c>.</summary>
     Hstswritefunction = 20303,
 
     /// <summary><c>CURLOPT_HSTS_CTRL</c> (299), a <c>CURLOT_LONG</c> option.</summary>
@@ -301,34 +303,34 @@ public enum CurlOption
     /// <summary><c>CURLOPT_HTTP09_ALLOWED</c> (285), a <c>CURLOT_LONG</c> option.</summary>
     Http09Allowed = 285,
 
-    /// <summary><c>CURLOPT_HTTP200ALIASES</c> (10104), a <c>CURLOT_SLIST</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTP200ALIASES</c> (10104), a <c>CURLOT_SLIST</c> option. Word-cased: <c>Http200</c>.</summary>
     Http200aliases = 10104,
 
-    /// <summary><c>CURLOPT_HTTPAUTH</c> (107), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPAUTH</c> (107), a <c>CURLOT_VALUES</c> option. Word-cased: <c>HttpAuth</c>.</summary>
     Httpauth = 107,
 
-    /// <summary><c>CURLOPT_HTTPGET</c> (80), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPGET</c> (80), a <c>CURLOT_LONG</c> option. Word-cased: <c>HttpGet</c>.</summary>
     Httpget = 80,
 
-    /// <summary><c>CURLOPT_HTTPHEADER</c> (10023), a <c>CURLOT_SLIST</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPHEADER</c> (10023), a <c>CURLOT_SLIST</c> option. Word-cased: <c>HttpHeader</c>.</summary>
     Httpheader = 10023,
 
-    /// <summary><c>CURLOPT_HTTPPOST</c> (10024), a <c>CURLOT_OBJECT</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPPOST</c> (10024), a <c>CURLOT_OBJECT</c> option. Word-cased: <c>HttpPost</c>.</summary>
     Httppost = 10024,
 
-    /// <summary><c>CURLOPT_HTTPPROXYTUNNEL</c> (61), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPPROXYTUNNEL</c> (61), a <c>CURLOT_LONG</c> option. Word-cased: <c>HttpProxyTunnel</c>.</summary>
     Httpproxytunnel = 61,
 
-    /// <summary><c>CURLOPT_HTTPSIG_ALGORITHM</c> (329), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPSIG_ALGORITHM</c> (329), a <c>CURLOT_VALUES</c> option. Word-cased: <c>HttpSigAlgorithm</c>.</summary>
     HttpsigAlgorithm = 329,
 
-    /// <summary><c>CURLOPT_HTTPSIG_HEADERS</c> (10332), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPSIG_HEADERS</c> (10332), a <c>CURLOT_STRING</c> option. Word-cased: <c>HttpSigHeaders</c>.</summary>
     HttpsigHeaders = 10332,
 
-    /// <summary><c>CURLOPT_HTTPSIG_KEY</c> (10330), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPSIG_KEY</c> (10330), a <c>CURLOT_STRING</c> option. Word-cased: <c>HttpSigKey</c>.</summary>
     HttpsigKey = 10330,
 
-    /// <summary><c>CURLOPT_HTTPSIG_KEYID</c> (10331), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_HTTPSIG_KEYID</c> (10331), a <c>CURLOT_STRING</c> option. Word-cased: <c>HttpSigKeyId</c>.</summary>
     HttpsigKeyid = 10331,
 
     /// <summary><c>CURLOPT_HTTP_CONTENT_DECODING</c> (158), a <c>CURLOT_LONG</c> option.</summary>
@@ -346,52 +348,52 @@ public enum CurlOption
     /// <summary><c>CURLOPT_INFILE</c>: an alias of <c>CURLOPT_READDATA</c> (10009), a <c>CURLOT_CBPTR</c> option.</summary>
     Infile = Readdata,
 
-    /// <summary><c>CURLOPT_INFILESIZE</c> (14), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_INFILESIZE</c> (14), a <c>CURLOT_LONG</c> option. Word-cased: <c>InfileSize</c>.</summary>
     Infilesize = 14,
 
-    /// <summary><c>CURLOPT_INFILESIZE_LARGE</c> (30115), a <c>CURLOT_OFF_T</c> option.</summary>
+    /// <summary><c>CURLOPT_INFILESIZE_LARGE</c> (30115), a <c>CURLOT_OFF_T</c> option. Word-cased: <c>InfileSizeLarge</c>.</summary>
     InfilesizeLarge = 30115,
 
     /// <summary><c>CURLOPT_INTERFACE</c> (10062), a <c>CURLOT_STRING</c> option.</summary>
     Interface = 10062,
 
-    /// <summary><c>CURLOPT_INTERLEAVEDATA</c> (10195), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_INTERLEAVEDATA</c> (10195), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>InterleaveData</c>.</summary>
     Interleavedata = 10195,
 
-    /// <summary><c>CURLOPT_INTERLEAVEFUNCTION</c> (20196), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_INTERLEAVEFUNCTION</c> (20196), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>InterleaveFunction</c>.</summary>
     Interleavefunction = 20196,
 
-    /// <summary><c>CURLOPT_IOCTLDATA</c> (10131), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_IOCTLDATA</c> (10131), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>IoctlData</c>.</summary>
     Ioctldata = 10131,
 
-    /// <summary><c>CURLOPT_IOCTLFUNCTION</c> (20130), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_IOCTLFUNCTION</c> (20130), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>IoctlFunction</c>.</summary>
     Ioctlfunction = 20130,
 
-    /// <summary><c>CURLOPT_IPRESOLVE</c> (113), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_IPRESOLVE</c> (113), a <c>CURLOT_VALUES</c> option. Word-cased: <c>IpResolve</c>.</summary>
     Ipresolve = 113,
 
-    /// <summary><c>CURLOPT_ISSUERCERT</c> (10170), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_ISSUERCERT</c> (10170), a <c>CURLOT_STRING</c> option. Word-cased: <c>IssuerCert</c>.</summary>
     Issuercert = 10170,
 
-    /// <summary><c>CURLOPT_ISSUERCERT_BLOB</c> (40295), a <c>CURLOT_BLOB</c> option.</summary>
+    /// <summary><c>CURLOPT_ISSUERCERT_BLOB</c> (40295), a <c>CURLOT_BLOB</c> option. Word-cased: <c>IssuerCertBlob</c>.</summary>
     IssuercertBlob = 40295,
 
     /// <summary><c>CURLOPT_KEEP_SENDING_ON_ERROR</c> (245), a <c>CURLOT_LONG</c> option.</summary>
     KeepSendingOnError = 245,
 
-    /// <summary><c>CURLOPT_KEYPASSWD</c> (10026), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_KEYPASSWD</c> (10026), a <c>CURLOT_STRING</c> option. Word-cased: <c>KeyPasswd</c>.</summary>
     Keypasswd = 10026,
 
-    /// <summary><c>CURLOPT_KRB4LEVEL</c>: an alias of <c>CURLOPT_KRBLEVEL</c> (10063), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_KRB4LEVEL</c>: an alias of <c>CURLOPT_KRBLEVEL</c> (10063), a <c>CURLOT_STRING</c> option. Word-cased: <c>Krb4</c>.</summary>
     Krb4level = Krblevel,
 
-    /// <summary><c>CURLOPT_KRBLEVEL</c> (10063), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_KRBLEVEL</c> (10063), a <c>CURLOT_STRING</c> option. Word-cased: <c>KrbLevel</c>.</summary>
     Krblevel = 10063,
 
-    /// <summary><c>CURLOPT_LOCALPORT</c> (139), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_LOCALPORT</c> (139), a <c>CURLOT_LONG</c> option. Word-cased: <c>LocalPort</c>.</summary>
     Localport = 139,
 
-    /// <summary><c>CURLOPT_LOCALPORTRANGE</c> (140), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_LOCALPORTRANGE</c> (140), a <c>CURLOT_LONG</c> option. Word-cased: <c>LocalPortRange</c>.</summary>
     Localportrange = 140,
 
     /// <summary><c>CURLOPT_LOGIN_OPTIONS</c> (10224), a <c>CURLOT_STRING</c> option.</summary>
@@ -412,28 +414,28 @@ public enum CurlOption
     /// <summary><c>CURLOPT_MAIL_RCPT</c> (10187), a <c>CURLOT_SLIST</c> option.</summary>
     MailRcpt = 10187,
 
-    /// <summary><c>CURLOPT_MAIL_RCPT_ALLLOWFAILS</c>: an alias of <c>CURLOPT_MAIL_RCPT_ALLOWFAILS</c> (290), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_MAIL_RCPT_ALLLOWFAILS</c>: an alias of <c>CURLOPT_MAIL_RCPT_ALLOWFAILS</c> (290), a <c>CURLOT_LONG</c> option. Word-cased: <c>MailRcptAlllowFails</c>.</summary>
     MailRcptAlllowfails = MailRcptAllowfails,
 
-    /// <summary><c>CURLOPT_MAIL_RCPT_ALLOWFAILS</c> (290), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_MAIL_RCPT_ALLOWFAILS</c> (290), a <c>CURLOT_LONG</c> option. Word-cased: <c>MailRcptAllowFails</c>.</summary>
     MailRcptAllowfails = 290,
 
-    /// <summary><c>CURLOPT_MAXAGE_CONN</c> (288), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_MAXAGE_CONN</c> (288), a <c>CURLOT_LONG</c> option. Word-cased: <c>MaxAgeConn</c>.</summary>
     MaxageConn = 288,
 
-    /// <summary><c>CURLOPT_MAXCONNECTS</c> (71), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_MAXCONNECTS</c> (71), a <c>CURLOT_LONG</c> option. Word-cased: <c>MaxConnects</c>.</summary>
     Maxconnects = 71,
 
-    /// <summary><c>CURLOPT_MAXFILESIZE</c> (114), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_MAXFILESIZE</c> (114), a <c>CURLOT_LONG</c> option. Word-cased: <c>MaxFileSize</c>.</summary>
     Maxfilesize = 114,
 
-    /// <summary><c>CURLOPT_MAXFILESIZE_LARGE</c> (30117), a <c>CURLOT_OFF_T</c> option.</summary>
+    /// <summary><c>CURLOPT_MAXFILESIZE_LARGE</c> (30117), a <c>CURLOT_OFF_T</c> option. Word-cased: <c>MaxFileSizeLarge</c>.</summary>
     MaxfilesizeLarge = 30117,
 
-    /// <summary><c>CURLOPT_MAXLIFETIME_CONN</c> (314), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_MAXLIFETIME_CONN</c> (314), a <c>CURLOT_LONG</c> option. Word-cased: <c>MaxLifetimeConn</c>.</summary>
     MaxlifetimeConn = 314,
 
-    /// <summary><c>CURLOPT_MAXREDIRS</c> (68), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_MAXREDIRS</c> (68), a <c>CURLOT_LONG</c> option. Word-cased: <c>MaxRedirs</c>.</summary>
     Maxredirs = 68,
 
     /// <summary><c>CURLOPT_MAX_RECV_SPEED_LARGE</c> (30146), a <c>CURLOT_OFF_T</c> option.</summary>
@@ -442,7 +444,7 @@ public enum CurlOption
     /// <summary><c>CURLOPT_MAX_SEND_SPEED_LARGE</c> (30145), a <c>CURLOT_OFF_T</c> option.</summary>
     MaxSendSpeedLarge = 30145,
 
-    /// <summary><c>CURLOPT_MIMEPOST</c> (10269), a <c>CURLOT_OBJECT</c> option.</summary>
+    /// <summary><c>CURLOPT_MIMEPOST</c> (10269), a <c>CURLOT_OBJECT</c> option. Word-cased: <c>MimePost</c>.</summary>
     Mimepost = 10269,
 
     /// <summary><c>CURLOPT_MIME_OPTIONS</c> (315), a <c>CURLOT_LONG</c> option.</summary>
@@ -460,22 +462,22 @@ public enum CurlOption
     /// <summary><c>CURLOPT_NEW_FILE_PERMS</c> (159), a <c>CURLOT_LONG</c> option.</summary>
     NewFilePerms = 159,
 
-    /// <summary><c>CURLOPT_NOBODY</c> (44), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_NOBODY</c> (44), a <c>CURLOT_LONG</c> option. Word-cased: <c>NoBody</c>.</summary>
     Nobody = 44,
 
-    /// <summary><c>CURLOPT_NOPROGRESS</c> (43), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_NOPROGRESS</c> (43), a <c>CURLOT_LONG</c> option. Word-cased: <c>NoProgress</c>.</summary>
     Noprogress = 43,
 
-    /// <summary><c>CURLOPT_NOPROXY</c> (10177), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_NOPROXY</c> (10177), a <c>CURLOT_STRING</c> option. Word-cased: <c>NoProxy</c>.</summary>
     Noproxy = 10177,
 
-    /// <summary><c>CURLOPT_NOSIGNAL</c> (99), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_NOSIGNAL</c> (99), a <c>CURLOT_LONG</c> option. Word-cased: <c>NoSignal</c>.</summary>
     Nosignal = 99,
 
-    /// <summary><c>CURLOPT_OPENSOCKETDATA</c> (10164), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_OPENSOCKETDATA</c> (10164), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>OpenSocketData</c>.</summary>
     Opensocketdata = 10164,
 
-    /// <summary><c>CURLOPT_OPENSOCKETFUNCTION</c> (20163), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_OPENSOCKETFUNCTION</c> (20163), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>OpenSocketFunction</c>.</summary>
     Opensocketfunction = 20163,
 
     /// <summary><c>CURLOPT_PASSWORD</c> (10174), a <c>CURLOT_STRING</c> option.</summary>
@@ -484,10 +486,10 @@ public enum CurlOption
     /// <summary><c>CURLOPT_PATH_AS_IS</c> (234), a <c>CURLOT_LONG</c> option.</summary>
     PathAsIs = 234,
 
-    /// <summary><c>CURLOPT_PINNEDPUBLICKEY</c> (10230), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PINNEDPUBLICKEY</c> (10230), a <c>CURLOT_STRING</c> option. Word-cased: <c>PinnedPublicKey</c>.</summary>
     Pinnedpublickey = 10230,
 
-    /// <summary><c>CURLOPT_PIPEWAIT</c> (237), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_PIPEWAIT</c> (237), a <c>CURLOT_LONG</c> option. Word-cased: <c>PipeWait</c>.</summary>
     Pipewait = 237,
 
     /// <summary><c>CURLOPT_PORT</c> (3), a <c>CURLOT_LONG</c> option.</summary>
@@ -499,28 +501,28 @@ public enum CurlOption
     /// <summary><c>CURLOPT_POST301</c>: an alias of <c>CURLOPT_POSTREDIR</c> (161), a <c>CURLOT_VALUES</c> option.</summary>
     Post301 = Postredir,
 
-    /// <summary><c>CURLOPT_POSTFIELDS</c> (10015), a <c>CURLOT_OBJECT</c> option.</summary>
+    /// <summary><c>CURLOPT_POSTFIELDS</c> (10015), a <c>CURLOT_OBJECT</c> option. Word-cased: <c>PostFields</c>.</summary>
     Postfields = 10015,
 
-    /// <summary><c>CURLOPT_POSTFIELDSIZE</c> (60), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_POSTFIELDSIZE</c> (60), a <c>CURLOT_LONG</c> option. Word-cased: <c>PostFieldSize</c>.</summary>
     Postfieldsize = 60,
 
-    /// <summary><c>CURLOPT_POSTFIELDSIZE_LARGE</c> (30120), a <c>CURLOT_OFF_T</c> option.</summary>
+    /// <summary><c>CURLOPT_POSTFIELDSIZE_LARGE</c> (30120), a <c>CURLOT_OFF_T</c> option. Word-cased: <c>PostFieldSizeLarge</c>.</summary>
     PostfieldsizeLarge = 30120,
 
-    /// <summary><c>CURLOPT_POSTQUOTE</c> (10039), a <c>CURLOT_SLIST</c> option.</summary>
+    /// <summary><c>CURLOPT_POSTQUOTE</c> (10039), a <c>CURLOT_SLIST</c> option. Word-cased: <c>PostQuote</c>.</summary>
     Postquote = 10039,
 
-    /// <summary><c>CURLOPT_POSTREDIR</c> (161), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_POSTREDIR</c> (161), a <c>CURLOT_VALUES</c> option. Word-cased: <c>PostRedir</c>.</summary>
     Postredir = 161,
 
-    /// <summary><c>CURLOPT_PREQUOTE</c> (10093), a <c>CURLOT_SLIST</c> option.</summary>
+    /// <summary><c>CURLOPT_PREQUOTE</c> (10093), a <c>CURLOT_SLIST</c> option. Word-cased: <c>PreQuote</c>.</summary>
     Prequote = 10093,
 
-    /// <summary><c>CURLOPT_PREREQDATA</c> (10313), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_PREREQDATA</c> (10313), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>PrereqData</c>.</summary>
     Prereqdata = 10313,
 
-    /// <summary><c>CURLOPT_PREREQFUNCTION</c> (20312), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_PREREQFUNCTION</c> (20312), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>PrereqFunction</c>.</summary>
     Prereqfunction = 20312,
 
     /// <summary><c>CURLOPT_PRE_PROXY</c> (10262), a <c>CURLOT_STRING</c> option.</summary>
@@ -529,10 +531,10 @@ public enum CurlOption
     /// <summary><c>CURLOPT_PRIVATE</c> (10103), a <c>CURLOT_OBJECT</c> option.</summary>
     Private = 10103,
 
-    /// <summary><c>CURLOPT_PROGRESSDATA</c>: an alias of <c>CURLOPT_XFERINFODATA</c> (10057), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_PROGRESSDATA</c>: an alias of <c>CURLOPT_XFERINFODATA</c> (10057), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>ProgressData</c>.</summary>
     Progressdata = Xferinfodata,
 
-    /// <summary><c>CURLOPT_PROGRESSFUNCTION</c> (20056), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_PROGRESSFUNCTION</c> (20056), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>ProgressFunction</c>.</summary>
     Progressfunction = 20056,
 
     /// <summary><c>CURLOPT_PROTOCOLS</c> (181), a <c>CURLOT_LONG</c> option.</summary>
@@ -544,25 +546,25 @@ public enum CurlOption
     /// <summary><c>CURLOPT_PROXY</c> (10004), a <c>CURLOT_STRING</c> option.</summary>
     Proxy = 10004,
 
-    /// <summary><c>CURLOPT_PROXYAUTH</c> (111), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXYAUTH</c> (111), a <c>CURLOT_VALUES</c> option. Word-cased: <c>ProxyAuth</c>.</summary>
     Proxyauth = 111,
 
-    /// <summary><c>CURLOPT_PROXYHEADER</c> (10228), a <c>CURLOT_SLIST</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXYHEADER</c> (10228), a <c>CURLOT_SLIST</c> option. Word-cased: <c>ProxyHeader</c>.</summary>
     Proxyheader = 10228,
 
-    /// <summary><c>CURLOPT_PROXYPASSWORD</c> (10176), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXYPASSWORD</c> (10176), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyPassword</c>.</summary>
     Proxypassword = 10176,
 
-    /// <summary><c>CURLOPT_PROXYPORT</c> (59), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXYPORT</c> (59), a <c>CURLOT_LONG</c> option. Word-cased: <c>ProxyPort</c>.</summary>
     Proxyport = 59,
 
-    /// <summary><c>CURLOPT_PROXYTYPE</c> (101), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXYTYPE</c> (101), a <c>CURLOT_VALUES</c> option. Word-cased: <c>ProxyType</c>.</summary>
     Proxytype = 101,
 
-    /// <summary><c>CURLOPT_PROXYUSERNAME</c> (10175), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXYUSERNAME</c> (10175), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyUsername</c>.</summary>
     Proxyusername = 10175,
 
-    /// <summary><c>CURLOPT_PROXYUSERPWD</c> (10006), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXYUSERPWD</c> (10006), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyUserPwd</c>.</summary>
     Proxyuserpwd = 10006,
 
     /// <summary><c>CURLOPT_PROXY_CAINFO</c> (10246), a <c>CURLOT_STRING</c> option.</summary>
@@ -577,40 +579,40 @@ public enum CurlOption
     /// <summary><c>CURLOPT_PROXY_CRLFILE</c> (10260), a <c>CURLOT_STRING</c> option.</summary>
     ProxyCrlfile = 10260,
 
-    /// <summary><c>CURLOPT_PROXY_ISSUERCERT</c> (10296), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_ISSUERCERT</c> (10296), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyIssuerCert</c>.</summary>
     ProxyIssuercert = 10296,
 
-    /// <summary><c>CURLOPT_PROXY_ISSUERCERT_BLOB</c> (40297), a <c>CURLOT_BLOB</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_ISSUERCERT_BLOB</c> (40297), a <c>CURLOT_BLOB</c> option. Word-cased: <c>ProxyIssuerCertBlob</c>.</summary>
     ProxyIssuercertBlob = 40297,
 
-    /// <summary><c>CURLOPT_PROXY_KEYPASSWD</c> (10258), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_KEYPASSWD</c> (10258), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyKeyPasswd</c>.</summary>
     ProxyKeypasswd = 10258,
 
-    /// <summary><c>CURLOPT_PROXY_PINNEDPUBLICKEY</c> (10263), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_PINNEDPUBLICKEY</c> (10263), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyPinnedPublicKey</c>.</summary>
     ProxyPinnedpublickey = 10263,
 
     /// <summary><c>CURLOPT_PROXY_SERVICE_NAME</c> (10235), a <c>CURLOT_STRING</c> option.</summary>
     ProxyServiceName = 10235,
 
-    /// <summary><c>CURLOPT_PROXY_SSLCERT</c> (10254), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSLCERT</c> (10254), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxySslCert</c>.</summary>
     ProxySslcert = 10254,
 
-    /// <summary><c>CURLOPT_PROXY_SSLCERTTYPE</c> (10255), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSLCERTTYPE</c> (10255), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxySslCertType</c>.</summary>
     ProxySslcerttype = 10255,
 
-    /// <summary><c>CURLOPT_PROXY_SSLCERT_BLOB</c> (40293), a <c>CURLOT_BLOB</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSLCERT_BLOB</c> (40293), a <c>CURLOT_BLOB</c> option. Word-cased: <c>ProxySslCertBlob</c>.</summary>
     ProxySslcertBlob = 40293,
 
-    /// <summary><c>CURLOPT_PROXY_SSLKEY</c> (10256), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSLKEY</c> (10256), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxySslKey</c>.</summary>
     ProxySslkey = 10256,
 
-    /// <summary><c>CURLOPT_PROXY_SSLKEYTYPE</c> (10257), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSLKEYTYPE</c> (10257), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxySslKeyType</c>.</summary>
     ProxySslkeytype = 10257,
 
-    /// <summary><c>CURLOPT_PROXY_SSLKEY_BLOB</c> (40294), a <c>CURLOT_BLOB</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSLKEY_BLOB</c> (40294), a <c>CURLOT_BLOB</c> option. Word-cased: <c>ProxySslKeyBlob</c>.</summary>
     ProxySslkeyBlob = 40294,
 
-    /// <summary><c>CURLOPT_PROXY_SSLVERSION</c> (250), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSLVERSION</c> (250), a <c>CURLOT_VALUES</c> option. Word-cased: <c>ProxySslVersion</c>.</summary>
     ProxySslversion = 250,
 
     /// <summary><c>CURLOPT_PROXY_SSL_CIPHER_LIST</c> (10259), a <c>CURLOT_STRING</c> option.</summary>
@@ -619,22 +621,22 @@ public enum CurlOption
     /// <summary><c>CURLOPT_PROXY_SSL_OPTIONS</c> (261), a <c>CURLOT_LONG</c> option.</summary>
     ProxySslOptions = 261,
 
-    /// <summary><c>CURLOPT_PROXY_SSL_VERIFYHOST</c> (249), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSL_VERIFYHOST</c> (249), a <c>CURLOT_LONG</c> option. Word-cased: <c>ProxySslVerifyHost</c>.</summary>
     ProxySslVerifyhost = 249,
 
-    /// <summary><c>CURLOPT_PROXY_SSL_VERIFYPEER</c> (248), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_SSL_VERIFYPEER</c> (248), a <c>CURLOT_LONG</c> option. Word-cased: <c>ProxySslVerifyPeer</c>.</summary>
     ProxySslVerifypeer = 248,
 
     /// <summary><c>CURLOPT_PROXY_TLS13_CIPHERS</c> (10277), a <c>CURLOT_STRING</c> option.</summary>
     ProxyTls13Ciphers = 10277,
 
-    /// <summary><c>CURLOPT_PROXY_TLSAUTH_PASSWORD</c> (10252), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_TLSAUTH_PASSWORD</c> (10252), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyTlsAuthPassword</c>.</summary>
     ProxyTlsauthPassword = 10252,
 
-    /// <summary><c>CURLOPT_PROXY_TLSAUTH_TYPE</c> (10253), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_TLSAUTH_TYPE</c> (10253), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyTlsAuthType</c>.</summary>
     ProxyTlsauthType = 10253,
 
-    /// <summary><c>CURLOPT_PROXY_TLSAUTH_USERNAME</c> (10251), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_PROXY_TLSAUTH_USERNAME</c> (10251), a <c>CURLOT_STRING</c> option. Word-cased: <c>ProxyTlsAuthUsername</c>.</summary>
     ProxyTlsauthUsername = 10251,
 
     /// <summary><c>CURLOPT_PROXY_TRANSFER_MODE</c> (166), a <c>CURLOT_LONG</c> option.</summary>
@@ -655,10 +657,10 @@ public enum CurlOption
     /// <summary><c>CURLOPT_RANGE</c> (10007), a <c>CURLOT_STRING</c> option.</summary>
     Range = 10007,
 
-    /// <summary><c>CURLOPT_READDATA</c> (10009), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_READDATA</c> (10009), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>ReadData</c>.</summary>
     Readdata = 10009,
 
-    /// <summary><c>CURLOPT_READFUNCTION</c> (20012), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_READFUNCTION</c> (20012), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>ReadFunction</c>.</summary>
     Readfunction = 20012,
 
     /// <summary><c>CURLOPT_REDIR_PROTOCOLS</c> (182), a <c>CURLOT_LONG</c> option.</summary>
@@ -688,7 +690,7 @@ public enum CurlOption
     /// <summary><c>CURLOPT_RESUME_FROM_LARGE</c> (30116), a <c>CURLOT_OFF_T</c> option.</summary>
     ResumeFromLarge = 30116,
 
-    /// <summary><c>CURLOPT_RTSPHEADER</c>: an alias of <c>CURLOPT_HTTPHEADER</c> (10023), a <c>CURLOT_SLIST</c> option.</summary>
+    /// <summary><c>CURLOPT_RTSPHEADER</c>: an alias of <c>CURLOPT_HTTPHEADER</c> (10023), a <c>CURLOT_SLIST</c> option. Word-cased: <c>RtspHeader</c>.</summary>
     Rtspheader = Httpheader,
 
     /// <summary><c>CURLOPT_RTSP_CLIENT_CSEQ</c> (193), a <c>CURLOT_LONG</c> option.</summary>
@@ -715,10 +717,10 @@ public enum CurlOption
     /// <summary><c>CURLOPT_SASL_IR</c> (218), a <c>CURLOT_LONG</c> option.</summary>
     SaslIr = 218,
 
-    /// <summary><c>CURLOPT_SEEKDATA</c> (10168), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_SEEKDATA</c> (10168), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>SeekData</c>.</summary>
     Seekdata = 10168,
 
-    /// <summary><c>CURLOPT_SEEKFUNCTION</c> (20167), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_SEEKFUNCTION</c> (20167), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>SeekFunction</c>.</summary>
     Seekfunction = 20167,
 
     /// <summary><c>CURLOPT_SERVER_RESPONSE_TIMEOUT</c> (112), a <c>CURLOT_LONG</c> option.</summary>
@@ -733,10 +735,10 @@ public enum CurlOption
     /// <summary><c>CURLOPT_SHARE</c> (10100), a <c>CURLOT_OBJECT</c> option.</summary>
     Share = 10100,
 
-    /// <summary><c>CURLOPT_SOCKOPTDATA</c> (10149), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_SOCKOPTDATA</c> (10149), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>SockoptData</c>.</summary>
     Sockoptdata = 10149,
 
-    /// <summary><c>CURLOPT_SOCKOPTFUNCTION</c> (20148), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_SOCKOPTFUNCTION</c> (20148), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>SockoptFunction</c>.</summary>
     Sockoptfunction = 20148,
 
     /// <summary><c>CURLOPT_SOCKS5_AUTH</c> (267), a <c>CURLOT_LONG</c> option.</summary>
@@ -754,10 +756,10 @@ public enum CurlOption
     /// <summary><c>CURLOPT_SSH_COMPRESSION</c> (268), a <c>CURLOT_LONG</c> option.</summary>
     SshCompression = 268,
 
-    /// <summary><c>CURLOPT_SSH_HOSTKEYDATA</c> (10317), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_SSH_HOSTKEYDATA</c> (10317), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>SshHostKeyData</c>.</summary>
     SshHostkeydata = 10317,
 
-    /// <summary><c>CURLOPT_SSH_HOSTKEYFUNCTION</c> (20316), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_SSH_HOSTKEYFUNCTION</c> (20316), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>SshHostKeyFunction</c>.</summary>
     SshHostkeyfunction = 20316,
 
     /// <summary><c>CURLOPT_SSH_HOST_PUBLIC_KEY_MD5</c> (10162), a <c>CURLOT_STRING</c> option.</summary>
@@ -766,52 +768,52 @@ public enum CurlOption
     /// <summary><c>CURLOPT_SSH_HOST_PUBLIC_KEY_SHA256</c> (10311), a <c>CURLOT_STRING</c> option.</summary>
     SshHostPublicKeySha256 = 10311,
 
-    /// <summary><c>CURLOPT_SSH_KEYDATA</c> (10185), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_SSH_KEYDATA</c> (10185), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>SshKeyData</c>.</summary>
     SshKeydata = 10185,
 
-    /// <summary><c>CURLOPT_SSH_KEYFUNCTION</c> (20184), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_SSH_KEYFUNCTION</c> (20184), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>SshKeyFunction</c>.</summary>
     SshKeyfunction = 20184,
 
-    /// <summary><c>CURLOPT_SSH_KNOWNHOSTS</c> (10183), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSH_KNOWNHOSTS</c> (10183), a <c>CURLOT_STRING</c> option. Word-cased: <c>SshKnownHosts</c>.</summary>
     SshKnownhosts = 10183,
 
-    /// <summary><c>CURLOPT_SSH_PRIVATE_KEYFILE</c> (10153), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSH_PRIVATE_KEYFILE</c> (10153), a <c>CURLOT_STRING</c> option. Word-cased: <c>SshPrivateKeyFile</c>.</summary>
     SshPrivateKeyfile = 10153,
 
-    /// <summary><c>CURLOPT_SSH_PUBLIC_KEYFILE</c> (10152), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSH_PUBLIC_KEYFILE</c> (10152), a <c>CURLOT_STRING</c> option. Word-cased: <c>SshPublicKeyFile</c>.</summary>
     SshPublicKeyfile = 10152,
 
-    /// <summary><c>CURLOPT_SSLCERT</c> (10025), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLCERT</c> (10025), a <c>CURLOT_STRING</c> option. Word-cased: <c>SslCert</c>.</summary>
     Sslcert = 10025,
 
-    /// <summary><c>CURLOPT_SSLCERTPASSWD</c>: an alias of <c>CURLOPT_KEYPASSWD</c> (10026), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLCERTPASSWD</c>: an alias of <c>CURLOPT_KEYPASSWD</c> (10026), a <c>CURLOT_STRING</c> option. Word-cased: <c>SslCertPasswd</c>.</summary>
     Sslcertpasswd = Keypasswd,
 
-    /// <summary><c>CURLOPT_SSLCERTTYPE</c> (10086), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLCERTTYPE</c> (10086), a <c>CURLOT_STRING</c> option. Word-cased: <c>SslCertType</c>.</summary>
     Sslcerttype = 10086,
 
-    /// <summary><c>CURLOPT_SSLCERT_BLOB</c> (40291), a <c>CURLOT_BLOB</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLCERT_BLOB</c> (40291), a <c>CURLOT_BLOB</c> option. Word-cased: <c>SslCertBlob</c>.</summary>
     SslcertBlob = 40291,
 
-    /// <summary><c>CURLOPT_SSLENGINE</c> (10089), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLENGINE</c> (10089), a <c>CURLOT_STRING</c> option. Word-cased: <c>SslEngine</c>.</summary>
     Sslengine = 10089,
 
-    /// <summary><c>CURLOPT_SSLENGINE_DEFAULT</c> (90), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLENGINE_DEFAULT</c> (90), a <c>CURLOT_LONG</c> option. Word-cased: <c>SslEngineDefault</c>.</summary>
     SslengineDefault = 90,
 
-    /// <summary><c>CURLOPT_SSLKEY</c> (10087), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLKEY</c> (10087), a <c>CURLOT_STRING</c> option. Word-cased: <c>SslKey</c>.</summary>
     Sslkey = 10087,
 
-    /// <summary><c>CURLOPT_SSLKEYPASSWD</c>: an alias of <c>CURLOPT_KEYPASSWD</c> (10026), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLKEYPASSWD</c>: an alias of <c>CURLOPT_KEYPASSWD</c> (10026), a <c>CURLOT_STRING</c> option. Word-cased: <c>SslKeyPasswd</c>.</summary>
     Sslkeypasswd = Keypasswd,
 
-    /// <summary><c>CURLOPT_SSLKEYTYPE</c> (10088), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLKEYTYPE</c> (10088), a <c>CURLOT_STRING</c> option. Word-cased: <c>SslKeyType</c>.</summary>
     Sslkeytype = 10088,
 
-    /// <summary><c>CURLOPT_SSLKEY_BLOB</c> (40292), a <c>CURLOT_BLOB</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLKEY_BLOB</c> (40292), a <c>CURLOT_BLOB</c> option. Word-cased: <c>SslKeyBlob</c>.</summary>
     SslkeyBlob = 40292,
 
-    /// <summary><c>CURLOPT_SSLVERSION</c> (32), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_SSLVERSION</c> (32), a <c>CURLOT_VALUES</c> option. Word-cased: <c>SslVersion</c>.</summary>
     Sslversion = 32,
 
     /// <summary><c>CURLOPT_SSL_CIPHER_LIST</c> (10083), a <c>CURLOT_STRING</c> option.</summary>
@@ -832,25 +834,25 @@ public enum CurlOption
     /// <summary><c>CURLOPT_SSL_ENABLE_NPN</c> (225), a <c>CURLOT_LONG</c> option.</summary>
     SslEnableNpn = 225,
 
-    /// <summary><c>CURLOPT_SSL_FALSESTART</c> (233), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_SSL_FALSESTART</c> (233), a <c>CURLOT_LONG</c> option. Word-cased: <c>SslFalseStart</c>.</summary>
     SslFalsestart = 233,
 
     /// <summary><c>CURLOPT_SSL_OPTIONS</c> (216), a <c>CURLOT_VALUES</c> option.</summary>
     SslOptions = 216,
 
-    /// <summary><c>CURLOPT_SSL_SESSIONID_CACHE</c> (150), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_SSL_SESSIONID_CACHE</c> (150), a <c>CURLOT_LONG</c> option. Word-cased: <c>SslSessionIdCache</c>.</summary>
     SslSessionidCache = 150,
 
     /// <summary><c>CURLOPT_SSL_SIGNATURE_ALGORITHMS</c> (10328), a <c>CURLOT_STRING</c> option.</summary>
     SslSignatureAlgorithms = 10328,
 
-    /// <summary><c>CURLOPT_SSL_VERIFYHOST</c> (81), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_SSL_VERIFYHOST</c> (81), a <c>CURLOT_LONG</c> option. Word-cased: <c>SslVerifyHost</c>.</summary>
     SslVerifyhost = 81,
 
-    /// <summary><c>CURLOPT_SSL_VERIFYPEER</c> (64), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_SSL_VERIFYPEER</c> (64), a <c>CURLOT_LONG</c> option. Word-cased: <c>SslVerifyPeer</c>.</summary>
     SslVerifypeer = 64,
 
-    /// <summary><c>CURLOPT_SSL_VERIFYSTATUS</c> (232), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_SSL_VERIFYSTATUS</c> (232), a <c>CURLOT_LONG</c> option. Word-cased: <c>SslVerifyStatus</c>.</summary>
     SslVerifystatus = 232,
 
     /// <summary><c>CURLOPT_STDERR</c> (10037), a <c>CURLOT_OBJECT</c> option.</summary>
@@ -868,25 +870,25 @@ public enum CurlOption
     /// <summary><c>CURLOPT_SUPPRESS_CONNECT_HEADERS</c> (265), a <c>CURLOT_LONG</c> option.</summary>
     SuppressConnectHeaders = 265,
 
-    /// <summary><c>CURLOPT_TCP_FASTOPEN</c> (244), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_TCP_FASTOPEN</c> (244), a <c>CURLOT_LONG</c> option. Word-cased: <c>TcpFastOpen</c>.</summary>
     TcpFastopen = 244,
 
-    /// <summary><c>CURLOPT_TCP_KEEPALIVE</c> (213), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_TCP_KEEPALIVE</c> (213), a <c>CURLOT_LONG</c> option. Word-cased: <c>TcpKeepAlive</c>.</summary>
     TcpKeepalive = 213,
 
-    /// <summary><c>CURLOPT_TCP_KEEPCNT</c> (326), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_TCP_KEEPCNT</c> (326), a <c>CURLOT_LONG</c> option. Word-cased: <c>TcpKeepCnt</c>.</summary>
     TcpKeepcnt = 326,
 
-    /// <summary><c>CURLOPT_TCP_KEEPIDLE</c> (214), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_TCP_KEEPIDLE</c> (214), a <c>CURLOT_LONG</c> option. Word-cased: <c>TcpKeepIdle</c>.</summary>
     TcpKeepidle = 214,
 
-    /// <summary><c>CURLOPT_TCP_KEEPINTVL</c> (215), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_TCP_KEEPINTVL</c> (215), a <c>CURLOT_LONG</c> option. Word-cased: <c>TcpKeepIntvl</c>.</summary>
     TcpKeepintvl = 215,
 
     /// <summary><c>CURLOPT_TCP_NODELAY</c> (121), a <c>CURLOT_LONG</c> option.</summary>
     TcpNodelay = 121,
 
-    /// <summary><c>CURLOPT_TELNETOPTIONS</c> (10070), a <c>CURLOT_SLIST</c> option.</summary>
+    /// <summary><c>CURLOPT_TELNETOPTIONS</c> (10070), a <c>CURLOT_SLIST</c> option. Word-cased: <c>TelnetOptions</c>.</summary>
     Telnetoptions = 10070,
 
     /// <summary><c>CURLOPT_TFTP_BLKSIZE</c> (178), a <c>CURLOT_LONG</c> option.</summary>
@@ -895,7 +897,7 @@ public enum CurlOption
     /// <summary><c>CURLOPT_TFTP_NO_OPTIONS</c> (242), a <c>CURLOT_LONG</c> option.</summary>
     TftpNoOptions = 242,
 
-    /// <summary><c>CURLOPT_TIMECONDITION</c> (33), a <c>CURLOT_VALUES</c> option.</summary>
+    /// <summary><c>CURLOPT_TIMECONDITION</c> (33), a <c>CURLOT_VALUES</c> option. Word-cased: <c>TimeCondition</c>.</summary>
     Timecondition = 33,
 
     /// <summary><c>CURLOPT_TIMEOUT</c> (13), a <c>CURLOT_LONG</c> option.</summary>
@@ -904,31 +906,31 @@ public enum CurlOption
     /// <summary><c>CURLOPT_TIMEOUT_MS</c> (155), a <c>CURLOT_LONG</c> option.</summary>
     TimeoutMs = 155,
 
-    /// <summary><c>CURLOPT_TIMEVALUE</c> (34), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_TIMEVALUE</c> (34), a <c>CURLOT_LONG</c> option. Word-cased: <c>TimeValue</c>.</summary>
     Timevalue = 34,
 
-    /// <summary><c>CURLOPT_TIMEVALUE_LARGE</c> (30270), a <c>CURLOT_OFF_T</c> option.</summary>
+    /// <summary><c>CURLOPT_TIMEVALUE_LARGE</c> (30270), a <c>CURLOT_OFF_T</c> option. Word-cased: <c>TimeValueLarge</c>.</summary>
     TimevalueLarge = 30270,
 
     /// <summary><c>CURLOPT_TLS13_CIPHERS</c> (10276), a <c>CURLOT_STRING</c> option.</summary>
     Tls13Ciphers = 10276,
 
-    /// <summary><c>CURLOPT_TLSAUTH_PASSWORD</c> (10205), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_TLSAUTH_PASSWORD</c> (10205), a <c>CURLOT_STRING</c> option. Word-cased: <c>TlsAuthPassword</c>.</summary>
     TlsauthPassword = 10205,
 
-    /// <summary><c>CURLOPT_TLSAUTH_TYPE</c> (10206), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_TLSAUTH_TYPE</c> (10206), a <c>CURLOT_STRING</c> option. Word-cased: <c>TlsAuthType</c>.</summary>
     TlsauthType = 10206,
 
-    /// <summary><c>CURLOPT_TLSAUTH_USERNAME</c> (10204), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_TLSAUTH_USERNAME</c> (10204), a <c>CURLOT_STRING</c> option. Word-cased: <c>TlsAuthUsername</c>.</summary>
     TlsauthUsername = 10204,
 
-    /// <summary><c>CURLOPT_TRAILERDATA</c> (10284), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_TRAILERDATA</c> (10284), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>TrailerData</c>.</summary>
     Trailerdata = 10284,
 
-    /// <summary><c>CURLOPT_TRAILERFUNCTION</c> (20283), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_TRAILERFUNCTION</c> (20283), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>TrailerFunction</c>.</summary>
     Trailerfunction = 20283,
 
-    /// <summary><c>CURLOPT_TRANSFERTEXT</c> (53), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_TRANSFERTEXT</c> (53), a <c>CURLOT_LONG</c> option. Word-cased: <c>TransferText</c>.</summary>
     Transfertext = 53,
 
     /// <summary><c>CURLOPT_TRANSFER_ENCODING</c> (207), a <c>CURLOT_LONG</c> option.</summary>
@@ -946,7 +948,7 @@ public enum CurlOption
     /// <summary><c>CURLOPT_UPLOAD</c> (46), a <c>CURLOT_LONG</c> option.</summary>
     Upload = 46,
 
-    /// <summary><c>CURLOPT_UPLOAD_BUFFERSIZE</c> (280), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_UPLOAD_BUFFERSIZE</c> (280), a <c>CURLOT_LONG</c> option. Word-cased: <c>UploadBufferSize</c>.</summary>
     UploadBuffersize = 280,
 
     /// <summary><c>CURLOPT_UPLOAD_FLAGS</c> (327), a <c>CURLOT_LONG</c> option.</summary>
@@ -955,13 +957,13 @@ public enum CurlOption
     /// <summary><c>CURLOPT_URL</c> (10002), a <c>CURLOT_STRING</c> option.</summary>
     Url = 10002,
 
-    /// <summary><c>CURLOPT_USERAGENT</c> (10018), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_USERAGENT</c> (10018), a <c>CURLOT_STRING</c> option. Word-cased: <c>UserAgent</c>.</summary>
     Useragent = 10018,
 
     /// <summary><c>CURLOPT_USERNAME</c> (10173), a <c>CURLOT_STRING</c> option.</summary>
     Username = 10173,
 
-    /// <summary><c>CURLOPT_USERPWD</c> (10005), a <c>CURLOT_STRING</c> option.</summary>
+    /// <summary><c>CURLOPT_USERPWD</c> (10005), a <c>CURLOT_STRING</c> option. Word-cased: <c>UserPwd</c>.</summary>
     Userpwd = 10005,
 
     /// <summary><c>CURLOPT_USE_SSL</c> (119), a <c>CURLOT_VALUES</c> option.</summary>
@@ -970,25 +972,25 @@ public enum CurlOption
     /// <summary><c>CURLOPT_VERBOSE</c> (41), a <c>CURLOT_LONG</c> option.</summary>
     Verbose = 41,
 
-    /// <summary><c>CURLOPT_WILDCARDMATCH</c> (197), a <c>CURLOT_LONG</c> option.</summary>
+    /// <summary><c>CURLOPT_WILDCARDMATCH</c> (197), a <c>CURLOT_LONG</c> option. Word-cased: <c>WildcardMatch</c>.</summary>
     Wildcardmatch = 197,
 
-    /// <summary><c>CURLOPT_WRITEDATA</c> (10001), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_WRITEDATA</c> (10001), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>WriteData</c>.</summary>
     Writedata = 10001,
 
-    /// <summary><c>CURLOPT_WRITEFUNCTION</c> (20011), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_WRITEFUNCTION</c> (20011), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>WriteFunction</c>.</summary>
     Writefunction = 20011,
 
-    /// <summary><c>CURLOPT_WRITEHEADER</c>: an alias of <c>CURLOPT_HEADERDATA</c> (10029), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_WRITEHEADER</c>: an alias of <c>CURLOPT_HEADERDATA</c> (10029), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>WriteHeader</c>.</summary>
     Writeheader = Headerdata,
 
     /// <summary><c>CURLOPT_WS_OPTIONS</c> (320), a <c>CURLOT_LONG</c> option.</summary>
     WsOptions = 320,
 
-    /// <summary><c>CURLOPT_XFERINFODATA</c> (10057), a <c>CURLOT_CBPTR</c> option.</summary>
+    /// <summary><c>CURLOPT_XFERINFODATA</c> (10057), a <c>CURLOT_CBPTR</c> option. Word-cased: <c>XferInfoData</c>.</summary>
     Xferinfodata = 10057,
 
-    /// <summary><c>CURLOPT_XFERINFOFUNCTION</c> (20219), a <c>CURLOT_FUNCTION</c> option.</summary>
+    /// <summary><c>CURLOPT_XFERINFOFUNCTION</c> (20219), a <c>CURLOT_FUNCTION</c> option. Word-cased: <c>XferInfoFunction</c>.</summary>
     Xferinfofunction = 20219,
 
     /// <summary><c>CURLOPT_XOAUTH2_BEARER</c> (10220), a <c>CURLOT_STRING</c> option.</summary>

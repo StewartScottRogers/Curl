@@ -33,7 +33,7 @@ public sealed class TelnetProtocolHandlerDiagnosticLogTests
         Diagnostics.Assert("log lines", 2, log.Lines.Count);
         Diagnostics.Diff("info line 0", "session started to example.test:23", info[0]);
         Diagnostics.Assert("info line 1 pattern", "^session ended: 5 bytes in [0-9]+ ms$", info[1]);
-        Assert.AreEqual(TransferResult.Success(5), result);
+        Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
         Assert.HasCount(2, log.Lines);
         Assert.AreEqual("session started to example.test:23", info[0]);
         StringAssert.Matches(info[1], new Regex("^session ended: 5 bytes in [0-9]+ ms$"));

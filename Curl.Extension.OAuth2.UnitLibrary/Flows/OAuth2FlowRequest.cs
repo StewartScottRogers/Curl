@@ -10,5 +10,8 @@ namespace Curl.Extension.OAuth2.Flows;
 public sealed record OAuth2FlowRequest(Uri TokenEndpoint, OAuth2Client Client, string? Scope)
 {
     /// <summary>Gets the key the token this request gets is cached under (ADR-1034).</summary>
-    public OAuth2TokenCacheKey CacheKey => new(TokenEndpoint, Client.ClientId, Scope);
+    public OAuth2TokenCacheKey CacheKey => new(TokenEndpoint, Client.ClientId, Scope) { DpopKeyThumbprint = DpopKeyThumbprint };
+
+    /// <summary>Gets the JWK thumbprint of the DPoP key the token is to be bound to, or <see langword="null"/> for none.</summary>
+    public string? DpopKeyThumbprint { get; init; }
 }

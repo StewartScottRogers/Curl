@@ -14,7 +14,7 @@ service REST API at `x-ms-version: 2025-01-05` and HTTP/1.1 (RFC 9112), by the c
 | AzureStorage:PutBlob-2 | REQUIRED | Put Blob carries `Content-Length`, the length of the body that becomes the blob. | AzureBlobTransferCases.Upload_SmallFile_SendsOnePutBlobOfABlockBlob |
 | AzureStorage:ErrorCodes-1 | MUST | A failed operation answers a 4xx or 5xx status with an `Error` body holding `Code` and `Message`; curl exits 22 naming them. | AzureBlobTransferCases.Download_MissingBlob_ReadsTheErrorBodyAndExits22 |
 | AzureStorage:AnonymousAccess-1 | MAY | A read of a container with anonymous read access needs no `Authorization` and no SAS. | AzureBlobTransferCases.Download_NoCredential_SendsNoAuthorizationAndReadsAPublicContainer |
-| AzureStorage:AuthorizeSharedKey-1 | REQUIRED | A Shared Key request signs its canonical headers and resource in `Authorization: SharedKey`. | n/a: curl's client does not implement Shared Key (BL-4290's Notes) |
+| AzureStorage:AuthorizeSharedKey-1 | REQUIRED | A Shared Key request signs its canonical headers and resource in `Authorization: SharedKey`. | AzureBlobSharedKeyCases.Download_AccountAndKey_SendsAnAuthorizationSharedKeySignatureOverTheCanonicalRequest |
 | AzureStorage:PutBlock-1 | REQUIRED | Put Block is `PUT` on `/<container>/<blob>?comp=block&blockid=<id>` with `Content-Length` and the block as its body. | AzureBlobBlockUploadAndListingCases.Upload_EightMiBAndMore_SendsEqualLengthBlocksThenTheBlockListInOrder |
 | AzureStorage:PutBlock-2 | MUST | Every block ID of a blob is Base64 and of the same length before encoding. | AzureBlobBlockUploadAndListingCases.Upload_EightMiBAndMore_SendsEqualLengthBlocksThenTheBlockListInOrder |
 | AzureStorage:PutBlockList-1 | REQUIRED | Put Block List is `PUT` with `comp=blocklist` and a `BlockList` body naming the staged blocks in the order that makes up the blob. | AzureBlobBlockUploadAndListingCases.Upload_EightMiBAndMore_SendsEqualLengthBlocksThenTheBlockListInOrder |
@@ -37,10 +37,16 @@ service REST API at `x-ms-version: 2025-01-05` and HTTP/1.1 (RFC 9112), by the c
 | AzureStorage:RFC9112-6.1-1 | MUST NOT | A sender does not send `Content-Length` in a message that carries `Transfer-Encoding`; every request body here is framed by `Content-Length` alone. | AzureBlobRequestHeaderCases.Upload_EightMiBAndMoreWithBearer_FramesEveryBodyByContentLengthOverTls |
 | AzureStorage:AuthorizeOAuth-2 | MUST | A request authorized with OAuth is sent over HTTPS. | AzureBlobRequestHeaderCases.Upload_EightMiBAndMoreWithBearer_FramesEveryBodyByContentLengthOverTls |
 | AzureStorage:ListBlobs-3 | OPTIONAL | `maxresults` limits a page's size; without it the service chooses (up to 5,000). | n/a: curl's client sends no `maxresults` and follows `NextMarker` whatever the page size |
-| AzureStorage:GetBlob-2 | OPTIONAL | `Range` or `x-ms-range` reads part of a blob. | n/a: curl's client reads the whole blob |
+| AzureStorage:GetBlob-2 | OPTIONAL | `Range` or `x-ms-range` reads part of a blob. | n/a: curl's client reads the whole blob; `-r` and `-C` are refused with exit 4 before any request (ADR-1348, `AzureStorageByteRangeRefusalTests`) |
 
 Data Lake Storage Gen2 (`abfs://`, `abfss://`) has its own matrix: [AzureStorage-DataLake.md](AzureStorage-DataLake.md).
 
 ## Request methods
 
 `az://` sends only the methods its operations need: GET to download or list, and with `-T` PUT (Put Blob, Put Block, Put Block List); `abfs://` and `abfss://` behave the same. `-X GET` without `-T` and `-X PUT` with it are accepted, since they name what is sent anyway. `-I`/`--head` and every other `-X` (`DELETE`, `HEAD`, `POST`, ...) fail with exit 4 and `az:// does not support ...` before any connection, so a destructive method is never reported done while a GET was sent instead (ADR-1249, `AzureStorageRequestMethodTests`).
+
+## URL port
+
+A port in an `az://`, `abfs://` or `abfss://` URL is used (BL-5342): `az://127.0.0.1:10000/c/x` connects to `127.0.0.1` on port 10000, so an Azurite-style emulator works, and the `Host` header is `127.0.0.1:10000`. With no port, or port 443, the connection goes to 443 and `Host` is the bare host. The request is always HTTPS. SAS and bearer authorization carry no host or port in what they sign, so they are unchanged (`AzureStoragePortTests`, `AzureStorageRequestAuthorizerTests`).
+
+A host that is an IP address or `localhost` is a path-style emulator (BL-5407): the account is the first path segment and the container the second, as in `az://127.0.0.1:10000/devstoreaccount1/ctr/` listing `GET /devstoreaccount1/ctr?restype=container&comp=list&delimiter=%2F`. A blob GET or PUT keeps the account in the path. A public-cloud host (a bare account name or a name with a dot) is unchanged.

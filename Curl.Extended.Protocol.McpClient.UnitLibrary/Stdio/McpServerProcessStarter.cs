@@ -21,6 +21,15 @@ public sealed class McpServerProcessStarter : IMcpServerProcessStarter
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(arguments);
+        var startInfo = BuildStartInfo(command, arguments);
+        var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"The MCP server '{command}' did not start.");
+        return new SystemMcpServerProcess(process);
+    }
+
+    /// <summary>Builds the start info: no shell (the streams cannot be redirected through one), input and output redirected, error not.</summary>
+    internal static ProcessStartInfo BuildStartInfo(string command, IReadOnlyList<string> arguments)
+    {
         var startInfo = new ProcessStartInfo(command)
         {
             UseShellExecute = false,
@@ -29,14 +38,20 @@ public sealed class McpServerProcessStarter : IMcpServerProcessStarter
             RedirectStandardError = false,
             StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
         };
+        if (McpBatchArgumentRefusal.IsBatchFile(command))
+        {
+            // cmd.exe splits an unquoted argument at = , and ;, so every argument of a batch server is double-quoted
+            // (the refusal has already kept " and % out of them).
+            startInfo.Arguments = string.Join(' ', arguments.Select(argument => "\"" + argument + "\""));
+            return startInfo;
+        }
+
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
 
-        var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException($"The MCP server '{command}' did not start.");
-        return new SystemMcpServerProcess(process);
+        return startInfo;
     }
 
     private sealed class SystemMcpServerProcess(Process process) : IMcpServerProcess

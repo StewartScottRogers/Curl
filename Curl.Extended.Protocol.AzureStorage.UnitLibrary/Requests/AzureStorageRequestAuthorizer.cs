@@ -17,26 +17,34 @@ public sealed class AzureStorageRequestAuthorizer(TimeProvider timeProvider)
     /// <param name="endpoint">Where the request goes.</param>
     /// <param name="credential">What authorizes it.</param>
     /// <returns>The request target and header fields.</returns>
-    /// <exception cref="AzureStorageRequestException">The SAS token is not a query string, or the bearer token cannot be a header value.</exception>
-    public AzureStorageAuthorizedRequest Authorize(AzureStorageEndpoint endpoint, AzureStorageCredential credential)
+    /// <param name="method">The request's verb, which a Shared Key signature covers.</param>
+    /// <param name="extraHeaders">The header fields the caller sends after these, which a Shared Key signature covers; <see langword="null"/> for none.</param>
+    /// <param name="bodyLength">The request body's length, which a Shared Key signature covers.</param>
+    /// <exception cref="AzureStorageRequestException">The SAS token is not a query string, the bearer token cannot be a header value, or the account key is not base64.</exception>
+    public AzureStorageAuthorizedRequest Authorize(AzureStorageEndpoint endpoint, AzureStorageCredential credential, string method = "GET", IReadOnlyList<KeyValuePair<string, string>>? extraHeaders = null, long bodyLength = 0)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         ArgumentNullException.ThrowIfNull(credential);
         var headers = new List<KeyValuePair<string, string>>
         {
-            new("Host", endpoint.Host),
+            new("Host", endpoint.HostHeader),
             new("x-ms-version", ServiceVersion),
             new("x-ms-date", timeProvider.GetUtcNow().ToString("R", CultureInfo.InvariantCulture)),
         };
         var query = endpoint.Query;
         if (credential.Kind == AzureStorageCredentialKind.SharedAccessSignature)
         {
-            var sas = SasQuery(credential.Value);
-            query = query.Length == 0 ? sas : query + "&" + sas;
+            query = Joined(query, SasQuery(credential.Value));
         }
         else if (credential.Kind == AzureStorageCredentialKind.Bearer)
         {
             headers.Add(new("Authorization", "Bearer " + BearerToken(credential.Value)));
+        }
+
+        else if (credential.Kind == AzureStorageCredentialKind.SharedKey)
+        {
+            var stringToSign = AzureStorageSharedKeyStringToSign.Build(method, credential.Account, endpoint.Path, query, [.. headers, .. extraHeaders ?? []], bodyLength);
+            headers.Add(new("Authorization", AzureStorageSharedKeySigner.AuthorizationOf(credential.Account, credential.Value, stringToSign)));
         }
 
         var target = query.Length == 0 ? endpoint.Path : endpoint.Path + "?" + query;
@@ -58,6 +66,8 @@ public sealed class AzureStorageRequestAuthorizer(TimeProvider timeProvider)
 
         return query;
     }
+
+    private static string Joined(string query, string addition) => query.Length == 0 ? addition : query + "&" + addition;
 
     private static bool IsSignedQuery(string query)
     {

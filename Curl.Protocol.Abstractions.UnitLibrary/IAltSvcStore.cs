@@ -5,8 +5,10 @@ namespace Curl.Protocol.Abstractions;
 /// headers (<c>--alt-svc</c>).
 /// </summary>
 /// <remarks>
-/// Implemented in <c>Curl.Core.UnitLibrary</c> (<c>AltSvcCache</c>, ADR-0175) and set on
-/// <see cref="HttpRequestOptions.AltSvcStore" /> by <c>Curl.Console</c>, which also reads and
+/// Implemented in <c>Curl.Engine.UnitLibrary</c> by <c>AltSvcTransferCache</c>, which wraps
+/// <c>Curl.Core.UnitLibrary</c>'s <c>AltSvcCache</c> (ADR-0175), and set on
+/// <see cref="HttpRequestOptions.AltSvcStore" /> by <c>TransferContextFactory</c> in
+/// <c>Curl.Engine.UnitLibrary</c>, which also reads and
 /// writes the cache file around the transfers and looks up the <see cref="AltSvcRoute" /> a
 /// transfer uses. The store never reads a clock: the caller passes the time from
 /// <see cref="ITransferContext.TimeProvider" />.

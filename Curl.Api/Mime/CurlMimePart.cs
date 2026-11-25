@@ -59,7 +59,14 @@ public sealed record CurlMimePart
         return Bytes(name, Encoding.UTF8.GetBytes(value));
     }
 
-    /// <summary>A part of <paramref name="bytes"/>, copied when the request is sent (<c>curl_mime_data</c>).</summary>
+    /// <summary>
+    /// A part of <paramref name="bytes"/>, copied when the request is sent (<c>curl_mime_data</c>).
+    /// With no <see cref="ContentType"/> the part gets the header libcurl gives a data part, not the
+    /// <c>application/octet-stream</c> of a file part (<c>curl -F name=@file</c>): none when it has no
+    /// <see cref="FileName"/> or one whose extension is unknown (<c>.bin</c>), and the type of a known
+    /// extension (<c>.txt</c> is <c>text/plain</c>) over HTTP; over SMTP a <c>text/plain</c> guess is left out.
+    /// Set <see cref="ContentType"/> to <c>application/octet-stream</c> to label an attachment.
+    /// </summary>
     /// <param name="name">The field name, or <see langword="null"/> for none.</param>
     /// <param name="bytes">The content.</param>
     /// <returns>The part.</returns>

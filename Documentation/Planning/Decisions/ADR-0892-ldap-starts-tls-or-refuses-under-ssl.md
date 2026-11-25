@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-26
 - **Task:** BL-3542 (CGR-013)
+- **Amended by:** ADR-1366 (refusal codes, closed server, handshake failures, LDAPv2 fallback)
 - **Decided by Claude under Stewart's delegation**
 
 ## Context
@@ -38,7 +39,4 @@ clear. Real curl never does:
 
 ## Consequences
 
-The refused-StartTLS text and exit code on the OpenLDAP dialect were not measured: under a
-`nc` stand-in in WSL, curl 8.18.0 sent StartTLS but never acted on the canned ExtendedResponse
-before the timeout, so the exit-64 path follows curl's source. The OpenLDAP dialect writes no
-extra `-v` lines for StartTLS.
+Correction (BL-5332, 2026-11-16, decided by Claude under Stewart's delegation): this ADR first inferred exit 64 `LDAP local: <libldap text>` for a refused StartTLS from curl's source because the 2026-10-26 `nc` stand-in never got an answer. An outside fitness review (STD-082) measured curl 8.18 (OpenSSL/OpenLDAP) against a stand-in answering with resultCode 2, 52, 53 and 12: exit 1 `curl: (1) Unsupported protocol`, then an UnbindRequest. The port follows the measurement; the closed-server case was not re-measured and keeps exit 64. The OpenLDAP dialect writes no extra `-vlines for StartTLS.

@@ -72,6 +72,11 @@ internal static class OAuth2TokenCacheFormat
         writer.WriteString("token_endpoint", key.TokenEndpoint.AbsoluteUri);
         writer.WriteString("client_id", key.ClientId);
         writer.WriteString("scope", key.Scope);
+        if (key.DpopKeyThumbprint is { } thumbprint)
+        {
+            writer.WriteString("dpop_jkt", thumbprint);
+        }
+
         writer.WriteString("access_token", token.AccessToken);
         writer.WriteString("token_type", token.TokenType);
         writer.WritePropertyName("expires_at");
@@ -97,7 +102,10 @@ internal static class OAuth2TokenCacheFormat
     private static OAuth2TokenCacheKey ReadKey(JsonElement entry) => new(
         new Uri(ReadRequiredString(entry, "token_endpoint"), UriKind.Absolute),
         ReadRequiredString(entry, "client_id"),
-        entry.GetProperty("scope").GetString());
+        entry.GetProperty("scope").GetString())
+    {
+        DpopKeyThumbprint = entry.TryGetProperty("dpop_jkt", out var thumbprint) ? thumbprint.GetString() : null,
+    };
 
     private static OAuth2CachedToken ReadToken(JsonElement entry) => new(
         ReadRequiredString(entry, "access_token"),

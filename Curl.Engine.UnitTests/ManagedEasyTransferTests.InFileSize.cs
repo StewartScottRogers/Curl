@@ -130,6 +130,12 @@ public sealed partial class ManagedEasyTransferTests
     [DataRow("http://h/x", 13L, 13L)]
     [DataRow("HTTPS://h/x", 0L, 0L)]
     [DataRow("http://h/x", -1L, null)]
+    [DataRow("smb://h/share/x", 13L, 13L)]
+    [DataRow("SMBS://h/share/x", 0L, 0L)]
+    [DataRow("imap://h/INBOX", 13L, 13L)]
+    [DataRow("IMAPS://h/INBOX", 0L, 0L)]
+    [DataRow("imap://h/INBOX", -1L, null)]
+    [DataRow("smb://h/share/x", -1L, null)]
     [DataRow("ftp://h/x", 13L, null)]
     [DataRow("ws://h/x", 13L, null)]
     public void DeclaredUploadLengthOf_SchemeAndInFileSize_HoldsOnlyAnHttpUploadOfKnownSize(string url, long inFileSize, long? expected) =>

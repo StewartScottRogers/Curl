@@ -40,7 +40,7 @@ internal static class LdapRequests
     private static readonly Asn1Tag PresentFilterTag = new(TagClass.ContextSpecific, 7);
 
     /// <summary>The time limit, in seconds, WinLDAP puts on its rootDSE reads.</summary>
-    private const int RootDseTimeLimit = 120;
+    private const int WinLdapRootDseTimeLimit = 120;
 
     /// <summary>
     /// Encodes a BindRequest with simple authentication (RFC 4511 section 4.2): the anonymous
@@ -76,6 +76,24 @@ internal static class LdapRequests
                 LdapBerWriter.OctetString(Asn1Tag.PrimitiveOctetString, credentials)));
 
     /// <summary>
+    /// Encodes an LDAPv3 BindRequest with a SASL mechanism and no credentials field, as OpenLDAP sends a
+    /// mechanism without an initial response and, with an empty mechanism, curl's cancellation.
+    /// </summary>
+    /// <param name="writer">Writes the elements with the dialect's length form.</param>
+    /// <param name="messageId">The LDAPMessage's messageID.</param>
+    /// <param name="mechanism">The SASL mechanism's name.</param>
+    /// <returns>The LDAPMessage.</returns>
+    public static byte[] SaslBindWithoutCredentials(LdapBerWriter writer, int messageId, string mechanism) =>
+        BindWith(
+            writer,
+            messageId,
+            3,
+            string.Empty,
+            writer.Constructed(
+                SaslAuthenticationTag,
+                LdapBerWriter.OctetString(Asn1Tag.PrimitiveOctetString, Encoding.UTF8.GetBytes(mechanism))));
+
+    /// <summary>
     /// Encodes an LDAPv3 BindRequest with one of Microsoft's Sicily authentication choices
     /// (MS-ADTS 5.1.1.1.3), as WinLDAP sends its NTLM logon bind to a server that offers no
     /// <c>GSS-SPNEGO</c>: <c>[10]</c> <c>sicilyNegotiate</c> with the name <c>NTLM</c>, then
@@ -98,8 +116,9 @@ internal static class LdapRequests
     /// <param name="writer">Writes the elements with the dialect's length form.</param>
     /// <param name="messageId">The LDAPMessage's messageID.</param>
     /// <param name="attribute">The attribute to read.</param>
+    /// <param name="timeLimit">The search's time limit in seconds; WinLDAP's unless given, where OpenLDAP sends 0.</param>
     /// <returns>The LDAPMessage.</returns>
-    public static byte[] RootDseSearch(LdapBerWriter writer, int messageId, string attribute) =>
+    public static byte[] RootDseSearch(LdapBerWriter writer, int messageId, string attribute, int timeLimit = WinLdapRootDseTimeLimit) =>
         Search(
             writer,
             messageId,
@@ -107,7 +126,7 @@ internal static class LdapRequests
             0,
             LdapBerWriter.OctetString(PresentFilterTag, "objectclass"u8),
             [Encoding.UTF8.GetBytes(attribute)],
-            RootDseTimeLimit);
+            timeLimit);
 
     /// <summary>Encodes a BindRequest with <paramref name="authentication" /> as its AuthenticationChoice.</summary>
     private static byte[] BindWith(LdapBerWriter writer, int messageId, int version, string name, byte[] authentication) =>

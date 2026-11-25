@@ -23,7 +23,7 @@ public sealed class NativeExtendedAttributeWriterIntegrationTests
         File.WriteAllText(path, "hello");
         try
         {
-            NativeExtendedAttributeWriter writer = NativeExtendedAttributeWriter.ForCurrentPlatform()!;
+            IExtendedAttributeWriter writer = NativeExtendedAttributeWriter.ForCurrentPlatform()!;
             Diagnostics.Arrange("file", "temporary file containing hello");
             Diagnostics.Arrange("attribute", OutputFileExtendedAttributes.MimeTypeName + " = text/plain");
 
@@ -47,7 +47,7 @@ public sealed class NativeExtendedAttributeWriterIntegrationTests
     [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
     public void TryWrite_OnAMissingFile_FailsWithTheSystemText()
     {
-        NativeExtendedAttributeWriter writer = NativeExtendedAttributeWriter.ForCurrentPlatform()!;
+        IExtendedAttributeWriter writer = NativeExtendedAttributeWriter.ForCurrentPlatform()!;
         Diagnostics.Arrange("path", "/nonexistent-bl651/x");
         Diagnostics.Arrange("attribute", OutputFileExtendedAttributes.CreatorName + " = curl");
 

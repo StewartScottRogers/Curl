@@ -21,6 +21,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
     private readonly Lock _gate = new();
     private readonly Queue<byte[]> _chunks = new();
     private readonly TaskCompletionSource _started = NewSignal();
+    private readonly TaskCompletionSource _endedOrPaused = NewSignal();
     private TaskCompletionSource _arrived = NewSignal();
     /// <summary>How far into the first queued chunk the reader has already read.</summary>
     private int _offset;
@@ -37,6 +38,9 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
     /// <summary>Completes on the first delivery of body bytes or the end of the transfer, whichever comes first.</summary>
     public Task Started => _started.Task;
 
+    /// <summary>Completes when the transfer ends or the buffer first fills and pauses it, whichever comes first.</summary>
+    public Task EndedOrPaused => _endedOrPaused.Task;
+
     /// <summary>Whether <see cref="Complete"/> has been called: the transfer is over.</summary>
     public bool Ended
     {
@@ -45,6 +49,18 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
             lock (_gate)
             {
                 return _ended;
+            }
+        }
+    }
+
+    /// <summary>Whether body bytes have been delivered and not yet read (ADR-1334): a transfer that failed after them still hands them to the reader before its error.</summary>
+    public bool HasUnreadBody
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _buffered > 0;
             }
         }
     }
@@ -73,6 +89,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
             if (_buffered > 0 && _buffered + data.Length > capacity)
             {
                 _paused = true;
+                _endedOrPaused.TrySetResult();
                 return WriteCallbackResult.Pause;
             }
 
@@ -102,6 +119,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
         }
 
         _started.TrySetResult();
+        _endedOrPaused.TrySetResult();
         arrived.TrySetResult();
     }
 

@@ -93,6 +93,12 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
     public bool OffersKeyboardInteractive { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a server that offers <c>keyboard-interactive</c> offers
+    /// <c>password</c> as well (BL-5670).
+    /// </summary>
+    public bool OffersPasswordToo { get; init; }
+
+    /// <summary>
     /// Gets how many bytes more than an SCP download's file holds the server's <c>C</c> line
     /// announces before the channel ends, with no zero byte after the bytes: 0, the default,
     /// for the file's own size.
@@ -100,7 +106,12 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
     public int ScpFileShortBy { get; init; }
 
     /// <summary>Gets the authentication methods a refusal lists, as <see cref="OffersKeyboardInteractive" /> chooses them.</summary>
-    internal string AuthenticationMethods => OffersKeyboardInteractive ? "publickey,keyboard-interactive" : "publickey,password";
+    internal string AuthenticationMethods => (OffersKeyboardInteractive, OffersPasswordToo) switch
+    {
+        (true, true) => "publickey,password,keyboard-interactive",
+        (true, false) => "publickey,keyboard-interactive",
+        _ => "publickey,password",
+    };
 
     /// <summary>
     /// Gets the step at which the server resets the connection rather than answering, or

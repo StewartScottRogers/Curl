@@ -12,23 +12,23 @@ namespace Curl.Engine;
 internal static class ManagedCurlVersion
 {
     // -V's Protocols: line without ipfs and ipns, which the curl tool adds itself (src/tool_libinfo.c).
-    private static readonly string[] Protocols =
+    internal static readonly string[] Protocols =
     [
         "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap", "imaps", "ldap", "ldaps",
-        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
+        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
     ];
 
     // The Schannel reference build's Features: line.
     private static readonly string[] WindowsFeatures =
     [
-        "alt-svc", "AsynchDNS", "brotli", "HSTS", "HTTPS-proxy", "IDN", "IPv6", "Kerberos", "Largefile",
+        "alt-svc", "AsynchDNS", "brotli", "HSTS", "HTTP2", "HTTP3", "HTTPS-proxy", "IDN", "IPv6", "Kerberos", "Largefile",
         "libz", "NTLM", "PSL", "SPNEGO", "SSL", "SSPI", "threadsafe", "UnixSockets", "zstd",
     ];
 
     // The OpenSSL reference build's Features: line, which Curl's -V shows on Linux and macOS alike; no HTTPSRR (ADR-0957).
     private static readonly string[] Features =
     [
-        "alt-svc", "AsynchDNS", "brotli", "GSS-API", "HSTS", "HTTP2", "HTTPS-proxy", "IDN", "IPv6",
+        "alt-svc", "AsynchDNS", "brotli", "GSS-API", "HSTS", "HTTP2", "HTTP3", "HTTPS-proxy", "IDN", "IPv6",
         "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL", "SSLS-EXPORT", "threadsafe",
         "UnixSockets", "zstd",
     ];

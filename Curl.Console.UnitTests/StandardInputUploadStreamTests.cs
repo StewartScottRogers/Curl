@@ -21,13 +21,14 @@ public sealed class StandardInputUploadStreamTests
     }
 
     [TestMethod]
-    [DataRow(true, false, true, DisplayName = "seekable input, seek of a pipe fails")]
-    [DataRow(false, true, true, DisplayName = "pipe, seek of a pipe succeeds (Windows)")]
-    [DataRow(false, false, false, DisplayName = "pipe, seek of a pipe fails (Linux, macOS)")]
-    public void CanRewind_ByInputAndPlatform_IsWhetherCurlsSeekWouldSucceed(bool inputSeeks, bool seekOfUnseekableInputSucceeds, bool expected)
+    [DataRow(true, false, true, DisplayName = "seekable input, seek of descriptor 0 fails")]
+    [DataRow(false, true, true, DisplayName = "pipe on Windows or a redirected file elsewhere, seek of descriptor 0 succeeds")]
+    [DataRow(false, false, false, DisplayName = "pipe on Linux or macOS, seek of descriptor 0 fails")]
+    public void CanRewind_OnceReadByInputAndPlatform_IsWhetherCurlsSeekWouldSucceed(bool inputSeeks, bool seekOfStandardInputSucceeds, bool expected)
     {
         using MemoryStream input = inputSeeks ? new MemoryStream([1]) : new UnseekableInput();
-        using StandardInputUploadStream stream = new(input) { SeekOfUnseekableInputSucceeds = seekOfUnseekableInputSucceeds };
+        using StandardInputUploadStream stream = new(input) { SeekOfStandardInputSucceeds = seekOfStandardInputSucceeds };
+        _ = stream.Read(new byte[1], 0, 1);
 
         bool canRewind = stream.CanRewind;
 
@@ -35,13 +36,36 @@ public sealed class StandardInputUploadStreamTests
     }
 
     [TestMethod]
-    public void SeekOfUnseekableInputSucceeds_ByDefault_IsWhetherThisIsWindows()
+    public void CanRewind_PipeWhoseSeekFailsNotYetRead_IsTrueAsCurlNeedsNoRewind()
+    {
+        // curl rewinds only a reader it has read from (measured, BL-5910 Notes; upstream test1072 and test1073).
+        using StandardInputUploadStream stream = new(new UnseekableInput()) { SeekOfStandardInputSucceeds = false };
+
+        bool canRewind = stream.CanRewind;
+
+        Assert.IsTrue(canRewind);
+    }
+
+    [TestMethod]
+    public async Task CanRewind_PipeWhoseSeekFailsOnceReadAsync_IsFalse()
+    {
+        await using StandardInputUploadStream stream = new(new UnseekableInput()) { SeekOfStandardInputSucceeds = false };
+        _ = await stream.ReadAsync(new byte[1].AsMemory(), TestContext.CancellationToken);
+
+        bool canRewind = stream.CanRewind;
+
+        Assert.IsFalse(canRewind);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void SeekOfStandardInputSucceeds_ByDefaultOnWindows_IsTrue()
     {
         using StandardInputUploadStream stream = new(new MemoryStream([1]));
 
-        bool succeeds = stream.SeekOfUnseekableInputSucceeds;
+        bool succeeds = stream.SeekOfStandardInputSucceeds;
 
-        Assert.AreEqual(OperatingSystem.IsWindows(), succeeds);
+        Assert.IsTrue(succeeds);
     }
 
     [TestMethod]

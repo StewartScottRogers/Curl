@@ -23,10 +23,8 @@ namespace Curl.Networking;
 /// its OpenSSL build.
 /// </param>
 /// <param name="timeProvider">Dates the OpenSSL verify result's validity checks.</param>
-internal sealed class ServerCertificateVerification(TlsClientOptions options, bool matchesSchannelBuild, TimeProvider timeProvider)
+internal sealed partial class ServerCertificateVerification(TlsClientOptions options, bool matchesSchannelBuild, TimeProvider timeProvider)
 {
-    private const string PemCertificateBegin = "-----BEGIN CERTIFICATE-----";
-
     private static readonly Oid ServerAuthentication = new("1.3.6.1.5.5.7.3.1");
 
     /// <summary>
@@ -56,6 +54,13 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// without a revocation server, so tests replace it.
     /// </summary>
     internal Func<X509Chain?, X509ChainStatus[]> ReadChainStatus { get; init; } = chain => chain?.ChainStatus ?? [];
+
+    /// <summary>
+    /// Reads the statuses of every chain element but the last, the trust anchor. A test seam,
+    /// like <see cref="ReadChainStatus" />.
+    /// </summary>
+    internal Func<X509Chain, X509ChainStatus[]> ReadCertificatesBelowAnchorStatus { get; init; } = chain =>
+        chain.ChainElements.Cast<X509ChainElement>().Take(AnchorIndexOf(chain)).SelectMany(element => element.ChainElementStatus).ToArray();
 
     /// <summary>
     /// The CA bundles curl's <c>configure</c> looks for, in its order, the first that exists
@@ -106,10 +111,30 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         }
     }
 
+    // A host that sets no CA option (Curl.Api) gets what the console's CaCertificateEnvironment gives
+    // its options: CURL_CA_BUNDLE names the CA file (BL-5642).
     private string? FindDefaultCaBundleFile() =>
-        matchesSchannelBuild || options.HasCaCertificates || !EmptiesSystemStore()
+        matchesSchannelBuild || options.HasCaCertificates || options.Insecure
             ? null
-            : DefaultCaBundleCandidates.FirstOrDefault(File.Exists);
+            : IsProxy ? BuiltInBundleForAProxy() : NonEmptyCurlCaBundle() ?? BuiltInBundleForAnEmptiedSystemStore();
+
+    /// <summary>
+    /// Whether the handshake is with an HTTPS proxy. The OpenSSL build then verifies the proxy
+    /// against its built-in bundle, never the file <c>CURL_CA_BUNDLE</c> or <c>SSL_CERT_FILE</c>
+    /// names, which is for the target (BL-5828); <c>SSL_CERT_DIR</c> still reaches it.
+    /// </summary>
+    internal bool IsProxy { get; init; }
+
+    private string? BuiltInBundleForAProxy() =>
+        string.IsNullOrEmpty(ReadEnvironmentVariable("SSL_CERT_DIR")) ? FirstExistingBuiltInBundle() : null;
+
+    private string? NonEmptyCurlCaBundle() =>
+        ReadEnvironmentVariable("CURL_CA_BUNDLE") is { Length: > 0 } bundle ? bundle : null;
+
+    private string? BuiltInBundleForAnEmptiedSystemStore() =>
+        EmptiesSystemStore() ? FirstExistingBuiltInBundle() : null;
+
+    private string? FirstExistingBuiltInBundle() => DefaultCaBundleCandidates.FirstOrDefault(File.Exists);
 
     private bool EmptiesSystemStore() =>
         ReadEnvironmentVariable("SSL_CERT_FILE") is "" || ReadEnvironmentVariable("SSL_CERT_DIR") is "";
@@ -131,7 +156,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// revocation endpoint fails with exit 60 as in curl (ADR-0321); the OpenSSL build never
     /// checks it. The OpenSSL build then loads the <c>--crlfile</c> lists, as curl loads them
     /// after the <c>--cacert</c> file (BL-609); the Schannel build ignores <c>--crlfile</c>.
-    /// Under <c>-k</c> nothing is read.
+    /// Under <c>-k</c> no trust anchor is read; the OpenSSL build still gets the policy that disables certificate downloads.
     /// </summary>
     /// <returns>
     /// The chain policy, or <see langword="null" />, the roots trusted beside the system store, and
@@ -147,7 +172,8 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     {
         if (options.Insecure)
         {
-            return (null, [], null);
+            // The OpenSSL build follows no AIA link even under -k (BL-5450).
+            return (matchesSchannelBuild ? null : SystemStoreChainPolicy(), [], null);
         }
 
         var (chainPolicy, anchorsBesideSystemStore) = ReadChainAnchors();
@@ -201,10 +227,11 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
     private (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadChainAnchors()
     {
-        var directoryAnchors = ReadCaCertificateDirectory();
+        var directory = ReadCaCertificateDirectory();
         if (!HasCaCertificates)
         {
-            return (SystemStoreChainPolicy(), directoryAnchors);
+            rejectedCaCertificates = directory.RejectedForServerAuthentication;
+            return (SystemStoreChainPolicy(), directory.Certificates);
         }
 
         var chainPolicy = new X509ChainPolicy
@@ -213,19 +240,32 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
             RevocationMode = matchesSchannelBuild && !options.SkipRevocationCheck
                 ? X509RevocationMode.Online
                 : X509RevocationMode.NoCheck,
+            DisableCertificateDownloads = !matchesSchannelBuild,
         };
         chainPolicy.ApplicationPolicy.Add(ServerAuthentication);
-        chainPolicy.CustomTrustStore.AddRange(ReadCaCertificates());
-        chainPolicy.CustomTrustStore.AddRange(directoryAnchors);
+        chainPolicy.CustomTrustStore.AddRange(ReadCaCertificates(directory));
         return (chainPolicy, []);
     }
 
     // The Schannel build checks the system store chain for revocation as Schannel's default
     // flags do: online, CRL distribution points and OCSP, every certificate but the root,
     // unless --ssl-no-revoke (ADR-0930). The OpenSSL build checks none: SslStream's default.
+    // The OpenSSL build follows no AIA link, so a server that omits its intermediate is
+    // refused with exit 60 as OpenSSL curl does (ADR-1296).
     private X509ChainPolicy? SystemStoreChainPolicy()
     {
-        if (!matchesSchannelBuild || options.SkipRevocationCheck)
+        if (!matchesSchannelBuild)
+        {
+            var openSslPolicy = new X509ChainPolicy
+            {
+                RevocationMode = X509RevocationMode.NoCheck,
+                DisableCertificateDownloads = true,
+            };
+            openSslPolicy.ApplicationPolicy.Add(ServerAuthentication);
+            return openSslPolicy;
+        }
+
+        if (options.SkipRevocationCheck)
         {
             return null;
         }
@@ -272,15 +312,22 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         ReadOnlyMemory<byte>[] peerCertificates,
         byte[]? stapledResponse = null)
     {
+        if (RelyingOnAnUnsentIntermediate(chain, anchorsBesideSystemStore, peerCertificates))
+        {
+            return (
+                new PeerVerification(false, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally, peerCertificates),
+                (CurlExitCode.PeerFailedVerification, UnableToGetLocalIssuerRefusal));
+        }
         var stapled = StapledRevocationStatus(stapledResponse, chain, peerCertificates);
         errors = WithoutUnavailableRevocationAGoodStapleAnswers(errors, chain, stapled);
         var anchoredErrors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
-        var observed = ObservePeerVerification(anchoredErrors, chain, peerCertificates) with
+        using var reasonChain = ReasonChainFromAnchors(anchoredErrors, chain, anchorsBesideSystemStore);
+        var observed = ObservePeerVerification(anchoredErrors, reasonChain ?? chain, chain, peerCertificates) with
         {
             RevocationCheckIncomplete = RevocationCheckIncomplete(chain, stapled),
         };
-        (observed, var refusal) = Refusal(observed, anchoredErrors, chain, targetHost, revocationLists, stapled);
+        (observed, var refusal) = Refusal(observed, anchoredErrors, chain, targetHost, revocationLists, stapled, anchorsBesideSystemStore, reasonChain);
         if (JudgesPinnedPublicKeyBeforeVerification)
         {
             var pinned = JudgePinnedPublicKey(observed, peerCertificates);
@@ -289,6 +336,47 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
         return refusal is null ? JudgePinnedPublicKey(observed, peerCertificates) : (observed, refusal);
     }
+
+    private const string UnableToGetLocalIssuerRefusal = "SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)";
+
+    // curl's OpenSSL build builds the chain from what the server sent and its trust anchors alone.
+    // .NET's Unix X509Chain also reads, and saves AIA-downloaded certificates to, the CurrentUser CA
+    // store (~/.dotnet/corefx/cryptography/x509stores/ca), so a chain whose middle certificate the
+    // server did not send was completed from that store, which OpenSSL never reads: it fails
+    // with "unable to get local issuer certificate (20)" (BL-5449, STD-131). The first
+    // element is the server's own and the last the anchor, neither of which need be sent.
+    // An element the --capath holds is a trust source OpenSSL reads too, so it needs no sending (STD-182).
+    private bool RelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates)
+    {
+        return !matchesSchannelBuild
+            && !options.Insecure
+            && chain is not null
+            && peerCertificates.Length > 0
+            && chain.ChainElements.Skip(1).Take(Math.Max(0, AnchorIndexOf(chain) - 1)).Any(element => !WasSent(element.Certificate, peerCertificates, anchors));
+    }
+
+    private bool RelyingOnAnUnsentIntermediate(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates) =>
+        RelyingOnAnIntermediateTheServerDidNotSend(chain, anchors, peerCertificates)
+        || AnchoredChainRelyingOnAnIntermediateTheServerDidNotSend(chain, anchors, peerCertificates);
+
+    // The same test for the chain rebuilt against the --capath roots, which the system store's
+    // intermediates reach too when the SslStream chain does not end at an anchor (BL-5827).
+    private bool AnchoredChainRelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, X509Certificate2Collection anchors, ReadOnlyMemory<byte>[] peerCertificates)
+    {
+        if (matchesSchannelBuild || options.Insecure || peerCertificates.Length == 0)
+        {
+            return false;
+        }
+
+        using var rebuilt = RebuildAgainstAnchors(chain, anchors, requireServerAuthentication: true, out _);
+        return rebuilt is not null
+            && EndsAtAnchor(rebuilt, anchors)
+            && rebuilt.ChainElements.Skip(1).Take(Math.Max(0, rebuilt.ChainElements.Count - 2)).Any(element => !WasSent(element.Certificate, peerCertificates, anchors));
+    }
+
+    private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates, X509Certificate2Collection anchors) =>
+        peerCertificates.Any(sent => sent.Span.SequenceEqual(certificate.RawData))
+        || anchors.Any(anchor => anchor.RawData.AsSpan().SequenceEqual(certificate.RawData));
 
     // The Schannel build checks revocation with CertGetCertificateChain on the context Schannel
     // attached the server's stapled OCSP response to, so a staple that says good or revoked
@@ -309,7 +397,25 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     private bool RevocationCheckIncomplete(X509Chain? chain, OcspStapleStatus? stapled) =>
         !options.Insecure && stapled != OcspStapleStatus.Good && RevocationBestEffortTolerates(chain);
 
-    // The first refusal: a revoked staple, the chain or name, then a --crlfile list. A list's
+    private const long UnsuitablePurposeVerifyResult = 26;
+
+    private static PeerVerification WithRefusalVerifyResult(PeerVerification observed, string refusalMessage) =>
+        refusalMessage switch
+        {
+            OpenSslUnsuitablePurposeRefusal => observed with { VerifyResult = UnsuitablePurposeVerifyResult },
+            OpenSslCertificateRejectedRefusal => observed with { VerifyResult = CertificateRejectedVerifyResult },
+            _ => observed,
+        };
+
+    private const string OpenSslUnsuitablePurposeRefusal = "SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)";
+
+    // OpenSSL's server purpose check, run against the --capath roots: a certificate whose extended key usage forbids server authentication fails (BL-5310).
+    private (CurlExitCode ExitCode, string Message)? PurposeRefusal(SslPolicyErrors errors, X509Chain? chain, X509Certificate2Collection anchors) =>
+        options.Insecure || matchesSchannelBuild || errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch) || !AnchorsRefuseServerPurpose(chain, anchors)
+            ? null
+            : (CurlExitCode.PeerFailedVerification, OpenSslUnsuitablePurposeRefusal);
+
+    // The first refusal: a rejected --cacert or --capath certificate unless the name is refused too, a revoked staple, the chain or name, then a --crlfile list. A list's
     // refusal is OpenSSL's verify result too, so %{ssl_verify_result} reports its code, 23 for
     // a revoked certificate and 12 for an expired list (measured with curl 8.18.0, CGR-168).
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) Refusal(
@@ -318,18 +424,32 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         X509Chain? chain,
         string targetHost,
         CertificateRevocationListFile? revocationLists,
-        OcspStapleStatus? stapled)
+        OcspStapleStatus? stapled,
+        X509Certificate2Collection anchorsBesideSystemStore,
+        X509Chain? reasonChain)
     {
-        var refusal = RevokedStapleRefusal(stapled) ?? VerifyPeer(anchoredErrors, chain, targetHost, []);
+        var purposeRefusal = PurposeRefusal(anchoredErrors, chain, anchorsBesideSystemStore);
+        var refusal = RejectedCaCertificateOrRevokedStapleRefusal(anchoredErrors, chain, stapled, anchorsBesideSystemStore) ?? purposeRefusal ?? VerifyPeer(anchoredErrors, chain, targetHost, [], reasonChain);
         if (refusal is not null)
         {
-            return (observed, refusal);
+            return (WithRefusalVerifyResult(observed, refusal.Value.Message), refusal);
         }
 
-        return revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
+        return RevocationListVerdict(observed, chain, revocationLists);
+    }
+
+    // curl checks the name before OpenSSL's verify result, so a refused name outranks a
+    // rejected --cacert or --capath certificate (curl 8.18.0 on OpenSSL 3.5.5, BL-5926).
+    private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateOrRevokedStapleRefusal(SslPolicyErrors anchoredErrors, X509Chain? chain, OcspStapleStatus? stapled, X509Certificate2Collection anchorsBesideSystemStore) =>
+        (RefusesTheName(anchoredErrors) ? null : RejectedCaCertificateRefusal(chain, anchorsBesideSystemStore)) ?? RevokedStapleRefusal(stapled);
+
+    private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) RevocationListVerdict(
+        PeerVerification observed,
+        X509Chain? chain,
+        CertificateRevocationListFile? revocationLists) =>
+        revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
             ? (observed with { VerifyResult = verifyResult }, (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslRevocationListRefusal(verifyResult)))
             : (observed, null);
-    }
 
     // A good staple answers the revocation status the online check could not fetch.
     private SslPolicyErrors WithoutUnavailableRevocationAGoodStapleAnswers(SslPolicyErrors errors, X509Chain? chain, OcspStapleStatus? stapled) =>
@@ -381,6 +501,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// Roots trusted in addition to the system store, from <c>--capath</c> without
     /// <c>--cacert</c>.
     /// </param>
+    /// <param name="reasonChain">The chain rebuilt against <paramref name="anchorsBesideSystemStore" />, whose statuses name the reason, or <see langword="null" /> to name it from <paramref name="chain" />.</param>
     /// <returns>
     /// <see langword="null" /> to accept the certificate, otherwise the exit code and message:
     /// exit 60, except in the Schannel build without <c>--cacert</c>, where a certificate
@@ -390,7 +511,8 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         SslPolicyErrors errors,
         X509Chain? chain,
         string targetHost,
-        X509Certificate2Collection anchorsBesideSystemStore)
+        X509Certificate2Collection anchorsBesideSystemStore,
+        X509Chain? reasonChain = null)
     {
         if (options.Insecure && !options.ChecksHostNameWhenInsecure)
         {
@@ -399,6 +521,16 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
         errors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
+        if (PurposeRefusal(errors, chain, anchorsBesideSystemStore) is { } purposeRefusal)
+        {
+            return purposeRefusal;
+        }
+
+        return RefusalOfRemainingErrors(errors, chain, targetHost, reasonChain);
+    }
+
+    private (CurlExitCode ExitCode, string Message)? RefusalOfRemainingErrors(SslPolicyErrors errors, X509Chain? chain, string targetHost, X509Chain? reasonChain)
+    {
         if (options.Insecure)
         {
             // CURLOPT_SSL_VERIFYHOST without CURLOPT_SSL_VERIFYPEER: only the name counts.
@@ -412,220 +544,14 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
         return matchesSchannelBuild
             ? SchannelRefusal(errors, chain, targetHost)
-            : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost));
+            : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, reasonChain ?? chain, targetHost));
     }
-
-    /// <summary>
-    /// Returns whether a chain's faults are all ones <c>--ssl-revoke-best-effort</c> tolerates:
-    /// its revocation status is unknown or could not be fetched, and nothing else is wrong.
-    /// </summary>
-    /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
-    /// <returns>
-    /// <see langword="true" /> when there is at least one fault and every fault is
-    /// <see cref="X509ChainStatusFlags.RevocationStatusUnknown" /> or
-    /// <see cref="X509ChainStatusFlags.OfflineRevocation" />.
-    /// </returns>
-    internal static bool HasOnlyUnavailableRevocationStatus(X509ChainStatus[] chainStatus) =>
-        chainStatus.Length > 0
-        && chainStatus.All(status =>
-            (status.Status & ~(X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation)) == 0);
-
-    /// <summary>
-    /// Whether the Schannel build, checking against the system store, fails the handshake
-    /// with <see cref="SchannelCertificateRevoked" /> (exit 35): the host name matches and the
-    /// chain's only fault, beside a revocation status that could not be fetched for another
-    /// certificate, is that one of its certificates, the server's own or an intermediate, is
-    /// revoked.
-    /// </summary>
-    /// <param name="errors">What the verification found wrong.</param>
-    /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
-    /// <returns><see langword="true" /> when Schannel reports <c>CRYPT_E_REVOKED</c>.</returns>
-    internal static bool IsSchannelCertificateRevoked(SslPolicyErrors errors, X509ChainStatus[] chainStatus) =>
-        errors == SslPolicyErrors.RemoteCertificateChainErrors
-        && (chainStatus.Aggregate(X509ChainStatusFlags.NoError, (all, next) => all | next.Status)
-            & ~(X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation))
-            == X509ChainStatusFlags.Revoked;
-
-    /// <summary>
-    /// The Schannel build's refusal of a chain checked against the system store, unless
-    /// <c>--ssl-no-revoke</c>, in which a certificate is revoked: exit 35 with
-    /// <see cref="SchannelCertificateRevoked" />. <c>--ssl-revoke-best-effort</c> does not
-    /// tolerate it; the OpenSSL build never checks revocation there.
-    /// </summary>
-    /// <param name="errors">What the verification found wrong.</param>
-    /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
-    /// <returns>The exit code and message, or <see langword="null" /> when this is not the refusal.</returns>
-    internal (CurlExitCode ExitCode, string Message)? SchannelRevocationRefusal(SslPolicyErrors errors, X509ChainStatus[] chainStatus) =>
-        !matchesSchannelBuild || HasCaCertificates || options.SkipRevocationCheck
-            ? null
-            : IsSchannelCertificateRevoked(errors, chainStatus)
-                ? (CurlExitCode.SslConnectError, SchannelCertificateRevoked)
-                : SchannelRevocationUnavailableRefusal(errors, chainStatus);
-
-    // Without --ssl-revoke-best-effort, Schannel fails the handshake when a revocation status
-    // could not be fetched: CRYPT_E_REVOCATION_OFFLINE when the chain is flagged offline,
-    // CRYPT_E_NO_REVOCATION_CHECK otherwise (BL-3252; texts are Windows' own).
-    private (CurlExitCode ExitCode, string Message)? SchannelRevocationUnavailableRefusal(
-        SslPolicyErrors errors, X509ChainStatus[] chainStatus) =>
-        errors != SslPolicyErrors.RemoteCertificateChainErrors || !HasOnlyUnavailableRevocationStatus(chainStatus)
-            ? null
-            : (CurlExitCode.SslConnectError,
-                chainStatus.Any(status => status.Status.HasFlag(X509ChainStatusFlags.OfflineRevocation))
-                    ? SchannelRevocationOffline
-                    : SchannelNoRevocationCheck);
-
-    // The Schannel build's answer for a certificate SslStream found fault with: a revoked
-    // chain is the handshake's failure, anything else the peer verification's.
-    private (CurlExitCode ExitCode, string Message) SchannelRefusal(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        SchannelRevocationRefusal(errors, ReadChainStatus(chain)) ?? SchannelPeerVerificationFailure(errors, chain, targetHost);
-
-    // The Schannel build's answer for a certificate SslStream found fault with, but revocation.
-    private (CurlExitCode ExitCode, string Message) SchannelPeerVerificationFailure(
-        SslPolicyErrors errors,
-        X509Chain? chain,
-        string targetHost)
-    {
-        var hasCaCertificateFile = HasCaCertificates;
-        return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
-            ? (CurlExitCode.SslConnectError, TlsFailureMessages.SchannelCertificateExpired)
-            : (CurlExitCode.PeerFailedVerification,
-                TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, hasCaCertificateFile));
-    }
-
-    // The chain's errors do not count when it leads to a --capath root trusted beside the
-    // system store, when --ssl-revoke-best-effort tolerates every one of them, or when the
-    // --cacert file anchors it: on the Schannel build by listing the server's own (leaf)
-    // certificate, on the OpenSSL build by listing any certificate of the chain.
-    private SslPolicyErrors WithoutChainErrorsCurlTolerates(
-        SslPolicyErrors errors,
-        X509Chain? chain,
-        X509Certificate2Collection anchorsBesideSystemStore) =>
-        ChainLeadsToAnyOf(chain, anchorsBesideSystemStore) || RevocationBestEffortTolerates(chain) || CaCertificateFileAnchorsChain(chain)
-            ? errors & ~SslPolicyErrors.RemoteCertificateChainErrors
-            : errors;
-
-    // curl's Schannel build builds the --cacert chain with an exclusive-root engine holding
-    // the file's certificates, where any certificate the file lists, the leaf or an intermediate, is itself a trust anchor (BL-5100): a chain
-    // .NET finds partial or untrusted only for want of a root is accepted (measured with curl
-    // 8.22.0, tls-wrong-ca, BL-3289, ADR-0797).
-    //
-    // curl's OpenSSL build sets X509_V_FLAG_PARTIAL_CHAIN, so there any certificate of the
-    // chain the file lists, leaf or intermediate, anchors it (measured with curl 8.18.0 and
-    // OpenSSL 3.5.5, BL-3335).
-    private bool CaCertificateFileAnchorsChain(X509Chain? chain) =>
-        HasCaCertificates
-        && chain is not null
-        && chain.ChainElements.Count > 0
-        && HasOnlyMissingRootStatus(ReadChainStatus(chain))
-        && ListsAnAnchorCandidate(chain);
-
-    private static bool ListsAnAnchorCandidate(X509Chain chain) =>
-        chain.ChainElements.Cast<X509ChainElement>()
-            .Any(element => ListsCertificate(chain.ChainPolicy.CustomTrustStore, element.Certificate));
-
-    private static bool HasOnlyMissingRootStatus(X509ChainStatus[] chainStatus) =>
-        chainStatus.All(status => (status.Status & ~(X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) == 0);
-
-    private static bool ListsCertificate(X509Certificate2Collection certificates, X509Certificate2 certificate) =>
-        certificates.Any(listed => listed.RawDataMemory.Span.SequenceEqual(certificate.RawDataMemory.Span));
-
-    // curl's Schannel build, under --ssl-revoke-best-effort, masks CERT_TRUST_REVOCATION_STATUS_UNKNOWN
-    // and CERT_TRUST_IS_OFFLINE_REVOCATION out of the chain's trust errors (measured, BL-490).
-    private bool RevocationBestEffortTolerates(X509Chain? chain) =>
-        matchesSchannelBuild
-        && options.RevocationCheckBestEffort
-        && chain is not null
-        && HasOnlyUnavailableRevocationStatus(chain.ChainStatus);
-
-    // Where curl's name check and .NET's disagree, the build curl's answer stands.
-    private SslPolicyErrors WithTheNameCheckCurlRuns(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        matchesSchannelBuild
-            ? WithoutNameMismatchSchannelAccepts(errors, chain, targetHost)
-            : WithNameMismatchOpenSslFinds(errors, chain, targetHost);
-
-    // curl's OpenSSL build never matches a host name by the common name of a certificate
-    // whose subjectAltName holds only IP addresses, which .NET on Windows does (BL-460).
-    private static SslPolicyErrors WithNameMismatchOpenSslFinds(SslPolicyErrors errors, X509Chain? chain, string targetHost)
-    {
-        if (chain is not { ChainElements.Count: > 0 })
-        {
-            return errors;
-        }
-
-        var leaf = chain.ChainElements[0].Certificate;
-        if (OpenSslKeyUsageRefusal.ForbidsServerUse(leaf))
-        {
-            errors |= SslPolicyErrors.RemoteCertificateChainErrors;
-        }
-
-        return OpenSslCommonNameRefusal.RefusesHostName(leaf, targetHost)
-            ? errors | SslPolicyErrors.RemoteCertificateNameMismatch
-            : errors;
-    }
-
-    // With --cacert curl's Schannel build checks the name itself and, for a certificate
-    // with no DNS subjectAltName, matches the common name, which .NET's check does not
-    // (BL-415). Without --cacert Schannel's own check stands.
-    // An IP-literal target against a certificate with no subjectAltName extension at all is
-    // a mismatch there, whatever its common name (BL-5031, curl 8.22.0 Schannel:
-    // `CertFindExtension() returned no extension.`).
-    private SslPolicyErrors WithoutNameMismatchSchannelAccepts(SslPolicyErrors errors, X509Chain? chain, string targetHost)
-    {
-        if (!HasCaCertificates)
-        {
-            return errors;
-        }
-
-        if (SchannelRefusesTheAlternativeNames(chain, targetHost))
-        {
-            return errors | SslPolicyErrors.RemoteCertificateNameMismatch;
-        }
-
-        return WithoutNameMismatchTheCommonNameAnswers(errors, chain, targetHost);
-    }
-
-    private static SslPolicyErrors WithoutNameMismatchTheCommonNameAnswers(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
-        && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
-            ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
-            : errors;
-
-    private static bool SchannelRefusesTheAlternativeNames(X509Chain? chain, string targetHost) =>
-        IsIpTargetWithoutAlternativeNames(chain, targetHost)
-        || (chain is { ChainElements.Count: > 0 }
-            && !SchannelAlternativeNamesMatch(chain.ChainElements[0].Certificate, targetHost));
-
-    // Windows' own name check lets "f*.a.test" stand for "foo.a.test" and matches an IP host
-    // against a dNSName holding the same text; curl's Schannel build does neither (BL-5095).
-    // An IP host needs an iPAddress name; a DNS host needs a dNSName under
-    // SchannelCommonNameCheck.PatternMatchesHost. A certificate with no name of the kind
-    // asked for is left to the common name check.
-    private static bool SchannelAlternativeNamesMatch(X509Certificate2 leaf, string targetHost)
-    {
-        var names = leaf.Extensions.OfType<X509SubjectAlternativeNameExtension>().FirstOrDefault();
-        if (names is null)
-        {
-            return true;
-        }
-
-        if (System.Net.IPAddress.TryParse(targetHost, out var address))
-        {
-            return names.EnumerateIPAddresses().Any(candidate => candidate.Equals(address));
-        }
-
-        var dnsNames = names.EnumerateDnsNames().ToList();
-        return dnsNames.Count == 0 || dnsNames.Any(name => SchannelCommonNameCheck.PatternMatchesHost(name, targetHost));
-    }
-
-    private static bool IsIpTargetWithoutAlternativeNames(X509Chain? chain, string targetHost) =>
-        chain is { ChainElements.Count: > 0 }
-        && System.Net.IPAddress.TryParse(targetHost, out _)
-        && !chain.ChainElements[0].Certificate.Extensions.OfType<X509SubjectAlternativeNameExtension>().Any();
 
     // Taken while the chain is alive, whether or not -k lets the handshake go on, because
     // SslStream disposes the chain once its callback returns.
     private PeerVerification ObservePeerVerification(
         SslPolicyErrors anchoredErrors,
+        X509Chain? reasonChain,
         X509Chain? chain,
         ReadOnlyMemory<byte>[] peerCertificates)
     {
@@ -637,7 +563,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
             anchoredErrors == SslPolicyErrors.None,
             RefusesTheName(anchoredErrors)
                 ? OpenSslVerifyResult.Unspecified
-                : OpenSslVerifyResult.Of(anchoredErrors, chain, timeProvider.GetUtcNow()),
+                : OpenSslVerifyResult.Of(anchoredErrors, reasonChain, timeProvider.GetUtcNow()),
             reportedChain);
     }
 
@@ -656,147 +582,5 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
         return [.. elements];
     }
-
-    // The OpenSSL build refuses the whole file (exit 77) unless every CERTIFICATE block in
-    // it parses and there is at least one; ImportFromPem skips a block whose body is not
-    // base64, so the blocks imported are counted against the blocks begun. The Schannel
-    // build trusts whatever parses.
-    // A CURLOPT_CAINFO_BLOB is read as the file would be, and wins over it (ADR-0704).
-    private X509Certificate2Collection ReadCaCertificates()
-    {
-        var pem = options.CaCertificateBlob is { } blob
-            ? Encoding.ASCII.GetString(blob.Span)
-            : ReadCaCertificateFile(CaCertificateFile!);
-        var certificates = new X509Certificate2Collection();
-        if (matchesSchannelBuild)
-        {
-            ImportParsableCertificates(certificates, pem);
-            return certificates;
-        }
-
-        certificates.ImportFromPem(pem);
-        if (certificates.Count == 0 || certificates.Count != pem.AsSpan().Count(PemCertificateBegin))
-        {
-            throw new CryptographicException("The file holds no certificate, or one that could not be decoded.");
-        }
-
-        return certificates;
-    }
-
-    // An empty --cacert names no file, so it is unusable (exit 77) rather than the
-    // ArgumentException File.ReadAllText throws for it (GF-0097).
-    private static string ReadCaCertificateFile(string path) =>
-        path.Length == 0
-            ? throw new FileNotFoundException("The CA certificate file name is empty.")
-            : File.ReadAllText(path);
-
-    private X509Certificate2Collection ReadCaCertificateDirectory()
-    {
-        var certificates = new X509Certificate2Collection();
-        var directories = options.CaCertificateDirectory;
-        if (matchesSchannelBuild || directories is null)
-        {
-            return certificates;
-        }
-
-        foreach (var directory in directories.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            foreach (var subjectHash in SubjectHashesNamedIn(directory))
-            {
-                ImportHashedCertificates(certificates, directory, subjectHash);
-            }
-        }
-
-        return certificates;
-    }
-
-    // OpenSSL's hashed directory lookup (by_dir.c, ADR-0836) opens only files named
-    // <subject hash>.<n>, as c_rehash and openssl rehash name them; any other file adds nothing
-    // (CGR-111).
-    private static IEnumerable<string> SubjectHashesNamedIn(string directory) =>
-        ListFilesOrNothing(directory)
-            .Select(Path.GetFileName)
-            .Where(IsHashedCertificateFileName)
-            .Select(name => name![..8])
-            .Distinct(StringComparer.Ordinal);
-
-    // Length >= 10: eight hash characters, the dot and at least one digit; a bare "<hash>." never names a file OpenSSL reads.
-    private static bool IsHashedCertificateFileName(string? name) =>
-        name is { Length: >= 10 }
-        && name[8] == '.'
-        && name.AsSpan(0, 8).ContainsAnyExcept("0123456789abcdef") is false
-        && name.AsSpan(9).ContainsAnyExceptInRange('0', '9') is false;
-
-    // OpenSSL reads <hash>.0, <hash>.1 and on until a number is missing, and finds in them only
-    // the certificates whose subject has that hash.
-    private static void ImportHashedCertificates(X509Certificate2Collection certificates, string directory, string subjectHash)
-    {
-        for (var number = 0; File.Exists(Path.Combine(directory, $"{subjectHash}.{number}")); number++)
-        {
-            var inFile = new X509Certificate2Collection();
-            ImportParsableCertificates(inFile, ReadTextOrNothing(Path.Combine(directory, $"{subjectHash}.{number}")));
-            certificates.AddRange(inFile.Where(certificate => OpenSslSubjectNameHash.Of(certificate.SubjectName) == subjectHash).ToArray());
-        }
-    }
-
-    // A --capath that is empty, malformed, missing, not a directory or cannot be listed adds
-    // nothing, as in curl's OpenSSL build (GF-0097).
-    private static string[] ListFilesOrNothing(string directory)
-    {
-        try
-        {
-            return Directory.GetFiles(directory);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
-        {
-            return [];
-        }
-    }
-
-    private static string ReadTextOrNothing(string path)
-    {
-        try
-        {
-            return File.ReadAllText(path);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return string.Empty;
-        }
-    }
-
-    // ImportFromPem throws for a block that is base64 but not a certificate; what was
-    // imported before it is kept.
-    private static void ImportParsableCertificates(X509Certificate2Collection certificates, string pem)
-    {
-        try
-        {
-            certificates.ImportFromPem(pem);
-        }
-        catch (CryptographicException)
-        {
-            // The rest of the text is not a usable certificate; it adds nothing.
-        }
-    }
-
-    // The server's own chain, rebuilt against the extra roots alone.
-    private static bool ChainLeadsToAnyOf(X509Chain? chain, X509Certificate2Collection anchors)
-    {
-        if (chain is null || chain.ChainElements.Count == 0 || anchors.Count == 0)
-        {
-            return false;
-        }
-
-        using var anchoredChain = new X509Chain();
-        anchoredChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
-        anchoredChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-        anchoredChain.ChainPolicy.CustomTrustStore.AddRange(anchors);
-        anchoredChain.ChainPolicy.ExtraStore.AddRange(chain.ChainPolicy.ExtraStore);
-        foreach (var element in chain.ChainElements)
-        {
-            anchoredChain.ChainPolicy.ExtraStore.Add(element.Certificate);
-        }
-
-        return anchoredChain.Build(chain.ChainElements[0].Certificate);
-    }
 }
+

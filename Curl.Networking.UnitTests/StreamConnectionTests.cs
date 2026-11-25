@@ -172,6 +172,38 @@ public sealed class StreamConnectionTests
     }
 
     [TestMethod]
+    [DataRow(false, false, 0, DisplayName = "no rewrite, nothing read yet")]
+    [DataRow(false, true, 0, DisplayName = "no rewrite, after a read")]
+    [DataRow(true, false, 1, DisplayName = "rewrite, nothing read yet")]
+    [DataRow(true, true, 1, DisplayName = "rewrite, after a read")]
+    public async Task WriteAsync_ChecksTheSocketBeforeWritingOnlyWhenAbortsAreReportedAsResets(bool reportsAbortAsReset, bool readFirst, int expectedChecks)
+    {
+        // BL-5939: on Linux the check's peek takes a reset socket's pending error, so the write
+        // would report EPIPE (32) where curl reports ECONNRESET (104).
+        int checks = 0;
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadOnceThenFailingStream(aborted), null)
+        {
+            ReportsAbortedReadAsReset = reportsAbortAsReset,
+            HasUnreadBytesOrEndBeforeWrite = _ => ++checks > 0,
+            HasUnreadBytesBeforeFirstRead = _ => ++checks > 0,
+        };
+        if (readFirst)
+        {
+            await connection.ReadAsync(new byte[8], CancellationToken.None);
+        }
+
+        Diagnostics.Arrange("reports abort as reset, read first", $"{reportsAbortAsReset}, {readFirst}");
+
+        await connection.WriteAsync(new byte[] { 0x47 }, CancellationToken.None);
+
+        Diagnostics.Act("checks run", checks);
+        Diagnostics.Assert("checks run", expectedChecks, checks);
+
+        Assert.AreEqual(expectedChecks, checks);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_WhenThePeerHadSentUnreadBytesBeforeTheWriteAndTheReadIsAborted_FailsWithTheAbort()
     {
         var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
@@ -179,6 +211,7 @@ public sealed class StreamConnectionTests
         {
             ReportsAbortedReadAsReset = true,
             HasUnreadBytesOrEndBeforeWrite = _ => true,
+            HasUnreadBytesBeforeFirstRead = _ => true,
         };
 
         Diagnostics.Arrange("read failure, reports abort as reset, unread bytes before write", "ConnectionAborted, true, true");
@@ -199,11 +232,12 @@ public sealed class StreamConnectionTests
         // prints "Recv failure: Connection was aborted" for it.
         var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
         bool peersFinUnread = true;
-        await using var connection = new StreamConnection(new ReadFailingStream(aborted), null)
+        await using var connection = new StreamConnection(new ReadOnceThenFailingStream(aborted), null)
         {
             ReportsAbortedReadAsReset = true,
             HasUnreadBytesOrEndBeforeWrite = _ => peersFinUnread,
         };
+        await connection.ReadAsync(new byte[8], CancellationToken.None);
 
         Diagnostics.Arrange("read failure, reports abort as reset, peer's FIN unread before write", "ConnectionAborted, true, true");
 
@@ -215,6 +249,44 @@ public sealed class StreamConnectionTests
         Diagnostics.Assert("words", "Recv failure: Connection was aborted", words);
 
         Assert.AreEqual("Recv failure: Connection was aborted", words);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WhenOnlyThePeersFinWasUnreadAtTheFirstWriteAndTheReadIsAborted_FailsWithConnectionReset()
+    {
+        // BL-5259: a peer that resets right after accepting looks like a FIN until the request is written.
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadFailingStream(aborted), null)
+        {
+            ReportsAbortedReadAsReset = true,
+            HasUnreadBytesOrEndBeforeWrite = _ => true,
+            HasUnreadBytesBeforeFirstRead = _ => false,
+        };
+
+        await connection.WriteAsync(new byte[] { 0x47 }, CancellationToken.None);
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+
+        Assert.AreEqual(SocketError.ConnectionReset, ((SocketException)failure.InnerException!).SocketErrorCode);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WhenTheOnlyEarlierReadReturnedZeroBytesAndTheFinWasUnreadAtTheWrite_FailsWithConnectionReset()
+    {
+        // AF-0917: a zero-byte (end-of-stream) read is not a byte read, so the connection still counts as fresh.
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadZeroThenFailingStream(aborted), null)
+        {
+            ReportsAbortedReadAsReset = true,
+            HasUnreadBytesOrEndBeforeWrite = _ => true,
+            HasUnreadBytesBeforeFirstRead = _ => false,
+        };
+        int read = await connection.ReadAsync(new byte[8], CancellationToken.None);
+
+        await connection.WriteAsync(new byte[] { 0x47 }, CancellationToken.None);
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+
+        Assert.AreEqual(0, read);
+        Assert.AreEqual(SocketError.ConnectionReset, ((SocketException)failure.InnerException!).SocketErrorCode);
     }
 
     [TestMethod]
@@ -273,6 +345,41 @@ public sealed class StreamConnectionTests
         Diagnostics.Assert("failure is unchanged", true, ReferenceEquals(other, failure));
 
         Assert.AreSame(other, failure);
+    }
+
+    /// <summary>A stream whose first read returns one byte and every later read fails with the given exception.</summary>
+    private sealed class ReadOnceThenFailingStream(IOException failure) : MemoryStream
+    {
+        private bool _served;
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_served)
+            {
+                return ValueTask.FromException<int>(failure);
+            }
+
+            _served = true;
+            buffer.Span[0] = 0x47;
+            return ValueTask.FromResult(1);
+        }
+    }
+
+    /// <summary>A stream whose first read returns zero bytes and every later read fails with the given exception.</summary>
+    private sealed class ReadZeroThenFailingStream(IOException failure) : MemoryStream
+    {
+        private bool _served;
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_served)
+            {
+                return ValueTask.FromException<int>(failure);
+            }
+
+            _served = true;
+            return ValueTask.FromResult(0);
+        }
     }
 
     /// <summary>A stream whose every read fails with the given exception.</summary>

@@ -352,8 +352,12 @@ function Invoke-GapMeasureSelfTest {
 
         $shipped = Join-Path (Split-Path $savedTools -Parent) 'Baselines/platform-exclusions.json'
         $onWindows = Get-GapPlatformExclusions $shipped 'windows'
-        $http2Keys = 'behaviour:test1704,options:--http2,options:--http2-prior-knowledge,options:--proxy-http2,options:--proxy-http2:no-form'
-        & $report 'the shipped platform exclusions are the five ADR-0786 HTTP/2 items, on Windows only' ((($onWindows.Keys | Sort-Object) -join ',') -eq $http2Keys -and @($onWindows.Values | Where-Object { $_ -ne 'decided:ADR-0786' }).Count -eq 0 -and (Get-GapPlatformExclusions $shipped 'linux').Count -eq 0 -and (Get-GapPlatformExclusions $shipped 'macos').Count -eq 0)
+        $http2Keys = @('behaviour:test1704', 'options:--http2', 'options:--http2-prior-knowledge', 'options:--proxy-http2', 'options:--proxy-http2:no-form')
+        $http3Keys = @('options:--http3', 'options:--http3-only')
+        $isHttp3Only = { param($table) ((($table.Keys | Sort-Object) -join ',') -eq (($http3Keys | Sort-Object) -join ',')) -and @($table.Values | Where-Object { $_ -ne 'decided:ADR-1282' }).Count -eq 0 }
+        $windowsHttp2 = @($http2Keys | Where-Object { $onWindows[$_] -eq 'decided:ADR-0786' }).Count -eq $http2Keys.Count
+        $windowsHttp3 = @($http3Keys | Where-Object { $onWindows[$_] -eq 'decided:ADR-1282' }).Count -eq $http3Keys.Count
+        & $report 'the shipped platform exclusions are the five ADR-0786 HTTP/2 items on Windows and the two ADR-1282 HTTP/3 options on every platform' ($onWindows.Count -eq 7 -and $windowsHttp2 -and $windowsHttp3 -and (& $isHttp3Only (Get-GapPlatformExclusions $shipped 'linux')) -and (& $isHttp3Only (Get-GapPlatformExclusions $shipped 'macos')))
         & $report 'no platform exclusions file means no exclusions' ((Get-GapPlatformExclusions (Join-Path $scratch 'none.json') 'windows').Count -eq 0)
         $exclusionsFile = Join-Path $scratch 'platform-exclusions.json'
         [System.IO.File]::WriteAllText($exclusionsFile, '{ "items": [ { "key": "behaviour:test2", "platform": "windows", "reason": "decided:ADR-9999" }, { "key": "behaviour:test1", "platform": "linux", "reason": "decided:ADR-9998" } ] }')

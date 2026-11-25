@@ -32,6 +32,9 @@ public sealed class CommandLineRefusal
     /// <summary>The reason curl gives for an option it does not know.</summary>
     private const string UnknownOptionReason = "is unknown";
 
+    /// <summary>The reason a config file line gives for an extension option that only works on the command line.</summary>
+    private const string CommandLineOnlyReason = "cannot be used in a config file";
+
     /// <summary>The reason curl gives for a file it cannot read.</summary>
     private const string ReadErrorReason = "error encountered when reading a file";
 
@@ -47,13 +50,14 @@ public sealed class CommandLineRefusal
         StandardErrorLines = [.. errorLines, $"curl: option {spelledOption}: {reason}", TryHelpLine];
     }
 
-    private CommandLineRefusal(CurlExitCode exitCode, IReadOnlyList<string> errorLines, IReadOnlyList<string> standardErrorLines, bool foundAtTransferSetup = false)
+    private CommandLineRefusal(CurlExitCode exitCode, IReadOnlyList<string> errorLines, IReadOnlyList<string> standardErrorLines, bool foundAtTransferSetup = false, bool echoesConfigFileText = false)
     {
         ExitCode = exitCode;
         ErrorLines = errorLines;
         Reason = string.Empty;
         StandardErrorLines = standardErrorLines;
         FoundAtTransferSetup = foundAtTransferSetup;
+        EchoesConfigFileText = echoesConfigFileText;
     }
 
     private CommandLineRefusal(string tryHelpLine)
@@ -204,7 +208,7 @@ public sealed class CommandLineRefusal
     /// <returns>A refusal reading <c>cannot be used in a config file</c>, exit code 2.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
     public static CommandLineRefusal CommandLineOnlyOption(string spelledOption) =>
-        Create(spelledOption, "cannot be used in a config file");
+        Create(spelledOption, CommandLineOnlyReason);
 
     /// <summary>Refuses an option value curl reads but cannot use, such as a size in an unknown unit.</summary>
     /// <param name="spelledOption">The whole argument as typed.</param>
@@ -681,9 +685,16 @@ public sealed class CommandLineRefusal
     /// <returns>The refusal.</returns>
     internal static CommandLineRefusal ConfigFileOptionRefused(string spelledOption, string file, int lineNumber, string option, CommandLineRefusal lineRefusal, bool errorsHidden)
     {
+        IReadOnlyList<string> lineErrorLines = ConfigFileLineErrorLines(file, lineNumber, option, lineRefusal, errorsHidden);
+        if (lineRefusal.Reason == CommandLineOnlyReason)
+        {
+            // The file line already says it all; a second line blaming -K would mislead (BL-5344).
+            return new(lineRefusal.ExitCode, lineErrorLines, [.. lineErrorLines, TryHelpLine], echoesConfigFileText: true);
+        }
+
         return new(
             lineRefusal.ExitCode,
-            ConfigFileLineErrorLines(file, lineNumber, option, lineRefusal, errorsHidden),
+            lineErrorLines,
             spelledOption,
             lineRefusal.Reason == UnknownOptionReason ? "found an unknown config option" : lineRefusal.Reason,
             echoesConfigFileText: true);

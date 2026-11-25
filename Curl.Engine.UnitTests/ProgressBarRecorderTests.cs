@@ -323,6 +323,21 @@ public sealed class ProgressBarRecorderTests
         Assert.AreEqual(Bar(36, " 50.0"), drawn);
     }
 
+    [TestMethod]
+    public void Finish_SucceededAfterAnUploadReport_DrawsNothingMore()
+    {
+        Diagnostics.Arrange("reports", "5 of 10 bytes uploaded, then finish succeeded with 10 bytes at 500 ms");
+        ProgressBarRecorder bar = NewBar(0, 79);
+        bar.ReportUploaded(5, 10);
+
+        clock.Advance(500);
+        bar.Finish(succeeded: true, bytesTransferred: 10);
+        string drawn = ActDrawn(bar);
+
+        AssertDrawn(Bar(36, " 50.0"), drawn);
+        Assert.AreEqual(Bar(36, " 50.0"), drawn);
+    }
+
     private static string Bar(int hashes, string percent) =>
         "\r" + new string('#', hashes).PadRight(72) + " " + percent + "%";
 

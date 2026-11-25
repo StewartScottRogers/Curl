@@ -64,6 +64,16 @@ public sealed class TransferHeaderStoreTests
     }
 
     [TestMethod]
+    public void Next_LineStartingWithColon_IsStoredAsHeaderWithEmptyName()
+    {
+        TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", ":x", string.Empty);
+
+        CurlHeader? header = store.Next(CurlHeaderOrigin.Header, Last, null);
+
+        Assert.AreEqual(new CurlHeader(string.Empty, "x", 1, 0, CurlHeaderOrigin.Header), header);
+    }
+
+    [TestMethod]
     public void Find_NothingRecorded_AnswersNoHeaders()
     {
         Assert.AreEqual(CurlHeaderCode.NoHeaders, new TransferHeaderStore().Find("Server", 0, CurlHeaderOrigin.Header, Last, out _));
@@ -103,6 +113,21 @@ public sealed class TransferHeaderStoreTests
         Assert.AreEqual("/b", location?.Value);
         Assert.AreEqual("second", server?.Value);
         Assert.AreEqual(CurlHeaderCode.Missing, store.Find("Location", 0, CurlHeaderOrigin.Header, 1, out _));
+    }
+
+    [TestMethod]
+    public void RecordLine_InformationalHeadThenFinalHeadAfterAFinalHead_KeepsBothInTheSecondRequest()
+    {
+        TransferHeaderStore store = StoreOf(
+            "HTTP/1.1 302 Found", "Location: /b", string.Empty,
+            "HTTP/1.1 100 Continue", string.Empty,
+            "HTTP/1.1 200 OK", "Server: second", string.Empty);
+
+        CurlHeaderCode code = store.Find("Server", 0, CurlHeaderOrigin.Header, 1, out CurlHeader? server);
+
+        Assert.AreEqual(CurlHeaderCode.Ok, code);
+        Assert.AreEqual("second", server?.Value);
+        Assert.AreEqual(CurlHeaderCode.NoRequest, store.Find("Server", 0, CurlHeaderOrigin.Header, 2, out _));
     }
 
     [TestMethod]

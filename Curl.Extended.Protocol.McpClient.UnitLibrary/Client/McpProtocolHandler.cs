@@ -105,6 +105,6 @@ internal sealed class McpProtocolHandler(IConnector connector, IMcpServerProcess
 
         McpStdioCommand command = McpStdioCommand.From(context.Url)
             ?? throw new McpClientException(CurlExitCode.UrlMalformat, NoLocalCommand);
-        return McpStdioClientSession.Start(processStarter, command, context.TimeProvider);
+        return McpStdioClientSession.Start(processStarter, command, context.TimeProvider, context.MaxTime, context.OperationStarted);
     }
 }

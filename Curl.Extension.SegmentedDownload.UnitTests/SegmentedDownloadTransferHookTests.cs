@@ -33,18 +33,38 @@ public sealed class SegmentedDownloadTransferHookTests
     }
 
     [TestMethod]
-    [DataRow(null)]
-    [DataRow("W/\"v1\"")]
-    public async Task ExecuteAsync_NoStrongEntityTag_SendsNoIfRange_Rfc9110Section13_1_5(string? tag)
+    public async Task ExecuteAsync_NeitherAnETagNorALastModified_SendsOnePlainGetAndNoRanges_Adr1087()
     {
-        var origin = new RangeOrigin(Alphabet) { ETag = tag };
-        var context = Context(dumpHeaders: false);
+        var origin = new RangeOrigin(Alphabet) { ETag = null };
+        var context = Context();
 
-        await new SegmentedDownloadTransferHook(2).ExecuteAsync(context, origin.Invoke);
+        await new SegmentedDownloadTransferHook(4).ExecuteAsync(context, origin.Invoke);
 
-        Assert.IsTrue(origin.Requests.All(request => RangeOrigin.Field(request, "If-Range") is null));
+        Assert.HasCount(2, origin.Requests);
+        Assert.IsEmpty(origin.Requests.Last().Http!.Headers);
         Assert.AreEqual(Alphabet, Text(context.Output));
-        Assert.IsNull(context.DumpHeaderOutput);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AServerWhoseBodyChangesPerRequestAndSendsNoValidator_WritesExactlyOneResponse_Adr1087()
+    {
+        var origin = new RangeOrigin(Alphabet) { ETag = null, ChangesEveryRequest = true };
+        var context = Context();
+
+        await new SegmentedDownloadTransferHook(4).ExecuteAsync(context, origin.Invoke);
+
+        Assert.AreEqual("cdefghijklmnopqrstuvwxyzab", Text(context.Output));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AStrongETag_SendsTheRequestedNumberOfRangesEachWithIfRange_Adr1087()
+    {
+        var origin = new RangeOrigin(Alphabet);
+
+        await new SegmentedDownloadTransferHook(4).ExecuteAsync(Context(), origin.Invoke);
+
+        Assert.HasCount(5, origin.Requests);
+        Assert.AreEqual(4, origin.Requests.Count(request => RangeOrigin.Field(request, "If-Range") == "\"v1\""));
     }
 
     [TestMethod]
@@ -184,6 +204,10 @@ public sealed class SegmentedDownloadTransferHookTests
             new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions(), NoBody = true },
             new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions(), Range = ByteRange.Bounded(0, 1) },
             new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions(), ResumeFrom = 3 },
+            new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions { Compressed = true } },
+            new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions { Headers = ["Range: bytes=0-99"] } },
+            new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions { Headers = ["NoSeparator", "accept: */*", "  if-range : \"v1\""] } },
+            new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions { Headers = ["Range;"] } },
             new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions(), TimeCondition = new TimeCondition(DateTimeOffset.UnixEpoch, TimeConditionKind.IfModifiedSince) },
         ];
 
@@ -212,6 +236,26 @@ public sealed class SegmentedDownloadTransferHookTests
     };
 
     private static string Text(Stream stream) => Encoding.Latin1.GetString(((MemoryStream)stream).ToArray());
+
+    [TestMethod]
+    public async Task ExecuteAsync_CompleteLengthAboveMaxFileSize_FailsWithExit63AfterOnlyTheProbe_Ext088()
+    {
+        var origin = new RangeOrigin(Alphabet);
+        var context = new TransferContext
+        {
+            Url = Url,
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions(),
+            MaxFileSize = 10,
+        };
+
+        var result = await new SegmentedDownloadTransferHook(3).ExecuteAsync(context, origin.Invoke);
+
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Assert.AreEqual("Maximum file size exceeded", result.ErrorMessage);
+        Assert.HasCount(1, origin.Requests);
+        Assert.AreEqual(0, context.Output.Length);
+    }
 
     private static TransferContext Context(bool dumpHeaders = true) => new()
     {

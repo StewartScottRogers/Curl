@@ -65,6 +65,86 @@ public sealed class ClosedStandardInputStream : Stream
             || exception.InnerException is IOException { HResult: badDescriptorErrno };
     }
 
+    /// <summary>
+    /// A standard input that is opened on its first read, so a command that never reads it never
+    /// touches the descriptor, and one that reads it while it is closed (Linux reports EBADF from the
+    /// open itself) sees end of input instead of crashing (BL-5316).
+    /// </summary>
+    /// <param name="opener">Opens the real standard input; called at most once, on the first read.</param>
+    /// <param name="isInputRedirected">Whether standard input is not a terminal; called when the first read opens it.</param>
+    /// <returns>The stream to read standard input from.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static Stream Lazy(Func<Stream> opener, Func<bool> isInputRedirected)
+    {
+        ArgumentNullException.ThrowIfNull(opener);
+        ArgumentNullException.ThrowIfNull(isInputRedirected);
+        return new LazyStandardInputStream(opener, isInputRedirected);
+    }
+
+    /// <summary>
+    /// Reports whether the process's standard input is redirected rather than a terminal, as
+    /// <see cref="Console.IsInputRedirected"/> does; the <c>isInputRedirected</c> argument of <see cref="Lazy"/> in production.
+    /// </summary>
+    /// <returns><see langword="true"/> when standard input is not a terminal.</returns>
+    public static bool ProcessInputIsRedirected() => Console.IsInputRedirected;
+
+    private sealed class LazyStandardInputStream(Func<Stream> opener, Func<bool> isInputRedirected) : Stream
+    {
+        private Stream? _opened;
+
+        private Stream Opened => _opened ??= Open();
+
+        private Stream Open()
+        {
+            try
+            {
+                return InPlaceOfNull(opener(), isInputRedirected());
+            }
+            catch (Exception exception) when (IsBadDescriptor(exception))
+            {
+                return new ClosedStandardInputStream();
+            }
+        }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => Opened.Read(buffer, offset, count);
+
+        public override int Read(Span<byte> buffer) => Opened.Read(buffer);
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _opened?.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
     /// <inheritdoc/>
     public override bool CanRead => true;
 

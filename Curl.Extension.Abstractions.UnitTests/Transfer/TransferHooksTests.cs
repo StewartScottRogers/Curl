@@ -124,6 +124,7 @@ public sealed class TransferHooksTests
         Assert.AreEqual(own.MaxTime, given.MaxTime);
         Assert.AreEqual(own.OperationStarted, given.OperationStarted);
         Assert.AreEqual(own.Proxy, given.Proxy);
+        Assert.AreEqual(own.NoProxy, given.NoProxy);
         Assert.AreEqual(own.Mail, given.Mail);
         Assert.AreEqual(own.Ssh, given.Ssh);
         Assert.AreEqual(own.TimeProvider, given.TimeProvider);

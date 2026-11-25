@@ -34,7 +34,7 @@ internal static class WinLdapLogonBind
 {
     private const string SupportedCapabilities = "supportedCapabilities";
 
-    private const string SupportedSaslMechanisms = "supportedSASLMechanisms";
+    internal const string SupportedSaslMechanisms = "supportedSASLMechanisms";
 
     private const string GssSpnego = "GSS-SPNEGO";
 
@@ -108,7 +108,7 @@ internal static class WinLdapLogonBind
     /// Reads the rootDSE as one attempt does and says whether to bind with <c>GSS-SPNEGO</c>;
     /// <see langword="null" /> when the server closed or sent bytes that are not an LDAPMessage.
     /// </summary>
-    private static async ValueTask<bool?> ReadOffersSpnegoAsync(LdapExchange exchange, bool offeredBefore, CancellationToken cancellationToken)
+    internal static async ValueTask<bool?> ReadOffersSpnegoAsync(LdapExchange exchange, bool offeredBefore, CancellationToken cancellationToken)
     {
         if (await ReadRootDseAsync(exchange, SupportedCapabilities, cancellationToken).ConfigureAwait(false) is null
             || await ReadRootDseAsync(exchange, SupportedSaslMechanisms, cancellationToken).ConfigureAwait(false) is not { } mechanisms)
@@ -128,10 +128,19 @@ internal static class WinLdapLogonBind
     /// skipped. <see langword="null" /> when the server closed or sent bytes that are not an
     /// LDAPMessage first.
     /// </summary>
-    private static async ValueTask<List<string>?> ReadRootDseAsync(LdapExchange exchange, string attribute, CancellationToken cancellationToken)
+    internal static ValueTask<List<string>?> ReadRootDseAsync(LdapExchange exchange, string attribute, CancellationToken cancellationToken)
     {
         int messageId = exchange.TakeMessageId();
-        await exchange.SendAsync(LdapRequests.RootDseSearch(exchange.Writer, messageId, attribute), cancellationToken).ConfigureAwait(false);
+        return ReadRootDseAnswerAsync(exchange, messageId, attribute, LdapRequests.RootDseSearch(exchange.Writer, messageId, attribute), cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends <paramref name="search" />, a rootDSE search under <paramref name="messageId" />, and reads its
+    /// answer as <see cref="ReadRootDseAsync" /> does.
+    /// </summary>
+    internal static async ValueTask<List<string>?> ReadRootDseAnswerAsync(LdapExchange exchange, int messageId, string attribute, byte[] search, CancellationToken cancellationToken)
+    {
+        await exchange.SendAsync(search, cancellationToken).ConfigureAwait(false);
         var values = new List<string>();
         while (true)
         {
@@ -197,7 +206,7 @@ internal static class WinLdapLogonBind
     }
 
     /// <summary>Sends <c>GSS-SPNEGO</c> binds, one for each token, until the server answers anything but <c>saslBindInProgress</c>.</summary>
-    private static async ValueTask<LdapBindReply> SaslBindAsync(LdapExchange exchange, ILdapLogonAuthentication authentication, CancellationToken cancellationToken)
+    internal static async ValueTask<LdapBindReply> SaslBindAsync(LdapExchange exchange, ILdapLogonAuthentication authentication, CancellationToken cancellationToken)
     {
         byte[]? token = authentication.NextToken([]);
         while (token is not null)

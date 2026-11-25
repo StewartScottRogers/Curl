@@ -190,12 +190,26 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         set => throw new NotSupportedException();
     }
 
-    /// <inheritdoc />
-    public override void Flush() => file?.Flush();
+    /// <summary>
+    /// The size of the buffer C stdio gives a file: a write smaller than this to a file whose
+    /// handle has already failed is held there, and only <c>fclose</c> reports the failure.
+    /// </summary>
+    internal const int StdioBufferSize = 4096;
 
     /// <inheritdoc />
+    /// <remarks>A file a failed flush has already closed is left alone; <see cref="CompleteAsync" /> reports it.</remarks>
+    public override void Flush()
+    {
+        if (file is { CanWrite: true } open)
+        {
+            open.Flush();
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>A file a failed flush has already closed is left alone; <see cref="CompleteAsync" /> reports it.</remarks>
     public override Task FlushAsync(CancellationToken cancellationToken) =>
-        file?.FlushAsync(cancellationToken) ?? Task.CompletedTask;
+        file is { CanWrite: true } open ? open.FlushAsync(cancellationToken) : Task.CompletedTask;
 
     /// <inheritdoc />
     public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
@@ -248,6 +262,11 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
             return ValueTask.FromCanceled(cancellationToken);
         }
 
+        if (!open.CanWrite)
+        {
+            return WriteToClosedFile(buffer.Length);
+        }
+
         try
         {
             open.Write(buffer.Span);
@@ -259,6 +278,20 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
             return ValueTask.FromException(exception);
         }
     }
+
+    /// <summary>
+    /// Answers a write to a file that a failed flush has already closed - a <c>-J</c> name of
+    /// <c>conin$</c> on Windows, whose handle takes no bytes (STD-209) - as curl's <c>fwrite</c> does:
+    /// a write smaller than <see cref="StdioBufferSize" /> stays in the stdio buffer and succeeds,
+    /// leaving <see cref="CompleteAsync" /> to report curl's <c>Failed writing body</c>; a larger one
+    /// fails.
+    /// </summary>
+    /// <param name="length">The size of the write.</param>
+    /// <returns>A completed task, or one faulted with an <see cref="IOException" />.</returns>
+    private static ValueTask WriteToClosedFile(int length) =>
+        length < StdioBufferSize
+            ? ValueTask.CompletedTask
+            : ValueTask.FromException(new IOException("The output file was closed by a failed write."));
 
     /// <summary>
     /// Pushes what the file stream buffers out to the file, so a process killed mid-transfer leaves
@@ -335,9 +368,17 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// Flushes what the open file still buffers, as curl's <c>fclose</c> of the file does.
     /// </summary>
     /// <param name="open">The open file.</param>
-    /// <returns><see langword="false" /> when the flush failed (a full disk, <c>/dev/full</c>).</returns>
+    /// <returns>
+    /// <see langword="false" /> when the flush failed (a full disk, <c>/dev/full</c>), or an earlier
+    /// failed flush has already closed the file.
+    /// </returns>
     private static async ValueTask<bool> TryFlushAsync(Stream open)
     {
+        if (!open.CanWrite)
+        {
+            return false;
+        }
+
         try
         {
             await open.FlushAsync().ConfigureAwait(false);

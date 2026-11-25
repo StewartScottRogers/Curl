@@ -1,4 +1,6 @@
+using System.Net;
 using System.Text;
+using Curl.Protocol.Abstractions;
 using Curl.Extended.Protocol.Stomp.Client;
 
 namespace Curl.Extended.Protocol.Stomp.Wire;
@@ -60,6 +62,16 @@ public sealed class StompFrameReaderTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_BlankLineArrivesAsTheFirstByteOfARead_EndsTheHeadersWithoutReadingBeforeTheBuffer()
+    {
+        StompFrameReader reader = new(ScriptedStompConnection.Replaying("MESSAGE\n", "\nhi\0"), CancellationToken.None);
+
+        StompFrame? frame = await reader.ReadAsync();
+
+        Assert.AreEqual("hi", Encoding.UTF8.GetString(frame!.Body));
+    }
+
+    [TestMethod]
     public async Task ReadAsync_BodyLargerThanTheBuffer_GrowsTheBuffer()
     {
         string body = new('x', 10_000);
@@ -67,6 +79,19 @@ public sealed class StompFrameReaderTests
         StompFrame? frame = await Read($"MESSAGE\n\n{body}\0");
 
         Assert.AreEqual(body, Encoding.UTF8.GetString(frame!.Body));
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_SmallFrameInTinyChunks_NeverGrowsTheBufferWhileThereIsRoom()
+    {
+        BufferSizeRecordingConnection connection = new("MESS", "AGE\n\nhi\0");
+        StompFrameReader reader = new(connection, CancellationToken.None);
+
+        StompFrame? frame = await reader.ReadAsync();
+
+        Assert.AreEqual("hi", Encoding.UTF8.GetString(frame!.Body));
+        Assert.IsNotEmpty(connection.OfferedSizes);
+        Assert.IsTrue(connection.OfferedSizes.All(size => size <= 4096), string.Join(",", connection.OfferedSizes));
     }
 
     [TestMethod]
@@ -86,6 +111,35 @@ public sealed class StompFrameReaderTests
     [DataRow("MESSAGE\nbad\n\n\0")]
     public async Task ReadAsync_MalformedFrame_ThrowsFormat(string bytes) =>
         await Assert.ThrowsExactlyAsync<FormatException>(async () => await Read(bytes));
+
+    private sealed class BufferSizeRecordingConnection(params string[] chunks) : IConnection
+    {
+        private readonly Queue<byte[]> reads = new(chunks.Select(chunk => Encoding.UTF8.GetBytes(chunk)));
+
+        public List<int> OfferedSizes { get; } = [];
+
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            OfferedSizes.Add(buffer.Length);
+            if (!reads.TryDequeue(out byte[]? chunk))
+            {
+                return ValueTask.FromResult(0);
+            }
+
+            chunk.CopyTo(buffer);
+            return ValueTask.FromResult(chunk.Length);
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     private static ValueTask<StompFrame?> Read(string bytes) =>
         new StompFrameReader(ScriptedStompConnection.Replaying(bytes), CancellationToken.None).ReadAsync();

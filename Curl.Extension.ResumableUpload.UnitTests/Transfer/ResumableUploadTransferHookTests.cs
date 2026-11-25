@@ -1,58 +1,41 @@
+using System.Net;
 using System.Text;
-using Curl.Extension.Abstractions.Transfer;
-using Curl.Extension.ResumableUpload.Http;
 using Curl.Protocol.Abstractions;
+using static Curl.Extension.ResumableUpload.Transfer.ScriptedNext;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Extension.ResumableUpload.Transfer;
 
 /// <summary>
-/// Pins the resumable upload flows over fake connections: tus 1.0 ("Creation", "Core Protocol") and
+/// Pins the resumable upload flows over a scripted rest of curl's transfer: tus 1.0 ("Creation", "Core Protocol") and
 /// draft-ietf-httpbis-resumable-upload (upload creation, upload append, offset retrieval), with resumption after a
-/// broken connection and the last response as the transfer's.
+/// broken connection, the last response as the transfer's, and every request sent through <c>next</c> so
+/// <c>-v</c>, <c>--trace</c>, <c>--har</c> and <c>--record</c> see it (EXT-119, ADR-1379).
 /// </summary>
 [TestClass]
 public sealed class ResumableUploadTransferHookTests
 {
-    private const string TusOptions = "HTTP/1.1 204 No Content\r\nTus-Resumable: 1.0.0\r\nTus-Version: 1.0.0,0.2.2\r\nTus-Extension: creation,expiration\r\n\r\n";
-    private const string TusCreated = "HTTP/1.1 201 Created\r\nLocation: /files/24e5\r\nTus-Resumable: 1.0.0\r\nContent-Length: 0\r\n\r\n";
-    private const string TusPatched = "HTTP/1.1 204 No Content\r\nTus-Resumable: 1.0.0\r\nUpload-Offset: 5\r\n\r\n";
-    private const string PlainOptions = "HTTP/1.1 200 OK\r\nAllow: GET, PUT\r\nContent-Length: 0\r\n\r\n";
-    private const string IetfCreated = "HTTP/1.1 201 Created\r\nLocation: /uploads/7\r\nContent-Length: 0\r\n\r\n";
-    private const string IetfAppended = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndone";
-    private const string Host = "Host: up.example.com\r\n";
+    private static readonly Answer TusOptions = Response(204, "", "Tus-Resumable: 1.0.0", "Tus-Version: 1.0.0,0.2.2", "Tus-Extension: creation,expiration");
+    private static readonly Answer TusCreated = Response(201, "", "Location: /files/24e5", "Tus-Resumable: 1.0.0");
+    private static readonly Answer TusPatched = Response(204, "", "Tus-Resumable: 1.0.0", "Upload-Offset: 5");
+    private static readonly Answer PlainOptions = Response(200, "", "Allow: GET, PUT");
+    private static readonly Answer IetfCreated = Response(201, "", "Location: /uploads/7");
+    private static readonly Answer IetfAppended = Response(200, "done", "Content-Length: 4");
 
     [TestMethod]
-    public async Task ExecuteAsync_WithoutUpload_CallsNextUnchanged()
+    public async Task ExecuteAsync_WithoutUploadOrOverAnotherScheme_CallsNextUnchanged()
     {
-        var context = Context("http://up.example.com/files", upload: null);
+        var plain = new TransferContext { Url = CurlUrl.Parse("http://up.example.com/files"), Output = new MemoryStream() };
+        var ftp = Context("ftp://up.example.com/files");
+        var expected = TransferResult.Success(42);
+        List<ITransferContext> given = [];
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector()), Next(context));
+        foreach (var context in new ITransferContext[] { plain, ftp })
+        {
+            Assert.AreSame(expected, await new ResumableUploadTransferHook().ExecuteAsync(context, sent => { given.Add(sent); return ValueTask.FromResult(expected); }));
+        }
 
-        Assert.AreSame(NextResult, result);
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_SchemeOtherThanHttp_CallsNextUnchanged()
-    {
-        var context = Context("ftp://up.example.com/files");
-
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector()), Next(context));
-
-        Assert.AreSame(NextResult, result);
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_WithoutServices_CallsNextForOtherTransfersAndFailsAnUpload()
-    {
-        var plain = Context("https://up.example.com/files", upload: null);
-
-        var passed = await new ResumableUploadTransferHook().ExecuteAsync(plain, Next(plain));
-        var failed = await new ResumableUploadTransferHook().ExecuteAsync(Context("HTTPS://up.example.com/files"), Next(plain));
-
-        Assert.AreSame(NextResult, passed);
-        Assert.AreEqual(CurlExitCode.FailedInit, failed.ExitCode);
-        Assert.AreEqual(ResumableUploadTransferHook.NoServicesMessage, failed.ErrorMessage);
+        CollectionAssert.AreEqual(new ITransferContext[] { plain, ftp }, given);
     }
 
     [TestMethod]
@@ -63,20 +46,19 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_TusServer_CreatesWithPostAndAppendsWithPatch()
+    public async Task ExecuteAsync_TusServer_SendsOptionsPostAndPatchThroughNext()
     {
-        // tus 1.0 "Creation": POST with Upload-Length, 201 with Location; "Core Protocol": PATCH with Upload-Offset and
-        // Content-Type: application/offset+octet-stream, 204 with the new offset.
-        var connection = new RecordedConnection(TusOptions + TusCreated + TusPatched);
+        // EXT-119: each request goes through the rest of curl's transfer, so --har, --record, -v and --trace see all three.
+        var next = new ScriptedNext(TusOptions, TusCreated, TusPatched);
         var context = Context("http://up.example.com/files?x=1", http: new HttpRequestOptions { Fail = HttpFailMode.Fail });
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, next.SendAsync);
 
         Assert.AreEqual(
-            "OPTIONS /files?x=1 HTTP/1.1\r\n" + Host + "\r\n"
-            + "POST /files?x=1 HTTP/1.1\r\n" + Host + "Tus-Resumable: 1.0.0\r\nUpload-Length: 5\r\nContent-Length: 0\r\n\r\n"
-            + "PATCH /files/24e5 HTTP/1.1\r\n" + Host + "Tus-Resumable: 1.0.0\r\nUpload-Offset: 0\r\nContent-Type: application/offset+octet-stream\r\nContent-Length: 5\r\n\r\nhello",
-            connection.Written);
+            "OPTIONS http://up.example.com/files?x=1 [] -|POST http://up.example.com/files?x=1 [Tus-Resumable: 1.0.0,Upload-Length: 5] |"
+            + "PATCH http://up.example.com/files/24e5 [Tus-Resumable: 1.0.0,Upload-Offset: 0,Content-Type: application/offset+octet-stream] hello",
+            Describe(next));
+        Assert.IsTrue(next.Sent.All(sent => sent.Context.Http!.Fail == HttpFailMode.None && sent.Context.HeaderOutput is not null && sent.Context.DumpHeaderOutput is null));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(204, result.Report!.ResponseCode);
         Assert.AreEqual("PATCH", result.Report.Method);
@@ -84,259 +66,245 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_TusPatchBrokenMidBody_RetrievesTheOffsetWithHeadAndPatchesFromIt()
+    [DataRow(CurlExitCode.RecvError, "3", "lo")]
+    [DataRow(CurlExitCode.SendError, "5", "")]
+    [DataRow(CurlExitCode.GotNothing, "0", "hello")]
+    public async Task ExecuteAsync_TusPatchBroken_RetrievesTheOffsetWithHeadAndPatchesFromIt(CurlExitCode broken, string offset, string rest)
     {
-        // tus 1.0 "Core Protocol": after a broken PATCH the client sends HEAD and resumes from its Upload-Offset.
-        var broken = new RecordedConnection(TusOptions + TusCreated, writesBeforeBreak: 3);
-        var resumed = new RecordedConnection("HTTP/1.1 200 OK\r\nUpload-Offset: 3\r\nUpload-Length: 5\r\nTus-Resumable: 1.0.0\r\n\r\n" + TusPatched);
-        var connector = new ScriptedConnector(ConnectResult.Connected(broken), ConnectResult.Connected(resumed));
+        // tus 1.0 "Core Protocol": after a broken PATCH the client sends HEAD and resumes from its Upload-Offset, the
+        // upload's whole length included.
+        var next = new ScriptedNext(TusOptions, TusCreated, Failure(broken), Response(200, "", "Upload-Offset: " + offset, "Tus-Resumable: 1.0.0"), TusPatched);
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), Services(connector), NeverSent);
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), next.SendAsync);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.IsTrue(broken.IsDisposed);
+        Assert.IsTrue(next.Sent[3].Context.NoBody);
         Assert.AreEqual(
-            "HEAD /files/24e5 HTTP/1.1\r\n" + Host + "Tus-Resumable: 1.0.0\r\n\r\n"
-            + "PATCH /files/24e5 HTTP/1.1\r\n" + Host + "Tus-Resumable: 1.0.0\r\nUpload-Offset: 3\r\nContent-Type: application/offset+octet-stream\r\nContent-Length: 2\r\n\r\nlo",
-            resumed.Written);
+            $"HEAD http://up.example.com/files/24e5 [Tus-Resumable: 1.0.0] -|PATCH http://up.example.com/files/24e5 [Tus-Resumable: 1.0.0,Upload-Offset: {offset},Content-Type: application/offset+octet-stream] {rest}",
+            Describe(next, skip: 3));
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_OffsetRetrievalReportsTheWholeUploadReceived_PatchesTheEmptyRest()
+    public async Task ExecuteAsync_IetfServer_CreatesWithUploadCompleteFalseAndWritesTheLastResponse()
     {
-        // tus 1.0 "Core Protocol": an Upload-Offset equal to the upload's length is a valid offset, so the client
-        // appends the empty rest from it rather than treating the response as a weird reply.
-        var broken = new RecordedConnection(TusOptions + TusCreated, writesBeforeBreak: 3);
-        var resumed = new RecordedConnection("HTTP/1.1 200 OK\r\nUpload-Offset: 5\r\nUpload-Length: 5\r\nTus-Resumable: 1.0.0\r\n\r\n" + TusPatched);
-        var connector = new ScriptedConnector(ConnectResult.Connected(broken), ConnectResult.Connected(resumed));
-
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), Services(connector), NeverSent);
-
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(
-            "HEAD /files/24e5 HTTP/1.1\r\n" + Host + "Tus-Resumable: 1.0.0\r\n\r\n"
-            + "PATCH /files/24e5 HTTP/1.1\r\n" + Host + "Tus-Resumable: 1.0.0\r\nUpload-Offset: 5\r\nContent-Type: application/offset+octet-stream\r\nContent-Length: 0\r\n\r\n",
-            resumed.Written);
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_IetfServer_CreatesWithUploadCompleteFalseAndAppendsTheWhole()
-    {
-        // draft-ietf-httpbis-resumable-upload "Upload Creation" (Upload-Complete: ?0, Upload-Length) and "Upload Append"
-        // (PATCH, application/partial-upload, Upload-Offset, Upload-Complete: ?1); -H lines follow the flow's fields.
-        var connection = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        // draft-ietf-httpbis-resumable-upload "Upload Creation" and "Upload Append"; -H lines follow the flow's fields,
+        // except one naming a flow field or Content-Length.
+        var next = new ScriptedNext(PlainOptions, IetfCreated, IetfAppended);
         var headerOutput = new MemoryStream();
         var dumpHeaderOutput = new MemoryStream();
         var context = Context(
             "http://up.example.com/files",
-            http: new HttpRequestOptions { Headers = ["Authorization: Bearer t", "host: evil", "Content-Length: 9", "NoColon", "Empty:"] },
+            http: new HttpRequestOptions { Headers = ["Authorization: Bearer t", "upload-offset: 9", "Content-Length: 9", "NoColon"] },
             headerOutput: headerOutput,
             dumpHeaderOutput: dumpHeaderOutput);
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, next.SendAsync);
 
         Assert.AreEqual(
-            "OPTIONS /files HTTP/1.1\r\n" + Host + "Authorization: Bearer t\r\n\r\n"
-            + "PUT /files HTTP/1.1\r\n" + Host + "Upload-Draft-Interop-Version: 6\r\nUpload-Complete: ?0\r\nUpload-Length: 5\r\nAuthorization: Bearer t\r\nContent-Length: 0\r\n\r\n"
-            + "PATCH /uploads/7 HTTP/1.1\r\n" + Host + "Upload-Draft-Interop-Version: 6\r\nUpload-Complete: ?1\r\nUpload-Offset: 0\r\nContent-Type: application/partial-upload\r\nAuthorization: Bearer t\r\nContent-Length: 5\r\n\r\nhello",
-            connection.Written);
+            "OPTIONS http://up.example.com/files [Authorization: Bearer t,upload-offset: 9,NoColon] -|"
+            + "PUT http://up.example.com/files [Upload-Draft-Interop-Version: 6,Upload-Complete: ?0,Upload-Length: 5,Authorization: Bearer t,upload-offset: 9,NoColon] |"
+            + "PATCH http://up.example.com/uploads/7 [Upload-Draft-Interop-Version: 6,Upload-Complete: ?1,Upload-Offset: 0,Content-Type: application/partial-upload,Authorization: Bearer t,NoColon] hello",
+            Describe(next));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("done", Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray()));
-        Assert.AreEqual("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n", Encoding.ASCII.GetString(headerOutput.ToArray()));
-        Assert.AreEqual("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n", Encoding.ASCII.GetString(dumpHeaderOutput.ToArray()));
-        Assert.AreEqual(TransferResult.Success(4).BytesTransferred, result.BytesTransferred);
-        Assert.AreEqual(200, result.Report!.ResponseCode);
+        Assert.AreEqual("HTTP/1.1 200 R\r\nContent-Length: 4\r\n\r\n", Encoding.ASCII.GetString(headerOutput.ToArray()));
+        CollectionAssert.AreEqual(headerOutput.ToArray(), dumpHeaderOutput.ToArray());
+        Assert.AreEqual(headerOutput.Length, result.Report!.HeaderSize);
     }
 
     [TestMethod]
-    [DataRow("HTTP/1.1 404 Not Found\r\nTus-Version: 1.0.0\r\nTus-Extension: creation\r\nContent-Length: 0\r\n\r\n")]
-    [DataRow("HTTP/1.1 204 No Content\r\nTus-Extension: creation\r\n\r\n")]
-    [DataRow("HTTP/1.1 204 No Content\r\nTus-Version: 0.2.2\r\nTus-Extension: creation\r\n\r\n")]
-    [DataRow("HTTP/1.1 204 No Content\r\nTus-Version: 1.0.0\r\n\r\n")]
-    [DataRow("HTTP/1.1 204 No Content\r\nTus-Version: 1.0.0\r\nTus-Extension: expiration\r\n\r\n")]
-    public async Task ExecuteAsync_OptionsWithoutTusCreation_UsesTheIetfDraftWithCurlsMethod(string options)
+    public async Task ExecuteAsync_OptionsWithoutTusCreation_UsesTheIetfDraftWithCurlsMethod()
     {
-        var connection = new RecordedConnection(options + IetfCreated + IetfAppended);
-        var context = Context("http://up.example.com/files", http: new HttpRequestOptions { CustomMethod = "POST" });
+        var next = new ScriptedNext(Response(204, "", "Tus-Version: 1.0.0", "Tus-Extension: termination"), IetfCreated, IetfAppended);
 
-        await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", http: new HttpRequestOptions { CustomMethod = "POST" }), next.SendAsync);
 
-        StringAssert.Contains(connection.Written, "POST /files HTTP/1.1\r\n" + Host + "Upload-Draft-Interop-Version: 6\r\n");
+        Assert.AreEqual("POST", next.Sent[1].Method);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_IetfAppendResponseLost_RetrievesTheOffsetAndAppendsFromIt()
+    public async Task ExecuteAsync_LocationOnAnotherOrigin_DropsCredentialsButKeepsOtherFields()
     {
-        // draft-ietf-httpbis-resumable-upload "Offset Retrieval": HEAD gives Upload-Offset; the append resumes from it.
-        var broken = new RecordedConnection(PlainOptions + IetfCreated);
-        var resumed = new RecordedConnection("HTTP/1.1 204 No Content\r\nUpload-Offset: 4\r\nUpload-Complete: ?0\r\n\r\n" + IetfAppended);
-        var connector = new ScriptedConnector(ConnectResult.Connected(broken), ConnectResult.Connected(resumed));
+        // Curl drops Authorization, Cookie and Proxy-Authorization on a cross-origin redirect, and so does the upload.
+        var next = new ScriptedNext(PlainOptions, Response(201, "", "Location: https://store.example.net/u/1"), IetfAppended);
+        var http = new HttpRequestOptions { Headers = ["Authorization: Bearer t", "cookie: a=b", "Proxy-Authorization: Basic x", "X-Trace: 1"], BearerToken = "t", UserAgent = "agent" };
+        var credentials = new NetworkCredential("user", "secret");
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), Services(connector), NeverSent);
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", http: http, credentials: credentials), next.SendAsync);
 
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(
-            "HEAD /uploads/7 HTTP/1.1\r\n" + Host + "Upload-Draft-Interop-Version: 6\r\n\r\n"
-            + "PATCH /uploads/7 HTTP/1.1\r\n" + Host + "Upload-Draft-Interop-Version: 6\r\nUpload-Complete: ?1\r\nUpload-Offset: 4\r\nContent-Type: application/partial-upload\r\nContent-Length: 1\r\n\r\no",
-            resumed.Written);
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_ClosedConnectionOrLocationOnAnotherHost_ConnectsAgainToTheRightTarget()
-    {
-        var options = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
-        var creation = new RecordedConnection("HTTP/1.1 201 Created\r\nLocation: https://store.example.net:8443/u/1\r\nContent-Length: 0\r\n\r\n");
-        var append = new RecordedConnection(IetfAppended);
-        var connector = new ScriptedConnector(ConnectResult.Connected(options), ConnectResult.Connected(creation), ConnectResult.Connected(append));
-
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), Services(connector), NeverSent);
-
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.IsTrue(options.IsDisposed);
-        Assert.IsTrue(creation.IsDisposed);
-        Assert.AreEqual(new ConnectTarget("store.example.net", 8443, true), connector.Targets[2]);
-        StringAssert.StartsWith(append.Written, "PATCH /u/1 HTTP/1.1\r\nHost: store.example.net:8443\r\n");
+        var creation = next.Sent[1].Context;
+        var append = next.Sent[2].Context;
+        Assert.AreSame(credentials, creation.Credentials);
+        Assert.AreEqual("t", creation.Http!.BearerToken);
+        Assert.IsTrue(creation.Http.SendsCookieStrings);
+        Assert.IsNull(append.Credentials);
+        Assert.IsNull(append.Http!.BearerToken);
+        Assert.IsFalse(append.Http.SendsCookieStrings);
+        Assert.AreEqual("agent", append.Http.UserAgent);
+        Assert.AreEqual("https://store.example.net/u/1", next.Sent[2].Url);
+        CollectionAssert.AreEqual(new[] { "X-Trace: 1" }, append.Http.Headers.Skip(4).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_UnseekableOrPartlyReadUpload_IsBufferedFromWhereItStands()
     {
-        var partlyRead = new MemoryStream(Encoding.ASCII.GetBytes("xhello")) { Position = 1 };
         var unseekable = new UnseekableStream(Encoding.ASCII.GetBytes("hello"));
-        var first = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
-        var second = new RecordedConnection(PlainOptions + IetfCreated + IetfAppended);
+        var partlyRead = new MemoryStream(Encoding.ASCII.GetBytes("xxhello")) { Position = 2 };
 
-        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", partlyRead), Services(new ScriptedConnector(ConnectResult.Connected(first))), NeverSent);
-        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", unseekable), Services(new ScriptedConnector(ConnectResult.Connected(second))), NeverSent);
-
-        StringAssert.EndsWith(first.Written, "Content-Length: 5\r\n\r\nhello");
-        StringAssert.EndsWith(second.Written, "Content-Length: 5\r\n\r\nhello");
+        foreach (var upload in new Stream[] { unseekable, partlyRead })
+        {
+            var next = new ScriptedNext(PlainOptions, IetfCreated, IetfAppended);
+            await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", upload: upload), next.SendAsync);
+            Assert.AreEqual("hello", next.Sent[2].Upload);
+        }
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ConnectFails_EndsWithTheConnectorsExitCode()
+    public async Task ExecuteAsync_FailureThatCannotResume_EndsWithItsExitCodeAndSendsNoMore()
     {
-        var connector = new ScriptedConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect to up.example.com port 80"));
+        var next = new ScriptedNext(Failure(CurlExitCode.CouldntConnect, "Failed to connect"));
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), Services(connector), NeverSent);
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), next.SendAsync);
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
-        Assert.AreEqual("Failed to connect to up.example.com port 80", result.ErrorMessage);
+        Assert.AreEqual("Failed to connect", result.ErrorMessage);
+        Assert.HasCount(1, next.Sent);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_BrokenWithNoResumptionLeft_EndsWithSendError()
+    public async Task ExecuteAsync_BrokenWithNoResumptionLeft_EndsWithTheBreaksExitCode()
     {
-        var broken = new RecordedConnection(TusOptions + TusCreated, writesBeforeBreak: 3);
+        var next = new ScriptedNext(PlainOptions, IetfCreated, Failure(CurlExitCode.RecvError, message: null));
 
-        var result = await new ResumableUploadTransferHook(0).ExecuteAsync(
-            Context("http://up.example.com/files"), Services(new ScriptedConnector(ConnectResult.Connected(broken))), NeverSent);
-
-        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
-        Assert.AreEqual("Send failure: The connection was reset.", result.ErrorMessage);
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_ResponseLostWithNoResumptionLeft_EndsWithRecvError()
-    {
-        var broken = new RecordedConnection(PlainOptions);
-
-        var result = await new ResumableUploadTransferHook(0).ExecuteAsync(
-            Context("http://up.example.com/files"), Services(new ScriptedConnector(ConnectResult.Connected(broken))), NeverSent);
+        var result = await new ResumableUploadTransferHook(maxResumptions: 0).ExecuteAsync(Context("http://up.example.com/files"), next.SendAsync);
 
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
-        StringAssert.StartsWith(result.ErrorMessage, "Recv failure: ");
+        Assert.AreEqual(string.Empty, result.ErrorMessage);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_MalformedResponse_EndsWithWeirdServerReply()
+    [DataRow("Upload-Offset: 9")]
+    [DataRow("X-Other: 1")]
+    public async Task ExecuteAsync_OffsetRetrievalWithoutAnOffsetInTheUpload_EndsWithWeirdServerReply(string field)
     {
-        var connection = new RecordedConnection("garbage\r\n\r\n");
+        var next = new ScriptedNext(PlainOptions, IetfCreated, Failure(CurlExitCode.RecvError), Response(204, "", field));
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(
-            Context("http://up.example.com/files"), Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), next.SendAsync);
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-    }
-
-    [TestMethod]
-    [DataRow("HTTP/1.1 204 No Content\r\nUpload-Complete: ?0\r\n\r\n")]
-    [DataRow("HTTP/1.1 204 No Content\r\nUpload-Offset: 6\r\n\r\n")]
-    public async Task ExecuteAsync_OffsetRetrievalWithoutAnOffsetInTheUpload_EndsWithWeirdServerReply(string retrieval)
-    {
-        var connector = new ScriptedConnector(
-            ConnectResult.Connected(new RecordedConnection(PlainOptions + IetfCreated)), ConnectResult.Connected(new RecordedConnection(retrieval)));
-
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), Services(connector), NeverSent);
-
-        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-        Assert.AreEqual("The offset retrieval response gave no Upload-Offset within the upload's 5 bytes.", result.ErrorMessage);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_OffsetRetrievalAnswers404WithFail_EndsWithHttpReturnedErrorAndWritesNothing()
     {
-        var connector = new ScriptedConnector(
-            ConnectResult.Connected(new RecordedConnection(PlainOptions + IetfCreated)),
-            ConnectResult.Connected(new RecordedConnection("HTTP/1.1 404 Not Found\r\n\r\n")));
-        var headerOutput = new MemoryStream();
-        var context = Context("http://up.example.com/files", http: new HttpRequestOptions { Fail = HttpFailMode.Fail }, headerOutput: headerOutput);
+        var next = new ScriptedNext(PlainOptions, IetfCreated, Failure(CurlExitCode.RecvError), Response(404, "gone"));
+        var context = Context("http://up.example.com/files", http: new HttpRequestOptions { Fail = HttpFailMode.Fail }, headerOutput: new MemoryStream());
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(connector), NeverSent);
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, next.SendAsync);
 
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
-        Assert.AreEqual("The requested URL returned error: 404", result.ErrorMessage);
-        Assert.AreEqual("HEAD", result.Report!.Method);
-        Assert.AreEqual(0, headerOutput.Length);
         Assert.AreEqual(0, context.Output.Length);
+        Assert.AreEqual(0, context.HeaderOutput!.Length);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_CreationRefusedWithFailWithBody_WritesTheBodyAndEndsWithHttpReturnedError()
     {
-        var connection = new RecordedConnection(PlainOptions + "HTTP/1.1 413 Content Too Large\r\nContent-Length: 7\r\n\r\ntoo big");
+        var next = new ScriptedNext(PlainOptions, Response(403, "no"));
         var context = Context("http://up.example.com/files", http: new HttpRequestOptions { Fail = HttpFailMode.FailWithBody });
 
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, next.SendAsync);
 
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
-        Assert.AreEqual("too big", Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray()));
+        Assert.AreEqual("no", Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray()));
+        Assert.HasCount(2, next.Sent);
     }
 
-    private static readonly TransferResult NextResult = TransferResult.Success(42);
-
-    private static ValueTask<TransferResult> NeverSent(ITransferContext context) => throw new AssertFailedException("curl's handler ran.");
-
-    private static Func<ITransferContext, ValueTask<TransferResult>> Next(ITransferContext expected) => given =>
+    [TestMethod]
+    public async Task ExecuteAsync_ResultsWithoutAReport_AreTakenAsNoStatusAndEndTheUpload()
     {
-        Assert.AreSame(expected, given);
-        return ValueTask.FromResult(NextResult);
-    };
+        // A transfer that reports no response (status 0) offers no tus, and its creation is no success.
+        var next = new ScriptedNext(Response(0), Response(0));
 
-    private static TransferHookServices Services(IConnector connector) => new(connector, new UnusedListener());
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), next.SendAsync);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0, result.Report!.ResponseCode);
+        Assert.HasCount(2, next.Sent);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ExecuteAsync_CreationAnsweredWithoutLocation_FailsAndSendsNoBody(bool tus)
+    {
+        // EXT-045, ADR-1103: no upload resource, so no upload bytes are sent.
+        var next = new ScriptedNext(tus ? TusOptions : PlainOptions, Response(200, "ok"));
+
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), next.SendAsync);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage, "did not create an upload resource");
+        Assert.IsNull(result.Report);
+        Assert.HasCount(2, next.Sent);
+    }
+
+    [TestMethod]
+    public void RequestContext_OverridesTheRequestsMembersAndPassesTheRestThrough()
+    {
+        var inner = new TransferContext { Url = CurlUrl.Parse("http://up.example.com/"), Output = new MemoryStream(), ResumeFrom = 3, NoBody = false, PostWithoutData = true };
+        var url = CurlUrl.Parse("http://up.example.com/files/1");
+        var http = new HttpRequestOptions();
+        var output = new MemoryStream();
+        var head = new MemoryStream();
+
+        ITransferContext request = new ResumableUploadRequestContext(inner, url, http, Stream.Null, noBody: true, output, head, credentials: null);
+
+        Assert.AreSame(url, request.Url);
+        Assert.AreSame(output, request.Output);
+        Assert.AreSame(Stream.Null, request.Upload);
+        Assert.IsNull(request.ResumeFrom);
+        Assert.IsFalse(request.ResumeUploadFromUnknownOffset);
+        Assert.IsNull(request.Range);
+        Assert.IsNull(request.RangeText);
+        Assert.IsTrue(request.NoBody);
+        Assert.AreSame(head, request.HeaderOutput);
+        Assert.IsNull(request.DumpHeaderOutput);
+        Assert.IsNull(request.PostData);
+        Assert.IsFalse(request.PostWithoutData);
+        Assert.IsNull(request.Credentials);
+        Assert.AreSame(http, request.Http);
+        Assert.AreEqual(
+            (inner.MaxFileSize, inner.TimeCondition, inner.RemoteTime, inner.TelnetOptions, inner.TftpBlockSize, inner.TftpNoOptions, inner.FtpDisableEpsv, inner.FtpSkipPasvIp),
+            (request.MaxFileSize, request.TimeCondition, request.RemoteTime, request.TelnetOptions, request.TftpBlockSize, request.TftpNoOptions, request.FtpDisableEpsv, request.FtpSkipPasvIp));
+        Assert.AreEqual(
+            (inner.FtpFileMethod, inner.FtpCreateDirectories, inner.FtpAccount, inner.FtpAlternativeToUser, inner.FtpSendPret, inner.ListOnly, inner.UseAscii, inner.Append),
+            (request.FtpFileMethod, request.FtpCreateDirectories, request.FtpAccount, request.FtpAlternativeToUser, request.FtpSendPret, request.ListOnly, request.UseAscii, request.Append));
+        Assert.AreEqual(
+            (inner.FtpPort, inner.FtpUseEprt, inner.FtpAcceptTimeout, inner.FtpServerResponseTimeout, inner.SslLevel, inner.FtpSslControlOnly, inner.FtpCommandChannelClearing, inner.QuoteCommands),
+            (request.FtpPort, request.FtpUseEprt, request.FtpAcceptTimeout, request.FtpServerResponseTimeout, request.SslLevel, request.FtpSslControlOnly, request.FtpCommandChannelClearing, request.QuoteCommands));
+        Assert.AreEqual(
+            (inner.ConvertLineEndings, inner.CreateFileMode, inner.PathAsIs, inner.ConnectTimeout, inner.MaxTime, inner.OperationStarted, inner.Proxy, inner.NoProxy),
+            (request.ConvertLineEndings, request.CreateFileMode, request.PathAsIs, request.ConnectTimeout, request.MaxTime, request.OperationStarted, request.Proxy, request.NoProxy));
+        Assert.AreEqual(
+            (inner.Mail, inner.Ssh, inner.TimeProvider, inner.Events, inner.Progress, inner.CancellationToken, inner.DiagnosticLog),
+            (request.Mail, request.Ssh, request.TimeProvider, request.Events, request.Progress, request.CancellationToken, request.DiagnosticLog));
+    }
+
+    private static string Describe(ScriptedNext next, int skip = 0) =>
+        string.Join('|', next.Sent.Skip(skip).Select(sent => $"{sent.Method} {sent.Url} [{string.Join(',', sent.Headers)}] {sent.Upload ?? "-"}"));
 
     private static TransferContext Context(
-        string url, Stream? upload = null, HttpRequestOptions? http = null, Stream? headerOutput = null, Stream? dumpHeaderOutput = null) => new()
+        string url, Stream? upload = null, HttpRequestOptions? http = null, Stream? headerOutput = null, Stream? dumpHeaderOutput = null, NetworkCredential? credentials = null) => new()
         {
             Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
             Upload = upload ?? new MemoryStream(Encoding.ASCII.GetBytes("hello")),
             Http = http,
+            Credentials = credentials,
             HeaderOutput = headerOutput,
             DumpHeaderOutput = dumpHeaderOutput,
         };
-
-    private static TransferContext Context(string url, Stream? upload) => new()
-    {
-        Url = CurlUrl.Parse(url),
-        Output = new MemoryStream(),
-        Upload = upload,
-    };
-
-    private sealed class UnusedListener : IConnectionListener
-    {
-        public ValueTask<ListenResult> ListenAsync(ListenTarget target, CancellationToken cancellationToken) =>
-            throw new AssertFailedException("The listener was used.");
-    }
 
     private sealed class UnseekableStream(byte[] content) : MemoryStream(content)
     {

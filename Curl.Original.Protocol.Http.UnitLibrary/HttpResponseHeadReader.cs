@@ -500,9 +500,10 @@ internal sealed class HttpResponseHeadReader
     /// <summary>
     /// Fails a reply the peer closed before a final head, carrying the 1xx heads read before it,
     /// which curl 8.22.0 has already written to <c>-i</c>'s output (upstream test158, BL-2867).
+    /// Their last status line goes with them, so <c>-w</c> reports its code and size (BL-5336).
     /// </summary>
     private HttpTransferException EmptyReply() =>
-        new(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply) { HeadBytesBeforeFailure = builder.HeadBytesSoFar() };
+        new(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply) { HeadBytesBeforeFailure = builder.HeadBytesSoFar(), StatusLineBeforeFailure = headStatusLine };
 
     /// <summary>
     /// Gives the head of an HTTP/0.9 response <see cref="AcceptsHttp09" /> accepts, its bytes

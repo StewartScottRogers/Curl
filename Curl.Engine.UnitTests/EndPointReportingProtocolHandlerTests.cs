@@ -65,8 +65,8 @@ public sealed class EndPointReportingProtocolHandlerTests
         TransferResult result = await handler.ExecuteAsync(ContextOf(0));
         Diagnostics.Act("report", result.Report?.ToString() ?? "null");
 
-        Diagnostics.Assert("report", "null", result.Report?.ToString() ?? "null");
-        Assert.IsNull(result.Report);
+        Diagnostics.Assert("remote end point", "null", result.Report?.RemoteEndPoint?.ToString() ?? "null");
+        Assert.IsNull(result.Report?.RemoteEndPoint);
     }
 
     [TestMethod]

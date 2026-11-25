@@ -20,4 +20,10 @@ internal sealed class StreamContent(Stream stream, long? length) : CurlContent
             Callbacks = options.Callbacks with { Read = upload.Read, Seek = upload.Seek },
         };
     }
+
+    internal override EasyOptions ApplyAsUpload(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned)
+    {
+        (StreamUpload upload, long size) = StreamUpload.FromPosition(stream, length);
+        return WithUpload(options, upload, size);
+    }
 }

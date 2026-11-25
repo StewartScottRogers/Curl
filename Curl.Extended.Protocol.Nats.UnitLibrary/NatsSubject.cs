@@ -21,7 +21,7 @@ internal static class NatsSubject
 
         return IsValid(subject)
             ? subject
-            : throw new NatsException(CurlExitCode.UrlMalformat, $"NATS subject \"{subject}\" holds whitespace or an empty token");
+            : throw new NatsException(CurlExitCode.UrlMalformat, $"NATS subject \"{EscapeControlCharacters(subject)}\" holds whitespace or an empty token");
     }
 
     /// <summary>
@@ -34,9 +34,12 @@ internal static class NatsSubject
     {
         if (subject.Split('.').Any(token => token is "*" or ">"))
         {
-            throw new NatsException(CurlExitCode.UrlMalformat, $"NATS subject \"{subject}\" holds a wildcard, which a publish cannot name");
+            throw new NatsException(CurlExitCode.UrlMalformat, $"NATS subject \"{EscapeControlCharacters(subject)}\" holds a wildcard, which a publish cannot name");
         }
     }
+
+    private static string EscapeControlCharacters(string text) =>
+        string.Concat(text.Select(c => char.IsControl(c) ? $"\\x{(int)c:X2}" : c.ToString()));
 
     private static bool IsValid(string subject) =>
         !subject.Any(char.IsWhiteSpace) && !subject.Split('.').Any(token => token.Length == 0);

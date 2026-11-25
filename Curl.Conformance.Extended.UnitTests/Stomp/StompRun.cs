@@ -18,7 +18,7 @@ internal static class StompRun
     public const int SecurePort = 61614;
 
     /// <summary>The CONNECT frame curl sends to <c>localhost</c> with no credentials.</summary>
-    public const string PlainConnect = "CONNECT\naccept-version:1.2\nhost:localhost\nheart-beat:0,0\n\n\0";
+    public const string PlainConnect = "CONNECT\naccept-version:1.2\nhost:/\nheart-beat:0,0\n\n\0";
 
     /// <summary>A CONNECTED frame choosing STOMP 1.2.</summary>
     public const string Connected = "CONNECTED\nversion:1.2\n\n\0";

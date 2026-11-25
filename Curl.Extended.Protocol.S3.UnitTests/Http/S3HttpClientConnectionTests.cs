@@ -54,6 +54,10 @@ public sealed class S3HttpClientConnectionTests
     [TestMethod]
     [DataRow("X-Bad\r\nInjected", "v")]
     [DataRow("X-Bad", "v\nInjected: 1")]
+    [DataRow("\rX-Bad", "v")]
+    [DataRow("\nX-Bad", "v")]
+    [DataRow("X-Bad", "\rv")]
+    [DataRow("X-Bad", "\nInjected: 1")]
     public async Task SendAsync_FieldHoldsCrOrLf_ThrowsArgumentException(string name, string value)
     {
         var request = new S3HttpRequest("GET", "/", [new(name, value)]);
@@ -80,12 +84,12 @@ public sealed class S3HttpClientConnectionTests
     }
 
     [TestMethod]
-    public async Task SendAsync_ContentLengthBodyCutShort_FailsClosedEarly()
+    public async Task SendAsync_ContentLengthBodyCutShort_FailsBodyShort()
     {
         // RFC 9112 §8: a message whose Content-Length is not received in full is incomplete.
         var response = await SendAsync("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nhello");
 
-        await AssertFailureAsync(S3HttpFailure.ClosedEarly, () => ReadToEndAsync(response.Body));
+        await AssertFailureAsync(S3HttpFailure.BodyShort, () => ReadToEndAsync(response.Body));
     }
 
     [TestMethod]

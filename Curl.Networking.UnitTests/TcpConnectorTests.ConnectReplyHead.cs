@@ -105,6 +105,39 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenAClosingChallengeIsFollowedByAConnectionTheProxyClosesUnanswered_KeepsTheChallengesStatusHeadersAndBytes()
+    {
+        // STD-168: --proxy-anyauth against a proxy that answers 407 and closes, every time: curl prints [56 407 2 N].
+        var first = new ScriptedConnection(Encoding.Latin1.GetBytes(DigestChallengeClosing));
+        var second = new ScriptedConnection([]);
+        var (connector, _) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, first, second);
+
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
+
+        Diagnostics.Assert("exit code, status, headers, bytes", (CurlExitCode.RecvError, 407, 3, (long)DigestChallengeClosing.Length), (result.ExitCode, result.ProxyConnectResponseCode, result.ConnectReplyHeadersStored, result.ProxyConnectHeaderBytes));
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(407, result.ProxyConnectResponseCode);
+        Assert.AreEqual(3, result.ConnectReplyHeadersStored);
+        Assert.AreEqual((long)DigestChallengeClosing.Length, result.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheProxyRefusesTheConnect_CarriesTheRepliesHeaderCountAndBytesInTheFailure()
+    {
+        // STD-144: curl prints [7 2 59] for %{exitcode} %{num_headers} %{size_header} after this reply.
+        const string reply = "HTTP/1.1 403 Forbidden\r\nContent-Length: 4\r\nX-Proxy: yes\r\n\r\nnope";
+        var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes(reply));
+        var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
+
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(2, result.ConnectReplyHeadersStored);
+        Assert.AreEqual(59L, result.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheHandshakeInsideTheTunnelFails_ReturnsTheFailureWithNoHeaderCount()
     {
         const string reply = "HTTP/1.1 200 Connection established\r\nX-A: 1\r\n\r\n";

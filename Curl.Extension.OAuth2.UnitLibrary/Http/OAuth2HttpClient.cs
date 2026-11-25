@@ -15,7 +15,16 @@ namespace Curl.Extension.OAuth2.Http;
 /// <param name="connector">Opens the connection to the endpoint.</param>
 public sealed class OAuth2HttpClient(IConnector connector)
 {
-    /// <summary>Sends <paramref name="request"/> to <paramref name="endpoint"/> and reads the response.</summary>
+    /// <summary>
+    /// Gets what signs the requests to the token endpoint with a DPoP proof (RFC 9449 §5), or <see langword="null"/> to
+    /// sign none.
+    /// </summary>
+    internal OAuth2DpopTokenProver? DpopProver { get; init; }
+
+    /// <summary>
+    /// Sends <paramref name="request"/> to <paramref name="endpoint"/> and reads the response; with a DPoP key, a request
+    /// to the token endpoint carries a proof, and is sent once more when the endpoint asks for a new nonce.
+    /// </summary>
     /// <param name="endpoint">The endpoint, an absolute <c>http</c> or <c>https</c> URL.</param>
     /// <param name="request">The form body and the <c>Authorization</c> value.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
@@ -24,6 +33,13 @@ public sealed class OAuth2HttpClient(IConnector connector)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         ArgumentNullException.ThrowIfNull(request);
+        return DpopProver is { } prover && prover.TokenEndpoint == endpoint
+            ? await prover.PostAsync(request, signed => PostOnceAsync(endpoint, signed, cancellationToken))
+            : await PostOnceAsync(endpoint, request, cancellationToken);
+    }
+
+    private async Task<OAuth2HttpResult> PostOnceAsync(Uri endpoint, OAuth2FormRequest request, CancellationToken cancellationToken)
+    {
         if (!endpoint.IsAbsoluteUri || (endpoint.Scheme != Uri.UriSchemeHttp && endpoint.Scheme != Uri.UriSchemeHttps))
         {
             return OAuth2HttpResult.Failed(

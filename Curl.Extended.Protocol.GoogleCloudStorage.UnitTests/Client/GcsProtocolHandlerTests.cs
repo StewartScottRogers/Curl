@@ -187,6 +187,26 @@ public sealed class GcsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_UrlQuery_NarrowsTheListAndPassesOtherParametersOn()
+    {
+        QueuedGcsConnector connector = new(QueuedGcsConnector.Ok(Listing(Entry("d/b.txt"), "false", string.Empty)));
+
+        await Handler(connector, Emulator).ExecuteAsync(Context("gs://bucket/?prefix=d/&max-keys=5&flag", new MemoryStream()));
+
+        Assert.StartsWith("GET /bucket?list-type=2&delimiter=%2F&prefix=d%2F&max-keys=5&flag= HTTP/1.1\r\n", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UrlQueryDelimiterAndPrefix_ReplacesTheDelimiterAndExtendsTheUrlPrefix()
+    {
+        QueuedGcsConnector connector = new(QueuedGcsConnector.Ok(Listing(Entry("dir/x"), "false", string.Empty)));
+
+        await Handler(connector, Emulator).ExecuteAsync(Context("gs://bucket/dir/?delimiter=%7C&prefix=x+y", new MemoryStream()));
+
+        Assert.StartsWith("GET /bucket?list-type=2&delimiter=%7C&prefix=dir%2Fx%20y HTTP/1.1\r\n", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TruncatedListingWithoutAToken_StopsAfterThePage()
     {
         QueuedGcsConnector connector = new(QueuedGcsConnector.Ok(Listing(Entry("a"), "true", string.Empty)));

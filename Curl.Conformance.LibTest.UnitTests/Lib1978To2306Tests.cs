@@ -182,6 +182,18 @@ public sealed class Lib1978To2306Tests
     }
 
     [TestMethod]
+    public async Task Lib2023_WhenTheFirstHandleCannotBeMade_StopsWithoutTryingTheNextRequests()
+    {
+        CurlLibrary library = await PortRun.CleanedUpLibraryAsync();
+        var run = new PortRun(new FakeCurlEngine(), 2023, "http://x/2023", "basic", "basic");
+
+        await Lib2023.TestAsync(run.Context, run.Steps, library, HttpAuthenticationMethods.Basic, HttpAuthenticationMethods.Basic, CancellationToken.None);
+
+        Assert.AreEqual(LibTestErrorCodes.MajorBad, run.Steps.Result);
+        Assert.AreEqual("curl_easy_init() failed\n", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib2023_WhenTheSecondHandleCannotBeMade_EndsMajorBad()
     {
         var holder = new PortRun.LibraryHolder();
@@ -542,6 +554,20 @@ public sealed class Lib1978To2306Tests
             Assert.AreNotEqual(0, result.ExitCode);
             StringAssert.EndsWith(run.OutputText, "Data connection 2: 0\n");
         }
+    }
+
+    [TestMethod]
+    public async Task Lib2032_WhenMultiPerformFails_StopsBeforeWritingTheRunningLine()
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.PerformResult = (CurlMultiCode.BadHandle, 0);
+        var run = new PortRun(engine, 2032, "http://x/2032");
+
+        LibTestResult result = await new Lib2032(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreNotEqual(0, result.ExitCode);
+        Assert.DoesNotContain("lib2032.c:156", run.Error.ToString());
+        Assert.DoesNotContain("lib2032.c:181", run.Error.ToString());
     }
 
     [TestMethod]

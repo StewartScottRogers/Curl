@@ -19,7 +19,7 @@ public sealed record SignalRReferenceRequest(string Method, string Target, IRead
     /// <param name="pending">The bytes received and not yet read.</param>
     /// <param name="request">The request, or <see langword="null" /> when <paramref name="pending" /> holds no whole one yet.</param>
     /// <returns>The number of bytes the request took; 0 when it is not whole yet.</returns>
-    public static int TryRead(ReadOnlySpan<byte> pending, out SignalRReferenceRequest? request)
+    public static int TakeWholeRequest(ReadOnlySpan<byte> pending, out SignalRReferenceRequest? request)
     {
         request = null;
         int headEnd = pending.IndexOf("\r\n\r\n"u8);

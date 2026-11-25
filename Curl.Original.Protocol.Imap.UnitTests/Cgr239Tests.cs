@@ -31,8 +31,7 @@ public sealed class Cgr239Tests
         var handler = new ImapProtocolHandler(connector, new QueuedTlsProvider());
 
         await handler.ExecuteAsync(Context("1", "user.one"));
-        TransferResult result = await handler.ExecuteAsync(Context("2", "user.two"));
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(Context("2", "user.two")));
         Assert.AreEqual(TransferResult.Success(1), result);
         Assert.IsFalse(first.IsClosed);
         Assert.IsFalse(Encoding.Latin1.GetString(first.Sent).Contains("LOGOUT", StringComparison.Ordinal));

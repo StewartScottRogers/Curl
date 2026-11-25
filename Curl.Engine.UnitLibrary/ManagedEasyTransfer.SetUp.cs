@@ -14,9 +14,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -239,7 +239,7 @@ internal sealed partial class ManagedEasyTransfer
     {
         if (toolEvents is not null)
         {
-            AbortedHeadRecordingTransferEvents? toolAbortedHead = WatchesLowSpeed(options.Transfer) ? new(toolEvents.Events) : null;
+            AbortedHeadRecordingTransferEvents? toolAbortedHead = WatchdogMayEndTransfer(options.Transfer) ? new(toolEvents.Events) : null;
             return (toolEvents.State, toolAbortedHead ?? toolEvents.Events, null, null, toolAbortedHead);
         }
 
@@ -250,11 +250,11 @@ internal sealed partial class ManagedEasyTransfer
         return (state, recorder, recorder, negotiateFailure, abortedHead);
     }
 
-    /// <summary>Tells whether <c>-Y</c> or <c>-y</c> is set, so a <c>-Y</c>/<c>-y</c> watchdog may end the transfer.</summary>
+    /// <summary>Tells whether <c>-m</c>, <c>-Y</c> or <c>-y</c> is set, so the max-time or low-speed watchdog may end the transfer.</summary>
     /// <param name="transfer">The transfer's options.</param>
-    /// <returns><see langword="true" /> when the low-speed limit or time is above zero.</returns>
-    private static bool WatchesLowSpeed(EasyTransferOptions transfer) =>
-        transfer.LowSpeedLimit > 0 || transfer.LowSpeedTime > TimeSpan.Zero;
+    /// <returns><see langword="true" /> when the max time (<c>-m</c>), the low-speed limit (<c>-Y</c>) or the low-speed time (<c>-y</c>) is above zero.</returns>
+    private static bool WatchdogMayEndTransfer(EasyTransferOptions transfer) =>
+        transfer.LowSpeedLimit > 0 || transfer.LowSpeedTime > TimeSpan.Zero || transfer.Timeout > TimeSpan.Zero;
 
     /// <summary>
     /// The token the context stops on: the runner's abort token as it is when the runner gave <paramref name="toolProgress" />
@@ -334,7 +334,8 @@ internal sealed partial class ManagedEasyTransfer
     /// set) own none, as its run's connections outlive each transfer's handle.
     /// </summary>
     private void OwnTheConnectionsOpened() =>
-        shared.Connections.OpeningOwner = ToolSettings is null && !shared.MultiOwners.ContainsKey(this) ? this : null;
+        (ToolSettings is not null ? shared.EngineWide : MultiCachesOf() ?? shared).Connections.OpeningOwner =
+            ToolSettings is null && !shared.MultiOwners.ContainsKey(this) ? this : null;
 
     /// <summary>
     /// Wraps <paramref name="events" /> in the decorators the curl tool's runner adds under the same

@@ -17,6 +17,9 @@ data, and exit 16, even with `--ignore-content-length`:
 - A stream that ends short of the `content-length`: the DATA before it is written.
 - DATA on a response to HEAD (also `-X HEAD`), a 204 or a 304: nothing of it is written.
 - A 1xx head that ends the stream: its status and header lines are written, but no empty line.
+- A final head that ends the stream although its `content-length` promises a body (added by
+  BL-5947, curl 8.18.0): the same, also for `-I -X GET`; `-v` shows the message after the head
+  lines. Plain `-I` sends HEAD, which is promised no body, and succeeds.
 - A `content-length` that is not a number, or a second one: the lines before it are written, no
   empty line, and the message is `Invalid HTTP header field was received: frame type: 1, stream: 1,
   name: [content-length], value: [abc]`.

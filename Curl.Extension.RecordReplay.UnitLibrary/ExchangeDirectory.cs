@@ -6,13 +6,13 @@ namespace Curl.Extension.RecordReplay;
 /// reader sees the old exchange or the new one, never half of one.
 /// </summary>
 /// <param name="path">The directory; created on the first write.</param>
-public sealed class ExchangeDirectory(string path)
+public class ExchangeDirectory(string path)
 {
     /// <summary>Gets the directory's path, as the option gave it.</summary>
     public string Path { get; } = path;
 
     /// <summary>Writes <paramref name="exchange" /> as the file for <paramref name="key" />, replacing any it had.</summary>
-    public async Task WriteAsync(string key, RecordedExchange exchange, CancellationToken cancellationToken)
+    public virtual async Task WriteAsync(string key, RecordedExchange exchange, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path);
         var filePath = FilePath(key);

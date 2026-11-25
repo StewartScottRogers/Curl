@@ -195,6 +195,25 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     }
 
     [TestMethod]
+    [DataRow("--ftp-ssl-control --ssl", "--ssl is an insecure option, consider --ssl-reqd instead|--ssl overrides --ftp-ssl-control")]
+    [DataRow("--ftp-ssl-control --ftp-ssl", "--ftp-ssl is an insecure option, consider --ssl-reqd instead|--ftp-ssl overrides --ftp-ssl-control")]
+    [DataRow("--ssl --ftp-ssl-control", "--ssl is an insecure option, consider --ssl-reqd instead|--ftp-ssl-control overrides --ssl")]
+    [DataRow("--ftp-ssl --ftp-ssl-control", "--ftp-ssl is an insecure option, consider --ssl-reqd instead|--ftp-ssl-control overrides --ssl")]
+    [DataRow("--ssl --no-ssl --ftp-ssl-control", "--ssl is an insecure option, consider --ssl-reqd instead")]
+    [DataRow("--ftp-ssl-control --no-ftp-ssl-control --ssl", "--ssl is an insecure option, consider --ssl-reqd instead")]
+    [DataRow("--ftp-ssl-control --no-ssl --ssl", "--ssl is an insecure option, consider --ssl-reqd instead|--ssl overrides --ftp-ssl-control")]
+    [DataRow("--ftp-ssl-control --ssl --ftp-ssl-control", "--ssl is an insecure option, consider --ssl-reqd instead|--ssl overrides --ftp-ssl-control|--ftp-ssl-control overrides --ssl")]
+    [DataRow("--ssl -s --ftp-ssl-control", "--ssl is an insecure option, consider --ssl-reqd instead")]
+    public void Parse_SslAndFtpSslControl_WarnsWhichOverridesWhichAsCurlDoes(string options, string expected)
+    {
+        CommandLineParseResult result = Parse([.. options.Split(' '), Url]);
+
+        string[] expectedWarnings = expected.Length == 0 ? [] : [.. expected.Split('|').Select(line => "Warning: " + line)];
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(expectedWarnings, result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
     public void Parse_SslWithValue_WarnsWithTheLongNameOnly()
     {
         CommandLineParseResult result = Parse(["--ssl=x", Url]);

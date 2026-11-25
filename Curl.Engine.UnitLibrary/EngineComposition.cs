@@ -2,7 +2,6 @@ using Curl.Api.Options.Authentication;
 using Curl.Authentication;
 using Curl.Core.FileSystem;
 using Curl.Networking;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Dict;
 using Curl.Original.Protocol.File;
 using Curl.Original.Protocol.Ftp;
@@ -13,11 +12,13 @@ using Curl.Original.Protocol.Ldap;
 using Curl.Original.Protocol.Mqtt;
 using Curl.Original.Protocol.Pop3;
 using Curl.Original.Protocol.Rtsp;
+using Curl.Original.Protocol.Smb;
 using Curl.Original.Protocol.Smtp;
 using Curl.Original.Protocol.Ssh;
 using Curl.Original.Protocol.Telnet;
 using Curl.Original.Protocol.Tftp;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -29,13 +30,16 @@ namespace Curl.Engine;
 /// </summary>
 internal static partial class EngineComposition
 {
+    /// <summary>How much longer than the happy-eyeballs timeout the first QUIC attempt of a process leads TCP (BL-5660, ADR-1326).</summary>
+    private static readonly TimeSpan QuicColdStartAllowance = TimeSpan.FromSeconds(1);
+
     /// <summary>
     /// Creates the protocol handlers the executable registers: <c>file</c> over the real
     /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, <c>mqtt</c>
     /// and <c>mqtts</c>, <c>imap</c> and <c>imaps</c>, <c>pop3</c> and <c>pop3s</c>, <c>smtp</c> and <c>smtps</c> (the mail schemes authenticating with
     /// <see cref="CreateSaslAuthenticator" />'s authenticator and upgrading with
     /// <paramref name="tlsProvider" /> after <c>STARTTLS</c> or <c>STLS</c>), <c>ldap</c> and <c>ldaps</c>
-    /// answering as WinLDAP's build on Windows and as the OpenLDAP build elsewhere (ADR-0166), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
+    /// answering as WinLDAP's build on Windows and as the OpenLDAP build elsewhere (ADR-0166), the latter's SASL bind running that authenticator too (ADR-1362), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
     /// authenticator, answering a forward proxy with <paramref name="proxyAuthSchemes" /> (ADR-0239),
     /// and keeping cookies in <paramref name="cookieStore" />; <c>ws</c> and <c>wss</c>
@@ -44,8 +48,8 @@ internal static partial class EngineComposition
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
     /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
     /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
-    /// (ADR-0169); <c>smb</c> and <c>smbs</c> refused as disabled, as curl 8.22.0's reference builds leave them out
-    /// (ADR-0835); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
+    /// (ADR-0169); <c>smb</c> and <c>smbs</c> served by the SMB client (ADR-1281)
+    /// ; <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
     /// and key files from the disk and offering the Windows curl's libssh2 algorithms on Windows and the
     /// OpenSSL build's elsewhere (ADR-0122); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
@@ -177,7 +181,7 @@ internal static partial class EngineComposition
         Lazy<ISecurityContextFactory> contexts = new(() => securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog));
         Lazy<RankedHttpAuthenticator> httpAuthenticator = new(() => CreateHttpAuthenticator(contexts.Value, negotiateOptions, diagnosticLog, digestRandomBytes));
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
-        LazyProtocolHandler http = new(["http", "https"], () => new HttpProtocolHandler(recordingConnector, new HttpSignatureHttpAuthenticator(new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog)), signingClock ?? TimeProvider.System), cookieStore, proxyAuthSchemes, http2PushSink) { TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead, ContinueWaitBegins = ContinueWaitBeginsOf(socketWait), ContinueWaitEnds = ContinueWaitEndsOf(socketWait) });
+        LazyProtocolHandler http = new(["http", "https"], () => new HttpProtocolHandler(recordingConnector, new HttpSignatureHttpAuthenticator(new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog)), signingClock ?? TimeProvider.System), cookieStore, proxyAuthSchemes, http2PushSink) { QuicColdStartAllowance = QuicColdStartAllowance, TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead, ContinueWaitBegins = ContinueWaitBeginsOf(socketWait), ContinueWaitEnds = ContinueWaitEndsOf(socketWait) });
 
         IProtocolHandler[] handlers =
         [
@@ -190,10 +194,10 @@ internal static partial class EngineComposition
             new LazyProtocolHandler(["imap", "imaps"], () => new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog, digestRandomBytes))),
             new LazyProtocolHandler(["pop3", "pop3s"], () => new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog, digestRandomBytes))),
             new LazyProtocolHandler(["smtp", "smtps"], () => new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog, digestRandomBytes)) { TracesStateMachine = tracesSmtp }),
-            new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()), new NegotiateLogonTokenSource(), tlsProvider)),
+            new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()), new NegotiateLogonTokenSource(), tlsProvider) { SaslAuthenticator = CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog, digestRandomBytes) }),
             new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, webSocketRandomSource ?? new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode, PerformConnection = webSocketPerformConnection }),
             new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value, rtspInterleaveSink, rtspSettingsOf(), rtspSessionState)),
-            new LazyProtocolHandler(["smb", "smbs"], () => new DisabledProtocolHandler(["smb", "smbs"])),
+            new LazyProtocolHandler(["smb", "smbs"], () => new SmbProtocolHandler(recordingConnector)),
             new LazyProtocolHandler(["scp", "sftp"], () => new SshProtocolHandler(
                 recordingConnector,
                 new PhysicalFileSystem(),

@@ -110,5 +110,23 @@ public sealed class ConcatenatedReadStreamChunkReadTests
             throw new IOException("refused");
     }
 
+    [TestMethod]
+    public void Read_FileSegmentWithoutAnyCallback_StopsTheFillBeforeASecondFileRead()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("segments", "[1], file [2,3], [4], file [5]; file segments 1 and 3");
+        using ConcatenatedReadStream stream = new([Segment(1), Segment(2, 3), Segment(4), Segment(5)], fileSegments: [1, 3]);
+        byte[] buffer = new byte[16];
+
+        int first = stream.Read(buffer, 0, buffer.Length);
+        int second = stream.Read(buffer, 0, buffer.Length);
+        int third = stream.Read(buffer, 0, buffer.Length);
+
+        diagnostics.Assert("reads", "4, 1, 0", $"{first}, {second}, {third}");
+        Assert.AreEqual(4, first);
+        Assert.AreEqual(1, second);
+        Assert.AreEqual(0, third);
+    }
+
     private static MemoryStream Segment(params byte[] bytes) => new(bytes, writable: false);
 }

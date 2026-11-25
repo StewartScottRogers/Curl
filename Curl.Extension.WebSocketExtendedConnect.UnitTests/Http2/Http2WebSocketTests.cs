@@ -121,7 +121,7 @@ public sealed class Http2WebSocketTests
 
         var failure = await Assert.ThrowsExactlyAsync<Http2WebSocketException>(() => webSocket.ReceiveAsync(CancellationToken.None));
 
-        Assert.IsFalse(string.IsNullOrEmpty(failure.Message));
+        StringAssert.Contains(failure.Message, "masked input frame");
     }
 
     [TestMethod]

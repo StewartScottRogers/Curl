@@ -111,12 +111,12 @@ public sealed class OpenApiArgumentExpanderTests
     }
 
     [TestMethod]
-    public void ArgumentsFor_UnreadableDescription_FailsWithReadError()
+    public void ArgumentsFor_UnreadableDescription_FailsWithExit2InTheOptionStyle()
     {
         ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => new OpenApiArgumentExpander().ArgumentsFor(Claimed("missing.json", "getPet"), ContextOf()));
 
-        Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
-        Assert.AreEqual("openapi: cannot read missing.json", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual("--openapi cannot read 'missing.json'", failure.Message);
     }
 
     [TestMethod]

@@ -28,8 +28,8 @@ public sealed class ImapProtocolHandlerTwoUrlTests
         var connector = new QueuedConnector(ConnectResult.Connected(connection, null), ConnectResult.Connected(connection, null, isReused: true));
         var handler = new ImapProtocolHandler(connector, new QueuedTlsProvider());
 
-        TransferResult first = await handler.ExecuteAsync(Context("1"));
-        TransferResult second = await handler.ExecuteAsync(Context("2"));
+        TransferResult first = StampedTimings.Without(await handler.ExecuteAsync(Context("1")));
+        TransferResult second = StampedTimings.Without(await handler.ExecuteAsync(Context("2")));
         await connection.CloseAsync();
 
         Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);

@@ -197,7 +197,7 @@ public sealed class ImapProtocolHandlerDiagnosticLogTests
             new[]
             {
                 "greeting Ok received",
-                string.Create(CultureInfo.InvariantCulture, $"transfer done, {run.Result.BytesTransferred} bytes in 9 ms"),
+                string.Create(CultureInfo.InvariantCulture, $"transfer done, {run.Result.BytesTransferred} bytes in 36 ms"),
             },
             log.MessagesAt(DiagnosticLogLevel.Info));
         Assert.IsGreaterThan(0L, run.Result.BytesTransferred);

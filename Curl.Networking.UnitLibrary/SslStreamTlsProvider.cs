@@ -386,7 +386,40 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>The same result the three-argument overload describes.</returns>
-    public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
+        CancellationToken cancellationToken) =>
+        AuthenticateWithAsync(isProxy ? _verification.ForProxy() : _verification, plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
+
+    /// <summary>
+    /// Performs the handshake as the overload without a log does, its below-anchor revocation
+    /// list fetches writing their failures to <paramref name="diagnosticLog" /> and ending when
+    /// <paramref name="cancellationToken" />, the connect's limit, does (BL-5428).
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="isProxy"><see langword="true" /> when the handshake is with an HTTPS proxy.</param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="diagnosticLog">The connect target's diagnostic log.</param>
+    /// <param name="cancellationToken">Cancels the handshake at the connect's limit.</param>
+    /// <returns>The same result the overload without a log returns.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
+        IDiagnosticLog diagnosticLog,
+        CancellationToken cancellationToken) =>
+        AuthenticateWithAsync(_verification.ForHandshake(diagnosticLog, cancellationToken, isProxy), plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
+
+    private async ValueTask<ConnectResult> AuthenticateWithAsync(
+        ServerCertificateVerification verification,
         IConnection plaintext,
         string targetHost,
         ITransferEvents events,
@@ -420,13 +453,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CertificateRevocationListFile? revocationLists;
         try
         {
-            (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
+            (chainPolicy, anchorsBesideSystemStore, revocationLists) = verification.ReadTrustAnchors();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
             clientCertificate?.Dispose();
             await plaintext.DisposeAsync().ConfigureAwait(false);
-            var (exitCode, message) = _verification.TrustAnchorsUnusable(exception);
+            var (exitCode, message) = verification.TrustAnchorsUnusable(exception);
+            ReportUnusableCrlFile(events, exitCode, isProxy, _matchesSchannelBuild);
             return ConnectResult.Failed(exitCode, message);
         }
 
@@ -434,20 +468,34 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ReadOnlyMemory<byte>[] peerCertificates = [];
         var peerVerification = PeerVerification.Unobserved;
         var judgedHandshake = Unnegotiated(offeredApplicationProtocols);
+        var clientCertificateRequested = false;
         var authenticationOptions = new SslClientAuthenticationOptions
         {
             TargetHost = ServerNameIndication(targetHost),
             EnabledSslProtocols = _offeredProtocols,
             AllowTlsResume = SessionPartitions.MayResume(targetHost, _options),
             CertificateChainPolicy = chainPolicy,
-            LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate, _matchesSchannelBuild),
+            LocalCertificateSelectionCallback = (sender, host, local, remote, issuers) =>
+            {
+                // The client-certificate request arrives with the server's certificate; a server
+                // that then ends the handshake for want of one never reaches the validation
+                // callback, yet curl judged the certificate first (STD-174, BL-5822).
+                clientCertificateRequested = true;
+                if (remote is not null && chainPolicy is not null)
+                {
+                    (peerCertificates, peerVerification, verificationFailure) = JudgeCertificateOfClientCertificateRequest(
+                        verification, remote, chainPolicy, targetHost, anchorsBesideSystemStore, revocationLists);
+                }
+
+                return (ToCertificateSelection(clientCertificate, _matchesSchannelBuild) ?? ((_, _, _, _, _) => null!))(sender, host, local, remote, issuers);
+            },
             CipherSuitesPolicy = cipherSuitesPolicy,
             ApplicationProtocols = ToSslApplicationProtocols(offeredApplicationProtocols),
             RemoteCertificateValidationCallback = (sender, certificate, chain, errors) =>
             {
                 judgedHandshake = DescribeNegotiation((SslStream)sender, offeredApplicationProtocols);
                 peerCertificates = ListPeerCertificates(certificate, chain);
-                (peerVerification, verificationFailure) = _verification.Judge(
+                (peerVerification, verificationFailure) = verification.Judge(
                     errors, chain, targetHost, anchorsBesideSystemStore, revocationLists, peerCertificates);
                 return verificationFailure is null;
             },
@@ -477,6 +525,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), matchesOpenSslBuild: !_matchesSchannelBuild)
                 {
                     MatchesSchannelBuild = _matchesSchannelBuild,
+                    ServerRequestedClientCertificate = () => clientCertificateRequested,
                     TicketRecords = FollowTicketRecordsAfterHandshake(transport, sslStream.SslProtocol),
                     TicketEvents = events,
                     PeerHostName = targetHost,
@@ -501,6 +550,37 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return SchannelFailureEcho.Report(events, _matchesSchannelBuild, verificationFailure is { } rejected
             ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure)));
+    }
+
+    /// <summary>
+    /// Judges the server certificate when the server asks for a client certificate, before the
+    /// handshake can end for want of one: a server that then ends it never reaches the
+    /// validation callback, yet curl's Schannel build judged the certificate first, exit 60
+    /// (STD-174, BL-5822). The chain is built from the trust anchors alone, so a certificate
+    /// whose intermediates the server sent is judged again by the validation callback.
+    /// </summary>
+    /// <param name="verification">What judges the certificate.</param>
+    /// <param name="remote">The server's certificate.</param>
+    /// <param name="chainPolicy">The trust anchors the chain is built against.</param>
+    /// <param name="targetHost">The host the certificate is checked against.</param>
+    /// <param name="anchorsBesideSystemStore">The <c>--capath</c> roots trusted beside the system store.</param>
+    /// <param name="revocationLists">The <c>--crlfile</c> lists, or <see langword="null" />.</param>
+    /// <returns>What the server sent, the observation and the failure, or <see langword="null" /> to accept.</returns>
+    internal static (ReadOnlyMemory<byte>[] PeerCertificates, PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgeCertificateOfClientCertificateRequest(
+        ServerCertificateVerification verification,
+        X509Certificate remote,
+        X509ChainPolicy chainPolicy,
+        string targetHost,
+        X509Certificate2Collection anchorsBesideSystemStore,
+        CertificateRevocationListFile? revocationLists)
+    {
+        using var chain = new X509Chain { ChainPolicy = chainPolicy };
+        var errors = chain.Build(X509CertificateLoader.LoadCertificate(remote.GetRawCertData()))
+            ? SslPolicyErrors.None
+            : SslPolicyErrors.RemoteCertificateChainErrors;
+        var peerCertificates = ListPeerCertificates(remote, chain);
+        var (observed, failure) = verification.Judge(errors, chain, targetHost, anchorsBesideSystemStore, revocationLists, peerCertificates);
+        return (peerCertificates, observed, failure);
     }
 
     /// <summary>
@@ -731,6 +811,22 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         if (peerVerification.RevocationCheckIncomplete && events is HandshakeCapturingTransferEvents capturing)
         {
             capturing.ReportRevocationCheckIncomplete();
+        }
+    }
+
+    /// <summary>
+    /// The OpenSSL build's verify result is 1 (unspecified) when the <c>--crlfile</c> cannot be
+    /// loaded, exit 82 (STD-180, BL-5830).
+    /// </summary>
+    /// <param name="events">Where the verify result is reported.</param>
+    /// <param name="exitCode">The exit code of the unusable trust anchors.</param>
+    /// <param name="isProxy">Whether the handshake is with an HTTPS proxy.</param>
+    /// <param name="matchesSchannelBuild">Whether the Schannel build is reproduced.</param>
+    internal static void ReportUnusableCrlFile(ITransferEvents events, CurlExitCode exitCode, bool isProxy, bool matchesSchannelBuild)
+    {
+        if (!matchesSchannelBuild && exitCode == CurlExitCode.SslCrlBadfile)
+        {
+            events.ReportCertificateVerifyResult(OpenSslVerifyResult.Unspecified, isProxy);
         }
     }
 

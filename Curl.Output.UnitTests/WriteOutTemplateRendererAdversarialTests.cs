@@ -54,6 +54,19 @@ public sealed class WriteOutTemplateRendererAdversarialTests
     }
 
     [TestMethod]
+    public async Task RenderAsync_Filetime_IsAnUnknownVariableAsInCurl8220()
+    {
+        // curl 8.22.0 -w "[%{filetime}]" wrote "[]" and the warning (exit 37 for a file:// source),
+        // with and without -R; its write-out documentation lists no filetime variable (BL-5605).
+        Fixture fixture = new();
+
+        await fixture.RenderAsync("[%{filetime}]", TestContext);
+
+        Assert.AreEqual("[]", fixture.StandardOutputText);
+        Assert.AreEqual("curl: unknown --write-out variable: 'filetime'\n", fixture.StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RenderAsync_VariableNameOf24Bytes_EndsTheRenderingSilently()
     {
         // curl -w "1%{<24 a>}2|" wrote "1" and nothing on standard error.

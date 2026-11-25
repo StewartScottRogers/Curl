@@ -41,6 +41,12 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
 
     private bool silent;
 
+    /// <summary>Makes a receive its token cancels end as a <c>SocketError.OperationAborted</c> failure, as a socket's does on Windows when the cancel races the read.</summary>
+    public bool AbortsCancelledReceive { get; set; }
+
+    /// <summary>Makes a receive its token cancels end as a socket failure with this code, as a receive that really failed while the cancel raced it does.</summary>
+    public System.Net.Sockets.SocketError? FailsCancelledReceiveWith { get; set; }
+
     public EndPoint ServerEndPoint => QuicTestChannel.ServerAddress;
 
     public EndPoint? LocalEndPoint => ClientAddress;
@@ -186,6 +192,14 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
         {
             // A wait that is cancelled takes no count, so the datagram stays queued for the next receive.
             await inboundCount.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (FailsCancelledReceiveWith is not null)
+        {
+            throw new System.Net.Sockets.SocketException((int)FailsCancelledReceiveWith.Value);
+        }
+        catch (OperationCanceledException) when (AbortsCancelledReceive)
+        {
+            throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.OperationAborted);
         }
         finally
         {

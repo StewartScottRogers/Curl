@@ -479,6 +479,8 @@ internal sealed class CurlCommandRunner(
     private readonly TransferContextFactory transferContextFactory = new(standardInput, timeProvider, CredentialEncoding.ForPlatform(runsOnWindows));
 
     /// <summary>Builds each transfer's <c>-F</c> body; reads <c>@-</c> and <c>&lt;-</c> parts from standard input.</summary>
+    private IReadOnlyDictionary<string, long>? formFileSizesBeforeTrace;
+
     private readonly MultipartFormBodyBuilder formBodyBuilder = formBodyBuilder
         ?? new MultipartFormBodyBuilder(
             new PhysicalFileSystem(),
@@ -874,8 +876,8 @@ internal sealed class CurlCommandRunner(
         }
         catch (ArgumentExpansionException failure)
         {
-            // An extension could not turn its option into arguments: the run ends before any transfer (ADR-1040).
-            await WriteErrorLinesAsync(["curl: " + failure.Message]).ConfigureAwait(false);
+            // An extension could not turn its option into arguments: the run ends before any transfer (ADR-1040); it is a command-line refusal, so the try-help line follows.
+            await WriteErrorLinesAsync(["curl: " + failure.Message, CommandLineRefusal.TryHelpLine]).ConfigureAwait(false);
             return (int)failure.ExitCode;
         }
 
@@ -1063,7 +1065,8 @@ internal sealed class CurlCommandRunner(
         _ = UrlTransfer.TryCreate(optionsRead, 0, 0, transferPerformer.TakeTransferId(), match, null, runsOnWindows, out UrlTransfer? transfer, out _);
         runningTransfer.Value = NewRunningTransferState(CancellationToken.None, deferringStandardOutput, GatedDeferringStandardOutput);
         TransferResult result = TransferResult.Failure(refusal.ExitCode, CurlEasyErrorText.Of(refusal.ExitCode));
-        await WriteOutAsync(optionsRead, transfer!, match.Url, match.Url, result, false).ConfigureAwait(false);
+        bool standardOutputIsBinary = DumpsHeadersToStandardOutput(optionsRead) || (!optionsRead.UseAscii && !WritesToFile(optionsRead, 0));
+        await WriteOutAsync(optionsRead, transfer!, match.Url, match.Url, result, standardOutputIsBinary).ConfigureAwait(false);
     }
 
     /// <summary>Whether <paramref name="options" /> has a <c>-C</c> offset past zero and a request body: a <c>-F</c> form or a <c>-d</c> body not moved into the query by <c>-G</c>.</summary>
@@ -1753,6 +1756,7 @@ internal sealed class CurlCommandRunner(
             }
 
             await SizeUploadBeforeTraceFileOpensAsync(options, index).ConfigureAwait(false);
+            await SizeFormFilesBeforeTraceFileOpensAsync(options).ConfigureAwait(false);
             await OpenTransferEventOutputOnceAsync(options).ConfigureAwait(false);
             (exitCode, bool runEnded) = await TransferEachMatchAsync(dispatch, options, index, uploadFiles, glob, exitCode)
                 .ConfigureAwait(false);
@@ -1862,6 +1866,40 @@ internal sealed class CurlCommandRunner(
             uploadSizedBeforeTrace = (uploadFile, opened.Length);
         }
     }
+
+    /// <summary>
+    /// Sizes the <c>-F</c> file parts before the run's trace file opens and truncates one of them, handing the
+    /// sizes to the form builder so a part whose file shrinks fails with exit 26 as curl 8.22.0's does (AF-0982).
+    /// Does nothing once the event output is open or without a trace file.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>A task that completes when the files are sized.</returns>
+    private async Task SizeFormFilesBeforeTraceFileOpensAsync(CommandLineOptions options)
+    {
+        if (eventStandardError is not null || options.TraceFile is null
+            || EasyOptionsFromCommandLine.HttpOf(options).MimePost is not { } mimePost)
+        {
+            return;
+        }
+
+        Dictionary<string, long> sizes = [];
+        foreach (MultipartFormPart part in FormFileParts(MultipartFormPartMapping.FromMimeBody(mimePost)))
+        {
+            FileOpenResult opened = await fileSystem.OpenForReadAsync(part.Content, CancellationToken.None).ConfigureAwait(false);
+            if (opened.Content is { } content)
+            {
+                await content.DisposeAsync().ConfigureAwait(false);
+                sizes[part.Content] = opened.Length;
+            }
+        }
+
+        formFileSizesBeforeTrace = sizes;
+    }
+
+    private static IEnumerable<MultipartFormPart> FormFileParts(IEnumerable<MultipartFormPart> parts) =>
+        parts.SelectMany(part => part.Kind is MultipartFormPartKind.FileUpload or MultipartFormPartKind.FileContent
+            ? (part.ReadsStandardInput ? [] : [part])
+            : FormFileParts(part.Parts));
 
     /// <summary>
     /// Wraps an opened <c>-T</c> file in an <see cref="UploadSizedBeforeTraceStream" /> when
@@ -2209,11 +2247,123 @@ internal sealed class CurlCommandRunner(
             failure => ReportSkippedAsync(dispatch, options, transfer, state, failure));
         if (!await UploadFileOpensAsync(transfer.UploadFile).ConfigureAwait(false))
         {
-            await run.AbandonFirstBatchAsync(CannotOpenUploadFileFailure).ConfigureAwait(false);
+            await run.AbandonFirstBatchAsync(CannotOpenUploadFileFailure, startsOthersWhenExtraFails: true).ConfigureAwait(false);
             return true;
         }
 
+        if (await FormSetupFailureAsync(options, transfer).ConfigureAwait(false) is { } formFailure)
+        {
+            await run.AbandonFirstBatchAsync(formFailure, reportsOnlyFirst: true).ConfigureAwait(false);
+            return true;
+        }
+
+        if (FatalSetupFailureOf(options, transfer) is { } fatalFailure)
+        {
+            fatalSetupFailure ??= fatalFailure;
+            run.NoteFatalSetupFailureOfLastHeld(fatalFailure);
+        }
+
         return batchIsComplete && await run.StartHeldAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>The fatal setup failure that abandoned a <c>-Z</c> run's first batch, reported as it is.</summary>
+    private TransferResult? fatalSetupFailure;
+
+    /// <summary>
+    /// Finds the failure curl 8.22.0 meets while setting an <c>rtsp</c> or <c>telnet</c> transfer up, one of its fatal
+    /// codes (43 for a <c>Session</c> <c>-H</c> header, 48 for an unknown <c>-t</c> option): it ends a <c>-Z</c> run
+    /// before any transfer starts (STD-074, BL-5469).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The failure, or <see langword="null" /> when setup finds none.</returns>
+    private static TransferResult? FatalSetupFailureOf(CommandLineOptions options, UrlTransfer transfer)
+    {
+        string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
+        return url.StartsWith("rtsp:", StringComparison.OrdinalIgnoreCase)
+            ? RtspSessionHeaderFailure(options)
+            : url.StartsWith("telnet:", StringComparison.OrdinalIgnoreCase)
+                ? options.TelnetOptions.Select(UnknownTelnetOptionFailure).FirstOrDefault(failure => failure is not null)
+                : null;
+    }
+
+    private static TransferResult? RtspSessionHeaderFailure(CommandLineOptions options) =>
+        options.Headers.Any(NamesSessionHeader)
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, "Session ID cannot be set as a custom header.")
+            : null;
+
+    private static bool NamesSessionHeader(string header)
+    {
+        int end = header.AsSpan().IndexOfAny(':', ';');
+        return end >= 0 && header.AsSpan(0, end).Trim().Equals("Session", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static TransferResult? UnknownTelnetOptionFailure(string option)
+    {
+        int separator = option.IndexOf('=', StringComparison.Ordinal);
+        if (separator < 0 || !System.Text.Ascii.IsValid(option.AsSpan(separator + 1)))
+        {
+            return null;
+        }
+
+        string name = option[..separator];
+        string? known = Array.Find(["TTYPE", "XDISPLOC", "NEW_ENV", "WS", "BINARY"], candidate => candidate.Length == System.Text.Encoding.UTF8.GetByteCount(name));
+        if (known is null)
+        {
+            return TransferResult.Failure(CurlExitCode.UnknownOption, $"Unknown telnet option {option}");
+        }
+
+        return string.Equals(name, known, StringComparison.OrdinalIgnoreCase)
+            ? BadTelnetOptionValueFailure(known, option[(separator + 1)..])
+            : TransferResult.Failure(CurlExitCode.UnknownOption, "An unknown option was passed in to libcurl");
+    }
+
+    /// <summary>
+    /// Finds the exit 43 curl's <c>check_telnet_options</c> gives a known option whose value cannot be held: a
+    /// <c>NEW_ENV</c> without a comma, a <c>TTYPE</c> of 32 or more characters or an <c>XDISPLOC</c> of 128 or more
+    /// (STD-074, BL-5811).
+    /// </summary>
+    private static TransferResult? BadTelnetOptionValueFailure(string known, string value)
+    {
+        bool bad = known switch
+        {
+            "NEW_ENV" => !value.Contains(',', StringComparison.Ordinal),
+            "TTYPE" => value.Length >= 32,
+            "XDISPLOC" => value.Length >= 128,
+            _ => false,
+        };
+        return bad ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, "A libcurl function was given a bad argument") : null;
+    }
+
+    private static bool ReadsStandardInput(EasyMimeBody mimePost) =>
+        MultipartFormPartMapping.FromMimeBody(mimePost).Any(part => part.ReadsStandardInput);
+
+    /// <summary>
+    /// Sets up the <c>-F</c> form of an option group's last URL in a <c>-Z</c> run's first batch, as curl 8.22.0 sets
+    /// every handle up before it performs any: a part whose file cannot be opened abandons the batch with exit 26 and
+    /// nothing is sent (STD-123, BL-5441). A form reading standard input is left to the transfer, which must not drain it.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The failure, or <see langword="null" /> when the form builds or the transfer does not carry it.</returns>
+    private async Task<TransferResult?> FormSetupFailureAsync(CommandLineOptions options, UrlTransfer transfer)
+    {
+        EasyMimeBody? mimePost = EasyOptionsFromCommandLine.HttpOf(options).MimePost;
+        if (mimePost is null || transfer.UrlIndex != options.Urls.Count - 1 || ReadsStandardInput(mimePost))
+        {
+            return null;
+        }
+
+        _ = TryResolveTransferUrl(options, transfer.Url, transfer.UploadFile, out string transferUrl);
+        string scheme = transferUrl[..Math.Max(transferUrl.IndexOf(':', StringComparison.Ordinal), 0)];
+        MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, scheme, MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme), isSendingBuild: false).ConfigureAwait(false);
+        if (!form.IsBuilt)
+        {
+            return FormRunEndingFailureOf(form.Failure);
+        }
+
+        await form.Body.Content.DisposeAsync().ConfigureAwait(false);
+        return null;
     }
 
     /// <summary>
@@ -2279,7 +2429,7 @@ internal sealed class CurlCommandRunner(
 
         if (run.HasFailedEarly)
         {
-            run.DeferReport(transfer.TransferId, () => ReportSkippedAsync(dispatch, options, transfer, state, run.FirstFailure!));
+            DeferReportOfEarlyFailure(run, dispatch, options, transfer, state);
             return false;
         }
 
@@ -2290,6 +2440,25 @@ internal sealed class CurlCommandRunner(
         return false;
     }
 
+    /// <summary>
+    /// Leaves the report of a transfer <c>-Z</c> kept from starting once a failure ended the run: aborted
+    /// (exit 42) when the failure is fatal and <c>--fail-early</c> was not given, as curl aborts every other
+    /// transfer, otherwise skipped with the first failure's code (BL-5386).
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">What the transfer would go through.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    private void DeferReportOfEarlyFailure(ParallelRun run, TransferDispatch dispatch, CommandLineOptions options, UrlTransfer transfer, RunningTransferState state)
+    {
+        TransferResult first = run.FirstFailure!;
+        run.DeferReport(
+            transfer.TransferId,
+            !options.FailEarly && IsFatalFailure(first)
+                ? () => ReportAsync(dispatch, options, transfer, state, AbortedResultOf(state), transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol))
+                : () => ReportSkippedAsync(dispatch, options, transfer, state, first));
+    }
     /// <summary>
     /// Performs one transfer of a <c>-Z</c> run, then, holding the run's <see cref="writeGate" />,
     /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). A transfer
@@ -2367,7 +2536,9 @@ internal sealed class CurlCommandRunner(
             return (timedOut, transfer.Url, url);
         }
 
-        Running.ParallelProgress?.MarkLive(bindsInterface: options.Interface is not null);
+        // AF-0851: curl opens the --mptcp socket inside its blocking connect step, as it binds --interface, so a refused
+        // socket prints its curl: (7) line before the meter draws.
+        Running.ParallelProgress?.MarkLive(bindsInterface: options.Interface is not null || options.MultipathTcp);
         bool connectionStayedOpen = false;
         try
         {
@@ -2486,7 +2657,7 @@ internal sealed class CurlCommandRunner(
             run.RecordSetupFailure(ended.Result, endsTheRun: true);
         }
 
-        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly);
+        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly || IsFatalFailure(ended.Result));
 
         if (state.SkippedExistingOutputFile)
         {
@@ -2529,7 +2700,13 @@ internal sealed class CurlCommandRunner(
         RunningTransferState state,
         TransferResult firstFailure)
     {
-        TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
+        TransferResult skipped = ReferenceEquals(firstFailure, ParallelRun.AbortedResult) || ReferenceEquals(firstFailure, fatalSetupFailure)
+            ? firstFailure
+            : TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
+        if (ReferenceEquals(firstFailure, CannotOpenUploadFileFailure) || ReferenceEquals(firstFailure, cannotOpenUploadFileAfterFailure))
+        {
+            NoteUploadFileCouldNotBeOpened(state, options, transfer);
+        }
 
         if (!TryResolveTransferUrl(options, transfer.Url, transfer.UploadFile, out string transferUrl))
         {
@@ -2854,7 +3031,7 @@ internal sealed class CurlCommandRunner(
         }
 
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
-        await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp, options.ActsAsQuicBuild).ConfigureAwait(false);
+        await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
         transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
         Running.TransferId = transfer.TransferId;
         Running.RequestUrl = WriteOutRequestUrl(options, transferUrl, givenUrl);
@@ -3332,7 +3509,9 @@ internal sealed class CurlCommandRunner(
     /// <returns><see langword="true" /> when standard output is now in binary mode.</returns>
     private static bool SwitchesStandardOutputToBinary(CommandLineOptions options, UrlTransfer transfer, TransferResult result) =>
         DumpsHeadersToStandardOutput(options)
-        || (!options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure));
+        || (!options.UseAscii && !transfer.WritesToFile
+            && !ReferenceEquals(result, CannotOpenHeaderFileFailure)
+            && !ReferenceEquals(result, UploadUrlMalformedFailure));
 
     /// <summary>
     /// Tells whether the option group sends its header lines to standard output (<c>-D -</c>).
@@ -3424,7 +3603,7 @@ internal sealed class CurlCommandRunner(
         bool endsTheRun) =>
         !runsOnWindows
         || standardOutputSwitchedToBinary
-        || (!endsTheRun && LaterUrlSwitchesStandardOutputToBinary(options, index));
+        || ((!endsTheRun || parallelRun is not null) && LaterUrlSwitchesStandardOutputToBinary(options, index));
 
     /// <summary>
     /// Renders the <c>-w</c> template, when one was given, for the finished
@@ -3589,8 +3768,23 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        failure = TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
+        failure = MalformedResolveFailure(options, EventsBeforeConnecting(transfer)) ?? TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
         return false;
+    }
+
+    /// <summary>
+    /// The exit 49 failure for a malformed <c>--resolve</c> entry, or <see langword="null" /> when every entry parses: curl loads
+    /// <c>CURLOPT_RESOLVE</c> before it parses the URL, so the entry is reported ahead of a URL rejection (AF-0807), as an info line first (BL-5263). A <c>-G</c> query rejection comes before it: the tool fails that one itself (exit 3).
+    /// </summary>
+    private static TransferResult? MalformedResolveFailure(CommandLineOptions options, ITransferEvents events)
+    {
+        if (ResolveOverrides.Parse(EasyOptionsFromCommandLine.NetworkOf(options).Resolve).ParseError is not { } parseError)
+        {
+            return null;
+        }
+
+        events.ReportInfo(parseError);
+        return TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, parseError);
     }
 
     /// <summary>
@@ -3649,10 +3843,10 @@ internal sealed class CurlCommandRunner(
         Api.Info.TransferInfo info = WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider);
         return info with
         {
-            Scheme = TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
+            Scheme = Running.UploadFileCouldNotBeOpened ? null : TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
             Referer = info.Referer ?? options.Referer,
             ConnectionId = connectionId,
-            TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
+            TransferId = HasNoTransferNumber(result) || Running.UploadFileCouldNotBeOpened ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
             SslVerifyResult = Running.SslVerifyResult,
             ProxySslVerifyResult = Running.ProxySslVerifyResult,
             EarlyDataSent = Running.TlsEarlyDataSent,
@@ -3677,8 +3871,18 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when the transfer numbers a connection.</returns>
     private static bool UsedAConnection(TransferResult result) =>
-        result.ExitCode is not (CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat)
+        result.ExitCode is not CurlExitCode.UrlMalformat
+        && !IsUnsupportedProtocolRejection(result)
         && !IsIpfsGatewayFailure(result);
+
+    /// <summary>
+    /// Tells whether a result is an exit 1 refusal of a URL's scheme, which happens before any connection;
+    /// the one exit 1 failure that comes after a connection is a reply refused as HTTP/0.9 (STD-146).
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for the unsupported-protocol refusal.</returns>
+    private static bool IsUnsupportedProtocolRejection(TransferResult result) =>
+        result.ExitCode == CurlExitCode.UnsupportedProtocol && result.ErrorMessage != "Received HTTP/0.9 when not allowed";
 
     /// <summary>
     /// Gives a finished transfer its <c>%{conn_id}</c>: the next connection number when it
@@ -3687,7 +3891,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns>The number <c>%{conn_id}</c> prints.</returns>
     private long TakeConnectionId(TransferResult result) =>
-        UsedAConnection(result) ? Running.ConnectionId ?? transferPerformer.TakeConnectionId() : NoConnectionId;
+        UsedAConnection(result) && !Running.UploadFileCouldNotBeOpened ? Running.ConnectionId ?? transferPerformer.TakeConnectionId() : NoConnectionId;
 
     /// <summary>
     /// Gives what takes <paramref name="state" />'s <c>%{conn_id}</c>: the run's next connection number, kept on the
@@ -3726,14 +3930,25 @@ internal sealed class CurlCommandRunner(
         ITransferEvents recorded = options.WriteOut is null
             ? events
             : new ResponseCodeRecordingTransferEvents(new TlsResultRecordingTransferEvents(events, state), state);
-        ITransferEvents withFileFailure = options.Trace != TraceKind.None
-            ? new OutputFileOpenFailureTransferEvents(recorded, state, options.Silent ? null : eventStandardError)
-            : recorded;
-        state.Events = options.WriteOut is null && !options.TraceIds
+        ITransferEvents withFileFailure = WithOutputFileFailureEvents(options, recorded, state);
+        state.Events = options.WriteOut is null && !options.TraceIds && state.ParallelProgress is null
             ? withFileFailure
             : new ConnectionIdRecordingTransferEvents(withFileFailure, state, connectionIdsByPoolNumber, takeConnectionId);
         return EventsBeforeConnecting(transfer);
     }
+
+    /// <summary>
+    /// Wraps <paramref name="recorded" /> in the events that report a trace file that cannot be opened, under a
+    /// <c>--trace</c> option; otherwise gives it as it is.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="recorded">The events to wrap.</param>
+    /// <param name="state">The running transfer.</param>
+    /// <returns>The wrapping events, or <paramref name="recorded" /> without a trace.</returns>
+    private ITransferEvents WithOutputFileFailureEvents(CommandLineOptions options, ITransferEvents recorded, RunningTransferState state) =>
+        options.Trace != TraceKind.None
+            ? new OutputFileOpenFailureTransferEvents(recorded, state, options.Silent ? null : eventStandardError)
+            : recorded;
 
     /// <summary>
     /// The sink for what <paramref name="transfer" /> reports before it connects, whose lines under
@@ -3846,11 +4061,30 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when no further URL is transferred.</returns>
     private bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
+        IsRunEndingSetupFailure(result)
+        || IsFatalFailure(result)
+        || (options.FailEarly && !result.IsSuccess);
+
+    /// <summary>
+    /// Tells whether a result is one of the setup failures that end the run whatever the options.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for a run-ending setup failure.</returns>
+    private bool IsRunEndingSetupFailure(TransferResult result) =>
         RunEndingFailures.Contains(result)
         || setoptFailures.ContainsKey(result)
         || ReferenceEquals(result, transferPerformer.KnownHostsFileMissingFailure)
-        || ReferenceEquals(result, cannotOpenUploadFileAfterFailure)
-        || (options.FailEarly && !result.IsSuccess);
+        || ReferenceEquals(result, cannotOpenUploadFileAfterFailure);
+
+    /// <summary>
+    /// Tells whether a result carries one of the codes curl's <c>is_fatal_error()</c> names (curl 8.21.0,
+    /// <c>tool_operate.c</c>): 2 (failed init), 27 (out of memory), 43 (bad function argument) or 48
+    /// (unknown option), after which the whole run stops.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for a fatal failure.</returns>
+    private static bool IsFatalFailure(TransferResult result) =>
+        result.ExitCode is CurlExitCode.FailedInit or CurlExitCode.OutOfMemory or CurlExitCode.BadFunctionArgument or CurlExitCode.UnknownOption;
 
     /// <summary>
     /// The result of a transfer whose <c>-T</c> file cannot be opened. curl 8.21.0 does not set
@@ -4280,6 +4514,7 @@ internal sealed class CurlCommandRunner(
 
             await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine], commandLineEchoEncoding)
                 .ConfigureAwait(false);
+            NoteUploadFileCouldNotBeOpened(Running, options, transfer);
             return CannotOpenUploadFileResult();
         }
 
@@ -4394,7 +4629,7 @@ internal sealed class CurlCommandRunner(
         MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
-            return form.Failure;
+            return FormSetupFailureOf(form.Failure, options, transfer);
         }
 
         await using (form.Body.Content.ConfigureAwait(false))
@@ -4481,19 +4716,65 @@ internal sealed class CurlCommandRunner(
     /// <param name="mimePost">The <c>-F</c> parts, as <see cref="EasyOptionsFromCommandLine.HttpOf" /> maps them.</param>
     /// <param name="scheme">The transfer URL's scheme, which picks the names' escaping.</param>
     /// <param name="mimeMessage">Whether the parts are a mail message rather than a form.</param>
+    /// <param name="isSendingBuild">Whether the body is the one sent, which uses up the sizes taken before the trace file opened.</param>
     /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
-    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage) =>
-        mimeMessage
-            ? formBodyBuilder.BuildMailMessageAsync(
-                MultipartFormPartMapping.FromMimeBody(mimePost),
-                MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
-                options.Headers,
-                CancellationToken.None)
-            : formBodyBuilder.BuildAsync(
-                MultipartFormPartMapping.FromMimeBody(mimePost),
-                MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
-                MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
-                CancellationToken.None);
+    private async ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage, bool isSendingBuild = true)
+    {
+        // The sizes taken before the trace file opened belong to exactly one sending build, the first to ask
+        // (BL-5784, BL-5800); the build that only checks the form under -Z takes none (BL-5795).
+        IReadOnlyDictionary<string, long>? fileSizesBeforeTrace = isSendingBuild ? Interlocked.Exchange(ref formFileSizesBeforeTrace, null) : null;
+        return mimeMessage
+                ? await formBodyBuilder.BuildMailMessageAsync(
+                    MultipartFormPartMapping.FromMimeBody(mimePost),
+                    MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
+                    options.Headers,
+                    CancellationToken.None,
+                    fileSizesBeforeTrace).ConfigureAwait(false)
+                : await formBodyBuilder.BuildAsync(
+                    MultipartFormPartMapping.FromMimeBody(mimePost),
+                    MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
+                    MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
+                    CancellationToken.None,
+                    fileSizesBeforeTrace).ConfigureAwait(false);
+    }
+
+    /// <summary>Gives the run-ending <see cref="CannotOpenUploadFileFailure" /> for a form part whose file cannot be opened.</summary>
+    /// <param name="failure">The form builder's failure.</param>
+    /// <returns>The run-ending failure for the open failure, else <paramref name="failure" />.</returns>
+    private static TransferResult FormRunEndingFailureOf(TransferResult failure) =>
+        failure.ExitCode == CurlExitCode.ReadError && failure.ErrorMessage == MultipartFormBodyBuilder.OpenFailedMessage ? CannotOpenUploadFileFailure : failure;
+
+    /// <summary>
+    /// Turns a <c>-F</c> form whose file cannot be opened into <see cref="CannotOpenUploadFileFailure" />, which ends
+    /// the run and leaves <c>%{conn_id}</c> and <c>%{xfer_id}</c> at -1 as for <c>-T</c> (STD-124, BL-5442).
+    /// </summary>
+    /// <param name="failure">The form builder's failure.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The run-ending failure for a file that cannot be opened, else <paramref name="failure" />.</returns>
+    private TransferResult FormSetupFailureOf(TransferResult failure, CommandLineOptions options, UrlTransfer transfer)
+    {
+        if (!ReferenceEquals(FormRunEndingFailureOf(failure), CannotOpenUploadFileFailure))
+        {
+            return failure;
+        }
+
+        NoteUploadFileCouldNotBeOpened(Running, options, transfer);
+        return CannotOpenUploadFileFailure;
+    }
+
+    /// <summary>
+    /// Records, for <c>-w</c>, that a transfer ended because its <c>-T</c> file could not be opened: curl has named the
+    /// <c>-o</c> file by then, so <c>%{filename_effective}</c> prints it, but it never reached the URL's scheme (BL-5339).
+    /// </summary>
+    /// <param name="running">The transfer's state.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    private static void NoteUploadFileCouldNotBeOpened(RunningTransferState running, CommandLineOptions options, UrlTransfer transfer)
+    {
+        running.OutputFileName = transfer.OutputFileName is { } fileName ? InOutputDirectory(options, fileName) : null;
+        running.UploadFileCouldNotBeOpened = true;
+    }
 
     /// <summary>
     /// Names the <c>-o</c> file for <c>%{filename_effective}</c> when the transfer is refused for an unsupported
@@ -5706,7 +5987,7 @@ internal sealed class CurlCommandRunner(
 
         // CURLOPT_URL takes any string, so its answer is always CURLE_OK.
         _ = easy.Easy.SetOption(CurlOption.Url, StyledHeaderBaseUrl(attempt.Url));
-        easy.Hooks.ToolSettings = EasyOptionsFromCommandLine.TransferSettingsOf(options);
+        easy.Hooks.ToolSettings = EasyOptionsFromCommandLine.TransferSettingsOf(options, attempt.Url);
         easy.Hooks.Host = EasyTransferHost.Library with { DiagnosticLog = diagnosticLog };
         return easy.SetOptions([.. easySetoptsOf(groups), .. FormSetoptOf(form)]);
     }
@@ -6100,7 +6381,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>--extended-help</c> line for the options of <see cref="CurlOnlyOptionsMarkdown" />.</summary>
     private static readonly string[] CurlOnlyOptionLines =
     [
-        "diagnostic-log: Curl's own diagnostic log, not curl's -v: --log-level <level> sets how much is logged and --log-file <file> where. Schemes: none. Options: --log-level, --log-file.",
+        "diagnostic-log: Curl's own diagnostic log, not curl's -v: --log-level <level> sets how much is logged and --log-file <file> where. Schemes: none. Options: --log-level <level>, --log-file <file>.",
     ];
 
     /// <summary>Whether <c>CURL_EXTENSIONS</c> is anything but <c>0</c>: under <c>0</c> the help pages are curl's own.</summary>

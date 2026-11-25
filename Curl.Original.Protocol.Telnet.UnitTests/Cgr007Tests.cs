@@ -40,6 +40,23 @@ public sealed class Cgr007Tests
     }
 
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_OffWindowsServerResetsBeforeTheUploadGoes_ExitsWith56SendingNothing()
+    {
+        var connection = new FaultingConnection { ReadFailsAfterReads = true, WritesFail = true };
+        Diagnostics.Arrange("server", "resets at once; every write fails");
+        Diagnostics.ArrangeUpload("a\n"u8.ToArray());
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = new MemoryStream(), Upload = new MemoryStream("a\n"u8.ToArray()) });
+        Diagnostics.ActResult(result);
+
+        Diagnostics.AssertExitCode(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_ServerClosesAndUploadWriteFails_EndsWithExit0()
     {
         var connection = new FaultingConnection { ReadFailsAfterReads = true, WritesFail = true };

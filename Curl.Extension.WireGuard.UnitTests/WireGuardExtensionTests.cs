@@ -51,7 +51,7 @@ public sealed class WireGuardExtensionTests
     {
         ArgumentException error = Assert.ThrowsExactly<ArgumentException>(() => Activate(_ => throw new FileNotFoundException("no such file")));
 
-        Assert.StartsWith("--wireguard cannot read 'wg0.conf': no such file", error.Message);
+        Assert.AreEqual("--wireguard cannot read 'wg0.conf'", error.Message.Replace(" (Parameter '" + error.ParamName + "')", string.Empty, StringComparison.Ordinal));
     }
 
     [TestMethod]

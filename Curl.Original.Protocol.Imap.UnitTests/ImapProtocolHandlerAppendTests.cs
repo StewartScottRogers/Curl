@@ -56,7 +56,7 @@ public sealed class ImapProtocolHandlerAppendTests
         Assert.AreEqual(expected, run.Sent);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(21, run.Result.BytesTransferred);
-        Assert.AreEqual(21, run.Result.Report!.UploadSize);
+        Assert.AreEqual(21, run.Result.Report?.UploadSize ?? 0);
     }
 
     [TestMethod]
@@ -138,7 +138,7 @@ public sealed class ImapProtocolHandlerAppendTests
         Diagnostics.Assert("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {0}\r\n\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
-        Assert.AreEqual(0, run.Result.Report!.UploadSize);
+        Assert.AreEqual(0, run.Result.Report?.UploadSize ?? 0);
         CollectionAssert.AreEqual(new[] { "started" }, run.Progress.Reports);
     }
 
@@ -184,7 +184,7 @@ public sealed class ImapProtocolHandlerAppendTests
         Assert.AreEqual(CurlExitCode.UploadFailed, run.Result.ExitCode);
         Assert.AreEqual(UploadFailed, run.Result.ErrorMessage);
         Assert.AreEqual(21, run.Result.BytesTransferred);
-        Assert.AreEqual(21, run.Result.Report!.UploadSize);
+        Assert.AreEqual(21, run.Result.Report?.UploadSize ?? 0);
     }
 
     [TestMethod]

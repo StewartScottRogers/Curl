@@ -39,7 +39,7 @@ internal static class TlsFailureMessages
 
     private const string SchannelChainIncomplete = "schannel: the certificate chain is incomplete";
 
-    private const string SchannelRevocationStatusUnknown = "schannel: the revocation status is unknown";
+    internal const string SchannelRevocationStatusUnknown = "schannel: the revocation status is unknown";
 
     /// <summary>
     /// The Schannel build's message for exit 60 when, with <c>--cacert</c>, a certificate of the
@@ -125,19 +125,36 @@ internal static class TlsFailureMessages
     /// <param name="failure">What the read threw.</param>
     /// <param name="matchesSchannelBuild"><see langword="true" /> for curl's Schannel build.</param>
     /// <param name="presentedClientCertificate"><see langword="true" /> when <c>--cert</c> was presented.</param>
+    /// <param name="insideTlsTunnel"><see langword="true" /> for TLS inside an HTTPS proxy's tunnel, where the Schannel build reports the read aborted (BL-5388).</param>
+    /// <param name="serverRequestedClientCertificate"><see langword="true" /> when the handshake carried a client-certificate request (STD-192).</param>
     /// <returns>The message curl prints, or <see langword="null" />.</returns>
-    internal static string? AlertReadFailure(IOException failure, bool matchesSchannelBuild, bool presentedClientCertificate) =>
+    internal static string? AlertReadFailure(IOException failure, bool matchesSchannelBuild, bool presentedClientCertificate, bool insideTlsTunnel = false, bool serverRequestedClientCertificate = false) =>
         matchesSchannelBuild
-            ? SchannelAlertReadFailure(failure)
+            ? SchannelAlertReadFailure(failure, insideTlsTunnel, serverRequestedClientCertificate && !presentedClientCertificate)
             : OpenSslAlertReadFailure(failure, presentedClientCertificate);
 
-    private static string? SchannelAlertReadFailure(IOException failure)
+    /// <summary>The Schannel build's exit 56 text for a read the hand-built client saw a server alert end (BL-5330).</summary>
+    /// <param name="automaticClientCertificate"><see langword="true" /> under <c>--ssl-auto-client-cert</c>, where curl's read is aborted instead.</param>
+    /// <param name="insideTlsTunnel"><see langword="true" /> inside an HTTPS proxy's TLS tunnel, where curl's read is aborted too (BL-5388).</param>
+    /// <returns>The message curl prints.</returns>
+    internal static string SchannelHandBuiltAlertReadFailure(bool automaticClientCertificate, bool insideTlsTunnel = false) =>
+        automaticClientCertificate || insideTlsTunnel
+            ? "Recv failure: " + SchannelSocketErrorTexts[SocketError.ConnectionAborted]
+            : SchannelFatalAlertReceived.Replace("next InitializeSecurityContext failed", "failed to read data from server", StringComparison.Ordinal);
+
+    private static string? SchannelAlertReadFailure(IOException failure, bool insideTlsTunnel, bool refusedForWantOfCertificate)
     {
         var code = FindInnerException<Win32Exception>(failure)?.NativeErrorCode;
-        return code == SecEIllegalMessage || code == SecEDecryptFailure
-            ? SchannelFatalAlertReceived.Replace("next InitializeSecurityContext failed", "failed to read data from server", StringComparison.Ordinal)
+        return code == SecEIllegalMessage || code == SecEDecryptFailure || EndedBySocketAfterRefusal(failure, refusedForWantOfCertificate)
+            ? SchannelHandBuiltAlertReadFailure(automaticClientCertificate: false, insideTlsTunnel)
             : null;
     }
+
+    // A server that required a certificate none was sent for ends the read with its alert, which
+    // SslStream may surface as the socket abort or reset that follows it (STD-192, BL-5860).
+    private static bool EndedBySocketAfterRefusal(IOException failure, bool refusedForWantOfCertificate) =>
+        refusedForWantOfCertificate
+        && FindInnerException<SocketException>(failure)?.SocketErrorCode is SocketError.ConnectionAborted or SocketError.ConnectionReset;
 
     private static string? OpenSslAlertReadFailure(IOException failure, bool presentedClientCertificate)
     {
@@ -191,6 +208,7 @@ internal static class TlsFailureMessages
     // measured with curl 8.18.0's OpenSSL 3.5.5 build (BL-609); the others are OpenSSL's table.
     private static readonly FrozenDictionary<long, string> OpenSslRevocationListErrorTexts = new Dictionary<long, string>
     {
+        [OpenSslVerifyResult.UnableToGetIssuerCertificate] = "unable to get issuer certificate",
         [OpenSslVerifyResult.UnableToGetCertificateRevocationList] = "unable to get certificate CRL",
         [OpenSslVerifyResult.CertificateRevocationListSignatureFailure] = "CRL signature failure",
         [OpenSslVerifyResult.CertificateRevocationListNotYetValid] = "CRL is not yet valid",
@@ -205,6 +223,8 @@ internal static class TlsFailureMessages
         [OpenSslVerifyResult.CertificateSignatureFailure] = "certificate signature failure",
         [OpenSslVerifyResult.PathLengthExceeded] = "path length constraint exceeded",
         [OpenSslVerifyResult.PermittedSubtreeViolation] = "permitted subtree violation",
+        [OpenSslVerifyResult.ExcludedSubtreeViolation] = "excluded subtree violation",
+        [OpenSslVerifyResult.UnsupportedNameSyntax] = "unsupported or invalid name syntax",
         [OpenSslVerifyResult.InvalidCaCertificate] = "invalid CA certificate",
     }.ToFrozenDictionary();
 
@@ -281,6 +301,7 @@ internal static class TlsFailureMessages
 
         return maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11
             ? SchannelAlertBelowTls12(failure.Origin, minimumVersion, maximumVersion)
+            : failure.Origin == TlsHandshakeFailureOrigin.AlertReceived && failure.Alert == TlsAlertDescription.ProtocolVersion ? SchannelUnsupportedFunction
             : SchannelFatalAlertReceived;
     }
 
@@ -412,7 +433,7 @@ internal static class TlsFailureMessages
     /// curl checks the name first, so a name mismatch is reported even when the chain also
     /// failed (BL-150, measured). A certificate with DNS or IP subjectAltName entries is
     /// matched against those alone, and the message names the kind of target; one without
-    /// is matched against its common name.
+    /// is matched against its common name, and refused outright when that name holds a NUL.
     /// </remarks>
     public static string OpenSslPeerFailedVerification(SslPolicyErrors errors, X509Chain? chain, string targetHost)
     {
@@ -422,6 +443,11 @@ internal static class TlsFailureMessages
         }
 
         var certificate = chain!.ChainElements[0].Certificate;
+        if (OpenSslCommonNameRefusal.MatchedCommonNameHoldsANul(certificate))
+        {
+            return "SSL: illegal cert name field";
+        }
+
         var shownHost = IsBracketedByCurl(targetHost) ? $"[{targetHost}]" : targetHost;
         if (HasDnsOrIpAlternativeNames(certificate))
         {
@@ -499,7 +525,7 @@ internal static class TlsFailureMessages
     /// <param name="maximumVersion">The highest version offered, <c>--tls-max</c>.</param>
     /// <returns>The message curl prints.</returns>
     public static string SchannelSslConnectError(Exception exception, TlsVersion maximumVersion) =>
-        maximumVersion == TlsVersion.Tls12 && IsProtocolVersionRefusal(exception)
+        maximumVersion is not (TlsVersion.Tls10 or TlsVersion.Tls11) && IsProtocolVersionRefusal(exception)
             ? SchannelUnsupportedFunction
             : SchannelSslConnectError(exception, maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11);
 
@@ -878,7 +904,7 @@ internal static class TlsFailureMessages
             return "unable to get local issuer certificate (20)";
         }
 
-        var status = ChainStatus(chain);
+        var status = OpenSslVerifyResult.StatusOf(chain);
         if (RefusesPurposeOfATrustedChain(status, chain))
         {
             return "unsuitable certificate purpose (26)";

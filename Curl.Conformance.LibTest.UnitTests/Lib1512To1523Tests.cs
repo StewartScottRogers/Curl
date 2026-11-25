@@ -246,6 +246,8 @@ public sealed class Lib1512To1523Tests
         await Lib1515.TestAsync(run.Context, run.Steps, holder.Library, new LibTestClock(TimeProvider.System), TimeProvider.System, CancellationToken.None);
 
         Assert.AreEqual(LibTestErrorCodes.EasyInit, run.Steps.Result);
+        StringAssert.EndsWith(run.Error.ToString(), $"request http://testserver.example.com:8990/path/15150001 failed with {(int)LibTestErrorCodes.EasyInit}\n");
+        Assert.DoesNotContain("15150002", run.Error.ToString());
     }
 
     [TestMethod]

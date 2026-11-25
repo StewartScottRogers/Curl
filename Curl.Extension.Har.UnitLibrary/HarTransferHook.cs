@@ -15,6 +15,23 @@ internal sealed class HarTransferHook(string path) : ITransferHook
     /// <summary>The <c>User-Agent</c> curl sends when <c>-A</c> is not given.</summary>
     internal const string DefaultUserAgent = "curl/8.22.0";
 
+    /// <summary>What a recorded URL puts in place of a user and password (ADR-1134 uses the same text for <c>url.full</c>).</summary>
+    internal const string RedactedUserInfo = "REDACTED:REDACTED";
+
+    /// <summary>Puts <see cref="RedactedUserInfo" /> in place of any user information in <paramref name="url" />.</summary>
+    /// <param name="url">The URL as given.</param>
+    /// <returns>The URL with no credentials; a URL with no user information is returned unchanged.</returns>
+    internal static string Redacted(string url)
+    {
+        var schemeEnd = url.IndexOf("://", StringComparison.Ordinal);
+        var firstDelimiter = url.IndexOfAny(['/', '?', '#']);
+        var authorityStart = schemeEnd >= 0 && (firstDelimiter < 0 || schemeEnd < firstDelimiter) ? schemeEnd + 3 : 0;
+        var authorityEnd = url.IndexOfAny(['/', '?', '#'], authorityStart);
+        var authority = authorityEnd < 0 ? url[authorityStart..] : url[authorityStart..authorityEnd];
+        var at = authority.LastIndexOf('@');
+        return at < 0 ? url : url[..authorityStart] + RedactedUserInfo + url[(authorityStart + at)..];
+    }
+
     private readonly List<HarExchange> _exchanges = [];
 
     private readonly SemaphoreSlim _writing = new(1, 1);
@@ -32,14 +49,18 @@ internal sealed class HarTransferHook(string path) : ITransferHook
         HarExchange exchange = new(
             started,
             MethodOf(context, result.Report),
-            result.Report?.EffectiveUrl ?? context.Url.OriginalString,
+            Redacted(result.Report?.EffectiveUrl ?? context.Url.OriginalString),
             RequestHeadersOf(context.Http),
             context.Http.Body as BytesBody,
-            result,
+            RedactedRedirect(result),
             received.Copied(),
             context.TimeProvider.TimestampFrequency);
         return await RecordAsync(exchange, context.CancellationToken) ? result : WriteFailure(result);
     }
+
+    /// <summary>The result as the archive keeps it: the redirect URL, if any, with no user information.</summary>
+    private static TransferResult RedactedRedirect(TransferResult result) =>
+        result.Report?.RedirectUrl is { } redirect ? result with { Report = result.Report with { RedirectUrl = Redacted(redirect) } } : result;
 
     private static string MethodOf(ITransferContext context, TransferReport? report) =>
         report?.Method ?? context.Http!.CustomMethod ?? DefaultMethodOf(context);

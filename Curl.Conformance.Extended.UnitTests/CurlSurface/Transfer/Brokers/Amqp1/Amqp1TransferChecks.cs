@@ -78,7 +78,7 @@ internal static class Amqp1TransferChecks
         });
 
     /// <summary>
-    /// -w: each variable as the manual defines it, after the body; %{time_total} is 0.000000 on a clock that never moves
+    /// -w: each variable as the manual defines it, after the body; %{time_total} is 0.000001 (the least curl reports) on a clock that never moves
     /// and %{size_download} the bytes written.
     /// </summary>
     public static Task WriteOutAsync(Amqp1TransferScheme scheme) =>
@@ -87,7 +87,7 @@ internal static class Amqp1TransferChecks
             CurlRunResult result = await RunAnsweredAsync(scheme, ["-sS", "-w", WriteOutFormat]);
 
             Assert.AreEqual(0, result.ExitCode, Text(result.StandardError));
-            string expected = $"0||{scheme.Url}|{scheme.Url}|{scheme.Scheme}|127.0.0.1|{scheme.Port}|{Encoding.UTF8.GetByteCount(Body)}|0.000000\n";
+            string expected = $"0||{scheme.Url}|{scheme.Url}|{scheme.Scheme}|127.0.0.1|{scheme.Port}|{Encoding.UTF8.GetByteCount(Body)}|0.000001\n";
             Assert.AreEqual(Body + expected, Text(result.StandardOutput), "manual, -w");
         });
 

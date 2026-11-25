@@ -24,13 +24,14 @@ public sealed class CurlClientSendAsyncTests
     {
         CurlRequest request = new(HttpMethod.Get, "http://example/a")
         {
-            Headers = [new("X-One", "1"), new("X-Empty", "")],
+            Headers = [new("X-One", "1"), new("X-Gone", "")],
+            EmptyHeaders = ["X-Empty"],
             RemovedHeaders = ["Accept", "Host"],
         };
 
         (_, ScriptedEasyTransfer easy) = await SendAsync(request);
 
-        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty;", "Accept:", "Host:" }, Performed(easy).Http.HttpHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Gone:", "X-Empty;", "Accept:", "Host:" }, Performed(easy).Http.HttpHeaders.ToArray());
     }
 
     [TestMethod]
@@ -40,12 +41,13 @@ public sealed class CurlClientSendAsyncTests
         {
             Headers = [new("X-One", "1"), new("x-one", "2"), new("Accept", "")],
         };
+        // An empty value removes the header: the line is Name:, as curl -H "Name:" (ADR-1335).
 
         (_, ScriptedEasyTransfer easy) = await SendAsync(request);
 
         EasyOptions options = Performed(easy);
         Assert.AreEqual("http://example/a", options.Network.Url);
-        CollectionAssert.AreEqual(new[] { "X-One: 1", "x-one: 2", "Accept;" }, options.Http.HttpHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-One: 1", "x-one: 2", "Accept:" }, options.Http.HttpHeaders.ToArray());
         Assert.AreEqual("agent/1", options.Http.UserAgent);
     }
 
@@ -60,6 +62,26 @@ public sealed class CurlClientSendAsyncTests
         Assert.IsFalse(options.Http.Post);
         Assert.IsNull(options.Http.PostFields);
         Assert.AreEqual(-1, options.Http.PostFieldSize);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_CustomRequestWithSpaces_IsSetUnchangedAndWinsOverTheMethod()
+    {
+        CurlRequest request = new(HttpMethod.Get, "imap://example/INBOX") { CustomRequest = @"STORE 1 +Flags \Seen" };
+
+        (_, ScriptedEasyTransfer easy) = await SendAsync(request);
+
+        Assert.AreEqual(@"STORE 1 +Flags \Seen", Performed(easy).Transfer.CustomRequest);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_MoveCustomRequestOnAPost_WinsOverTheMethod()
+    {
+        CurlRequest request = new(HttpMethod.Post, "imap://example/INBOX") { CustomRequest = "MOVE 1 Archive" };
+
+        (_, ScriptedEasyTransfer easy) = await SendAsync(request);
+
+        Assert.AreEqual("MOVE 1 Archive", Performed(easy).Transfer.CustomRequest);
     }
 
     [TestMethod]
@@ -84,17 +106,18 @@ public sealed class CurlClientSendAsyncTests
     }
 
     [TestMethod]
-    public async Task SendAsync_PutWithBody_PostsTheBodyUnderACustomMethod()
+    public async Task SendAsync_PutWithBody_UploadsTheBodyAsCurlTDoes()
     {
         CurlRequest request = new(HttpMethod.Put, "http://example/") { Body = new byte[] { 1, 2, 3 } };
 
         (_, ScriptedEasyTransfer easy) = await SendAsync(request);
 
         EasyOptions options = Performed(easy);
-        Assert.IsTrue(options.Http.Post);
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, options.Http.PostFields!.Value.ToArray());
-        Assert.AreEqual(3, options.Http.PostFieldSize);
-        Assert.AreEqual("PUT", options.Transfer.CustomRequest);
+        Assert.IsTrue(options.Transfer.Upload);
+        Assert.IsFalse(options.Http.Post);
+        Assert.IsNull(options.Http.PostFields);
+        Assert.AreEqual(3, options.Transfer.InFileSize);
+        Assert.IsNull(options.Transfer.CustomRequest);
     }
 
     [TestMethod]
@@ -141,6 +164,32 @@ public sealed class CurlClientSendAsyncTests
     }
 
     [TestMethod]
+    [DataRow("smtp://mail/", 250L)]
+    [DataRow("smtps://mail/", 250L)]
+    [DataRow("imap://mail/INBOX", 200L)]
+    [DataRow("POP3://mail/", 200L)]
+    public async Task SendAsync_MailUrlWhoseReplyBodyComesBeforeTheEnd_ReportsTheReplyCodeAsStatusCode(string url, long code)
+    {
+        ScriptedEasyTransfer easy = new() { BodyBytes = [1], InfoAtEnd = new() { ResponseCode = code } };
+
+        (CurlResponse response, _) = await SendAsync(new(HttpMethod.Get, url) { CustomRequest = "NOOP" }, easy);
+
+        Assert.AreEqual((int)code, response.StatusCode);
+        Assert.AreEqual(code, response.Info.ResponseCode);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_MailUrlWhoseBodyFillsTheBuffer_ReturnsOnceTheBufferPausesTheTransfer()
+    {
+        ScriptedEasyTransfer easy = new() { BodyBytes = [1, 2, 3, 4], BodyWrites = 2 };
+        await using CurlClient client = new(new ScriptedCurlEngine(easy), new CurlClientOptions(), ownsEngine: true);
+
+        CurlResponse response = await client.SendWithBodyCapacityAsync(new(HttpMethod.Get, "imap://mail/INBOX"), 4, CancellationToken.None);
+
+        Assert.AreEqual(0, response.StatusCode);
+    }
+
+    [TestMethod]
     public async Task SendAsync_StatusLineDisagreesWithTransferInfo_TakesTheStatusLine()
     {
         ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 0, HttpVersion = 0 } };
@@ -150,6 +199,21 @@ public sealed class CurlClientSendAsyncTests
 
         Assert.AreEqual(404, response.StatusCode);
         Assert.AreEqual(System.Net.HttpVersion.Version20, response.Version);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\n", 2L)]
+    [DataRow("HTTP/2 200\r\n", 3L)]
+    [DataRow("HTTP/3 200\r\n", 30L)]
+    public async Task SendAsync_StatusLineNamesVersion_InfoHttpVersionHoldsItBeforeTheTransferEnds(string statusLine, long expected)
+    {
+        ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 0, HttpVersion = 0 } };
+        easy.HeaderLines.AddRange([statusLine, "\r\n"]);
+
+        (CurlResponse response, _) = await SendAsync(new(HttpMethod.Get, "http://example/"), easy);
+
+        Assert.AreEqual(expected, response.Info.HttpVersion);
+        Assert.AreEqual(Curl.Api.CurlClient.VersionOf(expected), response.Version);
     }
 
     [TestMethod]

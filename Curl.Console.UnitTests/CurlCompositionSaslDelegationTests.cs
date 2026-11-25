@@ -55,7 +55,7 @@ public sealed class CurlCompositionSaslDelegationTests
                 UserName = "u",
                 Password = "p",
                 Domain = "EXAMPLE",
-                MessageProtection = System.Net.Security.ProtectionLevel.Sign,
+                MessageProtection = System.Net.Security.ProtectionLevel.None,
                 Delegation = expected,
             },
             contexts.Request);

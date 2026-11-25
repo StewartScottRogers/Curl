@@ -267,6 +267,7 @@ internal sealed class FtpSession(
     private IPAddress? announcedAddress;
 
     private IConnection? dataConnection;
+    private Task<ConnectResult>? dataHandshake;
 
     private FtpDownloadWindow window;
 
@@ -369,6 +370,7 @@ internal sealed class FtpSession(
             {
                 ResponseCode = lastReplyCode,
                 FtpEntryPath = entryPath,
+                PseudoHeaders = PseudoHeadersOf(result),
                 DownloadSize = uploaded ? 0 : result.BytesTransferred,
                 UploadSize = uploaded ? result.BytesTransferred : 0,
                 RequestSize = uploaded ? result.BytesTransferred : 0,
@@ -400,7 +402,7 @@ internal sealed class FtpSession(
     /// transfer <paramref name="completed" />, and neither when the connect phase failed.
     /// </summary>
     private TransferTimings TimingsAt(long completed) =>
-        new(TransferStarted, ControlConnectTimings, connectPhaseEnded, null, connectPhaseEnded is null ? null : firstByteReceived ?? completed, completed);
+        new(TransferStarted, ControlConnectTimings, connectPhaseEnded, connectPhaseEnded, connectPhaseEnded is null ? null : firstByteReceived ?? completed, completed);
 
     /// <summary>
     /// Runs only curl's connect phase - the greeting, <c>AUTH</c>, the login, <c>PBSZ</c>,
@@ -447,6 +449,7 @@ internal sealed class FtpSession(
     public async ValueTask DisposeAsync()
     {
         await DisposeIfOpenAsync(dataConnection).ConfigureAwait(false);
+        await ObserveAbandonedHandshakeAsync().ConfigureAwait(false);
         await DisposeIfOpenAsync(acceptedEarly).ConfigureAwait(false);
         await DisposeIfOpenAsync(pendingConnection).ConfigureAwait(false);
         await DisposeIfOpenAsync(securedControl).ConfigureAwait(false);
@@ -1059,6 +1062,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> DownloadMatchAsync(string urlPath, FtpFileMethod method, long? size)
     {
         await DisposeIfOpenAsync(dataConnection).ConfigureAwait(false);
+        await ObserveAbandonedHandshakeAsync().ConfigureAwait(false);
         await DisposeIfOpenAsync(acceptedEarly).ConfigureAwait(false);
         await DisposeIfOpenAsync(pendingConnection).ConfigureAwait(false);
         dataConnection = null;
@@ -1311,7 +1315,7 @@ internal sealed class FtpSession(
             }
             catch (IOException failure)
             {
-                return TransferResult.Failure(CurlExitCode.SendError, FtpTransferMessages.SendFailed(failure), bytesTransferred);
+                return await EndFailedUploadWriteAsync(data, failure).ConfigureAwait(false);
             }
 
             context.Events.ReportDataSent(chunk.Span);
@@ -1320,19 +1324,69 @@ internal sealed class FtpSession(
         }
 
         dataConnection = null;
-        await CloseUploadDataConnectionAsync(data).ConfigureAwait(false);
+        await CloseDataConnectionDrainingAsync(data).ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.UploadSent(bytesTransferred));
         return null;
     }
 
     /// <summary>
-    /// Ends an upload's data connection without a reset: <c>close_notify</c> and FIN, then reads
+    /// Reads the control connection for <see cref="RefusalReplyWait" /> under a token the end of
+    /// the wait cancels, so no read is left pending to show a late reply or to fault unobserved
+    /// once the session is disposed; the wait ends early when the transfer is cancelled.
+    /// </summary>
+    /// <returns>The reply that arrived in time, or <see langword="null" />.</returns>
+    private async ValueTask<FtpReply?> ReadRefusalWithinWaitAsync()
+    {
+        using var wait = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+        CancellationToken transferToken = control.CancellationToken;
+        control.CancellationToken = wait.Token;
+        Task<FtpReply?> read = control.ReadReplyHeldAsync().AsTask();
+        await CompletesWithinAsync(read, RefusalReplyWait, context.CancellationToken).ConfigureAwait(false);
+        await wait.CancelAsync().ConfigureAwait(false);
+        await Task.WhenAny(read).ConfigureAwait(false);
+        _ = read.Exception;
+        control.CancellationToken = transferToken;
+        return read.IsCompletedSuccessfully ? read.Result : null;
+    }
+
+    /// <summary>
+    /// Ends an upload whose write to the data connection failed. A server that refuses the upload
+    /// with <c>552</c> and closes the data connection mid-transfer has sent its reply before the
+    /// write fails, and curl 8.22.0 reports it as exit 70, so the control connection is given
+    /// <see cref="RefusalReplyWait" /> to show that reply first, which makes the exit code
+    /// the same whichever of the reply and the failed write the client sees first; any other
+    /// outcome is exit 55.
+    /// </summary>
+    private async ValueTask<TransferResult> EndFailedUploadWriteAsync(IConnection data, IOException failure)
+    {
+        FtpReply? refusal = await ReadRefusalWithinWaitAsync().ConfigureAwait(false);
+        if (refusal?.Code != 552)
+        {
+            control.DiscardHeldReply();
+        }
+
+        if (refusal?.Code == 552)
+        {
+            await control.ReleaseHeldReplyAsync(refusal).ConfigureAwait(false);
+            lastReplyCode = refusal.Code;
+            dataConnection = null;
+            await CloseDataConnectionAtOnceAsync(data).ConfigureAwait(false);
+            trace.TransferReplyRead(refusal);
+            (CurlExitCode exitCode, string message) = DescribeTransferNotOk(refusal.Code);
+            return await QuitAndFailLeavingConnectionIntactAsync(exitCode, message).ConfigureAwait(false);
+        }
+
+        return TransferResult.Failure(CurlExitCode.SendError, FtpTransferMessages.SendFailed(failure), bytesTransferred);
+    }
+
+    /// <summary>
+    /// Ends a data connection without a reset: <c>close_notify</c> and FIN, then reads
     /// whatever the server still sends - a TLS 1.3 session ticket, its own <c>close_notify</c> -
     /// until it closes its side, for at most curl 8.22.0's two-second shutdown timeout. A socket
     /// closed with unread bytes is reset on Windows, and the reset throws away the upload the
-    /// server has not read yet (CGR-006, ADR-0891).
+    /// server has not read yet (CGR-006, ADR-0891). A TLS download that stops reading at its announced size\n    /// leaves the server's <c>close_notify</c> unread, and the reset that follows can fail the server's\n    /// write, so it answers <c>426</c> and the download exits 18 (BL-5643).
     /// </summary>
-    private async ValueTask CloseUploadDataConnectionAsync(IConnection data)
+    private async ValueTask CloseDataConnectionDrainingAsync(IConnection data)
     {
         await ShutDownSendingQuietlyAsync(data).ConfigureAwait(false);
         using var timeout = new CancellationTokenSource(DataShutdownTimeout, context.TimeProvider);
@@ -1493,6 +1547,21 @@ internal sealed class FtpSession(
             ?? await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
+    private readonly List<KeyValuePair<string, string>> writtenHeaders = [];
+
+    /// <summary>
+    /// The lines counted by <c>%{num_headers}</c>: every server reply line holding a colon plus those
+    /// <c>-I</c> wrote (BL-5470), or, when no reply holds a colon, the one line curl 8.22.0 counts for a
+    /// successful download (BL-5403).
+    /// </summary>
+    private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result)
+    {
+        KeyValuePair<string, string>[] counted = [.. control.ColonReplyLines, .. writtenHeaders];
+        return counted.Length > 0 ? counted
+            : context.NoBody || !result.IsSuccess ? []
+            : [FtpHeadHeaderLines.TransferComplete];
+    }
+
     /// <summary>
     /// Writes one <c>-I</c> header line to <see cref="ITransferContext.HeaderOutput" />;
     /// nothing when <paramref name="line" /> or the header output is absent.
@@ -1508,6 +1577,7 @@ internal sealed class FtpSession(
         try
         {
             await headerOutput.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
+            writtenHeaders.Add(FtpHeadHeaderLines.Split(line));
             return null;
         }
         catch (IOException)
@@ -1673,6 +1743,11 @@ internal sealed class FtpSession(
 
         ConnectResult accepted = await pendingConnection.AcceptAsync(context.CancellationToken).ConfigureAwait(false);
         acceptedEarly = accepted.Connection;
+        if (protectData && acceptedEarly is not null)
+        {
+            dataHandshake = StartDataHandshake(acceptedEarly);
+        }
+
         return acceptedEarly is null
             ? TransferResult.Failure(accepted.ExitCode, accepted.ErrorMessage!, bytesTransferred)
             : null;
@@ -1981,9 +2056,9 @@ internal sealed class FtpSession(
             return null;
         }
 
-        ConnectResult secured = await connections.TlsProvider
-            .AuthenticateAsClientAsync(dataConnection!, context.Url.IdnHost, context.Events, context.CancellationToken)
-            .ConfigureAwait(false);
+        Task<ConnectResult> handshake = dataHandshake!;
+        dataHandshake = null;
+        ConnectResult secured = await handshake.ConfigureAwait(false);
         dataConnection = secured.Connection;
         if (dataConnection is null)
         {
@@ -2150,7 +2225,31 @@ internal sealed class FtpSession(
         }
 
         log.PassiveDataConnected(host, port);
+        if (protectData)
+        {
+            // curl sends its ClientHello as soon as the data TCP connection opens; a server may
+            // finish its handshake before it answers the transfer command (STD-157, BL-5478).
+            dataHandshake = StartDataHandshake(dataConnection);
+        }
+
         return null;
+    }
+
+    private Task<ConnectResult> StartDataHandshake(IConnection data) =>
+        connections.TlsProvider
+            .AuthenticateAsClientAsync(data, context.Url.IdnHost, context.Events, context.CancellationToken)
+            .AsTask();
+
+    /// <summary>Waits for a handshake that no transfer used, so its failure is never left unobserved.</summary>
+    private async ValueTask ObserveAbandonedHandshakeAsync()
+    {
+        Task<ConnectResult>? abandoned = dataHandshake;
+        dataHandshake = null;
+        if (abandoned is not null)
+        {
+            await Task.WhenAny(abandoned).ConfigureAwait(false);
+            _ = abandoned.Exception;
+        }
     }
 
     /// <summary>Sends <c>TYPE A</c> for a listing or an ASCII transfer, <c>TYPE I</c> otherwise.</summary>
@@ -2565,6 +2664,16 @@ internal sealed class FtpSession(
         ReportRememberedDirectory();
         trace.ClosingDataConnection();
         await CloseDataConnectionAsync().ConfigureAwait(false);
+        if (expectedSize is { } announced && bytesTransferred < announced)
+        {
+            // curl's ftp_done fails a short download before reading the final reply, so the
+            // response code stays 150 and the connection is closed (BL-5404).
+            string message = FtpTransferMessages.ClosedWithBytesRemaining(announced - bytesTransferred);
+            context.Events.ReportInfo(message);
+            context.Events.ReportInfo(FtpTransferMessages.ClosingConnection(controlName.Number));
+            return TransferResult.Failure(CurlExitCode.PartialFile, message, bytesTransferred);
+        }
+
         FtpReply complete;
         try
         {
@@ -2577,11 +2686,6 @@ internal sealed class FtpSession(
         }
 
         trace.TransferReplyRead(complete);
-        if (expectedSize is { } expected && bytesTransferred < expected)
-        {
-            return TransferResult.Failure(CurlExitCode.PartialFile, FtpTransferMessages.ClosedWithBytesRemaining(expected - bytesTransferred), bytesTransferred);
-        }
-
         if (complete.Code is not (226 or 250))
         {
             (CurlExitCode exitCode, string message) = DescribeTransferNotOk(complete.Code);
@@ -2589,6 +2693,13 @@ internal sealed class FtpSession(
         }
 
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Ends a plain data connection: its send side shut down, then disposed.</summary>
+    private async ValueTask CloseDataConnectionAtOnceAsync(IConnection data)
+    {
+        await ShutDownSendingQuietlyAsync(data).ConfigureAwait(false);
+        await data.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -2603,8 +2714,7 @@ internal sealed class FtpSession(
         dataConnection = null;
         if (data is not null)
         {
-            await ShutDownSendingQuietlyAsync(data).ConfigureAwait(false);
-            await data.DisposeAsync().ConfigureAwait(false);
+            await (protectData ? CloseDataConnectionDrainingAsync(data) : CloseDataConnectionAtOnceAsync(data)).ConfigureAwait(false);
         }
     }
 
@@ -3035,13 +3145,13 @@ internal sealed class FtpSession(
     /// the transfer's clock, waiting out a timer that fires early, without cancelling the read.
     /// </summary>
     /// <returns>Whether <paramref name="read" /> completed in time.</returns>
-    private async ValueTask<bool> CompletesWithinAsync(Task read, TimeSpan limit)
+    private async ValueTask<bool> CompletesWithinAsync(Task read, TimeSpan limit, CancellationToken cancellationToken = default)
     {
         long started = context.TimeProvider.GetTimestamp();
         TimeSpan left = limit;
         while (!read.IsCompleted && left > TimeSpan.Zero)
         {
-            using var replied = new CancellationTokenSource();
+            using var replied = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             await Task.WhenAny(read, Task.Delay(left, context.TimeProvider, replied.Token)).ConfigureAwait(false);
             await replied.CancelAsync().ConfigureAwait(false);
             left = limit - context.TimeProvider.GetElapsedTime(started);
@@ -3067,6 +3177,43 @@ internal sealed class FtpSession(
         await SendAsync(command).ConfigureAwait(false);
         trace.Sent(command);
         trace.AwaitingReply();
+        return await ExchangeAcceptingEarlyAsync().ConfigureAwait(false);
+    }
+
+    private async ValueTask<FtpReply> ExchangeAcceptingEarlyAsync()
+    {
+        using var stopAccepting = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+        Task acceptingEarly = AcceptAndStartDataHandshakeAsync(pendingConnection!, stopAccepting.Token);
+        Task<FtpReply> exchange = ExchangeWhileAcceptingAsync().AsTask();
+        await ((Task)exchange).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await stopAccepting.CancelAsync().ConfigureAwait(false);
+        await acceptingEarly.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        return await exchange.ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Accepts the server's data connection while the transfer command's reply is awaited and
+    /// starts the TLS handshake over it at once, as curl does, so a server that finishes its
+    /// handshake before it sends <c>150</c> is served (STD-175). A failed or cancelled accept
+    /// is left to <see cref="AcceptDataConnectionAsync" />.
+    /// </summary>
+    private async Task AcceptAndStartDataHandshakeAsync(IPendingConnection pending, CancellationToken cancellationToken)
+    {
+        if (!protectData)
+        {
+            return;
+        }
+
+        ConnectResult accepted = await pending.AcceptAsync(cancellationToken).ConfigureAwait(false);
+        if (accepted.Connection is { } connection)
+        {
+            acceptedEarly = connection;
+            dataHandshake = StartDataHandshake(connection);
+        }
+    }
+
+    private async ValueTask<FtpReply> ExchangeWhileAcceptingAsync()
+    {
         Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
         TimeSpan acceptLeft = context.FtpAcceptTimeout - context.TimeProvider.GetElapsedTime(listenedAt);
         bool acceptFirst = acceptLeft <= context.FtpServerResponseTimeout;
@@ -3106,6 +3253,9 @@ internal sealed class FtpSession(
 
     /// <summary>How long curl 8.22.0 waits for a peer to end a connection it shuts down (<c>DEFAULT_SHUTDOWN_TIMEOUT_MS</c>).</summary>
     private static readonly TimeSpan DataShutdownTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>How long a failed upload write waits for the server's refusal reply before it is exit 55.</summary>
+    private static readonly TimeSpan RefusalReplyWait = TimeSpan.FromMilliseconds(500);
 
     private FtpControlConversationFailedException Failed(CurlExitCode exitCode, string message) =>
         new(TransferResult.Failure(exitCode, message, bytesTransferred));

@@ -126,6 +126,61 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public async Task FollowWatchingSpeedAsync_PastMaxTimeAfterConnecting_KeepsTheCancellationsReport_BL5491()
+    {
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
+        MaxTimeWatchdog? watchdog = performer.StartMaxTimeWatchdog(state, new EasyTransferOptions { Timeout = TimeSpan.FromSeconds(1) }, NoDiagnosticLog.Instance);
+        TransferReport carried = new() { ConnectionCount = 1 };
+        StallingHandler handler = new() { CarriedReport = carried };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = watchdog!.Token };
+
+        Task<TransferResult> attempt = TransferPerformer.FollowWatchingSpeedAsync(state, Follower(handler), context, new RedirectPolicy());
+        await handler.Stalled;
+        clock.Advance(TimeSpan.FromSeconds(1));
+        TransferResult result = await attempt;
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual(1, result.Report!.ConnectionCount);
+    }
+
+    [TestMethod]
+    public async Task FollowWatchingSpeedAsync_PastMaxTimeAfterBytesCame_StampsStartTransfer_BL5843()
+    {
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
+        MaxTimeWatchdog? watchdog = performer.StartMaxTimeWatchdog(state, new EasyTransferOptions { Timeout = TimeSpan.FromSeconds(1) }, NoDiagnosticLog.Instance);
+        TransferReport carried = new() { ConnectionCount = 1, Timings = new TransferTimings(1, null, 2, null, null, 9) };
+        StallingHandler handler = new() { CarriedReport = carried, BytesToReport = 6 };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = watchdog!.Token, Progress = watchdog.WatchProgress(NoTransferProgress.Instance) };
+
+        Task<TransferResult> attempt = TransferPerformer.FollowWatchingSpeedAsync(state, Follower(handler), context, new RedirectPolicy());
+        await handler.Stalled;
+        clock.Advance(TimeSpan.FromSeconds(1));
+        TransferResult result = await attempt;
+
+        Assert.AreEqual(9, result.Report!.Timings!.FirstByteReceived);
+    }
+
+    [TestMethod]
+    public async Task FollowWatchingSpeedAsync_PastMaxTimeBeforeAnyByte_LeavesStartTransferUnset_BL5843()
+    {
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
+        MaxTimeWatchdog? watchdog = performer.StartMaxTimeWatchdog(state, new EasyTransferOptions { Timeout = TimeSpan.FromSeconds(1) }, NoDiagnosticLog.Instance);
+        TransferReport carried = new() { ConnectionCount = 1, Timings = new TransferTimings(1, null, 2, null, null, 9) };
+        StallingHandler handler = new() { CarriedReport = carried };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = watchdog!.Token };
+
+        Task<TransferResult> attempt = TransferPerformer.FollowWatchingSpeedAsync(state, Follower(handler), context, new RedirectPolicy());
+        await handler.Stalled;
+        clock.Advance(TimeSpan.FromSeconds(1));
+        TransferResult result = await attempt;
+
+        Assert.IsNull(result.Report!.Timings!.FirstByteReceived);
+    }
+
+    [TestMethod]
     public async Task FollowWatchingSpeedAsync_CancelledWithoutWatchdog_Throws()
     {
         using CancellationTokenSource cancelled = new();
@@ -424,6 +479,10 @@ public sealed partial class TransferPerformerTests
 
         public bool Succeeds { get; init; }
 
+        public TransferReport? CarriedReport { get; init; }
+
+        public long BytesToReport { get; init; }
+
         public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)
         {
             Told.Add(result);
@@ -434,6 +493,11 @@ public sealed partial class TransferPerformerTests
 
         public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
         {
+            if (BytesToReport > 0)
+            {
+                context.Progress.ReportDownloaded(BytesToReport, null);
+            }
+
             stalled.TrySetResult();
             if (Failure is not null)
             {
@@ -445,7 +509,16 @@ public sealed partial class TransferPerformerTests
                 return TransferResult.Success(0);
             }
 
-            await Task.Delay(Timeout.Infinite, context.CancellationToken);
+            try
+            {
+                await Task.Delay(Timeout.Infinite, context.CancellationToken);
+            }
+            catch (OperationCanceledException cancelled) when (CarriedReport is not null)
+            {
+                cancelled.Data[EndPointReportingProtocolHandler.ReportDataKey] = CarriedReport;
+                throw;
+            }
+
             return TransferResult.Success(0);
         }
     }

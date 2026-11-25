@@ -1,0 +1,190 @@
+using System.Text;
+using Curl.Core;
+using Curl.Core.Multipart;
+using Curl.Engine;
+using Curl.Protocol.Abstractions;
+using Curl.Testing;
+
+namespace Curl.Console;
+
+/// <summary>
+/// Pins AF-0982: curl 8.22.0 sizes an <c>-F</c> file part before its trace file opens, so
+/// <c>-F f=@f.txt --trace-ascii f.txt</c> declares the bytes <c>f.txt</c> held before the trace truncated it.
+/// </summary>
+[TestClass]
+public sealed class FormFileSizedBeforeTraceTests
+{
+    [TestMethod]
+    public async Task RunAsync_TraceFileIsTheFormFile_DeclaresTheSizeTheFileHadBeforeTheTrace()
+    {
+        long traced = await BodyLengthAsync("--trace-ascii", "f.txt");
+        long untraced = await BodyLengthAsync("--trace-ascii", "t.txt");
+
+        Assert.AreEqual(untraced, traced);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceFileIsAnotherFile_DeclaresTheFileAsItIs()
+    {
+        long untraced = await BodyLengthAsync(null, null);
+        long traced = await BodyLengthAsync("--trace-ascii", "t.txt");
+
+        Assert.AreEqual(untraced, traced);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceTruncatesTheFormFileForASecondTransfer_SecondDeclaresTheNewLength()
+    {
+        InMemoryFileSystem files = new();
+        files.ExistingContent["f.txt"] = "file body\n"u8.ToArray();
+        List<long> lengths = [];
+        RecordingProtocolHandler http = new("http", context =>
+        {
+            lengths.Add((context.Http?.Body as StreamBody)?.Length ?? -1);
+            return ValueTask.FromResult(TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } });
+        });
+        TruncatingFileSystem truncating = new(files);
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                truncating,
+                files,
+                new MemoryStream(),
+                new MemoryStream(),
+                new MemoryStream(),
+                runsOnWindows: false,
+                outputPaths: files,
+                formBodyBuilder: new MultipartFormBodyBuilder(truncating, Encoding.UTF8, () => "B", standardInput: null))
+            .RunAsync(["-F", "f=@f.txt", "--trace-ascii", "f.txt", "http://127.0.0.1:22000/a", "http://127.0.0.1:22000/b"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(2, lengths);
+        Assert.IsLessThan(lengths[0], lengths[1]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ParallelTraceTruncatesTheFormFile_EndsWithExit26()
+    {
+        InMemoryFileSystem files = new();
+        files.ExistingContent["f.txt"] = "file body\n"u8.ToArray();
+        RecordingProtocolHandler http = new("http", async context =>
+        {
+            if (context.Http?.Body is StreamBody body)
+            {
+                using MemoryStream sent = new();
+                await body.Content.CopyToAsync(sent);
+                if (sent.Length < body.Length)
+                {
+                    return TransferResult.Failure(CurlExitCode.ReadError, "read error");
+                }
+            }
+
+            return TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } };
+        });
+        TruncatingFileSystem truncating = new(files);
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                truncating,
+                files,
+                new MemoryStream(),
+                new MemoryStream(),
+                new MemoryStream(),
+                runsOnWindows: false,
+                outputPaths: files,
+                formBodyBuilder: new MultipartFormBodyBuilder(truncating, Encoding.UTF8, () => "B", standardInput: null))
+            .RunAsync(["-Z", "-F", "f=@f.txt", "--trace-ascii", "f.txt", "http://127.0.0.1:22000/"]);
+
+        Assert.AreEqual(26, exitCode);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ParallelTraceTruncatesTheFormFileForTwoUrls_ExactlyOneBuildDeclaresTheEarlierSize()
+    {
+        InMemoryFileSystem files = new();
+        files.ExistingContent["f.txt"] = "file body\n"u8.ToArray();
+        List<long> lengths = [];
+        TaskCompletionSource bothArrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        RecordingProtocolHandler http = new("http", async context =>
+        {
+            lock (lengths)
+            {
+                lengths.Add((context.Http?.Body as StreamBody)?.Length ?? -1);
+                if (lengths.Count == 2)
+                {
+                    bothArrived.SetResult();
+                }
+            }
+
+            await bothArrived.Task;
+            return TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } };
+        });
+        TruncatingFileSystem truncating = new(files);
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                truncating,
+                files,
+                new MemoryStream(),
+                new MemoryStream(),
+                new MemoryStream(),
+                runsOnWindows: false,
+                outputPaths: files,
+                formBodyBuilder: new MultipartFormBodyBuilder(truncating, Encoding.UTF8, () => "B", standardInput: null))
+            .RunAsync(["-Z", "--parallel-immediate", "-F", "f=@f.txt", "--trace-ascii", "f.txt", "http://127.0.0.1:22000/a", "http://127.0.0.1:22000/b"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(2, lengths);
+        Assert.AreEqual(1, lengths.Count(length => length == lengths.Max()));
+        Assert.AreNotEqual(lengths[0], lengths[1]);
+    }
+
+    private static async Task<long> BodyLengthAsync(string? traceOption, string? traceFile)
+    {
+        InMemoryFileSystem files = new();
+        files.ExistingContent["f.txt"] = "file body\n"u8.ToArray();
+        long length = -2;
+        RecordingProtocolHandler http = new("http", context =>
+        {
+            length = (context.Http?.Body as StreamBody)?.Length ?? -1;
+            return ValueTask.FromResult(TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } });
+        });
+        List<string> arguments = ["-F", "f=@f.txt"];
+        if (traceOption is not null)
+        {
+            arguments.AddRange([traceOption, traceFile!]);
+        }
+
+        arguments.Add("http://127.0.0.1:22000/");
+
+        TruncatingFileSystem truncating = new(files);
+        await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                truncating,
+                files,
+                new MemoryStream(),
+                new MemoryStream(),
+                new MemoryStream(),
+                runsOnWindows: false,
+                outputPaths: files,
+                formBodyBuilder: new MultipartFormBodyBuilder(truncating, Encoding.UTF8, () => "B", standardInput: null))
+            .RunAsync([.. arguments]);
+        return length;
+    }
+
+    private sealed class TruncatingFileSystem(InMemoryFileSystem inner) : IFileSystem
+    {
+        public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken) =>
+            inner.OpenForReadAsync(path, cancellationToken);
+
+        public ValueTask<FileOpenResult> OpenForWriteAsync(string path, FileWriteMode mode, UnixFileMode createMode, CancellationToken cancellationToken)
+        {
+            if (mode == FileWriteMode.Truncate && inner.ExistingContent.ContainsKey(path))
+            {
+                inner.ExistingContent[path] = [];
+            }
+
+            return inner.OpenForWriteAsync(path, mode, createMode, cancellationToken);
+        }
+    }
+}

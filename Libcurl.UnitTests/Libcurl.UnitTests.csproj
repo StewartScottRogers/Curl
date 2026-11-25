@@ -21,4 +21,11 @@
     <Compile Include="..\Curl.Engine.UnitTests\RecordingDatagramConnector.cs" Link="Fakes\RecordingDatagramConnector.cs" />
   </ItemGroup>
 
+  <!-- The package's implicit usings, so a test compiles as a consumer does (BL-5551); the files are copied for the README test. -->
+  <Import Project="..\Libcurl\build\Surly.Libcurl.props" />
+  <ItemGroup>
+    <None Include="..\Libcurl\README.md" Link="PortingReadme\README.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Libcurl\build\Surly.Libcurl.props" Link="PortingReadme\Libcurl.props" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

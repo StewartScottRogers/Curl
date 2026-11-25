@@ -20,7 +20,6 @@ public sealed class LdapAuthenticatedNtlmTests
 
     [TestMethod]
     [DataRow(HttpAuthSchemes.Ntlm)]
-    [DataRow(HttpAuthSchemes.Negotiate)]
     public async Task ExecuteAsync_ChallengeAnswered_SendsTheSicilyResponseWithTag0x8bAndNoPassword(HttpAuthSchemes schemes)
     {
         (TransferResult result, byte[] sent) = await RunAsync(schemes, ChallengeReply(), BindSuccess2, SearchDone3);

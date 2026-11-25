@@ -83,11 +83,53 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     public List<int> ReadLengths { get; } = [];
 
     /// <inheritdoc />
-    public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+        YieldsBeforeReads ? ReadAfterYieldingAsync(buffer) : ReadNow(buffer, cancellationToken);
+
+    /// <summary>Gets or sets whether a read after the last scripted one never completes, as a quiet peer's does.</summary>
+    public bool HangsWhenExhausted { get; set; }
+
+    /// <summary>Gets or sets whether every read completes asynchronously, after a yield, as a socket's does.</summary>
+    public bool YieldsBeforeReads { get; set; }
+
+    private async ValueTask<int> ReadAfterYieldingAsync(Memory<byte> buffer)
     {
+        await Task.Yield();
+        return await ReadNow(buffer, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    /// <summary>Gets how many reads that hung were cancelled by their token.</summary>
+    public int HangingReadsCancelled { get; private set; }
+
+    /// <summary>Gets or sets what runs when a read starts to hang.</summary>
+    public Action? OnReadHangs { get; set; }
+
+    private ValueTask<int> HangUntilCancelled(CancellationToken cancellationToken)
+    {
+        var hanging = new TaskCompletionSource<int>();
+        cancellationToken.Register(() =>
+        {
+            HangingReadsCancelled++;
+            hanging.TrySetCanceled(cancellationToken);
+        });
+        OnReadHangs?.Invoke();
+        return new ValueTask<int>(hanging.Task);
+    }
+
+    /// <summary>Gets or sets what runs before each read is answered, such as moving a test's clock on.</summary>
+    public Action? OnRead { get; init; }
+
+    private ValueTask<int> ReadNow(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        OnRead?.Invoke();
         ReadLengths.Add(buffer.Length);
         if (nextRead == reads.Length)
         {
+            if (HangsWhenExhausted)
+            {
+                return HangUntilCancelled(cancellationToken);
+            }
+
             return FailReadsWhenExhausted
                 ? ValueTask.FromException<int>(ReadFailure)
                 : ValueTask.FromResult(0);

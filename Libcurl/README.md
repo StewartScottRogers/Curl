@@ -1,5 +1,7 @@
 # Libcurl
 
+A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, and it behaves like curl 8.22.0. Install: `dotnet add package Surly.Libcurl --prerelease`.
+
 Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
 
 The libcurl-faithful programming interface to Curl (ADR-0506): the libcurl C API shaped for C#.
@@ -32,6 +34,12 @@ CurlCode code = easy.Perform();
 `ManagedCurlEngine` is created. `InitMemory` also takes the `malloc`, `free`, `realloc`, `strdup`
 and `calloc` callbacks of `curl_global_init_mem`.
 
+`CurlOption` and `CurlInfo` names are curl's `CURLOPT_*` / `CURLINFO_*` name without the prefix and with
+one capital per underscore-separated word, so `CURLOPT_WRITEFUNCTION` is `CurlOption.Writefunction`. Where
+upstream runs several words together, the member's XML summary gives the word-cased form
+(`Word-cased: WriteFunction`), so a text search for the name known from C finds it (ADR-1307).
+`CurlOptions.ByName` still answers curl's own upper-case names.
+
 ## Which libcurl APIs it covers
 
 | libcurl API | Folder | Main types |
@@ -49,6 +57,43 @@ and `calloc` callbacks of `curl_global_init_mem`.
 | printf (`curl_mprintf` family) | `Misc/Printf` | `CurlPrintf` |
 | version (`curl_version_info`) | `Misc/Version` | `CurlVersion`, `CurlVersionFeatures` |
 | strings, dates, lists, error text | `Misc/Strings`, `Misc/DatesAndLists`, `Misc/ErrorText` | `CurlStrings` (`curl_easy_escape`), `CurlDate`, `CurlSlist`, `CurlErrorText` (`*_strerror`) |
+
+## Porting from C
+
+The package adds these implicit usings (`build/Surly.Libcurl.props`, ADR-1306), so `CurlCode`, `CurlWebSocketFlags`,
+`RtspRequest` and the callback delegates need no `using` of their own:
+
+- `Curl.Api.Callbacks`
+- `Curl.Api.Codes`
+- `Curl.Api.EngineContracts.WebSocket`
+- `Curl.Api.Options.Protocols`
+
+## Waiting for a WebSocket frame
+
+`curl_ws_recv` answers `CurlCode.Again` when no frame is ready, as upstream does. A C program then waits on the socket
+from `CURLINFO_ACTIVESOCKET` with `select` or `poll`; a .NET socket number is not something .NET can wait on, so
+`WebSocketWaitAsync` is that wait: it completes when a receive has something to answer and receives nothing itself
+(ADR-1308). Await it instead of sleeping:
+
+```csharp
+var buffer = new byte[4096];
+while (true)
+{
+    var code = easy.WebSocketRecv(buffer, out var received, out var meta);
+    if (code == CurlCode.Again)
+    {
+        await easy.WebSocketWaitAsync(cancellationToken);
+        continue;
+    }
+
+    if (code != CurlCode.Ok)
+    {
+        break;
+    }
+
+    Console.WriteLine($"{received} bytes, flags {meta?.Flags}");
+}
+```
 
 ## Folder map
 
@@ -79,4 +124,4 @@ and a CRAP score at most 30, measured from the fast tests only. Its tests are in
 
 ## Use the package from the preview release
 
-Download `Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Libcurl --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.
+Download `Surly.Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Surly.Libcurl --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.

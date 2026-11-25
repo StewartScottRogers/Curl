@@ -203,6 +203,20 @@ public sealed class EasyNetworkOptionSettersTests
     }
 
     [TestMethod]
+    public void SetOption_ConnectOnlyEnum_TakesEveryModeAndRejectsOutOfRange()
+    {
+        var options = new EasyOptions();
+
+        Assert.AreEqual(CurlCode.Ok, Set(ref options, CurlOption.ConnectOnly, ConnectOnly.WebSocket));
+        Assert.AreEqual(ConnectOnly.WebSocket, options.Network.ConnectOnly);
+        Assert.AreEqual(CurlCode.Ok, Set(ref options, CurlOption.ConnectOnly, ConnectOnly.Connect));
+        Assert.AreEqual(ConnectOnly.Connect, options.Network.ConnectOnly);
+        Assert.AreEqual(CurlCode.Ok, Set(ref options, CurlOption.ConnectOnly, ConnectOnly.Disabled));
+        Assert.AreEqual(ConnectOnly.Disabled, options.Network.ConnectOnly);
+        AssertBadFunctionArgument(CurlOption.ConnectOnly, (ConnectOnly)7);
+    }
+
+    [TestMethod]
     public void SetOption_UseSsl_TakesEveryLevel()
     {
         var options = new EasyOptions();

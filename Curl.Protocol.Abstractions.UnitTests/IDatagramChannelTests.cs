@@ -26,6 +26,16 @@ public sealed class IDatagramChannelTests
         Assert.IsNull(localEndPoint);
     }
 
+    [TestMethod]
+    public void ConnectToServer_WhenNotOverridden_DoesNothing()
+    {
+        IDatagramChannel channel = new MinimalChannel();
+
+        channel.ConnectToServer();
+
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 69), channel.ServerEndPoint);
+    }
+
     private sealed class MinimalChannel : IDatagramChannel
     {
         public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 69);

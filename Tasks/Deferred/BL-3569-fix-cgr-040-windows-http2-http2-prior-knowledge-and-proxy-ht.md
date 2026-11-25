@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs, Curl.Cli.UnitTests/Cgr040Tests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2Row.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs, Curl.Cli.UnitTests/Cgr040Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -67,7 +67,7 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 
 **Suspected location in source**
 
-- **[cli-options CLIO-05]** `Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs`.
+- **[cli-options CLIO-05]** `Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2Row.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs`.
 - **[upstream-cases UC-16]** Curl.Cli feature set.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
@@ -93,6 +93,8 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 - Decision (ADR-0929): Curl keeps Stewart's ADR-0871 (the three options run on Windows as the nghttp2 build runs them); refusing them would reverse a decision Stewart made himself, which the delegation does not cover, so the criteria (match REF's exit 2) cannot be met as written. Blocked for Stewart. If he reverses ADR-0871, the fix is `.RefusedBySchannelBuild()` on the three rows (`--proxy-http2` lives outside HttpVersionRows) plus `Cgr040Tests.cs` and `--ai-help`.
 - 2026-11-02 (lane 7): Claimed again after commit ec9518ed1 ("bring back 58 deferred tasks ... complete all existing tasks"), a bulk return that does not mention HTTP/2. ADR-0871 is still Accepted and unchanged (README row 0871; no later ADR supersedes it), and Stewart's 2026-10-26 ruling (keep HTTP/2 on Windows; CGR-040 is an accepted difference) still holds. Criterion 1 (exit 2 like the Schannel REF) can only be met by reversing ADR-0871, which the delegation does not cover. No code changed and nothing re-measured; lane 5's measurements above still stand. Blocked for Stewart: either reverse ADR-0871 (the fix is then the small one described above), or confirm CGR-040 as accepted so the task can close without criterion 1.
 
+- 2026-11-24 (lane 3): Claimed after Stewart's 2026-11-24 bulk undeferral ("to give the idle lanes work"), which does not reverse ADR-0871. ADR-0871, ADR-0929 and ADR-1282 are still Accepted, and Stewart ruled on 10-26, 11-02 and 11-22 to keep HTTP/2 on for Windows. Criterion 1 (exit 2, as the Schannel REF gives) would undo that ruling, and the delegation does not cover reversing it. No code changed and nothing re-measured; lane 5's measurements still stand. Deferred again, as lane 10 did with BL-3431 today (58e10c20f5). Revisit only if Stewart reverses ADR-0871; the fix is then `.RefusedBySchannelBuild()` on the three rows, plus `Cgr040Tests.cs` and `--ai-help`.
+
 ## Log
 
 - 2026-10-26: Created from CGR-040 of the third-party gap report.
@@ -103,3 +105,9 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-11-02: Doing -> Blocked. Stewart: your 11-02 bulk return asks to complete BL-3569, but meeting it means refusing --http2/--http2-prior-knowledge/--proxy-http2 on Windows (exit 2), which reverses your ADR-0871 that you upheld 10-26. Reverse ADR-0871, or close CGR-040 as an accepted difference?
 - 2026-11-02: Blocked -> Deferred. Stewart 2026-11-02 ('keep 0871'): ADR-0871 stays - --http2, --http2-prior-knowledge and --proxy-http2 keep running HTTP/2 on Windows; the exit-2 criterion would undo it. Closed as an accepted platform difference, listed in the handoff's known differences. GF-0098 and GF-0099 are already closed on the ADR-0871 exclusion.
+- 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs
+- 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/2 stays on for Windows (ADR-0871, ADR-0929); doing this would make --http2 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.
+- 2026-11-24: Deferred -> Backlog. Undeferred by Stewart 2026-11-24 to give the idle lanes work.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-24: Doing -> Deferred. ADR-0871, ADR-0929 and ADR-1282 (Stewart's 'keep HTTP/2 on') are still Accepted; the exit-2 criterion would undo them. Revisit only if Stewart reverses ADR-0871.

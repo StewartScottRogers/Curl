@@ -40,6 +40,9 @@ internal sealed class Http2ServerConnection : IConnection
     /// <summary>Gets the host the connection was opened to.</summary>
     public string Host { get; }
 
+    /// <summary>Gets the header fields every response carries after <c>:status</c>.</summary>
+    public IReadOnlyList<(string Name, string Value)> ResponseHeaders { get; init; } = [];
+
     /// <summary>Gets the stream identifiers the client opened, in order.</summary>
     public List<int> StreamIds { get; } = [];
 
@@ -177,5 +180,5 @@ internal sealed class Http2ServerConnection : IConnection
     }
 
     private void Respond(int streamId) =>
-        toClient.TryEnqueue(Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(streamId, encoder.Encode([new(":status", "200")]), isEndStream: true, isEndHeaders: true)));
+        toClient.TryEnqueue(Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(streamId, encoder.Encode([new(":status", "200"), .. ResponseHeaders.Select(header => new HeaderField(header.Name, header.Value))]), isEndStream: true, isEndHeaders: true)));
 }

@@ -4,10 +4,11 @@ namespace Curl.Protocol.Abstractions;
 /// How existing content is treated when a file is opened for writing.
 /// </summary>
 /// <remarks>
-/// curl chooses among the three: a plain download to a file truncates,
-/// <c>-C</c>/<c>--continue-at</c> appends to what is already there, and a
+/// curl chooses among the four: a plain download to a file truncates,
+/// <c>-C</c>/<c>--continue-at</c> appends to what is already there, a
 /// <c>-J</c>/<c>--remote-header-name</c> file is created only when nothing is there, as
-/// curl's <c>O_EXCL</c> open does. The choice belongs
+/// curl's <c>O_EXCL</c> open does, and the cookie jar, the HSTS cache and the alt-svc
+/// cache are replaced, as libcurl's <c>Curl_fopen</c> does. The choice belongs
 /// to the caller rather than to <see cref="IFileSystem" />, so a test can assert which
 /// mode a handler asked for without inspecting a file on disk.
 /// </remarks>
@@ -26,4 +27,18 @@ public enum FileWriteMode
     /// never overwritten.
     /// </summary>
     CreateNew,
+
+    /// <summary>
+    /// Replace the file whole. Off Windows, a path naming a regular file, or nothing yet, is
+    /// first opened as <see cref="Truncate" /> opens it, then the content goes to a temporary
+    /// file beside it that is renamed over the path when the stream closes with every write
+    /// done: a symbolic link is replaced rather than written through, and the new file takes
+    /// the old one's mode, narrowed by the umask. A device or pipe is written in place. On
+    /// Windows an existing file is not opened: the content goes to a temporary file beside it
+    /// that is renamed over the path in the same way, and the rename of a file that is
+    /// read-only or held open is retried for a second when the stream closes asynchronously;
+    /// a path naming nothing yet, or a device, is opened as <see cref="Truncate" /> opens it.
+    /// Closing throws an <see cref="IOException" /> when the file cannot be replaced.
+    /// </summary>
+    Replace,
 }

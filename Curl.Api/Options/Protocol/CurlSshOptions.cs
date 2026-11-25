@@ -7,6 +7,10 @@ namespace Curl.Api;
 /// member starts at libcurl 8.22.0's default. Set on <see cref="CurlClientOptions.Ssh"/> for every
 /// request or on <see cref="CurlRequest.Ssh"/> for one; a request's record replaces the client's whole.
 /// </summary>
+/// <remarks>
+/// There is deliberately no cipher or MAC list: curl 8.22.0 (libssh2) has no option that narrows them
+/// (<c>--ciphers</c> is TLS only, and libcurl has no <c>CURLOPT_SSH_CIPHERS</c>), so this record follows curl (BL-5662).
+/// </remarks>
 public sealed record CurlSshOptions : IEasyOptionRecord<EasySshOptions>
 {
     /// <summary><c>CURLOPT_SSH_AUTH_TYPES</c>: the authentication methods allowed. Default <see cref="SshAuthenticationTypes.Any"/>.</summary>

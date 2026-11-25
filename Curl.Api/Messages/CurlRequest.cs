@@ -36,9 +36,20 @@ public sealed partial record CurlRequest
 
     /// <summary>
     /// The request headers (<c>CURLOPT_HTTPHEADER</c>), sent in this order with this casing,
-    /// duplicates included. An empty value sends the header with no value (<c>Name;</c>). Default: none.
+    /// duplicates included. An empty value removes the header, as <c>curl -H "Name:"</c> does (the line
+    /// <c>Name:</c>); to send a header with no value on purpose, name it in <see cref="EmptyHeaders"/>. Default: none.
     /// </summary>
     public IReadOnlyList<KeyValuePair<string, string>> Headers
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = [];
+
+    /// <summary>
+    /// Names of headers sent with no value, each as the <c>CURLOPT_HTTPHEADER</c> line <c>Name;</c> after
+    /// <see cref="Headers"/>, as <c>curl -H "Name;"</c> does. Default: none.
+    /// </summary>
+    public IReadOnlyList<string> EmptyHeaders
     {
         get;
         init => field = value ?? throw new ArgumentNullException(nameof(value));

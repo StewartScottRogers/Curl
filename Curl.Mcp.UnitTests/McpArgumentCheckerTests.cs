@@ -40,16 +40,67 @@ public sealed class McpArgumentCheckerTests
     [DataRow("--cacert|{out}/ca.pem|https://h/", "--cacert")]
     [DataRow("--cacert|{in}/ca.pem|https://h/", "")]
     [DataRow("-n|http://h/", "-n")]
+    // The null device: -o may discard to it; lookalikes and other options keep the confinement.
+    [DataRow("-o|/dev/null|http://h/", "")]
+    [DataRow("-o|NUL|http://h/", "")]
+    [DataRow("-o|nul|http://h/", "")]
+    [DataRow("--output|/dev/null|http://h/", "")]
+    [DataRow("-o|/dev/null/x|http://h/", "-o")]
+    [DataRow("-o|/dev/null.txt|http://h/", "-o")]
+    [DataRow("-o|../NUL.txt|http://h/", "-o")]
+    [DataRow("-D|/dev/null|http://h/", "-D")]
     [DataRow("--netrc-optional|http://h/", "--netrc-optional")]
     [DataRow("-T|{out}/u|http://h/", "-T")]
     [DataRow("-T|{in}/u|http://h/", "")]
     [DataRow("-T|-|http://h/", "")]
     [DataRow("-T|.|http://h/", "")]
-    [DataRow("-T|{in}/{a,b}|http://h/", "-T")]
+    [DataRow("-T|{in}/{a,b}.txt|http://h/", "")]
+    [DataRow("-T|{in}/f[1-2].txt|http://h/", "")]
+    [DataRow("-T|{in}/f[01-10:3].txt|http://h/", "")]
+    [DataRow("-T|{in}/[a-c]{x,y}\\[z.txt|http://h/", "")]
+    [DataRow("-T|{in}/{a,../x}.txt|http://h/", "-T")]
+    [DataRow("-T|{in}/{a,b}/../../x|http://h/", "-T")]
+    [DataRow("-T|{in}/{a,b|http://h/", "-T")]
+    [DataRow("-T|{in}/a}|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-99999]|http://h/", "-T")]
+    [DataRow("-T|{in}/[3-1]|http://h/", "-T")]
+    [DataRow("-T|{in}/[c-a]|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-3:0]|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-3:x]|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-3:1:1]|http://h/", "-T")]
+    [DataRow("-T|{in}/[a]|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-b]|http://h/", "-T")]
+    [DataRow("-T|{in}/{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}|http://h/", "-T")]
     // WritesFile.
     [DataRow("-o|{out}/x|http://h/", "-o")]
     [DataRow("-o|-|http://h/", "")]
-    [DataRow("-o|{in}/#1.txt|http://h/{a,b}", "-o")]
+    [DataRow("-o|{in}/#1.txt|http://h/{a,b}", "")]
+    [DataRow("-o|{in}/reports/report-#1.csv|http://h/{a,b}", "")]
+    [DataRow("-o|{in}/../x-#1|http://h/{a,b}", "-o")]
+    [DataRow("--output-dir|{in}/downloads|-o|../guide.txt|http://h/", "")]
+    [DataRow("-o|../guide.txt|--output-dir|{in}/downloads|http://h/", "")]
+    [DataRow("--output-dir={in}/downloads|-o|../../x|http://h/", "-o")]
+    [DataRow("--output-dir|{in}/downloads|-o|../../x-#1|http://h/{a,b}", "-o")]
+    [DataRow("-o|#1|http://h/{../../x,y}", "-o")]
+    [DataRow("-o|#1|http://h/[a/b]", "-o")]
+    [DataRow("-o|#1./evil|http://h/{.,a}", "-o")]
+    [DataRow("-o|#1#2/x|http://h/{.}{.}", "-o")]
+    [DataRow("-o|#1x|http://h/{a.,b}", "-o")]
+    [DataRow("-o|#1|http://h/{C:evil,b}", "-o")]
+    [DataRow("-o|#1|http://h/[+-a]", "-o")]
+    [DataRow("-o|{in}/#1|http://h/{a.b,c}", "")]
+    [DataRow("-o|{in}/#1|http://h/[a-c]", "")]
+    [DataRow("-o|{in}/#1|http://[::1]/", "")]
+    [DataRow("-o|#1|http://h/{a/b", "-o")]
+    [DataRow("--output-dir|{in}/downloads|-o|#1|http://h/{../../x,y}", "-o")]
+    [DataRow("-o|{in}/x|http://h/{../../x,y}", "")]
+    [DataRow("--output-dir|{in}/downloads|-o|-|http://h/", "")]
+    [DataRow("--output-dir=|-o|{in}/x|http://h/", "")]
+    [DataRow("-o|{in}/x|http://h/|--output-dir", "")]
+    [DataRow("--output-dir|{in}/d|--|--output-dir|{out}", "")]
+    [DataRow("--output-dir|{in}/a/b/c|-o|x|http://h/|--next|-o|../../y|http://h/", "-o")]
+    [DataRow("-o|x|http://h/|--output-dir|..|--next|--output-dir|{in}/ok|-o|y|http://h/", "-o")]
+    [DataRow("--output-dir|{in}/d|-o|../g|http://h/|--next|-o|z|http://h/", "")]
     [DataRow("-o|{in}/a#b|http://h/", "")]
     [DataRow("-o|{in}/a#|http://h/", "")]
     [DataRow("-O|http://h/x", "")]
@@ -213,10 +264,10 @@ public sealed class McpArgumentCheckerTests
     [TestMethod]
     public void Check_UncheckableValue_SaysWhy()
     {
-        McpArgumentCheck check = checker.Check(Arguments("-T|{in}/{a,b}|http://h/"));
+        McpArgumentCheck check = checker.Check(Arguments("-T|{in}/{a,b|http://h/"));
 
-        Assert.AreEqual(Expand("{in}/{a,b}"), check.Path);
-        StringAssert.Contains(check.Reason, "glob characters");
+        Assert.AreEqual(Expand("{in}/{a,b"), check.Path);
+        StringAssert.Contains(check.Reason, "malformed or very large glob");
     }
 
     [TestMethod]
@@ -273,6 +324,23 @@ public sealed class McpArgumentCheckerTests
         {
             StringAssert.StartsWith(check.Reason, $"In config file '{config}', line ");
         }
+    }
+
+    [TestMethod]
+    [DataRow("url = \"http://h/{../../x,y}\"", "-K|{cfg}|-o|{in}/#1", "-o")]
+    [DataRow("url = \"http://h/{a,b}\"", "-K|{cfg}|-o|{in}/#1", "")]
+    [DataRow("next", "--output-dir|{in}/sub|-K|{cfg}|-o|../x|http://h/", "-o")]
+    [DataRow("output-dir = .", "--output-dir|{in}/a/b|-K|{cfg}|-o|../x|http://h/", "-o")]
+    [DataRow("output-dir = .", "--output-dir|{in}/a/b|-K|{cfg}|-o|x|http://h/", "")]
+    [DataRow("output-dir = \"{in}/d\"", "-K|{cfg}|-o|../g|http://h/", "")]
+    public void Check_ConfigFileGroupsAndGlobs_JudgeTheOutputNameAsCurlDoes(string content, string arguments, string refusedOption)
+    {
+        string config = Path.Combine(root, "cfg.txt");
+        File.WriteAllText(config, Expand(content));
+
+        McpArgumentCheck check = checker.Check(Arguments(arguments.Replace("{cfg}", config, StringComparison.Ordinal)));
+
+        Assert.AreEqual(refusedOption, check.Option ?? string.Empty, check.Reason);
     }
 
     [TestMethod]

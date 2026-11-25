@@ -90,7 +90,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     internal async ValueTask<TransferResult> RunAsync(TftpRequestFile file)
     {
         TftpTransferTimings timings = new(context.TimeProvider, startTimestamp);
-        return timings.Stamp(await RunUnstampedAsync(file).ConfigureAwait(false));
+        return timings.Stamp(await RunUnstampedAsync(file).ConfigureAwait(false), isUpload: false);
     }
 
     private async ValueTask<TransferResult> RunUnstampedAsync(TftpRequestFile file)
@@ -407,7 +407,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             return null;
         }
 
-        return payloadLength < blockSize ? TransferResult.Success(bytesTransferred) : null;
+        return payloadLength < blockSize ? TransferResult.Success(bytesTransferred) with { Report = new TransferReport { DownloadSize = bytesTransferred } } : null;
     }
 
     /// <summary>
@@ -443,7 +443,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             CultureInfo.InvariantCulture,
             $"Exceeded the maximum allowed file size ({limit}) with {bytesTransferred} bytes");
         events.MaxFileSizeExceeded(message);
-        return TransferResult.Failure(CurlExitCode.FilesizeExceeded, message, bytesTransferred);
+        return TransferResult.Failure(CurlExitCode.FilesizeExceeded, message, bytesTransferred) with { Report = new TransferReport { DownloadSize = bytesTransferred } };
     }
 
     /// <summary>

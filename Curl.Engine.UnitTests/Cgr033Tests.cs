@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
@@ -16,6 +17,8 @@ namespace Curl.Engine;
 public sealed class Cgr033Tests
 {
     private const int BodyLength = 4 * 1024 * 1024;
+
+    private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(30);
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -78,12 +81,10 @@ public sealed class Cgr033Tests
             await using IEasyTransfer transfer = engine.CreateEasy();
             transfer.Options = new EasyOptions { Network = new() { Url = new Uri(path).AbsoluteUri }, Callbacks = new() { Write = data => data.Length } };
             multi.Add(transfer);
-            DateTime start = DateTime.UtcNow;
 
             CurlMultiMessage? message = await DriveUntilDoneAsync(multi, _ => { }, () => { });
 
             Assert.AreEqual(new CurlMultiMessage(CurlMultiMessageType.Done, transfer, CurlCode.Ok), message);
-            Assert.IsLessThan(TimeSpan.FromSeconds(30), DateTime.UtcNow - start);
         }
         finally
         {
@@ -124,7 +125,7 @@ public sealed class Cgr033Tests
     // loop that only moved on at the wait's timeout would not finish within the test's limit.
     private static async Task<CurlMultiMessage?> DriveUntilDoneAsync(IMultiTransfer multi, Action<int> entering, Action leaving)
     {
-        DateTime deadline = DateTime.UtcNow.AddSeconds(60);
+        DateTime deadline = DateTime.UtcNow.AddMinutes(5);
         while (DateTime.UtcNow < deadline)
         {
             entering(Environment.CurrentManagedThreadId);
@@ -135,7 +136,11 @@ public sealed class Cgr033Tests
                 return message;
             }
 
-            await multi.WaitAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.FromSeconds(1), CancellationToken.None);
+            // A wait ended by its timeout, not by a callback or a finished transfer, is the defect; how long a
+            // loaded CI machine takes to move 4 MiB through the multi handle is not.
+            long waitStart = Stopwatch.GetTimestamp();
+            await multi.WaitAsync(Memory<CurlWaitSocket>.Empty, WaitTimeout, CancellationToken.None);
+            Assert.IsLessThan(WaitTimeout, Stopwatch.GetElapsedTime(waitStart), "a wait ran to its whole timeout");
         }
 
         return null;

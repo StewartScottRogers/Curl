@@ -13,9 +13,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -84,7 +84,8 @@ internal sealed partial class ManagedEasyTransfer
             return true;
         }
 
-        return TransferProxySelection.TrySelect(PerformShared.ProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out proxy, out refused, Host.DiagnosticLog);
+        // ToolSettings carry the tool's -U, which is percent-decoded; a library handle's proxy credential is not.
+        return TransferProxySelection.TrySelect(PerformShared.ProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out proxy, out refused, Host.DiagnosticLog, percentDecodesProxyUser: ToolSettings is not null);
     }
 
     /// <summary>The credentials <see cref="TryLookUpUrlAndNetrcCredentials" /> chose for the running perform, which <see cref="OwnInputsOf" /> puts on the context.</summary>

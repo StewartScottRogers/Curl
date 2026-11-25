@@ -162,15 +162,25 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_NoToolProgress_StartsNoWatchdog()
+    public async Task PerformAsync_NoToolProgressAndATimeout_StartsTheMaxTimeWatchdogAsLibcurlsTimeoutDoes()
     {
-        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
-        await using ManagedEasyTransfer easy = EasyOn(new SteppingTimeProvider(), handler);
+        SteppingTimeProvider clock = new();
+        TaskCompletionSource stalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        RecordingProtocolHandler handler = new("http", async context =>
+        {
+            stalled.TrySetResult();
+            await Task.Delay(Timeout.Infinite, context.CancellationToken);
+            return TransferResult.Success(0);
+        });
+        await using ManagedEasyTransfer easy = EasyOn(clock, handler);
         easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/x" }, Transfer = new EasyTransferOptions { Timeout = TimeSpan.FromSeconds(1) } };
 
-        await easy.PerformAsync(CancellationToken.None);
+        Task<CurlCode> perform = easy.PerformAsync(CancellationToken.None).AsTask();
+        await stalled.Task;
+        clock.Advance(TimeSpan.FromSeconds(3));
+        CurlCode code = await perform;
 
-        Assert.IsNull(handler.Contexts.Single().OperationStarted);
+        Assert.AreEqual(CurlCode.OperationTimedOut, code);
     }
 
     [TestMethod]

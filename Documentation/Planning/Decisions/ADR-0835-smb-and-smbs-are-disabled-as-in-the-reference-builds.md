@@ -1,6 +1,6 @@
 # ADR-0835 — `smb` and `smbs` are disabled, as in curl 8.22.0's reference builds
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-1281](ADR-1281-smb-and-smbs-are-served-as-in-the-openssl-reference-build.md) (BL-5286: the engine serves `smb` and `smbs` with `SmbProtocolHandler`, so the `DisabledProtocolHandler` and exit 1 below no longer hold)
 - **Date:** 2026-10-26
 
 Decided by Claude under Stewart's delegation (tasks BL-3572 and BL-3887, CGR-043).

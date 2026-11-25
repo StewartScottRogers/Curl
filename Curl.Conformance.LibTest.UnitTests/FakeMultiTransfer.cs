@@ -97,12 +97,19 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
         return AddResult;
     }
 
+    /// <summary>Runs as a transfer is removed.</summary>
+    public Action? Removing { get; set; }
+
+    /// <summary>Runs as the multi transfer is disposed.</summary>
+    public Action? Disposing { get; set; }
+
     /// <summary>How many transfers have been removed.</summary>
     public int Removals { get; private set; }
 
     public CurlMultiCode Remove(IEasyTransfer transfer)
     {
         Removals++;
+        Removing?.Invoke();
         return RemoveResult;
     }
 
@@ -209,6 +216,7 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
     public ValueTask DisposeAsync()
     {
         Disposals++;
+        Disposing?.Invoke();
         return ValueTask.CompletedTask;
     }
 }

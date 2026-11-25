@@ -275,7 +275,7 @@ public sealed class CurlCommandRunnerParallelTests
     {
         HeldTransferHandler http = new(observesCancellation: false);
 
-        Task<int> run = RunAsync(http, ["-Z", "--fail-early", "-sS", "-w", "%{urlnum} %{exitcode}\\n", A, M]);
+        Task<int> run = RunAsync(http, ["-Z", "--fail-early", "-sS", "-w", "%{urlnum} %{exitcode}\\n", A, M], standardOutput, timeProvider: new ManualTimerTimeProvider());
         await Task.WhenAll(http.WhenStartedAsync("/a"), http.WhenStartedAsync("/m"));
         http.Fail("/m", CurlExitCode.FileCouldntReadFile, MissingFile);
         await standardOutput.WhenEndsWithAsync("1 37\n");
@@ -348,6 +348,24 @@ public sealed class CurlCommandRunnerParallelTests
         Diagnostics.Assert("started count", 0, http.Started.ToArray().Length);
         Assert.AreEqual(26, exitCode);
         Assert.IsEmpty(http.Started);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UploadFileMissingOnTheBatchsExtraTransfer_RunsTheEarlierOneAndFailsWith26()
+    {
+        // STD-169, BL-5817: --parallel-max 1 holds two transfers; the second's -T file is missing.
+        HeldTransferHandler http = new();
+        fileSystem.UnreadablePaths.Add("nosuch");
+
+        Task<int> run = RunAsync(http, ["-Z", "--parallel-max", "1", "-s", A, "--next", "-T", "nosuch", B, "--next", "http://h/c"]);
+        await http.WhenStartedAsync("/a");
+        http.Finish("/a", "a");
+
+        int exitCode = await run;
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Assert.AreEqual(26, exitCode);
+        Assert.AreEqual("a", standardOutput.Text);
+        Assert.HasCount(1, http.Started);
     }
 
     [TestMethod]
@@ -531,7 +549,7 @@ public sealed class CurlCommandRunnerParallelTests
     /// Runs <paramref name="arguments" /> as on Windows through <paramref name="handler" /> alone, writing
     /// to <paramref name="runStandardOutput" /> and drawing the progress meter when <paramref name="writesProgressMeter" />.
     /// </summary>
-    private async Task<int> RunAsync(IProtocolHandler handler, string[] arguments, Stream runStandardOutput, bool writesProgressMeter = false)
+    private async Task<int> RunAsync(IProtocolHandler handler, string[] arguments, Stream runStandardOutput, bool writesProgressMeter = false, TimeProvider? timeProvider = null)
     {
         Diagnostics.Arrange("arguments", string.Join(' ', arguments));
         int exitCode;
@@ -545,7 +563,8 @@ public sealed class CurlCommandRunnerParallelTests
                     standardError,
                     new MemoryStream(),
                     runsOnWindows: true,
-                    writesProgressMeter: writesProgressMeter)
+                    writesProgressMeter: writesProgressMeter,
+                    timeProvider: timeProvider)
                 .RunAsync(arguments);
         }
 

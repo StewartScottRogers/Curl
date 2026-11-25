@@ -26,6 +26,9 @@ internal sealed record CapturedResponse(TransferResult Result, byte[] Headers, b
     public string? Field(string name) =>
         Result.Report!.ResponseHeaders.FirstOrDefault(field => string.Equals(field.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
 
+    /// <summary>Gets whether the response carries a strong ETag, the only validator ranges may be joined by (RFC 9110 section 15.3.7.3); only for a response with a <see cref="Code" />.</summary>
+    public bool HasStrongETag => Field("ETag") is { } tag && tag.StartsWith('"');
+
     /// <summary>Writes the captured headers to <paramref name="context" />'s header outputs, those it has.</summary>
     public async Task WriteHeadersAsync(ITransferContext context)
     {

@@ -23,7 +23,7 @@ public sealed class TftpTransferTimingsTests
         var channel = new FallsSilentDatagramChannel(ServerEndPoint, clock.Inner, [([0, 3, 0, 1, .. "hello"u8.ToArray()], TransferEndPoint)]);
         var result = await RunAsync(channel, clock, new MemoryStream(), upload: false);
 
-        AssertTimings(result);
+        AssertTimings(result, isUpload: false);
         Assert.IsNotNull(result.Report?.Timings?.FirstByteReceived);
     }
 
@@ -34,8 +34,28 @@ public sealed class TftpTransferTimingsTests
         var channel = new AcknowledgingDatagramChannel(ServerEndPoint, TransferEndPoint);
         var result = await RunAsync(channel, clock, new MemoryStream(new byte[600]), upload: true);
 
-        AssertTimings(result);
+        AssertTimings(result, isUpload: true);
         Assert.AreEqual(600, result.Report!.UploadSize);
+    }
+    [TestMethod]
+    public async Task ExecuteAsync_Upload_HasNoStartTransferStampButANonZeroTotal()
+    {
+        var clock = new SteppingTimeProvider();
+        var channel = new AcknowledgingDatagramChannel(ServerEndPoint, TransferEndPoint);
+        var result = await RunAsync(channel, clock, new MemoryStream(new byte[600]), upload: true);
+
+        Assert.IsNull(result.Report?.Timings?.FirstByteReceived);
+        Assert.IsTrue(result.Report!.Timings!.Completed > result.Report.Timings.Started);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Download_KeepsItsStartTransferStamp()
+    {
+        var clock = new SteppingTimeProvider();
+        var channel = new FallsSilentDatagramChannel(ServerEndPoint, clock.Inner, [([0, 3, 0, 1, .. "hello"u8.ToArray()], TransferEndPoint)]);
+        var result = await RunAsync(channel, clock, new MemoryStream(), upload: false);
+
+        Assert.IsTrue(result.Report!.Timings!.FirstByteReceived > result.Report.Timings.Started);
     }
 
     [TestMethod]
@@ -50,7 +70,7 @@ public sealed class TftpTransferTimingsTests
         Assert.IsNull(result.Report.Timings.FirstByteReceived);
     }
 
-    private static void AssertTimings(TransferResult result)
+    private static void AssertTimings(TransferResult result, bool isUpload)
     {
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         var timings = result.Report?.Timings;
@@ -58,8 +78,10 @@ public sealed class TftpTransferTimingsTests
         Assert.IsTrue(timings.Completed > timings.Started);
         Assert.IsNotNull(timings.Connect);
         Assert.IsTrue(timings.Connect.NameResolved > timings.Started);
-        Assert.IsTrue(timings.Connect.Connected > timings.Started);
-        Assert.IsTrue(timings.RequestReady > timings.Started);
+        Assert.IsNull(timings.Connect.Connected);
+        Assert.AreEqual(timings.Completed, timings.RequestReady);
+        Assert.AreEqual(timings.Completed, timings.RequestSent);
+Assert.IsTrue(timings.RequestReady > timings.Started);
     }
 
     private static async Task<TransferResult> RunAsync(IDatagramChannel channel, TimeProvider clock, MemoryStream stream, bool upload) =>

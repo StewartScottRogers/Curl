@@ -74,14 +74,14 @@ internal static class NatsTransferChecks
             Assert.AreEqual(Body, await File.ReadAllTextAsync(Path.Combine(directory, "greet")), "manual, -O: the body in the file named after the URL");
         });
 
-    /// <summary>-w: each variable as the manual defines it, after the body; %{time_total} is 0.000000 on a clock that never moves.</summary>
+    /// <summary>-w: each variable as the manual defines it, after the body; %{time_total} is 0.000001 (the least curl reports) on a clock that never moves.</summary>
     public static Task WriteOutAsync(string scheme, string requirement) =>
         RunCaseAsync(requirement, async directory =>
         {
             CurlRunResult result = await RunAnsweredAsync(scheme, ["-sS", "-w", WriteOutFormat]);
 
             Assert.AreEqual(0, result.ExitCode, Text(result.StandardError));
-            string expected = $"0||{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{NatsRun.Port}|{Encoding.UTF8.GetByteCount(Body)}|0.000000\n";
+            string expected = $"0||{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{NatsRun.Port}|{Encoding.UTF8.GetByteCount(Body)}|0.000001\n";
             Assert.AreEqual(Body + expected, Text(result.StandardOutput), "manual, -w");
         });
 

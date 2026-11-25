@@ -28,6 +28,12 @@ internal sealed class ScriptedEasyTransfer : IEasyTransfer
 
     public CurlCode Result { get; set; } = CurlCode.Ok;
 
+    /// <summary>How many times the body is written before the transfer ends.</summary>
+    public int BodyWrites { get; set; } = 1;
+
+    /// <summary>The info the handle holds only once the transfer has ended; null leaves <see cref="Info"/> as it is.</summary>
+    public TransferInfo? InfoAtEnd { get; set; }
+
     public EasyOptions? PerformedOptions { get; private set; }
 
     public CancellationToken PerformedToken { get; private set; }
@@ -51,7 +57,12 @@ internal sealed class ScriptedEasyTransfer : IEasyTransfer
             Options.Callbacks.Header!(Encoding.Latin1.GetBytes(line));
         }
 
-        BodyBytesTaken = Options.Callbacks.Write!(BodyBytes);
+        for (int write = 0; write < BodyWrites; write++)
+        {
+            BodyBytesTaken = Options.Callbacks.Write!(BodyBytes);
+        }
+
+        Info = InfoAtEnd ?? Info;
         return ValueTask.FromResult(Result);
     }
 

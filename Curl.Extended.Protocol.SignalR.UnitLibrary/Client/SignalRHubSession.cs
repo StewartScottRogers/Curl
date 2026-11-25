@@ -20,12 +20,18 @@ namespace Curl.Extended.Protocol.SignalR.Client;
 /// <param name="callRecord">The Invocation or StreamInvocation record <see cref="SignalRCall"/> gave, or <see langword="null"/>.</param>
 /// <param name="output">Where the lines go.</param>
 /// <param name="progress">Told the running byte total after each line, so a timeout message can count it.</param>
-internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]? callRecord, Stream output, ITransferProgress progress)
+/// <param name="timeProvider">The clock of the keep-alive Ping, sent whenever nothing else was sent for <see cref="KeepAliveInterval"/>.</param>
+internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]? callRecord, Stream output, ITransferProgress progress, TimeProvider timeProvider)
 {
+    /// <summary>How long the client may send nothing before it sends a Ping: the .NET client's default KeepAliveInterval, half the server's 30 s client timeout (HubProtocol.md, "Ping").</summary>
+    internal static readonly TimeSpan KeepAliveInterval = TimeSpan.FromSeconds(15);
+
     /// <summary>The error of the Completion curl sends for a hub call that expects a client result: the .NET client's text.</summary>
     internal const string NoClientResultError = "Client didn't provide a result.";
 
     private long bytesWritten;
+
+    private long lastSentAt;
 
     /// <summary>Runs the session and gives the number of bytes written to the output.</summary>
     /// <exception cref="SignalRHubException">The hub refused the handshake, failed the call or closed with an error (exit 22).</exception>
@@ -33,7 +39,7 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
     /// <exception cref="SignalRWireFormatException">The hub sent a record that is not a hub protocol message.</exception>
     public async Task<long> RunAsync(CancellationToken cancellationToken)
     {
-        await session.SendTextAsync(HubMessageWriter.WriteHandshakeRequest(), cancellationToken);
+        await SendAsync(HubMessageWriter.WriteHandshakeRequest(), cancellationToken);
         byte[] handshake = await session.ReceiveRecordAsync(cancellationToken)
             ?? throw new SignalRTransportException("The hub closed the WebSocket before answering the handshake.");
         if (HubMessageReader.ReadHandshakeResponse(handshake).Error is { } refusal)
@@ -43,16 +49,91 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
 
         if (callRecord is not null)
         {
-            await session.SendTextAsync(callRecord, cancellationToken);
+            await SendAsync(callRecord, cancellationToken);
         }
 
+        using var stopPinging = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task pinging = PingWhenIdleAsync(stopPinging.Token, cancellationToken);
+        Task reading = ReadUntilEndAsync(cancellationToken);
+        await Task.WhenAny(reading);
+        await StopPingingAsync(stopPinging, pinging);
+
+        // Rethrows the read loop's failure, which is then the transfer's; otherwise a Ping that failed to write while
+        // the hub was open fails the transfer here.
+        await reading;
+        await AwaitPingingAsync(pinging);
+        await session.CloseAsync(cancellationToken);
+        return bytesWritten;
+    }
+
+    // A Ping write that failed is ignored only when the read loop ended through the server's Close: the hub finished the
+    // transfer and went away, possibly while its Close was still unread when the write failed. Otherwise it is an error.
+    private async Task AwaitPingingAsync(Task pinging)
+    {
+        try
+        {
+            await pinging;
+        }
+        catch (IOException) when (session.CloseReceived)
+        {
+        }
+    }
+
+    // Sends a record and notes the time, so the keep-alive Ping waits a full interval after any send.
+    private async Task SendAsync(byte[] record, CancellationToken cancellationToken)
+    {
+        await session.SendTextAsync(record, cancellationToken);
+        Volatile.Write(ref lastSentAt, timeProvider.GetTimestamp());
+    }
+
+    // Sends a Ping each time KeepAliveInterval passes with nothing sent (HubProtocol.md, "Ping"); ends when stopped.
+    // The stop token is checked only before a Ping starts and never reaches the frame write, so a frame is written whole;
+    // abort is the transfer's own cancellation, which fails the transfer anyway.
+    private async Task PingWhenIdleAsync(CancellationToken stop, CancellationToken abort)
+    {
+        while (!stop.IsCancellationRequested)
+        {
+            TimeSpan idle = timeProvider.GetElapsedTime(Volatile.Read(ref lastSentAt));
+            if (idle >= KeepAliveInterval)
+            {
+                if (!await TrySendPingAsync(abort))
+                {
+                    return;
+                }
+            }
+            else
+            {
+                // WhenAny does not throw when the stop cancels the delay, so stopping is a normal end of this task.
+                await Task.WhenAny(Task.Delay(KeepAliveInterval - idle, timeProvider, stop));
+            }
+        }
+    }
+
+    // Reads and accepts records until the session ends.
+    private async Task ReadUntilEndAsync(CancellationToken cancellationToken)
+    {
         while (await session.ReceiveRecordAsync(cancellationToken) is { } record
             && !await AcceptAsync(HubMessageReader.ReadMessage(record), cancellationToken))
         {
         }
+    }
 
-        await session.CloseAsync(cancellationToken);
-        return bytesWritten;
+    // Waited for on every path, so the connection is never disposed under a Ping write and a cancel never cuts a Ping
+    // frame short; WhenAny does not rethrow, so when the read loop failed its exception is the one reported and the
+    // Ping task's own failure is dropped.
+    private static async Task StopPingingAsync(CancellationTokenSource stopPinging, Task pinging)
+    {
+        await stopPinging.CancelAsync();
+        await Task.WhenAny(pinging);
+    }
+
+    // Writes a Ping unless the Close handshake has begun; gives false when the keep-alive loop should end. A failed write
+    // faults the Ping task; RunAsync decides after the read loop ends whether that is an error (AwaitPingingAsync).
+    private async Task<bool> TrySendPingAsync(CancellationToken abort)
+    {
+        bool written = await session.SendTextUnlessClosingAsync(HubMessageWriter.WritePing(), abort);
+        Volatile.Write(ref lastSentAt, timeProvider.GetTimestamp());
+        return written;
     }
 
     private static string CallArray(InvocationMessage invocation)
@@ -122,7 +203,7 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
 
         if (message is InvocationMessage { InvocationId: { } invocationId })
         {
-            await session.SendTextAsync(RefusalOf(invocationId), cancellationToken);
+            await SendAsync(RefusalOf(invocationId), cancellationToken);
         }
 
         return Ends(message);

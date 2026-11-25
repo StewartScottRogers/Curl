@@ -205,12 +205,14 @@ public sealed class Lib3101To5004Tests
     [TestMethod]
     public async Task Lib3105_WhenBothRemovalsSucceed_EndsOk()
     {
-        var run = new PortRun(new FakeCurlEngine(), 3105, "-");
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 3105, "-");
 
         LibTestResult result = await new Lib3105().RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual(string.Empty, run.Error.ToString());
+        Assert.AreEqual(2, engine.Multi.Removals);
     }
 
     [TestMethod]
@@ -343,7 +345,7 @@ public sealed class Lib3101To5004Tests
 
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual("ed25519", seen!.Authentication.HttpSignatureAlgorithm);
-        Assert.IsNotNull(seen.Authentication.HttpSignatureKey);
-        Assert.IsNotNull(seen.Authentication.HttpSignatureKeyId);
+        Assert.AreEqual("9f8362f87a484a954e6e740c5b4c0e84229139a20aa8ab56ff66586f6a7d29c5", seen.Authentication.HttpSignatureKey);
+        Assert.AreEqual("test-key-ed25519", seen.Authentication.HttpSignatureKeyId);
     }
 }

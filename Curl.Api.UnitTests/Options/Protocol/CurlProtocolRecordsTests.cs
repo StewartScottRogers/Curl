@@ -132,6 +132,18 @@ public sealed class CurlProtocolRecordsTests
     }
 
     [TestMethod]
+    [DataRow(0, 512)]
+    [DataRow(4, 512)]
+    [DataRow(7, 512)]
+    [DataRow(8, 8)]
+    [DataRow(65464, 65464)]
+    [DataRow(70000, 65464)]
+    public void TftpBlockSize_FollowsLibcurl_FallsBackBelowEightAndClampsAbove(int given, int expected)
+    {
+        Assert.AreEqual(expected, new CurlTftpOptions { BlockSize = given }.BlockSize);
+    }
+
+    [TestMethod]
     public void InvalidValues_ThrowAsTheyAreSet()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => new CurlFtpOptions { Quote = null! });
@@ -142,8 +154,7 @@ public sealed class CurlProtocolRecordsTests
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new CurlFtpOptions { ClearCommandChannel = (FtpClearCommandChannel)3 });
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new CurlFtpOptions { FileMethod = (FtpFileMethod)4 });
         Assert.ThrowsExactly<ArgumentNullException>(() => new CurlMailOptions { MailRecipients = null! });
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new CurlTftpOptions { BlockSize = 7 });
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new CurlTftpOptions { BlockSize = 65465 });
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new CurlTftpOptions { BlockSize = -1 });
         Assert.ThrowsExactly<ArgumentNullException>(() => new CurlTelnetOptions { TelnetOptions = null! });
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new CurlRtspOptions { Request = (RtspRequest)12 });
         Assert.ThrowsExactly<ArgumentNullException>(() => new CurlRtspOptions { StreamUri = null! });

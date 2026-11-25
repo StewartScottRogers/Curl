@@ -35,6 +35,7 @@ public sealed class NatsWireTests
     [TestMethod]
     [DataRow("MSG a.b 1 5", "a.b", "1", null, 5)]
     [DataRow("msg\ta.b  9 _INBOX.r 0", "a.b", "9", "_INBOX.r", 0)]
+    [DataRow("MSG a.b 1 10", "a.b", "1", null, 10)]
     public void MessageLineParse_FourOrFiveFields_ReadsThem(string line, string subject, string sid, string? replyTo, int length) =>
         Assert.AreEqual(new NatsMessageLine(subject, sid, replyTo, length), NatsMessageLine.Parse(line, 10));
 
@@ -100,9 +101,18 @@ public sealed class NatsWireTests
         NatsSubject.RefuseWildcardToPublish(subject);
 
     [TestMethod]
+    public void RefuseWildcardToPublish_WildcardWithEscape_EscapesControlCharactersInMessage()
+    {
+        NatsException failure = Assert.ThrowsExactly<NatsException>(() => NatsSubject.RefuseWildcardToPublish("a\u001B.*"));
+
+        Assert.AreEqual("NATS subject \"a\\x1B.*\" holds a wildcard, which a publish cannot name", failure.Message);
+    }
+
+    [TestMethod]
     [DataRow("nats://h/", NatsMessages.NoSubject)]
     [DataRow("nats://h/a%20b", "NATS subject \"a b\" holds whitespace or an empty token")]
     [DataRow("nats://h/a..b", "NATS subject \"a..b\" holds whitespace or an empty token")]
+    [DataRow("nats://h/a%0D%0Ab", "NATS subject \"a\\x0D\\x0Ab\" holds whitespace or an empty token")]
     public void SubjectOf_NoSubjectOrABadOne_FailsWithExit3(string url, string message)
     {
         NatsException failure = Assert.ThrowsExactly<NatsException>(() => NatsSubject.Of(CurlUrl.Parse(url)));

@@ -104,6 +104,16 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http09ReplyWithoutHttp09Allowed_ReportsNoFirstByteTime()
+    {
+        TransferResult result = await Handler(QueueConnector.For(Connection("just text", 65536, LoopbackGet)))
+            .ExecuteAsync(EncodingContext(new MemoryStream(), new HttpRequestOptions()));
+
+        Assert.IsNotNull(result.Report?.Timings);
+        Assert.IsNull(result.Report.Timings.FirstByteReceived);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http11ReplyWithHttp09Allowed_IsReadAsHttp11()
     {
         MemoryStream output = new();

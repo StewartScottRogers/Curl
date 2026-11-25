@@ -32,9 +32,13 @@ namespace Curl.Original.Protocol.Telnet;
 /// subnegotiation with exit 56 (<see cref="CurlExitCode.RecvError" />).
 /// </para>
 /// <para>
-/// A connection failure is met as curl 8.21.0 on Windows meets it. A read the connection
-/// fails, as a reset does, ends the session like a close, with exit 0. A send of the
-/// upload it fails ends it with exit 55 (<see cref="CurlExitCode.SendError" />), and an
+/// A connection failure is met as the platform's curl meets it. On Linux and macOS a
+/// read the connection fails, as a reset does, ends the session with exit 56
+/// (<see cref="CurlExitCode.RecvError" />) (ADR-1382). On Windows it ends the session like
+/// a close, with exit 0, unless it strikes the option negotiation (a reply the connection
+/// did not take, or replies sent and no data written yet): then it ends with exit 56, so
+/// what the server sent is never lost under exit 0 (ADR-1352). A send of the
+/// upload the connection fails ends it with exit 55 (<see cref="CurlExitCode.SendError" />), and an
 /// output that refuses a write with exit 23 (<see cref="CurlExitCode.WriteError" />). Each
 /// negotiation reply is its own write, as curl sends it; one the connection fails with a
 /// socket error is reported as curl's <c>Sending data failed (N)</c> line and the session
@@ -66,6 +70,12 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     /// <summary>The port a <c>telnet</c> URL without one connects to.</summary>
     private const int DefaultPort = 23;
 
+    /// <summary>
+    /// Whether a failed read is met as curl on Windows meets it rather than as curl on
+    /// Linux and macOS does: the platform this process runs on, unless a test says otherwise.
+    /// </summary>
+    internal bool RunsOnWindows { get; init; } = OperatingSystem.IsWindows();
+
     /// <summary>The most bytes read from the upload at once.</summary>
     private const int BufferSize = 16384;
 
@@ -94,6 +104,12 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     private const string SendFailedMessage = "Failed sending data to the peer";
 
     private const string SuboptionErrorMessage = "telnet: suboption error";
+
+    /// <summary>
+    /// The exit 56 message for a failed read with no socket error:
+    /// <c>curl_easy_strerror(CURLE_RECV_ERROR)</c>.
+    /// </summary>
+    private const string ReceiveFailedMessage = "Failure when receiving data from the peer";
 
     private const string TerminalTypeTooLongMessage = "Too long telnet TTYPE";
 
@@ -155,7 +171,8 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         log.SessionStarted(target.Host, target.Port);
         context.Progress.ReportTransferStarted();
-        var outbox = new TelnetOutbox(context.Events);
+        long requestStarted = context.TimeProvider.GetTimestamp();
+        var outbox = new TelnetOutbox(context.Events, RunsOnWindows);
         var trace = new TelnetTraceReporter(outbox);
         await using (connection.ConfigureAwait(false))
         {
@@ -168,8 +185,22 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             log.SessionEnded(result, context.TimeProvider.GetElapsedTime(sessionStarted));
             trace.ConnectionEnded(result, connect.ConnectionNumber);
             outbox.ReportPending();
+            return StampTimings(result, context.TimeProvider, sessionStarted, connect.Timings, requestStarted);
+        }
+    }
+
+    // Adds the timings behind %{time_*} and %{speed_download} to the report the transfer made (BL-5390).
+    // The first byte is stamped with the completion time: the session is read until the server closes.
+    private static TransferResult StampTimings(TransferResult result, TimeProvider timeProvider, long started, ConnectTimings? connect, long requestStarted)
+    {
+        if (result.ExitCode != CurlExitCode.Ok)
+        {
             return result;
         }
+
+        long completed = timeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connect, requestStarted, requestStarted, requestStarted, completed);
+        return result with { Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { Timings = timings } };
     }
 
     /// <summary>
@@ -237,7 +268,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         while (true)
         {
-            read ??= ReadOrClosedAsync(connection, buffer, cancellationToken);
+            read ??= ReadAsync(connection, buffer, cancellationToken);
             if (await ReadCompletedAsync(read, upload, context).ConfigureAwait(false))
             {
                 Task<int> completed = read;
@@ -277,9 +308,8 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     }
 
     /// <summary>
-    /// Handles one completed read: the server closing ends the session with exit 0, the
-    /// <c>-m</c> watchdog cancelling it with exit 28; otherwise its data is written and its
-    /// replies sent. Returns the result the session ends with, or <see langword="null" /> when
+    /// Handles one completed read: a read that ends the session (<see cref="TakeReadAsync" />)
+    /// does so; otherwise its data is written and its replies sent. Returns the result the session ends with, or <see langword="null" /> when
     /// it goes on, and the bytes written so far.
     /// </summary>
     private static async Task<(TransferResult? Ended, long BytesWritten)> HandleReadAsync(
@@ -293,19 +323,10 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         long bytesWritten,
         long startedAt)
     {
-        int count;
-        try
+        (int count, TransferResult? ended) = await TakeReadAsync(read, context, outbox, bytesWritten, startedAt).ConfigureAwait(false);
+        if (ended is not null)
         {
-            count = await read.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (MaxTimePassed(context, startedAt))
-        {
-            return (new TransferResult(CurlExitCode.OperationTimedOut, bytesWritten, TimedOutMessage), bytesWritten);
-        }
-
-        if (count == 0)
-        {
-            return (TransferResult.Success(bytesWritten), bytesWritten);
+            return (ended, bytesWritten);
         }
 
         data.Clear();
@@ -334,25 +355,52 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         context.MaxTime is { } limit && limit > TimeSpan.Zero && context.TimeProvider.GetElapsedTime(startedAt) >= limit;
 
     /// <summary>
-    /// Reads from the server, taking a read the connection fails with
-    /// <see cref="IOException" /> as the server closing: curl 8.21.0 on Windows ends a
-    /// telnet session whose connection is reset with exit 0, the reset arriving as the
-    /// socket's close event.
+    /// Takes a completed read's byte count, and the result the session ends with when the
+    /// read ends it: the server closing with exit 0, the <c>-m</c> watchdog cancelling the
+    /// read with exit 28, and a failed read as <see cref="FailedReadResult" /> says.
     /// </summary>
-    private static async Task<int> ReadOrClosedAsync(
-        IConnection connection,
-        Memory<byte> buffer,
-        CancellationToken cancellationToken)
+    private static async Task<(int Count, TransferResult? Ended)> TakeReadAsync(
+        Task<int> read,
+        ITransferContext context,
+        TelnetOutbox outbox,
+        long bytesWritten,
+        long startedAt)
     {
         try
         {
-            return await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            int count = await read.ConfigureAwait(false);
+            return (count, count == 0 ? TransferResult.Success(bytesWritten) : null);
         }
-        catch (IOException)
+        catch (OperationCanceledException) when (MaxTimePassed(context, startedAt))
         {
-            return 0;
+            return (0, new TransferResult(CurlExitCode.OperationTimedOut, bytesWritten, TimedOutMessage));
+        }
+        catch (IOException failure)
+        {
+            return (0, FailedReadResult(failure, outbox, bytesWritten));
         }
     }
+
+    /// <summary>
+    /// The result for a read the connection fails. A receive failure
+    /// (<see cref="TelnetOutbox.FailedReadIsReceiveError" />) is exit 56, with the socket
+    /// filter's <c>Recv failure:</c> text for a socket error: every reset as curl 8.18.0 on
+    /// Linux ends it (measured, BL-5918), and a reset during the option negotiation as curl
+    /// 8.23.0 on Windows ends it (measured, BL-5882). Any other ends the session like a
+    /// close, with exit 0: curl on Windows sees a reset of an idle session as the socket's
+    /// close event.
+    /// </summary>
+    private static TransferResult FailedReadResult(IOException failure, TelnetOutbox outbox, long bytesWritten) =>
+        outbox.FailedReadIsReceiveError(bytesWritten)
+            ? new TransferResult(CurlExitCode.RecvError, bytesWritten, CurlSocketErrorText.ReceiveFailure(failure) ?? ReceiveFailedMessage)
+            : TransferResult.Success(bytesWritten);
+
+    /// <summary>Reads from the server, a read that throws at once ending as a faulted task.</summary>
+    private static async Task<int> ReadAsync(
+        IConnection connection,
+        Memory<byte> buffer,
+        CancellationToken cancellationToken) =>
+        await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
 
     /// <summary>
     /// Writes one read's data to the output as curl 8.21.0's download writer

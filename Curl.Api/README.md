@@ -1,5 +1,7 @@
 # Curl.Api
 
+A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, and it behaves like curl 8.22.0. Install: `dotnet add package Surly.Curl.Api --prerelease`.
+
 Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
 
 The .NET programming interface to Curl (ADR-0506): an async client over curl's engine, with
@@ -16,7 +18,9 @@ and a `destination` stream:
 ```csharp
 using System.Net;
 using Curl.Api;
+using Curl.Api.Codes;
 using Curl.Api.Errors;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
 ```
 
@@ -24,7 +28,7 @@ using Curl.Api.Options.Http;
 
 `CurlClient` is the entry point. `CurlClient.Create()` builds one over a new managed engine that
 the client owns and disposes; `CurlClientOptions` holds the defaults applied to every transfer
-(`UserAgent`, `Timeout`, `ConnectTimeout`, plus the option groups below, `MaxConnections` and
+(`UserAgent`, `Timeout`, `ConnectTimeout`, `FetchFileTime` (`CURLOPT_FILETIME`: a `HEAD` on an FTP URL sends `MDTM`, an HTTP response reports `Last-Modified`, and `CurlResponse.Info.FileTime` holds the time), plus the option groups below, `MaxConnections` and
 `MaxConnectionsPerHost` for concurrent transfers, and `Stores`). A value left unset is libcurl's
 own default. Make one client and share it: it is built for concurrent use.
 
@@ -61,6 +65,17 @@ await using Stream body = response.Body;
 await body.CopyToAsync(destination, cancellationToken);
 ```
 
+## The first request in a process
+
+`CurlClient.Create()` takes about 20 ms: it builds no protocol handler. The first `SendAsync` in a fresh process does the one-time work: it loads the engine's and the extensions' assemblies and JIT-compiles the transfer path. Measured on Windows 11 (Release build, loopback `http://` and `https://example.com/`, second request in the same process for comparison):
+
+| Request | First | Second |
+| --- | --- | --- |
+| `http://127.0.0.1` | about 0.5 s | about 40 ms |
+| `https://` (adds the HTTP/2 library, TLS set-up and DNS) | about 0.7 to 0.9 s | about 75 ms |
+
+The first run after a rebuild, or on a machine that scans freshly written DLLs, can take several seconds more, because each assembly is read from a cold disk cache and scanned on first load. A recipe with a short timeout should make one untimed warm-up request first, or set `CURL_EXTENSIONS=0` to skip loading the extension libraries (the first plain-HTTP request then takes about 0.3 s).
+
 ## Set options
 
 A request carries its headers, a body and optional option groups that override the client's: the
@@ -68,7 +83,20 @@ transport groups `CurlNetworkOptions`, `CurlTlsOptions` (with `CurlTlsPeerOption
 `CurlProxyOptions`, and the protocol groups `CurlHttpOptions`, `CurlAuthenticationOptions`,
 `CurlFtpOptions`, `CurlSshOptions`, `CurlMailOptions`, `CurlTftpOptions`, `CurlTelnetOptions` and
 `CurlRtspOptions`. A group set on a request replaces the client's whole group. Each value is
-checked as it is set.
+checked as it is set. Choose HTTP authentication methods (Digest, for a plain-HTTP server that refuses
+Basic) with `HttpAuthenticationMethods` from `Curl.Api.Options.Authentication`.
+
+For FTP, `CurlFtpOptions.ResumeFrom` is curl's `-C`: a download of `N` sends `REST N` and returns the file
+from byte `N`, and an upload continues from `N` (`-1` appends at the end of the remote file); `ListOnly`
+is `-l`, a names-only listing (`NLST`). Neither needs `REST` in `PreQuote` (ADR-1325). Both apply to every
+protocol, not only FTP, as `curl -C` and `-l` do: an HTTP request on a client whose `ResumeFrom` is set sends
+`Range: bytes=N-`, and `ListOnly` reaches SFTP and SCP. A request's `Ftp` record replaces the client's whole, so
+`ResumeFrom` is 0 again when a request sets only another member. `-1` on a download is no resume (ADR-1328).
+
+Curl's extensions have typed records of their own. `CurlRequest.Dns` takes a `CurlDnsOptions`: `Json = true`
+is `--dns-json` and `Transport = "tcp"` is `--dns-transport tcp`, for a `dns://` request. They work only while
+extensions are on; with `CURL_EXTENSIONS=0` the request fails with `CurlCode.UnknownOption`, as the `curl`
+tool refuses an unknown option (ADR-1319).
 
 <!-- sample: options -->
 ```csharp
@@ -82,10 +110,41 @@ CurlResponse response = await client.SendAsync(request, cancellationToken);
 await response.Body.DisposeAsync();
 ```
 
+## Trust a test server
+
+Against a server with a self-signed certificate, `curl -k` is `Tls.Origin.VerifyPeer = false` and
+`Tls.Origin.VerifyHost = false`: `CurlTlsOptions.Origin` holds the settings for the origin server, and
+`CurlTlsOptions.Proxy` holds the same `CurlTlsPeerOptions` for an HTTPS proxy. `VerifyPeer` is the peer
+check (the certificate chain leads to a trusted authority); `VerifyHost` is the host-name check (the
+certificate names the host). Both default to `true`. Switching them off is for testing only: nothing then
+proves who answers. The safer way is to trust the test server's own certificate authority with
+`CertificateAuthorityBlob` (its PEM bytes; `CertificateAuthorityFile` takes a file), which keeps both checks on.
+
+<!-- sample: trust -->
+```csharp
+CurlTlsPeerOptions skipChecks = new() { VerifyPeer = false, VerifyHost = false };
+CurlRequest insecure = new(HttpMethod.Get, "https://localhost:8443/")
+{
+    Tls = new CurlTlsOptions { Origin = skipChecks },
+};
+CurlResponse first = await client.SendAsync(insecure, cancellationToken);
+await first.Body.DisposeAsync();
+
+CurlRequest trusted = new(HttpMethod.Get, "https://localhost:8443/")
+{
+    Tls = new CurlTlsOptions
+    {
+        Origin = new CurlTlsPeerOptions { CertificateAuthorityBlob = testCertificateAuthorityPem },
+    },
+};
+CurlResponse second = await client.SendAsync(trusted, cancellationToken);
+await second.Body.DisposeAsync();
+```
+
 ## Upload a body
 
 `CurlContent` is the type of `CurlRequest.Body`. A `byte[]` converts to it implicitly
-(`CurlContent.FromBytes`), `CurlContent.FromStream` uploads a stream (give its length when you
+(`CurlContent.FromBytes`; a `null` array is no body), `CurlContent.FromStream` uploads a stream (give its length when you
 know it), and `CurlContent.Empty` is an empty body.
 
 <!-- sample: upload -->
@@ -104,6 +163,19 @@ await (await client.SendAsync(large, cancellationToken)).Body.DisposeAsync();
 ```
 
 (This sample also assumes a `file` stream.)
+
+## Send a custom request
+
+`CurlRequest.CustomRequest` is `CURLOPT_CUSTOMREQUEST` (`curl -X`): the text is sent unchanged, spaces and all, and wins over
+the `HttpMethod`, which .NET restricts to a token. Use it for IMAP `STORE` and `MOVE`, and for FTP and POP3 commands.
+
+```csharp
+CurlRequest markSeen = new(HttpMethod.Get, "imap://example.com/INBOX")
+{
+    CustomRequest = @"STORE 1 +Flags \Seen",
+};
+CurlRequest move = new(HttpMethod.Get, "imap://example.com/INBOX") { CustomRequest = "MOVE 1 Archive" };
+```
 
 ## Upload multipart
 
@@ -148,7 +220,8 @@ catch (OperationCanceledException)
 }
 catch (CurlException failure)
 {
-    Console.WriteLine($"curl error {(int)failure.Code}: {failure.Message}");
+    CurlCode code = failure.Code;
+    Console.WriteLine($"curl error {(int)code}: {failure.Message}");
 }
 ```
 
@@ -168,6 +241,14 @@ CurlRequest request = new(HttpMethod.Get, "https://example.com/big.iso") { Progr
 CurlResponse response = await client.SendAsync(request, cancellationToken);
 await response.Body.CopyToAsync(Stream.Null, cancellationToken);
 ```
+
+## See what the server said
+
+Set `CurlRequest.Debug` (`CURLOPT_DEBUGFUNCTION`) to take the trace `curl -v` writes: the callback gets each
+piece with its `CurlInfoType` (`Text`, `HeaderIn`, `HeaderOut`, `DataIn`, `DataOut`), and setting it makes the
+request verbose. With `MailRecipientAllowFails`, each server reply to a `RCPT TO` is a `HeaderIn` piece, `550 ...`
+for a refused recipient and `250 ...` for an accepted one, which the response's 250 status does not show. The
+pieces are exactly the bytes `curl -v` prints, so whatever `-v` hides never reaches the callback (ADR-1341).
 
 ## Use a WebSocket
 
@@ -245,6 +326,9 @@ format. Give clients one `CurlStores` through `CurlClientOptions.Stores` to shar
   converts them.
 - A non-2xx status is a normal `CurlResponse`; nothing throws for it.
 - `Headers` is an ordered list keeping the casing and duplicates received, not a header table.
+- A request header with an empty value removes that header, as `curl -H "Name:"` does; to send a
+  header with no value on purpose, name it in `CurlRequest.EmptyHeaders` (`curl -H "Name;"`), and
+  `RemovedHeaders` removes a default header libcurl adds.
 - The body stream is async-only: a synchronous `Read` throws `NotSupportedException`.
 - There is no `HttpClient.Timeout`; use `CurlClientOptions.Timeout` and `ConnectTimeout`.
 
@@ -276,6 +360,7 @@ format. Give clients one `CurlStores` through `CurlClientOptions.Stores` to shar
 | `CurlAltSvcEntry` | One alt-svc cache line. |
 | `CurlNetworkOptions`, `CurlTlsOptions`, `CurlTlsPeerOptions`, `CurlProxyOptions` | The transport option groups. |
 | `CurlHttpOptions`, `CurlAuthenticationOptions`, `CurlFtpOptions`, `CurlSshOptions`, `CurlMailOptions`, `CurlTftpOptions`, `CurlTelnetOptions`, `CurlRtspOptions` | The protocol option groups. |
+| `CurlDnsOptions` | The `dns://` extension's `--dns-json` and `--dns-transport`, set on `CurlRequest.Dns` (ADR-1319). |
 
 ## Folder map
 
@@ -307,4 +392,4 @@ no I/O) and `Curl.Engine.UnitLibrary` (the engine it sends through); `Curl.Api` 
 
 ## Use the package from the preview release
 
-Download `Curl.Api.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Curl.Api --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.
+Download `Surly.Curl.Api.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Surly.Curl.Api --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.

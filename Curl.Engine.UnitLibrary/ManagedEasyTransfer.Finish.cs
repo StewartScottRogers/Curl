@@ -15,9 +15,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -73,7 +73,7 @@ internal sealed partial class ManagedEasyTransfer
     /// <param name="result">The attempt's result, or <see langword="null" /> when a callback aborted it.</param>
     /// <returns><see langword="true" /> when it took no connection.</returns>
     private static bool FailedBeforeConnecting(TransferResult? result) =>
-        result is { ExitCode: CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat };
+        result is { ExitCode: CurlExitCode.UrlMalformat } or { ExitCode: CurlExitCode.UnsupportedProtocol, ErrorMessage: not "Received HTTP/0.9 when not allowed" };
 
     /// <summary>
     /// <c>CURLINFO_CONTENT_LENGTH_UPLOAD</c> of a performed transfer: the upload's declared size -

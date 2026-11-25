@@ -29,8 +29,8 @@ public sealed class HttpFileEnvironmentTests
     {
         ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => HttpFileEnvironment.Load("e.json", "dev", ContextOf(null), new HttpFileVariables(_ => null)));
 
-        Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
-        Assert.AreEqual("http-file: cannot read environment file e.json", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual("--http-file cannot read environment file 'e.json'", failure.Message);
     }
 
     [TestMethod]

@@ -159,6 +159,30 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEarlyDataAndASessionThatAllowsNone_OffersNoEarlyData()
+    {
+        var testCase = new EarlyDataCase { MaxEarlyDataSize = 0 };
+        ArrangeEarlyDataCase(testCase);
+
+        EarlyDataRun run;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            run = await RunEarlyDataAsync(testCase);
+        }
+
+        ActEarlyDataRun(run);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, run.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode, run.Result.ErrorMessage);
+        Diagnostics.Assert("early data offered", false, run.Server.EarlyDataOffered);
+        Assert.IsFalse(run.Server.EarlyDataOffered);
+        Diagnostics.Assert("received after handshake", EarlyRequest, run.ReceivedAfterHandshake);
+        Diagnostics.Assert("any early data info line", false, run.Events.Info.Any(line => line.Contains("early data", StringComparison.Ordinal)));
+        Assert.IsFalse(run.Events.Info.Any(line => line.Contains("early data", StringComparison.Ordinal)));
+        Assert.AreEqual(EarlyRequest, run.ReceivedAfterHandshake);
+    }
+
+
+    [TestMethod]
     public async Task AuthenticateAsClientAsync_WithEarlyDataAndASessionOfAnotherAlpn_OffersNoEarlyData()
     {
         var testCase = new EarlyDataCase { SessionApplicationProtocol = "h3" };

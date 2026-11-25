@@ -158,8 +158,7 @@ public sealed class Pop3ProtocolHandlerEventTests
             Mail = new MailRequestOptions { LoginOptions = "BAD" },
         };
 
-        TransferResult result = await ExecuteAsync(context, Greeting);
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(context, Greeting));
         Diagnostics.AssertValues("result.ExitCode", CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         CollectionAssert.AreEqual((string[])["* closing connection #0"], events.Transcript);
@@ -174,7 +173,7 @@ public sealed class Pop3ProtocolHandlerEventTests
 
         Diagnostics.ArrangeRun(Url + "1", connection.Script);
         Diagnostics.Arrange("writes before failure", connection.WritesBeforeFailure);
-        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context));
         Diagnostics.ActTransfer(result, events, connection.Sent);
 
         Diagnostics.AssertValues("events.Transcript.Any(line => line.StartsWith('>'))", false, events.Transcript.Any(line => line.StartsWith('>')));
@@ -193,7 +192,7 @@ public sealed class Pop3ProtocolHandlerEventTests
 
         Diagnostics.Arrange("sessions", $"plaintext {Pop3Diagnostics.Show(StlsAcceptingSession().Script)}, secured {Pop3Diagnostics.Show(SecuredSession().Script)}");
         Diagnostics.Arrange("connector", "reports connection #3 opened");
-        TransferResult result = await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(TlsRequiredContext(events));
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(TlsRequiredContext(events)));
         Diagnostics.ActTransfer(result, events, []);
 
         Diagnostics.AssertValues("tls.HandshakeEvents.Single() is events", true, ReferenceEquals(events, tls.HandshakeEvents.Single()));
@@ -216,7 +215,7 @@ public sealed class Pop3ProtocolHandlerEventTests
         var tls = new QueuedTlsProvider(ConnectResult.Connected(SecuredSession()));
 
         Diagnostics.Arrange("sessions", $"plaintext {Pop3Diagnostics.Show(StlsAcceptingSession().Script)}, secured {Pop3Diagnostics.Show(SecuredSession().Script)}");
-        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(StlsAcceptingSession())), tls).ExecuteAsync(TlsRequiredContext(events));
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(StlsAcceptingSession())), tls).ExecuteAsync(TlsRequiredContext(events)));
         Diagnostics.ActTransfer(result, events, []);
 
         Assert.Contains("< +OK Begin TLS negotiation\r\n", events.Transcript);
@@ -240,8 +239,7 @@ public sealed class Pop3ProtocolHandlerEventTests
         using var output = new MemoryStream();
         var context = new TransferContext { Url = CurlUrl.Parse(Url + path), Output = output, Events = events, Credentials = credentials };
 
-        TransferResult result = await ExecuteAsync(context, reads);
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(context, reads));
         return (result, events, Encoding.Latin1.GetString(output.ToArray()));
     }
 
@@ -250,7 +248,7 @@ public sealed class Pop3ProtocolHandlerEventTests
         var connection = new ScriptedConnection([.. reads.Select(Encoding.Latin1.GetBytes)]);
         Diagnostics.ArrangeRun(context.Url.ToString(), connection.Script, context.SslLevel);
         Diagnostics.Arrange("credentials", context.Credentials is null ? "(none)" : context.Credentials.UserName);
-        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context));
         if (context.Events is RecordingTransferEvents events)
         {
             Diagnostics.ActTransfer(result, events, connection.Sent);

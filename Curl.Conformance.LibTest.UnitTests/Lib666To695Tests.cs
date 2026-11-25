@@ -59,6 +59,23 @@ public sealed class Lib666To695Tests
     }
 
     [TestMethod]
+    public async Task Lib670_WhenNamingItsMimePartFails_WritesTheErrorAndDoesNotTransfer()
+    {
+        var engine = new FakeCurlEngine { CreatingMime = () => new FakeMimeBuilder(CurlCode.BadFunctionArgument) };
+        var run = new PortRun(engine, 670, "http://x/670");
+        await using CurlLibrary library = CurlGlobal.Init(engine);
+        await using CurlEasy easy = library.EasyInit();
+        using CurlMime mime = library.MimeInit();
+        var pooh = new Lib670.ReadThis(easy, TimeProvider.System, run.Error);
+
+        bool goesOn = Lib670.BindMime(run.Context, run.Steps, easy, mime, pooh);
+
+        Assert.IsFalse(goesOn);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, run.Steps.Result);
+        Assert.Contains("Something went wrong when building the mime structure", run.Error.ToString());
+    }
+
+    [TestMethod]
     [DataRow((int)CurlCode.Ok, "")]
     [DataRow((int)CurlCode.RecvError, "curl_easy_perform() failed\n")]
     public async Task Lib667AndLib668_PostTheCallbackPartsAndNameAFailedTransfer(int answer, string error)

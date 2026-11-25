@@ -6,7 +6,7 @@
   "packages": [
     {
       "registryType": "nuget",
-      "identifier": "Curl.Mcp",
+      "identifier": "Surly.Curl.Mcp",
       "version": "0.1.0",
       "transport": {
         "type": "stdio"

@@ -53,4 +53,25 @@ the client logs in in plaintext when STARTTLS is not offered; `xmpps://` is secu
 | Xmpp:XEP0368-1 | MUST | Direct TLS opens the XML stream only after the TLS handshake, with no STARTTLS. | XmppStreamCases.Xmpps_DirectTls_OpensTheStreamBehindTlsWithoutStartTls |
 
 `-T file` publishes like `-d`: the file's bytes become the message `<body/>` sent to the path JID (the upload stream is
-read into memory first when `-d` gave no data). It never receives or consumes; `XmppUploadTests` pins it.
+read into memory first). It never receives or consumes; `XmppUploadTests` pins it. The command line refuses `-d` with
+`-T` (exit 2) before anything is sent (ADR-1369).
+
+A message body from `-d` or `-T` is sent as the text its bytes spell in UTF-8. Bytes that are not valid UTF-8 cannot be
+carried unchanged, so the transfer fails with exit 43, `XMPP message body is not valid UTF-8`, before it connects
+(ADR-1350; `XmppUploadTests` pins it).
+
+A CR in the body is sent as the character reference `&#xD;` and an LF as itself, on every platform, so the server's XML
+line-end normalisation (XML 1.0, 2.11) leaves CR, CR LF and LF as they were (`XmppUploadTests` pins it).
+
+A disco answer's output holds the same line ends on every platform, never the platform's newline. A literal line end in
+the server's XML (CR LF, CR or LF) is read as LF (XML 1.0, 2.11) and written as LF. A CR the server sent as a character
+reference (`&#xD;`) is written as `&#xD;`, as is an LF in an attribute value as `&#xA;`, so parsing the output gives back
+the characters the server's answer held. The output ends with one LF
+(ADR-1378; `XmppProtocolHandlerTests.ExecuteAsync_DiscoAnswerHoldingLineEnds_WritesLfAndEntitizedCrOnEveryPlatform` pins it).
+
+Text typed on the command line (`-d`, `--data-ascii`, `--data-raw`, `--data-binary`, `--json`) reaches an `xmpp` or
+`xmpps` transfer as UTF-8 on every platform, so `-d café` sends `<body>café</body>` on Windows too, though curl's own
+protocols get such text in the ANSI code page there (ADR-0838, ADR-1360; `XmppPostDataUtf8Tests` pins it). The bytes of
+a file, a config file line or an `--expand-` value in which a variable was replaced are not re-spelled: on Windows,
+non-ASCII text in an `--expand-` value, or in a config file read in the ANSI code page, is refused unless its bytes are
+valid UTF-8.

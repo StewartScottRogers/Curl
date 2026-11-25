@@ -1,0 +1,46 @@
+---
+id: BL-5654
+title: Fix AF-0919: Surviving mutant: the lib1515 port can go on after easy_init fails instead of stopping
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs]
+requirement: none
+created: 2026-11-20
+completed: 2026-11-20
+---
+# BL-5654 — Fix AF-0919: Surviving mutant: the lib1515 port can go on after easy_init fails instead of stopping
+
+## Goal
+
+The defect the audit office reported as AF-0919 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0919 (Medium, quality auditor), which Stewart accepted. The finding's file is on the audit office's paths, which a dark factory lane may not read or run; everything this task needs is below.
+
+Location: `Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs:119`
+
+Location: `Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs:119`
+
+In Request.PerformAsync, `if (!steps.EasyInit(library, out CurlEasy? easy)) { return false; }` mutated to `return true;` survived Curl.Conformance.LibTest.UnitTests. The port then reports the failed request as done and carries on with the next one, where upstream's do_one_request stops; the program's result and stderr differ. No test drives lib1515 with an easy_init that fails.
+
+Reproduction: the audit office's mutation test changed `Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs line 119` as the evidence above describes (the mutant operator is `false`), and every test still passed. Check it by hand, not with the audit tools: make that one change, run the library's `.UnitTests` project, see a test fail, and revert the change. The audit office reruns its mutation test on the re-audit.
+
+The finding closes only when a later re-audit by the quality auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs line 119`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+Killed by `Lib1515_WhenTheLibraryGoesAtTheMultiHandle_StopsAtEasyInit`, which now also asserts the "request ... failed with" line on stderr and that no second request starts. Mutant applied by hand: that test failed; reverted: all 1232 fast tests pass.
+
+## Log
+
+- 2026-11-20: Created.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: e8624194 9742157d.
+- 2026-11-20: Doing -> Done. Test kills the mutant

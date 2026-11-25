@@ -99,6 +99,14 @@ public sealed class SigstoreVerificationTests
         StringAssert.Contains(Verify(Bundle(certificate), SigstoreFixture.Email, "https://other.example.com"), "issuer");
     }
 
+    [TestMethod]
+    public void FailureOf_AnIssuerExtensionThatIsNotDer_FailsOnTheIssuer_FulcioOid1_8()
+    {
+        using var certificate = fulcio.Issue(signer, issuerV2: null, undecodedIssuerV2: Encoding.UTF8.GetBytes(SigstoreFixture.Issuer));
+
+        Assert.AreEqual($"the bundle's certificate does not name the issuer {SigstoreFixture.Issuer}", Verify(Bundle(certificate), SigstoreFixture.Email, SigstoreFixture.Issuer));
+    }
+
     private SigstoreBundle Bundle(X509Certificate2 certificate, byte[]? signature = null, string algorithm = "SHA2_256") =>
         SigstoreBundle.Parse(Encoding.UTF8.GetBytes(SigstoreFixture.Bundle(certificate, Artifact, signature ?? SigstoreFixture.Sign(signer, Artifact), algorithm: algorithm)))!;
 

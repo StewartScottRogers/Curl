@@ -59,6 +59,8 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     [DataRow("UTF8", "", "UTF8", "+OK", DisplayName = "-X UTF8")]
     [DataRow("LIST 1", "", "LIST 1", "+OK 1 133", DisplayName = "-X 'LIST 1'")]
     [DataRow("uidl 1", "", "uidl 1", "+OK 1 uid-1", DisplayName = "-X 'uidl 1'")]
+    [DataRow("UIDL 2", "", "UIDL 2", "+OK 2 uid-2", DisplayName = "-X 'UIDL 2'")]
+    [DataRow("LIST 2", "", "LIST 2", "+OK 2 266", DisplayName = "-X 'LIST 2'")]
     public async Task ExecuteAsync_SingleLineCustomCommand_ReadsOnlyTheStatusLineWritesNothingAndQuits(
         string custom, string id, string line, string reply)
     {
@@ -257,9 +259,8 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
         Diagnostics.ArrangeRun(url, connection.Script);
         Diagnostics.Arrange("flags", $"custom command {Pop3Diagnostics.Show(flags.Mail?.CustomCommand)}, list only {flags.ListOnly}, no body {flags.NoBody}");
 
-        TransferResult result = await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context);
-
-        var run = new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context));
+        var run = new Pop3Run(StampedTimings.Without(result), connection, connector, tls, output.ToArray(), progress);
         Diagnostics.ActRun(run);
         return run;
     }

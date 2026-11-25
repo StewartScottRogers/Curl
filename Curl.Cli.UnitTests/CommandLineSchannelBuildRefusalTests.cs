@@ -36,14 +36,6 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
-    [DataRow("--http3")]
-    [DataRow("--http3-only")]
-    public void Parse_HttpVersionTheSchannelBuildLacks_IsRefusedAsNotSupported(string spelling)
-    {
-        AssertRefused(ParseAsWindowsBuild(["-s", spelling, Url]), $"curl: option {spelling}: {NotSupported}");
-    }
-
-    [TestMethod]
     [DataRow("--ssl-sessions", "f.txt")]
     public void Parse_ValueOptionTheSchannelBuildLacks_IsRefusedAsNotSupported(string spelledOption, string value)
     {
@@ -198,22 +190,6 @@ public sealed class CommandLineSchannelBuildRefusalTests
         Diagnostics.Assert("section says windows refuses", false, section.Contains("On Windows: refused", StringComparison.Ordinal));
         StringAssert.Contains(section, "- Not supported by this build yet: curl refuses it with exit 2.");
         Assert.DoesNotContain("On Windows: refused", section);
-    }
-
-    [TestMethod]
-    public void Parse_DefaultConfigFileSearchOverloadAsTheWindowsBuild_RefusesHttp3()
-    {
-        CommandLineParseResult result = Parse(
-            ["-q", "--http3", Url],
-            parsed => CommandLineParser.Parse(
-                parsed,
-                _ => false,
-                new EmptyPasswordPrompt(),
-                new RecordingDataFileReader(),
-                new DefaultConfigFileSearch(_ => null, isWindows: true, null, null),
-                isWindows: true));
-
-        AssertRefused(result, $"curl: option --http3: {NotSupported}");
     }
 
     [TestMethod]

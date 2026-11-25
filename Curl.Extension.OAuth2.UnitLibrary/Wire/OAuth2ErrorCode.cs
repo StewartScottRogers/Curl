@@ -1,6 +1,6 @@
 namespace Curl.Extension.OAuth2.Wire;
 
-/// <summary>The <c>error</c> of an error response (RFC 6749 §5.2, RFC 8628 §3.5).</summary>
+/// <summary>The <c>error</c> of an error response (RFC 6749 §5.2, RFC 8628 §3.5, RFC 9449 §8).</summary>
 public enum OAuth2ErrorCode
 {
     /// <summary>An <c>error</c> neither RFC names.</summary>
@@ -35,4 +35,7 @@ public enum OAuth2ErrorCode
 
     /// <summary><c>expired_token</c>: the device code expired (RFC 8628).</summary>
     ExpiredToken,
+
+    /// <summary><c>use_dpop_nonce</c>: send the request again with the <c>DPoP-Nonce</c> given (RFC 9449 §8).</summary>
+    UseDpopNonce,
 }

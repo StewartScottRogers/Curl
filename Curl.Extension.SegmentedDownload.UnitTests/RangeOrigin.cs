@@ -16,6 +16,12 @@ internal sealed class RangeOrigin(string representation)
     /// <summary>Gets or sets the strong entity tag it sends, or <see langword="null" /> for none.</summary>
     public string? ETag { get; set; } = "\"v1\"";
 
+    /// <summary>Gets or sets the Last-Modified it sends, or <see langword="null" /> for none.</summary>
+    public string? LastModified { get; set; }
+
+    /// <summary>Gets or sets whether it changes the representation on every request.</summary>
+    public bool ChangesEveryRequest { get; set; }
+
     /// <summary>Gets or sets whether it ignores <c>Range</c> and always answers 200.</summary>
     public bool IgnoresRange { get; set; }
 
@@ -25,6 +31,11 @@ internal sealed class RangeOrigin(string representation)
     public async ValueTask<TransferResult> Invoke(ITransferContext context)
     {
         Requests.Enqueue(context);
+        if (ChangesEveryRequest)
+        {
+            representation = new string([.. representation.Select(letter => letter == 'z' ? 'a' : (char)(letter + 1))]);
+        }
+
         var range = Field(context, "Range");
         var ifRange = Field(context, "If-Range");
         var response = range is null || IgnoresRange || (ifRange is not null && ifRange != ETag)
@@ -58,7 +69,8 @@ internal sealed class RangeOrigin(string representation)
         return new(206, [.. Validators(), new("Content-Range", $"bytes {first}-{last}/{representation.Length}")], representation[first..(last + 1)]);
     }
 
-    private KeyValuePair<string, string>[] Validators() => ETag is null ? [] : [new("ETag", ETag)];
+    private KeyValuePair<string, string>[] Validators() =>
+        [.. ETag is null ? [] : new KeyValuePair<string, string>[] { new("ETag", ETag) }, .. LastModified is null ? [] : new KeyValuePair<string, string>[] { new("Last-Modified", LastModified) }];
 
     /// <summary>One response the origin sends.</summary>
     internal sealed record Response(int Code, KeyValuePair<string, string>[] Fields, string Body, TransferResult? Result = null);

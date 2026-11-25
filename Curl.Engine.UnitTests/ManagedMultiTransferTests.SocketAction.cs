@@ -272,6 +272,29 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    public async Task SocketActionAsync_NoEventsOnTheSocketOfAReadWait_WakesTheWaitingRead()
+    {
+        List<string> calls = [];
+        TimerManualTimeProvider time = new();
+        await using ManagedCurlEngine engine = new(time, null);
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        multi.Options = RecordingOptions(calls);
+        multi.SocketWaitSettleLimit = TimeSpan.FromSeconds(30);
+        await using WrappingEasyTransfer transfer = new((ManagedEasyTransfer)engine.CreateEasy(), async (wait, token) =>
+        {
+            wait.TakeSocket(WrappedSocket.Handle);
+            await wait.WaitUntilReadableAsync(token);
+            return CurlCode.Ok;
+        });
+        multi.Add(transfer);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+
+        (CurlMultiCode Code, int RunningTransfers) finished = await multi.SocketActionAsync(WrappedSocket, CurlSocketSelect.None, CancellationToken.None);
+
+        Assert.AreEqual((CurlMultiCode.Ok, 0), finished);
+    }
+
+    [TestMethod]
     public void PerformingTransfer_TransferThatWrapsNone_IsItself()
     {
         ControlledEasyTransfer transfer = new();

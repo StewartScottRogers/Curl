@@ -272,6 +272,56 @@ public sealed class QuicConnectionTests
 
     [TestMethod]
     [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task OpenBidirectionalStreamAsync_WakeAbortsTheReceive_KeepsTheConnectionUsable()
+    {
+        (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
+        channel.AbortsCancelledReceive = true;
+        await using (connection)
+        {
+            await channel.WaitUntilReceiveWaitsAsync();
+
+            IMultiplexedStream first = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
+            await channel.WaitUntilReceiveWaitsAsync();
+            IMultiplexedStream second = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
+
+            Assert.IsNotNull(first);
+            Assert.IsNotNull(second);
+        }
+    }
+
+    [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task OpenBidirectionalStreamAsync_WakeFailsTheReceiveForReal_FailsWithRecvError()
+    {
+        (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
+        channel.FailsCancelledReceiveWith = System.Net.Sockets.SocketError.ConnectionReset;
+        await using (connection)
+        {
+            await channel.WaitUntilReceiveWaitsAsync();
+
+            await Assert.ThrowsExactlyAsync<MultiplexedConnectionFailedException>(async () =>
+            {
+                while (true)
+                {
+                    await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
+                }
+            });
+        }
+    }
+    [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task DisposeAsync_StopAbortsTheReceive_IsNotAChannelFailure()
+    {
+        (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
+        channel.AbortsCancelledReceive = true;
+        await channel.WaitUntilReceiveWaitsAsync();
+
+        await connection.DisposeAsync();
+
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(async () => await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken));
+    }
+    [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task AcceptUnidirectionalStreamAsync_ReceiveFails_FailsWithRecvError()
     {
         Diagnostics.Arrange("socket error code", 10054);

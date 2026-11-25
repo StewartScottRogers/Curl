@@ -20,6 +20,10 @@ namespace Curl.Original.Protocol.Pop3;
 /// <c>AUTH=EXTERNAL</c> names EXTERNAL and <c>CAPA</c> offers it: then SASL EXTERNAL is tried
 /// with an empty user name, sent as <c>=</c> (BL-1989). With a bearer
 /// token alone, only SASL is tried; no mechanism chosen is exit 67 <c>Login denied</c>.</item>
+/// <item>With a bearer token and no <c>AUTH=</c> option, only OAUTHBEARER and XOAUTH2 may be
+/// used: neither <c>APOP</c> nor <c>USER</c>/<c>PASS</c> is sent. <c>AUTH=*</c>,
+/// <c>AUTH=&lt;mech&gt;</c> and <c>AUTH=+APOP</c> allow what they name, token or not
+/// (BL-5880).</item>
 /// <item>SASL <c>AUTH</c> first, when <c>CAPA</c> lists <c>SASL</c> mechanisms and the
 /// authenticator chooses one. Under <c>--sasl-ir</c> the initial response goes on the
 /// command line (<c>=</c> when empty) unless the mechanism's name and the base64 are longer
@@ -314,7 +318,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// challenge, so a <c>+OK</c> now comes before the exchange has finished (RFC 4422 section 3.6, BL-5014).
     /// </summary>
     private bool NtlmUnfinished(string mechanism) =>
-        mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase) && challengesHanded == 0;
+        challengesHanded < (mechanism.Equals("DIGEST-MD5", StringComparison.OrdinalIgnoreCase) ? 2 : mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("LOGIN", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("CRAM-MD5", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
 
     /// <summary>
     /// Sends <c>AUTH &lt;mechanism&gt;</c>, with the initial response on the line when it goes
@@ -415,7 +419,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     private ValueTask<TransferResult?> LogInWithoutSaslAsync(
         Pop3LoginOptions options, Pop3Capabilities? capabilities, string? apopTimestamp, bool saslCancelled)
     {
-        if (options.Method == Pop3LoginMethod.Sasl || context.Credentials is not { } credential)
+        if (options.Method == Pop3LoginMethod.Sasl || PrefersBearerAlone(options) || context.Credentials is not { } credential)
         {
             return ValueTask.FromResult<TransferResult?>(NoWayToLogIn(options, capabilities, saslCancelled));
         }
@@ -516,12 +520,27 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
     /// <summary>
     /// Whether curl would enable <paramref name="mechanism" />: the login options name it, or
-    /// allow every way and it is not EXTERNAL, which curl tries only when named.
+    /// allow every way and it is not EXTERNAL, which curl tries only when named. With a bearer
+    /// token and no <c>AUTH=</c> option only the bearer mechanisms are enabled.
     /// </summary>
-    private static bool IsAllowed(Pop3LoginOptions options, string mechanism) =>
-        options.Method == Pop3LoginMethod.Any
-            ? !mechanism.Equals(ExternalMechanism, StringComparison.OrdinalIgnoreCase)
-            : mechanism.Equals(options.RequiredMechanism, StringComparison.OrdinalIgnoreCase);
+    private bool IsAllowed(Pop3LoginOptions options, string mechanism)
+    {
+        if (options.Method != Pop3LoginMethod.Any)
+        {
+            return mechanism.Equals(options.RequiredMechanism, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return PrefersBearerAlone(options)
+            ? BearerMechanisms.Contains(mechanism, StringComparer.OrdinalIgnoreCase)
+            : !mechanism.Equals(ExternalMechanism, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Whether <c>--oauth2-bearer</c> was given and no <c>AUTH=</c> option, so curl's
+    /// preferred ways of logging in are the bearer mechanisms alone (BL-5880).
+    /// </summary>
+    private bool PrefersBearerAlone(Pop3LoginOptions options) =>
+        mail.BearerToken is not null && options is { Method: Pop3LoginMethod.Any, RequiredMechanism: null };
 
     /// <summary>
     /// Whether <c>USER</c>/<c>PASS</c> may be sent: the login options allow any way, and

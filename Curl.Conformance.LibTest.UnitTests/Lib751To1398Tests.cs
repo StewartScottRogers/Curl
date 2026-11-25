@@ -162,6 +162,23 @@ public sealed class Lib751To1398Tests
     }
 
     [TestMethod]
+    [DataRow(CurlMultiCode.BadHandle, 1)]
+    [DataRow(CurlMultiCode.Ok, 0)]
+    public async Task Lib753_FirstPerformEndsTheRun_NeverWaitsOrPerformsAgain(CurlMultiCode code, int running)
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.PerformResult = (code, running);
+        int waits = 0;
+        engine.Multi.Waiting = () => waits++;
+        var run = new PortRun(engine, 753, "ftp://x/753");
+
+        _ = await new Lib753(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, waits);
+        Assert.AreEqual(1, run.Error.ToString().Split("curl_multi_perform").Length + run.Error.ToString().Split("multi_perform() ->").Length - 2);
+    }
+
+    [TestMethod]
     [DataRow(1)]
     [DataRow(2)]
     public async Task Lib753_PastTheHangTimeout_Aborts(int check)
@@ -232,6 +249,17 @@ public sealed class Lib751To1398Tests
         Assert.AreEqual(error, run.Error.ToString());
         Assert.AreEqual(failing is 1 or 3 ? 1 : 2, performs);
         Assert.AreEqual("lib757", new Lib757().ProgramName);
+    }
+
+    [TestMethod]
+    public void Lib757Read_BufferExactlyTheDataLength_GivesTheWholeData()
+    {
+        byte[] buffer = new byte[24];
+
+        long read = Lib757.Read(buffer);
+
+        Assert.AreEqual(24L, read);
+        Assert.AreEqual("<title>fun-times</title>", Encoding.ASCII.GetString(buffer));
     }
 
     [TestMethod]

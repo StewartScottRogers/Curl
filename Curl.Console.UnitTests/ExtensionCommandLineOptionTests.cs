@@ -41,6 +41,16 @@ public sealed class ExtensionCommandLineOptionTests
     }
 
     [TestMethod]
+    public async Task RunAsync_CacertCapathInsecureAndSslNoRevoke_ReachTheExtensionsAsTheTransfersTlsTrust()
+    {
+        string caFile = typeof(ExtensionCommandLineOptionTests).Assembly.Location;
+        int exitCode = await RunAsync(["--cacert", caFile, "--capath", "cadir", "-k", "--ssl-no-revoke", "file:///x"], _ => null);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(new ExtensionTlsTrust(true, caFile, "cadir", SkipRevocationCheck: true), transferValues!.TlsTrust);
+    }
+
+    [TestMethod]
     public async Task RunAsync_ExtensionOptionWithExtensionsOff_IsRefusedAsAnUnknownOption()
     {
         int exitCode = await RunAsync(["--test-flag", "file:///x"], name => name == "CURL_EXTENSIONS" ? "0" : null);

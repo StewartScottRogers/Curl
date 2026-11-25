@@ -39,6 +39,50 @@ public sealed class TcpDialerIntegrationTests
 
     [TestMethod]
     [TestCategory("Integration")]
+    public async Task DialUnixSocketAsync_HttpRequestThenReply_CarriesTheRequestOutAndTheReplyBack()
+    {
+        // BL-5686: on macOS a request over a Unix socket failed to send (exit 55); this pins the exchange on every platform.
+        var path = Path.Combine(Path.GetTempPath(), $"bl5686-{Guid.NewGuid():N}.sock");
+        using var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        listener.Bind(new UnixDomainSocketEndPoint(path));
+        listener.Listen(1);
+        try
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var accepting = listener.AcceptAsync(cancellation.Token);
+
+            await using var connection = await new TcpDialer().DialUnixSocketAsync(new UnixSocketAddress(path, IsAbstract: false), cancellation.Token);
+            using var accepted = await accepting;
+            var request = "GET /hello.txt HTTP/1.1\r\nHost: localhost:8080\r\n\r\n"u8.ToArray();
+            await connection.WriteAsync(request, cancellation.Token);
+            await connection.FlushAsync(cancellation.Token);
+            var received = new byte[request.Length];
+            var total = 0;
+            while (total < received.Length)
+            {
+                total += await accepted.ReceiveAsync(received.AsMemory(total), SocketFlags.None, cancellation.Token);
+            }
+
+            var reply = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"u8.ToArray();
+            await accepted.SendAsync(reply, SocketFlags.None, cancellation.Token);
+            var answer = new byte[reply.Length];
+            var answered = 0;
+            while (answered < answer.Length)
+            {
+                answered += await connection.ReadAsync(answer.AsMemory(answered), cancellation.Token);
+            }
+
+            CollectionAssert.AreEqual(request, received);
+            CollectionAssert.AreEqual(reply, answer);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
     public async Task DialUnixSocketAsync_ToAMissingSocket_ThrowsSocketException()
     {
         var path = Path.Combine(Path.GetTempPath(), $"bl507-missing-{Guid.NewGuid():N}.sock");

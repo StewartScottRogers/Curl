@@ -165,6 +165,32 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_RedirectHopAfterAnHttp10ResponseWithAnUnrewindableBodyNotYetRead_FailsWithExit25BeforeAnyRewindCheck()
+    {
+        // curl needs no rewind of stdin it has not read, so the -L hop fails with 25 on every platform (upstream test1073, BL-5910).
+        UnrewindableStream body = new([1, 2, 3]) { RewindsUntilRead = true };
+        HttpRequestOptions options = new()
+        {
+            EarlierResponseWasHttp10 = true,
+            Body = new StreamBody(body, null, "application/octet-stream"),
+            CustomMethod = "PUT",
+        };
+        ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello", 65536);
+        MemoryStream output = new();
+        Diagnostics.Arrange("request", "redirect hop after an HTTP/1.0 response, PUT of a 3-byte unrewindable stream of unknown length not yet read");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator())
+            .ExecuteAsync(EncodingContext(output, options));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual("Chunky upload is not supported by HTTP 1.0", result.ErrorMessage);
+        Assert.IsEmpty(connection.Written);
+        Assert.IsFalse(body.HasBeenRead);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_RedirectHopAfterAnHttp10ResponseWithKnownLength_SendsAnHttp10RequestLine()
     {
         HttpRequestOptions options = new()

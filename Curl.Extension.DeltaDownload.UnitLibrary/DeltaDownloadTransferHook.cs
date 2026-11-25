@@ -7,9 +7,11 @@ namespace Curl.Extension.DeltaDownload;
 /// The <c>--zsync</c> transfer hook (ADR-1092). For a plain HTTP GET it reads the zsync 0.6 control file, finds the
 /// target's blocks in the local seed file, asks the URL only for the ranges of the blocks still missing
 /// (<c>Range: bytes=first-last</c>, one request per run of missing blocks) and writes the joined file once its SHA-1
-/// equals the control file's. A 200 to a range, the server ignoring <c>Range</c>, is written as received; a failed
-/// request fails the transfer with nothing written; a range answered with anything else, or a joined file whose
-/// SHA-1 differs, runs the transfer again as curl runs it.
+/// equals the control file's. A range answered with anything but that range or a 200, or a joined file whose SHA-1
+/// differs, runs the transfer again as curl runs it. A failed request fails the transfer with nothing written. A
+/// whole response (a 200 to a range, the server ignoring <c>Range</c>, or the transfer run again) is written only
+/// when its body's SHA-1 equals the control file's; otherwise the transfer fails with exit 61
+/// (<see cref="CurlExitCode.BadContentEncoding" />) and nothing is written (ADR-1349).
 /// </summary>
 /// <param name="controlPath">The control file's path.</param>
 /// <param name="seedPath">The seed file's path, or <see langword="null" /> for the control file's <c>Filename</c> in the current directory.</param>
@@ -51,7 +53,7 @@ internal sealed class DeltaDownloadTransferHook(string controlPath, string? seed
         foreach (var (start, last) in blocks.MissingRanges())
         {
             var part = await CapturedResponse.CaptureAsync(context.WithRequestHeaders([$"Range: bytes={start}-{last}"]), next);
-            if (await EndBeforeJoiningAsync(part, start, last, control.Length, context, next) is { } ended)
+            if (await EndBeforeJoiningAsync(part, start, last, control, context, next) is { } ended)
             {
                 return ended;
             }
@@ -63,7 +65,7 @@ internal sealed class DeltaDownloadTransferHook(string controlPath, string? seed
         return await WriteIfIntactAsync(control, blocks, first, context, next);
     }
 
-    private static async Task<TransferResult?> EndBeforeJoiningAsync(CapturedResponse part, long start, long last, int length, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
+    private static async Task<TransferResult?> EndBeforeJoiningAsync(CapturedResponse part, long start, long last, ZsyncControlFile control, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
         if (!part.Result.IsSuccess)
         {
@@ -72,10 +74,10 @@ internal sealed class DeltaDownloadTransferHook(string controlPath, string? seed
 
         if (part.Code == Ok)
         {
-            return await part.WriteAsync(context);
+            return await WriteWholeIfIntactAsync(control, part, context);
         }
 
-        return IsRange(part, start, last, length) ? null : await next(context);
+        return IsRange(part, start, last, control.Length) ? null : await RunAgainAsync(control, context, next);
     }
 
     private static async Task<TransferResult> WriteIfIntactAsync(ZsyncControlFile control, SeedBlocks blocks, CapturedResponse? first, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
@@ -83,7 +85,25 @@ internal sealed class DeltaDownloadTransferHook(string controlPath, string? seed
         var file = blocks.Target.AsMemory(0, control.Length);
         return SHA1.HashData(file.Span).AsSpan().SequenceEqual(control.Sha1)
             ? await WriteAsync(first, file, context)
-            : await next(context);
+            : await RunAgainAsync(control, context, next);
+    }
+
+    private static async Task<TransferResult> RunAgainAsync(ZsyncControlFile control, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
+    {
+        var whole = await CapturedResponse.CaptureAsync(context, next);
+        return whole.Result.IsSuccess ? await WriteWholeIfIntactAsync(control, whole, context) : whole.Result;
+    }
+
+    private static async Task<TransferResult> WriteWholeIfIntactAsync(ZsyncControlFile control, CapturedResponse whole, ITransferContext context)
+    {
+        var sha1 = SHA1.HashData(whole.Body);
+        return sha1.AsSpan().SequenceEqual(control.Sha1)
+            ? await whole.WriteAsync(context)
+            : whole.Result with
+            {
+                ExitCode = CurlExitCode.BadContentEncoding,
+                ErrorMessage = $"--zsync: SHA-1 mismatch: expected {Convert.ToHexStringLower(control.Sha1)}, got {Convert.ToHexStringLower(sha1)}",
+            };
     }
 
     private static bool IsRange(CapturedResponse part, long first, long last, int length) =>

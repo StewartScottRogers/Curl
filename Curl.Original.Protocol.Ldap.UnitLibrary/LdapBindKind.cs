@@ -1,8 +1,9 @@
 namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
-/// How the WinLDAP dialect binds, as curl's <c>ldap_win_bind</c> and <c>ldap_win_bind_auth</c>
-/// choose from <c>-u</c> and the auth mask (ADR-1246).
+/// How a bind is made, in either dialect: the WinLDAP dialect as curl's <c>ldap_win_bind</c> and
+/// <c>ldap_win_bind_auth</c> choose from <c>-u</c> and the auth mask (ADR-1246), the OpenLDAP
+/// dialect as <c>ChooseOpenLdapBindKind</c> chooses (<see cref="Simple"/> or <see cref="Sasl"/>).
 /// </summary>
 public enum LdapBindKind
 {
@@ -17,6 +18,9 @@ public enum LdapBindKind
 
     /// <summary><c>LDAP_AUTH_DIGEST</c> with <c>-u</c>'s credentials: the SASL bind (tag <c>0xa3</c>) with the mechanism <c>DIGEST-MD5</c>.</summary>
     Digest,
+
+    /// <summary>The OpenLDAP dialect's SASL bind, chosen by the auth mask or <c>AUTH=</c> login options (BL-5435).</summary>
+    Sasl,
 
     /// <summary><c>LDAP_AUTH_NEGOTIATE</c> with no credentials: the bind as the logged-on user.</summary>
     LogonUser,

@@ -1,6 +1,6 @@
 # ADR-1095: The resumable upload wire format is a copied HTTP/1.1 client and one type per header field
 
-- Status: Accepted
+- Status: Superseded by ADR-1379 for the HTTP/1.1 client (the field types stand)
 - Date: 2026-10-29
 - Task: BL-4306 (split from BL-4129)
 

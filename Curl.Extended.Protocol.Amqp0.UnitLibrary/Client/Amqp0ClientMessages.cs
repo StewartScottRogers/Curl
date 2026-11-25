@@ -17,8 +17,8 @@ internal static class Amqp0ClientMessages
     /// <summary>curl's text for a failed send.</summary>
     internal const string SendFailed = "Failed sending data to the peer";
 
-    /// <summary>The text for a server that offers no PLAIN mechanism, naming the ones it offers.</summary>
-    internal static string NoPlainMechanism(string offered) => $"AMQP server offers no PLAIN mechanism (it offers \"{offered}\")";
+    /// <summary>The text for a server that offers no mechanism the client can use, naming the ones it offers.</summary>
+    internal static string NoUsableMechanism(string offered) => $"AMQP server offers no mechanism this client can use (it offers \"{offered}\")";
 
     /// <summary>The text for a method the flow did not expect at this point, naming its class and method ids.</summary>
     internal static string UnexpectedMethod(ushort classId, ushort methodId) =>
@@ -30,7 +30,10 @@ internal static class Amqp0ClientMessages
 
     /// <summary>The text for a connection.close or channel.close from the server, naming its reply code and text.</summary>
     internal static string ClosedByServer(string methodName, ushort replyCode, string replyText) =>
-        string.Create(CultureInfo.InvariantCulture, $"AMQP server sent {methodName}: reply code {replyCode}, {replyText}");
+        string.Create(CultureInfo.InvariantCulture, $"AMQP server sent {methodName}: reply code {replyCode}, {EscapeControlCharacters(replyText)}");
+
+    private static string EscapeControlCharacters(string text) =>
+        string.Concat(text.Select(c => char.IsControl(c) ? $"\\x{(int)c:X2}" : c.ToString()));
 
     /// <summary>curl's text for output that could not be written.</summary>
     internal static string OutputWriteFailed(int passed) =>

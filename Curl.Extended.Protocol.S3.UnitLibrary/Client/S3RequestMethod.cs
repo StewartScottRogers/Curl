@@ -18,12 +18,12 @@ internal static class S3RequestMethod
     {
         if (context.NoBody)
         {
-            return $"{context.Url.Scheme}:// does not support -I/--head; it sends only GET, or PUT with -T";
+            return $"{context.Url.Scheme}:// does not support -I/--head; it sends only GET, DELETE with -X DELETE, or PUT with -T";
         }
 
-        string sent = context.Upload is null ? "GET" : "PUT";
-        return context.Http?.CustomMethod is { } method && method != sent
-            ? $"{context.Url.Scheme}:// does not support -X {method}; it sends only GET, or PUT with -T"
+        string[] sends = context.Upload is null ? ["GET", "DELETE"] : ["PUT"];
+        return context.Http?.CustomMethod is { } method && !sends.Contains(method)
+            ? $"{context.Url.Scheme}:// does not support -X {method}; it sends only GET, DELETE with -X DELETE, or PUT with -T"
             : null;
     }
 }

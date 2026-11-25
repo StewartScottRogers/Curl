@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using Curl.Extension.Abstractions;
 
 namespace Curl.Extension.EncryptedDns;
@@ -21,7 +23,7 @@ internal static class EncryptedDnsServerAddress
     internal static (string Host, int Port) Parse(string value, ExtensionOption option, int defaultPort)
     {
         (string host, string? port) = Split(value);
-        if (host.Length == 0)
+        if (!IsHost(host))
         {
             throw Malformed(value, option);
         }
@@ -35,6 +37,16 @@ internal static class EncryptedDnsServerAddress
             ? (host, number)
             : throw Malformed(value, option);
     }
+
+    // A host name or IPv4 address (letters, digits, '.', '-' and '_', not starting with '-' or '.'), or an IPv6 address.
+    private static bool IsHost(string host) =>
+        host.Contains(':', StringComparison.Ordinal) ? IsIpv6Address(host) : IsHostName(host);
+
+    private static bool IsIpv6Address(string host) =>
+        IPAddress.TryParse(host, out IPAddress? address) && address.AddressFamily == AddressFamily.InterNetworkV6;
+
+    private static bool IsHostName(string host) =>
+        host.Length > 0 && host[0] is not ('-' or '.') && host.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-' or '_');
 
     // The host and the port text, or an empty host for a bracket that is not closed or not followed by ':'.
     private static (string Host, string? Port) Split(string value) =>

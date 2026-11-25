@@ -139,4 +139,33 @@ public sealed class CacheDirectoryTests
         replacement.CopyTo(bytes, "CURL-HTTP-CACHE 1\n".Length + offsetAfterMagic);
         return bytes;
     }
+
+    [TestMethod]
+    public void Constructor_PathThatCannotNameADirectory_ThrowsMessageNamingOptionAndPathOnly()
+    {
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => new CacheDirectory("bad\0dir"));
+
+        Assert.AreEqual("--cache-dir cannot use 'bad\0dir'", exception.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Constructor_WindowsNameWithColonAndWildcards_ThrowsMessageWithoutOperatingSystemText()
+    {
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => new CacheDirectory("<>:|bad"));
+
+        Assert.AreEqual("--cache-dir cannot use '<>:|bad'", exception.Message);
+    }
+
+    [TestMethod]
+    public void Constructor_PathNamingAnExistingFile_ThrowsMessageNamingOptionAndPath()
+    {
+        Directory.CreateDirectory(_directory);
+        var file = Path.Combine(_directory, "recfile");
+        File.WriteAllText(file, "x");
+
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => new CacheDirectory(file));
+
+        Assert.AreEqual($"--cache-dir cannot use '{file}'", exception.Message);
+    }
 }

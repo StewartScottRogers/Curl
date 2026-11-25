@@ -186,7 +186,7 @@ public static partial class CommandLineOptionTable
         CommandLineOption.NegatableFlag("ftp-ssl", null, (options, on) => options.SetSslTry(on, "--ftp-ssl")),
         CommandLineOption.NegatableFlag("ssl-reqd", null, (options, on) => options.SslRequired = on),
         CommandLineOption.NegatableFlag("ftp-ssl-reqd", null, (options, on) => options.SslRequired = on),
-        CommandLineOption.NegatableFlag("ftp-ssl-control", null, (options, on) => options.FtpSslControlOnly = on),
+        CommandLineOption.NegatableFlag("ftp-ssl-control", null, (options, on) => options.SetFtpSslControl(on)),
         CommandLineOption.NegatableFlag("ftp-ssl-ccc", null, (options, on) => options.FtpSslCccRequested = on),
         CommandLineOption.Value("ftp-ssl-ccc-mode", null, AcceptingEmpty(SetFtpSslCccMode)),
         CommandLineOption.Text("ftp-account", null, (options, account) => options.FtpAccount = account),
@@ -336,8 +336,8 @@ public static partial class CommandLineOptionTable
         .. HttpVersionRows(),
         CommandLineOption.Flag("ipv4", '4', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv4Only),
         CommandLineOption.Flag("ipv6", '6', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv6Only),
-        CommandLineOption.Flag("http3", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3)).RefusedWithoutQuic(),
-        CommandLineOption.Flag("http3-only", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3Only)).RefusedWithoutQuic(),
+        CommandLineOption.Flag("http3", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3)),
+        CommandLineOption.Flag("http3-only", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3Only)),
         CommandLineOption.NoFunctionFlag("sslv2", '2', negatable: false),
         CommandLineOption.NoFunctionFlag("sslv3", '3', negatable: false),
         CommandLineOption.NoFunctionFlag("metalink", null, negatable: true),
@@ -832,23 +832,24 @@ public static partial class CommandLineOptionTable
         AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, true, options.AppendJsonData);
 
     /// <summary>
-    /// Hands <paramref name="append"/> the bytes of <paramref name="value"/> (<see cref="CommandLineOptions.CommandLineTextBytes"/>),
-    /// or, when it starts with <c>@</c>, the unchanged bytes of the file it names, standard input for <c>@-</c> read in
-    /// Windows text mode when <paramref name="readsStandardInputAsText"/> (<see cref="WindowsTextModeInput"/>). A file
-    /// that cannot be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/> and nothing is appended.
+    /// Hands <paramref name="append"/> the bytes of <paramref name="value"/> (<see cref="CommandLineOptions.CommandLineTextBytes"/>)
+    /// and its <see cref="CommandLineOptions.TypedTextAsUtf8Bytes"/>, or, when it starts with <c>@</c>, the unchanged
+    /// bytes of the file it names as both, standard input for <c>@-</c> read in Windows text mode when
+    /// <paramref name="readsStandardInputAsText"/> (<see cref="WindowsTextModeInput"/>). A file that cannot be read is
+    /// refused with <see cref="CommandLineRefusal.DataFileUnreadable"/> and nothing is appended.
     /// </summary>
-    private static CommandLineRefusal? AppendTextOrFileBytes(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, Action<byte[]> append)
+    private static CommandLineRefusal? AppendTextOrFileBytes(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, Action<byte[], byte[]> append)
     {
         if (!value.StartsWith('@'))
         {
-            append(options.CommandLineTextBytes(value));
+            append(options.CommandLineTextBytes(value), options.TypedTextAsUtf8Bytes(value));
             return null;
         }
 
         CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, readsStandardInputAsText, false, out byte[] contents);
         if (refusal is null)
         {
-            append(contents);
+            append(contents, contents);
         }
 
         return refusal;

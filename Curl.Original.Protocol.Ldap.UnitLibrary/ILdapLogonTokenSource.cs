@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Security;
 
 namespace Curl.Original.Protocol.Ldap;
@@ -19,4 +20,12 @@ public interface ILdapLogonTokenSource
     /// </param>
     /// <returns>The authentication, which produces the tokens the binds carry.</returns>
     ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName, ProtectionLevel protection);
+
+    /// <summary>
+    /// Gets a source that authenticates with <paramref name="explicitCredential" />, the <c>-u</c> credentials,
+    /// instead of the logged-on user; a source with no such notion returns itself.
+    /// </summary>
+    /// <param name="explicitCredential">The <c>-u</c> credentials.</param>
+    /// <returns>The source to bind with.</returns>
+    ILdapLogonTokenSource ForCredential(NetworkCredential explicitCredential) => this;
 }

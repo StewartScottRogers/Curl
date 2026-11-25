@@ -193,6 +193,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             PoolScheme = url.Scheme,
         };
         string loginKey = SmtpKeptConnection.LoginKeyOf(context);
+        long started = context.TimeProvider.GetTimestamp();
         ConnectResult connected = await ConnectAsync(target, loginKey, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
@@ -202,6 +203,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             };
         }
 
+        long connectEnded = context.TimeProvider.GetTimestamp();
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
@@ -218,7 +220,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
                 ? await RunSessionAsync(channel, context, connectPhase, domain, implicitTls, connectEvents.Opened, KeptConnectionOf(connected, loginKey, context)).ConfigureAwait(false)
                 : TransferResult.Failure(CurlExitCode.UrlMalformat, SmtpSessionMessages.MalformedUrl);
             ReportConnectionEnd(context.Events, result, channel, target, connected.ConnectionNumber);
-            return result;
+            return StampTimings(result, context, started, connected, connectEnded);
         }
     }
 
@@ -311,5 +313,24 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
         {
             return await session.RunAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Gives a successful transfer the timings behind <c>%{time_connect}</c>, <c>%{time_pretransfer}</c>,
+    /// <c>%{time_posttransfer}</c>, <c>%{time_starttransfer}</c> and <c>%{time_total}</c> (BL-5473):
+    /// the pre- and post-transfer stamps are taken when the connect phase ended and the first byte
+    /// when the transfer completed, so <c>connect &lt;= pretransfer &lt;= starttransfer &lt;= total</c>.
+    /// A failure keeps the report it has; every success here carries one.
+    /// </summary>
+    private static TransferResult StampTimings(TransferResult result, ITransferContext context, long started, ConnectResult connected, long connectEnded)
+    {
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        long completed = context.TimeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connected.Timings, connectEnded, connectEnded, completed, completed);
+        return result with { Report = result.Report! with { Timings = timings } };
     }
 }

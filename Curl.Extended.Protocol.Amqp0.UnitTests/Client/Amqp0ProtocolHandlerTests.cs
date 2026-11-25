@@ -40,7 +40,7 @@ public sealed class Amqp0ProtocolHandlerTests
         Assert.AreEqual(new Amqp0ChannelOpen(), Method(connection.Writes[4], 1));
         var declare = (Amqp0QueueDeclare)Method(connection.Writes[5], 1);
         Assert.AreEqual("q", declare.Queue);
-        Assert.IsFalse(declare.Passive);
+        Assert.IsTrue(declare.Passive);
         Assert.IsFalse(declare.Durable);
         Assert.AreEqual(new Amqp0BasicGet("q", NoAck: true), Method(connection.Writes[6], 1));
         Assert.AreEqual(new Amqp0ChannelClose(200, "Goodbye", 0, 0), Method(connection.Writes[7], 1));
@@ -200,14 +200,14 @@ public sealed class Amqp0ProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_NoPlainMechanism_EndsWithLoginDenied()
+    public async Task ExecuteAsync_NoUsableMechanism_EndsWithLoginDenied()
     {
-        ScriptedAmqp0Connection connection = new(Frame(Start("AMQPLAIN EXTERNAL")));
+        ScriptedAmqp0Connection connection = new(Frame(Start("EXTERNAL CRAM-MD5")));
 
         TransferResult result = await ExecuteAsync(connection, "amqp://broker/v/q", new MemoryStream());
 
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
-        Assert.AreEqual("AMQP server offers no PLAIN mechanism (it offers \"AMQPLAIN EXTERNAL\")", result.ErrorMessage);
+        Assert.AreEqual("AMQP server offers no mechanism this client can use (it offers \"EXTERNAL CRAM-MD5\")", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -332,6 +332,8 @@ public sealed class Amqp0ProtocolHandlerTests
     [DataRow("amqp://broker/v/q", false, 5672)]
     [DataRow("amqps://broker/v/q", true, 5671)]
     [DataRow("AMQPS://broker:9999/v/q", true, 9999)]
+    [DataRow("amqp://broker:0/v/q", false, 0)]
+    [DataRow("amqps://broker:0/v/q", true, 0)]
     public async Task ExecuteAsync_Scheme_ConnectsWithTlsAndPortFromConnector(string url, bool useTls, int port)
     {
         ScriptedAmqp0Connector connector = new(ConnectResult.Refused("Failed to connect"));
@@ -377,6 +379,79 @@ public sealed class Amqp0ProtocolHandlerTests
     [TestMethod]
     public void SupportedSchemes_AreAmqpAndAmqps() =>
         CollectionAssert.AreEqual(new[] { "amqp", "amqps" }, new Amqp0ProtocolHandler(new ScriptedAmqp0Connector(ConnectResult.Refused("x"))).SupportedSchemes.ToArray());
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExistingQueue_DeclaresPassivelyOnceAndPublishes()
+    {
+        ScriptedAmqp0Connection connection = new([.. Handshake(0, 0), .. Closes()]);
+
+        TransferResult result = await PublishAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(((Amqp0QueueDeclare)Method(connection.Writes[5], 1)).Passive);
+        Assert.AreEqual(1, connection.Writes.Skip(1).Count(write => Frames(write).Any(frame => frame.Type == Amqp0FrameType.Method && Amqp0MethodReader.Read(frame) is Amqp0QueueDeclare)));
+        Assert.AreEqual(new Amqp0BasicPublish(string.Empty, "q"), Amqp0MethodReader.Read(Frames(connection.Writes[6])[0]));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PassiveDeclareNotFound_ReopensChannelDeclaresDurableAndPublishes()
+    {
+        ScriptedAmqp0Connection connection = new(
+        [
+            .. Opened(), .. Frame(new Amqp0ChannelClose(404, "NOT_FOUND", 0, 0), 1), .. Frame(new Amqp0ChannelOpenOk(), 1),
+            .. Frame(new Amqp0QueueDeclareOk("q", 0, 0), 1), .. Closes(),
+        ]);
+
+        TransferResult result = await PublishAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(((Amqp0QueueDeclare)Method(connection.Writes[5], 1)).Passive);
+        Assert.AreEqual(new Amqp0ChannelCloseOk(), Method(connection.Writes[6], 1));
+        Assert.AreEqual(new Amqp0ChannelOpen(), Method(connection.Writes[7], 1));
+        var durable = (Amqp0QueueDeclare)Method(connection.Writes[8], 1);
+        Assert.IsFalse(durable.Passive);
+        Assert.IsTrue(durable.Durable);
+        Assert.AreEqual(new Amqp0BasicPublish(string.Empty, "q"), Amqp0MethodReader.Read(Frames(connection.Writes[9])[0]));
+    }
+
+    [TestMethod]
+    [DataRow((ushort)406)]
+    [DataRow((ushort)403)]
+    public async Task ExecuteAsync_PassiveDeclareClosedWithOtherCode_EndsWithTheServerReplyAndNeverDeclaresAgain(ushort code)
+    {
+        ScriptedAmqp0Connection connection = new([.. Opened(), .. Frame(new Amqp0ChannelClose(code, "NO", 0, 0), 1)]);
+
+        TransferResult result = await PublishAsync(connection);
+
+        Assert.AreEqual(code == 403 ? CurlExitCode.LoginDenied : CurlExitCode.WeirdServerReply, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage, "channel.close");
+        StringAssert.Contains(result.ErrorMessage, code.ToString());
+        Assert.HasCount(7, connection.Writes);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_GetOfExistingQueue_NeverSendsANonPassiveDeclare()
+    {
+        ScriptedAmqp0Connection connection = new([.. Handshake(0, 0), .. Frame(new Amqp0BasicGetEmpty(), 1), .. Closes()]);
+
+        TransferResult result = await ExecuteAsync(connection, "amqp://broker/v/q", new MemoryStream());
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        var declare = (Amqp0QueueDeclare)Method(connection.Writes[5], 1);
+        Assert.IsTrue(declare.Passive);
+        Assert.IsFalse(declare.Durable);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PassiveDeclareAnsweredWithAnotherMethod_EndsWithWeirdServerReply()
+    {
+        ScriptedAmqp0Connection connection = new([.. Opened(), .. Frame(new Amqp0BasicGetEmpty(), 1)]);
+
+        TransferResult result = await PublishAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("Weird server reply: unexpected AMQP method 60.72", result.ErrorMessage);
+    }
 
     private static Amqp0ConnectionStart Start(string mechanisms) => new(0, 9, Amqp0FieldTable.Empty, mechanisms, "en_US");
 

@@ -115,8 +115,9 @@ public sealed class Pop3ProtocolHandlerNulByteTests
         Diagnostics.Bytes("output", output.ToArray());
 
         return new NulByteRun(
-            result, events, Encoding.Latin1.GetString(connection.Sent), Encoding.Latin1.GetString(output.ToArray()));
+            StampedTimings.Without(result), events, Encoding.Latin1.GetString(connection.Sent), Encoding.Latin1.GetString(output.ToArray()));
     }
 
     private sealed record NulByteRun(TransferResult Result, RecordingTransferEvents Events, string Sent, string Output);
 }
+

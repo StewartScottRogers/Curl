@@ -249,13 +249,34 @@ function Invoke-CoverageTestRun {
         )
         if ($NoBuild) { $testArguments += '--no-build' }
         if (-not $IncludeIntegration) { $testArguments += @('--filter', 'TestCategory!=Integration') }
-        Write-Host "dotnet test $(Split-Path $target -Leaf)" -ForegroundColor DarkCyan
-        & dotnet @testArguments | ForEach-Object {
-            $line = [string]$_
-            $testOutput.Add($line)
-            Write-Host $line
+        # A test host that crashes without any failed test (BL-5416: the HttpFile tests on a
+        # Windows runner) is an infrastructure fault, not a test result: run that project once
+        # more before counting it, and keep only the last attempt's output and exit code.
+        # dotnet test reports the crash on stderr and failed tests on stdout, so both are
+        # captured (BL-5919). Windows PowerShell turns a redirected stderr line into a
+        # terminating error under 'Stop', hence 'Continue' around the call alone.
+        foreach ($attempt in 1..2) {
+            Write-Host "dotnet test $(Split-Path $target -Leaf)" -ForegroundColor DarkCyan
+            $attemptOutput = New-Object System.Collections.Generic.List[string]
+            & { $ErrorActionPreference = 'Continue'; & dotnet @testArguments 2>&1 } | ForEach-Object {
+                $line = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { [string]$_ }
+                $attemptOutput.Add($line)
+                Write-Host $line
+            }
+            $attemptExitCode = $LASTEXITCODE
+            # A failed test shows as its own "Failed <name>" line or in a summary's count.
+            $hostCrashed = $attemptExitCode -ne 0 -and
+                @($attemptOutput | Where-Object { $_ -match 'Test host process crashed' }).Count -gt 0 -and
+                @($attemptOutput | Where-Object { $_ -match '^\s+Failed\s+\S|Failed:\s+[1-9]' }).Count -eq 0
+            if (-not $hostCrashed) { break }
+            Write-Warning "The test host crashed running $(Split-Path $target -Leaf); running it once more."
+            # An aborted run prints a "Failed!  - Failed: 0" summary, so only a count of 1 or
+            # more is a real failure above. Drop the first attempt's coverage files so the
+            # retry's are the only ones merged.
+            if (Test-Path $projectDirectory) { Remove-Item $projectDirectory -Recurse -Force }
         }
-        if ($LASTEXITCODE -ne 0) { $testExitCode = $LASTEXITCODE }
+        $testOutput.AddRange($attemptOutput)
+        if ($attemptExitCode -ne 0) { $testExitCode = $attemptExitCode }
     }
     if ($testExitCode -ne 0) {
         # A scaffolded .UnitTests project with no tests yet prints "No test matches the

@@ -97,6 +97,37 @@ public sealed partial class CurlEasy : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
+    /// <c>curl_easy_getinfo</c> into a typed variable, as C reads it: <typeparamref name="T"/> is the .NET
+    /// type <see cref="CurlInfo"/>'s remarks give for the info's base (<see cref="long"/>, <see cref="double"/>,
+    /// <see cref="string"/>, a list of strings, a list of such lists or <see cref="CurlTlsSessionInfo"/>).
+    /// </summary>
+    /// <typeparam name="T">The type the caller reads the info as.</typeparam>
+    /// <param name="info">The info to read.</param>
+    /// <param name="value">The value; <see langword="default"/> when the answer is not <see cref="CurlCode.Ok"/>.</param>
+    /// <returns>
+    /// <see cref="CurlCode.BadFunctionArgument"/> when the info's value is not a <typeparamref name="T"/>, as
+    /// libcurl answers a wrong <c>CURLINFO_*</c> type; otherwise what <see cref="GetInfo(CurlInfo, out object?)"/> answers.
+    /// </returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public CurlCode GetInfo<T>(CurlInfo info, out T? value)
+    {
+        var code = GetInfo(info, out object? boxed);
+        value = default;
+        if (code != CurlCode.Ok)
+        {
+            return code;
+        }
+
+        if (boxed is T typed)
+        {
+            value = typed;
+            return CurlCode.Ok;
+        }
+
+        return boxed is null && default(T) is null ? CurlCode.Ok : CurlCode.BadFunctionArgument;
+    }
+
+    /// <summary>
     /// <c>curl_easy_perform</c>, synchronously as libcurl's is: blocks on <see cref="PerformAsync"/>
     /// until the transfer ends. This is the one sanctioned sync-over-async bridge in Libcurl, kept for
     /// fidelity with libcurl's blocking call; callers that can await use <see cref="PerformAsync"/>.

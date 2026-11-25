@@ -187,7 +187,22 @@ internal sealed class HttpRequestFraming
     /// </summary>
     /// <returns>The framing of the HTTP/2 or HTTP/3 request.</returns>
     internal HttpRequestFraming ForHttp2OrHttp3() =>
-        new(Method, Body, KnownLength, isChunked: false, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange, IsAuthProbe);
+        IsChunkedOnlyByHeader
+            ? new(Method, null, null, isChunked: false, addsExpect: false, awaitsContinue: false)
+            : new(Method, Body, KnownLength, isChunked: false, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange, IsAuthProbe);
+
+    /// <summary>
+    /// The empty chunked body <see cref="OfNoBody" /> gives a request with no body of its own when an
+    /// <c>-H "Transfer-Encoding: chunked"</c> asks for chunked.
+    /// </summary>
+    private static readonly BytesBody HeaderOnlyChunkedBody = new(ReadOnlyMemory<byte>.Empty, string.Empty);
+
+    /// <summary>
+    /// Gets a value indicating whether the request has no body of its own and is chunked only because an
+    /// <c>-H "Transfer-Encoding: chunked"</c> asked (its body is <see cref="HeaderOnlyChunkedBody" />).
+    /// Over HTTP/2 and HTTP/3 curl then sends no <c>content-length</c> (BL-5335).
+    /// </summary>
+    private bool IsChunkedOnlyByHeader => ReferenceEquals(Body, HeaderOnlyChunkedBody);
 
     /// <summary>
     /// Makes the same framing for an HTTP/1.1 request that asks to upgrade to h2c: with no
@@ -261,7 +276,7 @@ internal sealed class HttpRequestFraming
     /// </summary>
     private static HttpRequestFraming OfNoBody(string method, HttpCustomHeader[] customHeaders) =>
         AsksForChunked(customHeaders)
-            ? new HttpRequestFraming(method, new BytesBody(ReadOnlyMemory<byte>.Empty, string.Empty), 0, true, false, false)
+            ? new HttpRequestFraming(method, HeaderOnlyChunkedBody, 0, true, false, false)
             : new HttpRequestFraming(method, null, null, false, false, false);
 
     /// <summary>

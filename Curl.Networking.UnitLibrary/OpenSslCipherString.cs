@@ -191,8 +191,7 @@ internal sealed class OpenSslCipherString
     // a selection naming an unknown alias.
     private (bool Valid, IReadOnlyList<TlsCipherSuite>? Suites) ReadSelection()
     {
-        var end = _value.IndexOfAny([':', ' ', ';', ','], _position);
-        var element = end < 0 ? _value[_position..] : _value[_position..end];
+        var element = _value[_position..].Split([':', ' ', ';', ','])[0];
         if (element.StartsWith(IanaNamePrefix, StringComparison.Ordinal) && OpenSslCipherSuites.Find(element) is { } named && !OpenSslCipherSuites.IsTls13(named))
         {
             _position += element.Length;

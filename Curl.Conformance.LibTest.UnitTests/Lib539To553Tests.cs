@@ -488,6 +488,25 @@ public sealed class Lib552Tests
 public sealed class Lib553Tests
 {
     [TestMethod]
+    public async Task RunAsync_SendsEightFiveThousandByteHeadersAndAnEmptyExpect()
+    {
+        string[]? sent = null;
+        var engine = new FakeCurlEngine { Performing = o => { sent = o.Http.HttpHeaders.ToArray(); return CurlCode.Ok; } };
+        var run = new PortRun(engine, 553, "http://x/553");
+
+        await new Lib553().RunAsync(run.Context, CancellationToken.None);
+
+        Assert.IsNotNull(sent);
+        Assert.AreEqual(9, sent.Length);
+        for (int i = 0; i < 8; i++)
+        {
+            Assert.AreEqual($"Header{i}: {new string('A', 5000)}", sent[i]);
+        }
+
+        Assert.AreEqual("Expect: ", sent[8]);
+    }
+
+    [TestMethod]
     public async Task RunAsync_AnswersTheTransfersCode()
     {
         var run = new PortRun(new FakeCurlEngine { PerformResult = CurlCode.SendError }, 553, "http://x/553");

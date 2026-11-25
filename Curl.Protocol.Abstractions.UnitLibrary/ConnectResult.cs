@@ -139,9 +139,10 @@ public sealed class ConnectResult
     public int MappedPort { get; private init; }
 
     /// <summary>
-    /// Gets how many header lines the reply to the CONNECT that opened a tunnel held, which curl
-    /// 8.21.0 stores and counts toward its limit of 5000 response headers (measured, BL-1609 Notes);
-    /// <c>0</c> when there was no CONNECT, the connection was reused, or the connect failed.
+    /// Gets how many header lines the reply to the CONNECT held, whether it opened a tunnel or the
+    /// proxy refused it, which curl 8.21.0 stores and counts toward its limit of 5000 response
+    /// headers (measured, BL-1609 Notes); <c>0</c> when there was no CONNECT, the connection was
+    /// reused, or the connect failed before any CONNECT reply was read.
     /// </summary>
     public int ConnectReplyHeadersStored { get; private init; }
 
@@ -149,8 +150,9 @@ public sealed class ConnectResult
     /// Gets how many bytes the heads of the proxy's replies to the CONNECTs that opened a tunnel
     /// held, status lines and blank lines included and every reply counted, a <c>407</c> answered
     /// on the way too, which curl 8.21.0 adds to <c>%{size_header}</c> with or without
-    /// <c>--suppress-connect-headers</c> (upstream test1288, BL-2010); <c>0</c> when there was no
-    /// CONNECT, the connection was reused, or the connect failed.
+    /// <c>--suppress-connect-headers</c> (upstream test1288, BL-2010); a refused CONNECT reports its
+    /// reply's bytes too; <c>0</c> when there was no CONNECT, the connection was reused, or the
+    /// connect failed before any CONNECT reply was read.
     /// </summary>
     public long ProxyConnectHeaderBytes { get; private init; }
 
@@ -297,6 +299,8 @@ public sealed class ConnectResult
     /// The socket error of the last connect attempt that failed; <see cref="SocketError.Success" />
     /// when the failure had none.
     /// </param>
+    /// <param name="connectReplyHeadersStored">How many header lines the proxy's refusing reply to a CONNECT held; <c>0</c> when none.</param>
+    /// <param name="proxyConnectHeaderBytes">How many bytes the heads of the proxy's replies to a CONNECT held, which curl still adds to <c>%{size_header}</c> when the CONNECT is refused (STD-144).</param>
     /// <param name="proxyError">
     /// Why the SOCKS proxy handshake failed; <see cref="CurlProxyCode.Ok" /> when the failure was
     /// not a SOCKS handshake's.
@@ -313,7 +317,9 @@ public sealed class ConnectResult
         long connectionNumber = 0,
         int proxyConnectResponseCode = 0,
         SocketError lastSocketError = SocketError.Success,
-        CurlProxyCode proxyError = CurlProxyCode.Ok)
+        CurlProxyCode proxyError = CurlProxyCode.Ok,
+        int connectReplyHeadersStored = 0,
+        long proxyConnectHeaderBytes = 0)
     {
         if (exitCode == CurlExitCode.Ok)
         {
@@ -330,6 +336,8 @@ public sealed class ConnectResult
             ProxyConnectResponseCode = proxyConnectResponseCode,
             LastSocketError = lastSocketError,
             ProxyError = proxyError,
+            ConnectReplyHeadersStored = connectReplyHeadersStored,
+            ProxyConnectHeaderBytes = proxyConnectHeaderBytes,
         };
     }
 

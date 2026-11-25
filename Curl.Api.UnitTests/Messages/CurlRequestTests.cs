@@ -51,7 +51,22 @@ public sealed class CurlRequestTests
     }
 
     [TestMethod]
+    public void With_NullEmptyHeaders_Throws()
+    {
+        CurlRequest request = new(HttpMethod.Get, "http://example/");
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => request with { EmptyHeaders = null! });
+    }
+
+    [TestMethod]
+    public void Constructor_HasNoEmptyHeaders()
+    {
+        Assert.AreEqual(0, new CurlRequest(HttpMethod.Get, "http://example/").EmptyHeaders.Count);
+    }
+
+    [TestMethod]
     public void Constructor_HasNoRemovedHeaders()
     {
         Assert.AreEqual(0, new CurlRequest(HttpMethod.Get, "http://example/").RemovedHeaders.Count);
-    }}
+    }
+}

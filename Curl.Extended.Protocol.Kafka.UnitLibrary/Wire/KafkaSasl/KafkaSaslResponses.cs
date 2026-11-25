@@ -24,7 +24,7 @@ internal static class KafkaSaslResponses
         KafkaReader reader = new(body);
         short errorCode = reader.Int16();
         string? errorMessage = reader.NullableString();
-        reader.NullableBytes();
-        return new KafkaSaslAuthenticateResponse(errorCode, errorMessage);
+        ReadOnlyMemory<byte> authBytes = reader.NullableBytes() ?? default;
+        return new KafkaSaslAuthenticateResponse(errorCode, errorMessage, authBytes);
     }
 }

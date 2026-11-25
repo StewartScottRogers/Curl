@@ -62,6 +62,26 @@ public sealed class CurlClientTests
     }
 
     [TestMethod]
+    public async Task CreateEasy_WithFetchFileTime_AsksForTheRemoteFileTime()
+    {
+        await using CurlClient client = new(new FakeCurlEngine(), new CurlClientOptions { FetchFileTime = true }, ownsEngine: true);
+
+        IEasyTransfer easy = client.CreateEasy();
+
+        Assert.IsTrue(easy.Options.Transfer.FileTime);
+    }
+
+    [TestMethod]
+    public async Task CreateEasy_WithoutFetchFileTime_DoesNotAskForTheRemoteFileTime()
+    {
+        await using CurlClient client = new(new FakeCurlEngine());
+
+        IEasyTransfer easy = client.CreateEasy();
+
+        Assert.IsFalse(easy.Options.Transfer.FileTime);
+    }
+
+    [TestMethod]
     public async Task CreateEasy_AppliesClientOptionsToTheHandle()
     {
         CurlClientOptions options = new()

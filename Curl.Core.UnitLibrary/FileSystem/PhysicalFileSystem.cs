@@ -50,6 +50,23 @@ namespace Curl.Core.FileSystem;
 /// it is ignored and the option has no effect.
 /// </para>
 /// <para>
+/// Off Windows a <see cref="FileWriteMode.Replace" /> open of a regular file, or of a path
+/// naming nothing yet, opens and closes the path as a truncating open does, then writes a
+/// temporary file beside it, created with the old file's mode and its owner's read and write
+/// bits, narrowed by the umask, which a <see cref="ReplacementFileStream" /> renames over the
+/// path when it closes: libcurl's <c>Curl_fopen</c> (ADR-1368). A device or pipe is written in
+/// place.
+/// </para>
+/// <para>
+/// On Windows a <see cref="FileWriteMode.Replace" /> open of an existing file never opens
+/// it: it writes the temporary file beside it and renames that over the path, retrying a
+/// refused rename for <see cref="WindowsRenameRetryWindow" /> when the stream closes
+/// asynchronously, as curl's <c>curlx_rename</c> does (ADR-1385). So a symbolic link, a hard
+/// link's other names and a hidden attribute are left behind, and a file that is read-only
+/// or still held open after that second keeps its content. A path naming nothing yet, a
+/// directory or a device is opened as a truncating open does.
+/// </para>
+/// <para>
 /// Every file opens with a synchronous handle (<see cref="FileOptions.None" />), as curl's
 /// <c>fopen</c> does. On Windows an asynchronous handle makes each of a download's 16 KiB
 /// writes an overlapped write completed through the thread pool, which made a 50 MiB
@@ -69,6 +86,9 @@ namespace Curl.Core.FileSystem;
 public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTimeSetter
 {
     private const int BufferSize = 4096;
+
+    /// <summary>How long curl's Windows build retries the rename of a replaced file before giving up.</summary>
+    internal static readonly TimeSpan WindowsRenameRetryWindow = TimeSpan.FromSeconds(1);
 
     // Read and write sharing for a write open: curl's Windows build opens -o files with the
     // C runtime's fopen, which shares the file for reading and writing, so two -Z transfers
@@ -93,6 +113,12 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
 
     private readonly Func<byte[], RawBytePathOpen>? openRawBytePathForRead;
 
+    private readonly Func<SafeFileHandle, UnixFileMode?>? readReplaceableMode;
+
+    private readonly Func<string, bool>? isReplacedUnopened;
+
+    private readonly TimeProvider renameClock;
+
     [UnsupportedOSPlatformGuard("windows")]
     private readonly bool setsUnixCreateMode;
 
@@ -105,14 +131,18 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
     /// the create mode of a written file everywhere except Windows, reports the Unix
     /// epoch for an unreadable timestamp only on Windows, and reports a path whose parent
     /// is a file as <see cref="FileAccessStatus.NotADirectory" /> everywhere except Windows,
-    /// and opens a <see cref="RawBytePath" /> for reading under its raw bytes everywhere except Windows.
+    /// and opens a <see cref="RawBytePath" /> for reading under its raw bytes everywhere except Windows,
+    /// where alone a <see cref="FileWriteMode.Replace" /> open replaces an existing file
+    /// without opening it first.
     /// </summary>
     public PhysicalFileSystem()
         : this(
             setsUnixCreateMode: !OperatingSystem.IsWindows(),
             reportsUnreadableTimestampAsEpoch: OperatingSystem.IsWindows(),
             reportsFileInPathAsNotADirectory: !OperatingSystem.IsWindows(),
-            openRawBytePathForRead: RawBytePathReadOpenerFor(OperatingSystem.IsWindows()))
+            openRawBytePathForRead: RawBytePathReadOpenerFor(OperatingSystem.IsWindows()),
+            readReplaceableMode: ReplaceableModeReaderFor(OperatingSystem.IsWindows()),
+            isReplacedUnopened: UnopenedReplacementCheckFor(OperatingSystem.IsWindows()))
     {
     }
 
@@ -142,12 +172,33 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
     /// does, for a read path holding a raw byte; <see langword="null" /> opens every path through
     /// <see cref="FileStream" />, as Windows does.
     /// </param>
+    /// <param name="readReplaceableMode">
+    /// Gives the mode of an opened regular file, which a <see cref="FileWriteMode.Replace" />
+    /// open then replaces, and <see langword="null" /> for a device or pipe, which it writes in
+    /// place; <see langword="null" /> decides nothing by the opened file.
+    /// </param>
+    /// <param name="isReplacedUnopened">
+    /// Tells whether a path is one a <see cref="FileWriteMode.Replace" /> open replaces without
+    /// opening it, as Windows does for an existing file; <see langword="null" /> asks nothing of
+    /// the path. With both this and <paramref name="readReplaceableMode" /> <see langword="null" />
+    /// every file is written in place.
+    /// </param>
+    /// <param name="renameClock">
+    /// Times the retries of a refused rename over an unopened file; <see langword="null" /> is
+    /// <see cref="TimeProvider.System" />.
+    /// </param>
     internal PhysicalFileSystem(
         bool setsUnixCreateMode,
         bool reportsUnreadableTimestampAsEpoch = false,
         bool reportsFileInPathAsNotADirectory = false,
-        Func<byte[], RawBytePathOpen>? openRawBytePathForRead = null)
+        Func<byte[], RawBytePathOpen>? openRawBytePathForRead = null,
+        Func<SafeFileHandle, UnixFileMode?>? readReplaceableMode = null,
+        Func<string, bool>? isReplacedUnopened = null,
+        TimeProvider? renameClock = null)
     {
+        this.readReplaceableMode = readReplaceableMode;
+        this.isReplacedUnopened = isReplacedUnopened;
+        this.renameClock = renameClock ?? TimeProvider.System;
         this.setsUnixCreateMode = setsUnixCreateMode;
         this.reportsUnreadableTimestampAsEpoch = reportsUnreadableTimestampAsEpoch;
         this.reportsFileInPathAsNotADirectory = reportsFileInPathAsNotADirectory;
@@ -185,12 +236,17 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        FileMode fileMode = FileModeFor(mode);
-        FileStreamOptions options = setsUnixCreateMode
-            ? WriteOptionsWithCreateMode(fileMode, createMode)
-            : OptionsFor(fileMode, FileAccess.Write, WriteShare);
+        if (mode == FileWriteMode.Replace && isReplacedUnopened?.Invoke(path) == true)
+        {
+            return ValueTask.FromResult(OpenTemporaryBeside(path, createMode, WindowsRenameRetryWindow));
+        }
 
-        return ValueTask.FromResult(Open(path, options));
+        FileOpenResult opened = Open(path, WriteOptionsFor(FileModeFor(mode), createMode));
+
+        return ValueTask.FromResult(
+            mode == FileWriteMode.Replace && readReplaceableMode is not null
+                ? OpenReplacementOf(path, opened, readReplaceableMode)
+                : opened);
     }
 
     /// <inheritdoc />
@@ -263,6 +319,61 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
         FileWriteMode.CreateNew => FileMode.CreateNew,
         _ => FileMode.Create,
     };
+
+    /// <summary>
+    /// The options for a write open, which set the mode a created file receives where this
+    /// instance sets it.
+    /// </summary>
+    /// <param name="fileMode">How to open or create the file.</param>
+    /// <param name="createMode">The mode a newly created file receives, before the umask.</param>
+    /// <returns>Options for a synchronous <see cref="FileStream" />.</returns>
+    private FileStreamOptions WriteOptionsFor(FileMode fileMode, UnixFileMode createMode) =>
+        setsUnixCreateMode
+            ? WriteOptionsWithCreateMode(fileMode, createMode)
+            : OptionsFor(fileMode, FileAccess.Write, WriteShare);
+
+    /// <summary>
+    /// The result of a <see cref="FileWriteMode.Replace" /> open once the path itself is open:
+    /// that open when it failed or is not of a regular file, so is written in place; otherwise
+    /// it is closed and a new temporary file beside the path is opened in its stead.
+    /// </summary>
+    /// <param name="path">The file to replace.</param>
+    /// <param name="target">The truncating open of <paramref name="path" />.</param>
+    /// <param name="readMode">Gives a regular file's mode, or <see langword="null" />.</param>
+    /// <returns>The handle to write to, or the reason there is none.</returns>
+    private FileOpenResult OpenReplacementOf(string path, FileOpenResult target, Func<SafeFileHandle, UnixFileMode?> readMode)
+    {
+        if (target.Content is not FileStream opened || readMode(opened.SafeFileHandle) is not { } targetMode)
+        {
+            return target;
+        }
+
+        opened.Dispose();
+
+        return OpenTemporaryBeside(path, targetMode | UnixFileMode.UserRead | UnixFileMode.UserWrite, TimeSpan.Zero);
+    }
+
+    /// <summary>
+    /// Opens a new temporary file beside <paramref name="path" />, which replaces it when the
+    /// returned stream closes.
+    /// </summary>
+    /// <param name="path">The file to replace.</param>
+    /// <param name="createMode">The mode the temporary file is created with, before the umask.</param>
+    /// <param name="renameRetryWindow">How long an asynchronous close retries a refused rename.</param>
+    /// <returns>The handle to write to, or the reason there is none.</returns>
+    private FileOpenResult OpenTemporaryBeside(string path, UnixFileMode createMode, TimeSpan renameRetryWindow)
+    {
+        // The path's own directory text, so the temporary file is on the same file system.
+        string temporaryPath = $"{path[..^Path.GetFileName(path).Length]}{Path.GetRandomFileName()}.tmp";
+        FileOpenResult temporary = Open(temporaryPath, WriteOptionsFor(FileMode.CreateNew, createMode));
+
+        return temporary.Content is { } content
+            ? FileOpenResult.Opened(
+                new ReplacementFileStream(content, temporaryPath, path, renameRetryWindow, renameClock),
+                0,
+                temporary.LastWriteTimeUtc)
+            : temporary;
+    }
 
     /// <summary>
     /// The options for a write open that also sets the mode a created file receives.

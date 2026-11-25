@@ -15,8 +15,9 @@ namespace Curl.Core;
 /// host it exempts (<see cref="NoProxyMatcher" />) is reached directly, whichever proxy was
 /// named. Then the proxy is <c>-x</c> when given, else <c>&lt;scheme&gt;_proxy</c>, then
 /// <c>&lt;SCHEME&gt;_PROXY</c> except for <c>http</c>, whose upper-case name curl never
-/// reads; then for <c>ws</c> <c>http_proxy</c>, for <c>wss</c> <c>https_proxy</c> and
-/// <c>HTTPS_PROXY</c>; then <c>all_proxy</c>, then <c>ALL_PROXY</c>. Empty proxy text,
+/// reads; then for <c>ws</c> and the cleartext extension schemes <c>http_proxy</c>, for <c>wss</c>
+/// and the extension schemes that always speak HTTPS <c>https_proxy</c> and
+/// <c>HTTPS_PROXY</c> (<c>ProxyVariableNames</c> lists them); then <c>all_proxy</c>, then <c>ALL_PROXY</c>. Empty proxy text,
 /// including <c>-x ""</c>, means a direct connection.
 /// </para>
 /// <para>
@@ -112,6 +113,50 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     /// </summary>
     private static string HostName(CurlUrl url) => url.Host.StartsWith('[') ? url.Host[1..^1] : url.Host;
 
+    /// <summary>
+    /// The host an exemption list is matched against: the URL's host, except for the cloud-storage schemes, whose
+    /// URL names a bucket or account and whose connection goes to the endpoint host the scheme handler maps it to
+    /// (the same rule as an oci hop, ADR-1290; BL-5480).
+    /// </summary>
+    private string EffectiveHost(CurlUrl url) => url.Scheme switch
+    {
+        "s3" => S3Host(HostName(url)),
+        "gs" => GcsHost(),
+        "az" => AzureBlobHost(HostName(url)),
+        "abfs" or "abfss" => AccountHost(HostName(url), ".dfs.core.windows.net"),
+        _ => HostName(url),
+    };
+
+    private string GcsHost()
+    {
+        string? emulator = Read("STORAGE_EMULATOR_HOST");
+        string? text = emulator is not null && !emulator.Contains("://", StringComparison.Ordinal) ? "http://" + emulator : emulator;
+        return EndpointHost(text) ?? "storage.googleapis.com";
+    }
+
+    private string S3Host(string bucket)
+    {
+        if (EndpointHost(Read("AWS_ENDPOINT_URL_S3") ?? Read("AWS_ENDPOINT_URL")) is { } endpoint)
+        {
+            return endpoint;
+        }
+
+        string awsHost = $"s3.{Read("AWS_REGION") ?? Read("AWS_DEFAULT_REGION") ?? "us-east-1"}.amazonaws.com";
+        return bucket.Contains('.', StringComparison.Ordinal) ? awsHost : $"{bucket}.{awsHost}";
+    }
+
+    private static string AzureBlobHost(string host) =>
+        System.Net.IPAddress.TryParse(host, out _) || string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+            ? host
+            : AccountHost(host, ".blob.core.windows.net");
+
+    private static string AccountHost(string host, string suffix) => host.Contains('.', StringComparison.Ordinal) ? host : host + suffix;
+
+    private static string? EndpointHost(string? endpoint) =>
+        Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
+            ? uri.IdnHost.Trim('[', ']')
+            : null;
+
     /// <summary>Whether <paramref name="url" /> is a <c>file</c> URL or its host is exempt from every proxy.</summary>
     private bool IsReachedDirectly(CurlUrl url, string? noProxyOption, ProxyDiagnosticLog log)
     {
@@ -121,7 +166,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
             return true;
         }
 
-        string host = HostName(url);
+        string host = EffectiveHost(url);
         if (NoProxyMatcher.MatchingEntry(host, noProxyOption ?? ReadNoProxy()) is not { } entry)
         {
             return false;
@@ -194,10 +239,14 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     private string? ReadProxyFor(string scheme) =>
         TryFindProxyVariable(scheme, out _, out string? proxyText) ? proxyText : null;
 
+    private static readonly HashSet<string> HttpProxySchemes = ["ws", "mcp", "grpc", "socketio", "signalr", "mqtt5+ws"];
+
+    private static readonly HashSet<string> HttpsProxySchemes = ["wss", "mcps", "grpcs", "socketios", "oci", "s3", "gs", "az", "abfs", "abfss", "signalrs"];
+
     /// <summary>
     /// The variables curl reads for <paramref name="scheme" />, in order: <c>&lt;scheme&gt;_proxy</c>, its upper
     /// case form (not for <c>http</c>), the HTTP proxy variable curl falls back to for a WebSocket URL
-    /// (<c>http_proxy</c> for <c>ws</c>, <c>https_proxy</c> then <c>HTTPS_PROXY</c> for <c>wss</c>), then
+    /// (<c>http_proxy</c> for <c>ws</c> and the cleartext extension schemes <c>mcp</c>, <c>grpc</c>, <c>socketio</c> and <c>signalr</c>, <c>https_proxy</c> then <c>HTTPS_PROXY</c> for <c>wss</c> and for the extension schemes that always speak HTTPS: <c>mcps</c>, <c>grpcs</c>, <c>socketios</c>, <c>oci</c>, <c>s3</c>, <c>gs</c>, <c>az</c>, <c>abfs</c>, <c>abfss</c> and <c>signalrs</c>, ADR-1297), then
     /// <c>all_proxy</c> and <c>ALL_PROXY</c>.
     /// </summary>
     private static IEnumerable<string> ProxyVariableNames(string scheme)
@@ -209,11 +258,11 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
             yield return lowerName.ToUpperInvariant();
         }
 
-        if (scheme == "ws")
+        if (HttpProxySchemes.Contains(scheme))
         {
             yield return "http_proxy";
         }
-        else if (scheme == "wss")
+        else if (HttpsProxySchemes.Contains(scheme))
         {
             yield return "https_proxy";
             yield return "HTTPS_PROXY";

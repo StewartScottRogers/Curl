@@ -32,11 +32,11 @@ public sealed class CurlMcpPackIntegrationTests
         {
             string log = await PackAsync(output);
 
-            string package = Path.Combine(output, "Curl.Mcp.0.1.0.nupkg");
+            string package = Path.Combine(output, "Surly.Curl.Mcp.0.1.0.nupkg");
             Assert.IsTrue(File.Exists(package), log);
             using ZipArchive archive = ZipFile.OpenRead(package);
             Assert.IsNotNull(archive.GetEntry(".mcp/server.json"));
-            ZipArchiveEntry nuspec = archive.GetEntry("Curl.Mcp.nuspec")!;
+            ZipArchiveEntry nuspec = archive.GetEntry("Surly.Curl.Mcp.nuspec")!;
             await using Stream nuspecStream = nuspec.Open();
             XDocument document = await XDocument.LoadAsync(nuspecStream, LoadOptions.None, CancellationToken.None);
             string[] packageTypes = [.. document.Descendants().Where(element => element.Name.LocalName == "packageType").Select(element => (string)element.Attribute("name")!)];

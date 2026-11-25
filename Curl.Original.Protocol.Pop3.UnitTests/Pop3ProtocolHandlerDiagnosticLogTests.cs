@@ -173,7 +173,7 @@ public sealed class Pop3ProtocolHandlerDiagnosticLogTests
         CollectionAssert.AreEqual(
             new[] { "reply +OK", "sent CAPA", "reply -ERR", "sent LIST", "reply +OK", "sent QUIT", "reply +OK" },
             log.MessagesAt(DiagnosticLogLevel.Verbose));
-        CollectionAssert.AreEqual(new[] { "greeting +OK received", "transfer done, 6 bytes in 7 ms" }, log.MessagesAt(DiagnosticLogLevel.Info));
+        CollectionAssert.AreEqual(new[] { "greeting +OK received", "transfer done, 6 bytes in 28 ms" }, log.MessagesAt(DiagnosticLogLevel.Info));
     }
 
     [TestMethod]
@@ -250,9 +250,8 @@ public sealed class Pop3ProtocolHandlerDiagnosticLogTests
         Diagnostics.ArrangeRun(context.Url.ToString(), connection.Script, context.SslLevel);
         Diagnostics.Arrange("sasl mechanisms", sasl is null ? "(no authenticator)" : "scripted");
 
-        TransferResult result = await new Pop3ProtocolHandler(connector, tls, sasl).ExecuteAsync(context);
-
-        var run = new Pop3Run(result, connection, connector, tls, [], new RecordingProgress());
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, tls, sasl).ExecuteAsync(context));
+        var run = new Pop3Run(StampedTimings.Without(result), connection, connector, tls, [], new RecordingProgress());
         Diagnostics.ActRun(run);
         if (context.DiagnosticLog is RecordingDiagnosticLog log)
         {

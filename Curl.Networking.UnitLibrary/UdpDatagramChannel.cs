@@ -22,6 +22,7 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     private readonly Socket _socket;
     private readonly IPEndPoint _serverEndPoint;
     private readonly Action<Socket, EndPoint> _connectRouteProbe;
+    private bool _isConnected;
 
     /// <summary>
     /// Opens a UDP socket of <paramref name="serverEndPoint" />'s address family, bound to
@@ -74,12 +75,14 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     /// <param name="localAddress">The local address to bind; <see langword="null" /> for any address of the family.</param>
     /// <param name="localPort">The local port to bind; <c>0</c> for an ephemeral one.</param>
     /// <param name="connectRouteProbe">Connects the throwaway socket <see cref="LocalEndPoint" /> asks the kernel's route with; <see langword="null" /> for <see cref="Socket.Connect(EndPoint)" />.</param>
+    /// <param name="connectsToServer">Connects the socket to <paramref name="serverEndPoint" /> after the bind, so Linux reports an ICMP port unreachable as <see cref="SocketError.ConnectionRefused" /> on the next receive (BL-5315).</param>
     internal UdpDatagramChannel(
         IPEndPoint serverEndPoint,
         Action<Socket, EndPoint> bind,
         IPAddress? localAddress = null,
         int localPort = 0,
-        Action<Socket, EndPoint>? connectRouteProbe = null)
+        Action<Socket, EndPoint>? connectRouteProbe = null,
+        bool connectsToServer = false)
     {
         ArgumentNullException.ThrowIfNull(serverEndPoint);
 
@@ -89,6 +92,7 @@ public sealed class UdpDatagramChannel : IDatagramChannel
         try
         {
             bind(_socket, new IPEndPoint(localAddress ?? AnyAddressOf(serverEndPoint.AddressFamily), localPort));
+            ConnectIf(connectsToServer);
         }
         catch
         {
@@ -106,16 +110,32 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     /// </summary>
     /// <param name="serverEndPoint">The resolved endpoint the first datagram goes to.</param>
     /// <param name="boundSocket">The bound socket, which the channel now owns.</param>
-    internal UdpDatagramChannel(IPEndPoint serverEndPoint, Socket boundSocket)
+    /// <param name="connectsToServer">Connects the socket to <paramref name="serverEndPoint" /> (BL-5315).</param>
+    internal UdpDatagramChannel(IPEndPoint serverEndPoint, Socket boundSocket, bool connectsToServer = false)
     {
         _connectRouteProbe = static (socket, remoteEndPoint) => socket.Connect(remoteEndPoint);
         _serverEndPoint = serverEndPoint;
         _socket = boundSocket;
+        try
+        {
+            ConnectIf(connectsToServer);
+        }
+        catch
+        {
+            _socket.Dispose();
+            throw;
+        }
         ServerEndPoint = serverEndPoint;
     }
 
     /// <inheritdoc />
     public EndPoint ServerEndPoint { get; }
+
+    /// <inheritdoc />
+    public void ConnectToServer()
+    {
+        ConnectIf(true);
+    }
 
     /// <summary>
     /// Gets the local endpoint the socket's datagrams to <see cref="ServerEndPoint" /> leave
@@ -150,6 +170,12 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     {
         ArgumentNullException.ThrowIfNull(destination);
 
+        if (_isConnected)
+        {
+            await _socket.SendAsync(datagram, SocketFlags.None, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         await _socket.SendToAsync(datagram, SocketFlags.None, destination, cancellationToken).ConfigureAwait(false);
     }
 
@@ -176,6 +202,17 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     {
         _socket.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    // A connected UDP socket is told by the kernel of an ICMP port unreachable (Linux reports nothing on an
+    // unconnected one), and receives only from the server (BL-5315). Connecting sends nothing.
+    private void ConnectIf(bool connectsToServer)
+    {
+        if (connectsToServer)
+        {
+            _socket.Connect(_serverEndPoint);
+            _isConnected = true;
+        }
     }
 
     // The source address the kernel picks for the server: a connected UDP socket's local

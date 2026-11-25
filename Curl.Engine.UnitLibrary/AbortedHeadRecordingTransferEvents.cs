@@ -32,29 +32,36 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     /// <param name="result">The finished transfer, or <see langword="null" /> when a callback aborted it.</param>
     /// <returns>The transfer with the report, or <paramref name="result" /> as it is.</returns>
     internal TransferResult? ReportOn(TransferResult? result) =>
-        result is { ExitCode: CurlExitCode.OperationTimedOut, Report: null } && connectionCount + requestSize + headerSize + downloadSize > 0
-            ? result with
-            {
-                Report = new TransferReport
-                {
-                    ResponseCode = responseCode,
-                    HttpVersion = httpVersion,
-                    HeaderSize = headerSize,
-                    RequestSize = requestSize,
-                    DownloadSize = downloadSize,
-                    ConnectionCount = connectionCount,
-                    LocalEndPoint = firstLocalEndPoint,
-                    RemoteEndPoint = firstRemoteEndPoint,
-                },
-            }
+        result is { ExitCode: CurlExitCode.OperationTimedOut } && connectionCount + requestSize + headerSize + downloadSize > 0
+            ? result with { Report = MergedInto(result.Report ?? new TransferReport()) }
             : result;
+
+    // What was recorded fills what a watchdog's report lacks, as the larger count, so a -m that ends a transfer keeps its sizes (BL-5613).
+    private TransferReport MergedInto(TransferReport report) => report with
+    {
+        ResponseCode = Math.Max(report.ResponseCode, responseCode),
+        HttpVersion = report.HttpVersion ?? httpVersion,
+        HeaderSize = Math.Max(report.HeaderSize, headerSize),
+        RequestSize = Math.Max(report.RequestSize, requestSize),
+        DownloadSize = Math.Max(report.DownloadSize, downloadSize),
+        ConnectionCount = Math.Max(report.ConnectionCount, connectionCount),
+        LocalEndPoint = report.LocalEndPoint ?? firstLocalEndPoint,
+        RemoteEndPoint = report.RemoteEndPoint ?? firstRemoteEndPoint,
+    };
 
     /// <inheritdoc />
     public void ReportInfo(string text) => inner.ReportInfo(text);
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Counts the connection and keeps the first one's end points, and forgets the status of any head reported before
+    /// it: that is a proxy's reply to the CONNECT that opened the tunnel, <c>%{http_connect}</c>'s and never
+    /// <c>%{response_code}</c>'s, though its bytes stay counted in the header size (BL-5893).
+    /// </summary>
+    /// <param name="opened">The connection opened.</param>
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
     {
+        responseCode = 0;
+        httpVersion = null;
         connectionCount++;
         if (connectionCount == 1)
         {

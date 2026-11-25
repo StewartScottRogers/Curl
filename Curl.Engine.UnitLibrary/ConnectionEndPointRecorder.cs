@@ -16,10 +16,16 @@ namespace Curl.Engine;
 /// recorder serves the run's transfers one at a time; <see cref="EndPointReportingProtocolHandler" />
 /// clears it before each. Its units live in one file each: the first connection's end points
 /// (<c>ConnectionEndPointRecorder.EndPoints.cs</c>), the failed connect's error numbers
-/// (<c>.OsErrno.cs</c>) and the earlier redirect hop (<c>.EarlierHop.cs</c>).
+/// (<c>.OsErrno.cs</c>), the CONNECT reply status (<c>.ProxyConnect.cs</c>) and the earlier redirect hop (<c>.EarlierHop.cs</c>).
 /// </remarks>
 internal sealed partial class ConnectionEndPointRecorder
 {
+    /// <summary>
+    /// Gets the clock of the transfer now running, which stamps when a datagram channel opened so the stamp is on the
+    /// same clock as the transfer's start and end (BL-5535); <see cref="EndPointReportingProtocolHandler" /> sets it from the transfer's context.
+    /// </summary>
+    internal TimeProvider TransferClock { get; set; } = TimeProvider.System;
+
     /// <summary>
     /// Forgets what the previous transfer recorded, or - for a redirect's next hop - sets it aside as the earlier hop's,
     /// which a hop that fails before it connects reports in its place as libcurl 8.22.0 keeps them (BL-3314).
@@ -30,6 +36,7 @@ internal sealed partial class ConnectionEndPointRecorder
         SetAsideEarlierHop(followingRedirect);
         ClearEndPoints();
         ClearConnectFailure();
+        ClearProxyConnect();
     }
 
     /// <summary>
@@ -38,6 +45,11 @@ internal sealed partial class ConnectionEndPointRecorder
     /// does, keeps its own.
     /// </summary>
     /// <param name="result">The transfer's result, as its handler returned it.</param>
+    /// <param name="handlerCountsConnections">
+    /// Whether the handler counted the connections on its own report, as the HTTP handler does: a 0 there is a transfer
+    /// that reused a connection, not one to count the connection another transfer of a parallel run opened through this
+    /// shared recorder (BL-5337).
+    /// </param>
     /// <returns>
     /// <paramref name="result" /> with the recorded end points on its report; a result without
     /// a report gets one carrying only the end points and <see cref="TransferResult.BytesTransferred" />
@@ -45,9 +57,10 @@ internal sealed partial class ConnectionEndPointRecorder
     /// without a report. <paramref name="result" /> itself when nothing was recorded or the
     /// handler reported an end point.
     /// </returns>
-    internal TransferResult ReportOn(TransferResult result)
+    internal TransferResult ReportOn(TransferResult result, bool handlerCountsConnections = false)
     {
         RememberResponseCode(result);
-        return WithEarlierHop(WithConnectionCount(WithEndPoints(WithConnectFailure(result))));
+        TransferResult withEndPoints = WithEndPoints(WithProxyConnect(WithConnectFailure(result)));
+        return WithEarlierHop(handlerCountsConnections ? withEndPoints : WithConnectionCount(withEndPoints));
     }
 }

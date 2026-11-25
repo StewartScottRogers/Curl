@@ -14,6 +14,9 @@ public sealed record McpResponseCap
     /// <summary>The cap when the variable is unset or empty: 1 MiB.</summary>
     public const int DefaultMaxBytes = 1024 * 1024;
 
+    /// <summary>The most a <c>transfer</c> request's <c>maxBodyBytes</c> may raise the cap to: 64 MiB.</summary>
+    public const int CeilingMaxBytes = 64 * 1024 * 1024;
+
     /// <summary>Creates a cap of <paramref name="maxBytes" /> bytes.</summary>
     /// <param name="maxBytes">The most bytes a tool returns; at least 1.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxBytes" /> is zero or negative.</exception>
@@ -25,6 +28,9 @@ public sealed record McpResponseCap
 
     /// <summary>The most bytes of output a tool returns.</summary>
     public int MaxBytes { get; }
+
+    /// <summary>The most a <c>transfer</c> request's <c>maxBodyBytes</c> may raise the cap to: <see cref="CeilingMaxBytes" /> unless the operator set <c>CURL_MCP_MAX_RESPONSE_BYTES</c>, then that value; the check on the field still refuses anything above <see cref="CeilingMaxBytes" /> (ADR-1330 amendment).</summary>
+    public int RequestCeilingBytes { get; private init; } = CeilingMaxBytes;
 
     /// <summary>
     /// Reads the cap from <c>CURL_MCP_MAX_RESPONSE_BYTES</c>: the default when it is unset or
@@ -47,6 +53,6 @@ public sealed record McpResponseCap
                 $"{VariableName} must be a positive whole number of bytes; got '{value}'.");
         }
 
-        return new McpResponseCap(maxBytes);
+        return new McpResponseCap(maxBytes) { RequestCeilingBytes = maxBytes };
     }
 }

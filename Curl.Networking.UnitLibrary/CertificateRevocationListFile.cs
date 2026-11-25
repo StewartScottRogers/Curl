@@ -56,6 +56,19 @@ internal sealed class CertificateRevocationListFile
     public long? FirstRefusal(X509Chain chain, DateTimeOffset now)
     {
         var elements = chain.ChainElements;
+        var last = elements[^1].Certificate;
+        if (last.SubjectName.RawData.AsSpan().SequenceEqual(last.IssuerName.RawData))
+        {
+            return FirstRefusalOfCertificates(elements, now);
+        }
+
+        // OpenSSL builds no partial chain: an anchor that is not self-signed leaves the chain
+        // without its issuer before any list is read (measured with curl 8.18.0, STD-180).
+        return OpenSslVerifyResult.UnableToGetIssuerCertificate;
+    }
+
+    private long? FirstRefusalOfCertificates(X509ChainElementCollection elements, DateTimeOffset now)
+    {
         for (var depth = 0; depth < elements.Count; depth++)
         {
             var issuer = elements[Math.Min(depth + 1, elements.Count - 1)].Certificate;
@@ -98,7 +111,7 @@ internal sealed class CertificateRevocationListFile
 
     private static long? SignatureOrRevocationRefusal(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer)
     {
-        if (!list.IsSignedBy(issuer))
+        if (!list.IsSignedBy(issuer, anotherMaskHashVerifies: true))
         {
             return OpenSslVerifyResult.CertificateRevocationListSignatureFailure;
         }

@@ -33,6 +33,26 @@ public sealed class UdpDatagramChannelIntegrationTests
         Assert.AreNotEqual(serverEndPoint.Port, ((IPEndPoint)received.RemoteEndPoint).Port);
     }
 
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task ReceiveAsync_ConnectedToAnUnboundPort_FailsAtOnceWithARefusalOnEveryPlatform()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var unbound = BindLoopbackUdpSocket();
+        var serverEndPoint = (IPEndPoint)unbound.LocalEndPoint!;
+        unbound.Dispose();
+        await using var channel = new UdpDatagramChannel(serverEndPoint);
+        channel.ConnectToServer();
+
+        var failure = await Assert.ThrowsAsync<SocketException>(async () =>
+        {
+            await channel.SendAsync(new byte[] { 1 }, channel.ServerEndPoint, cancellation.Token);
+            await channel.ReceiveAsync(new byte[16], cancellation.Token);
+        });
+
+        Assert.IsTrue(failure.SocketErrorCode is SocketError.ConnectionRefused or SocketError.ConnectionReset, failure.SocketErrorCode.ToString());
+    }
+
     private static Socket BindLoopbackUdpSocket()
     {
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);

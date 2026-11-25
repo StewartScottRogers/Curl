@@ -40,6 +40,19 @@ public sealed class BrotliPrefixCodeReaderTests
     public void Read_RepeatPastAlphabet_Throws() =>
         Assert.ThrowsExactly<BrotliFormatException>(() => BrotliPrefixCodeReader.Read(ReaderOf(new BrotliBitWriter().Bits(3, 2).Bits(0, 6).Bits(1, 2).Bits(0, 22)), 2));
 
+    // Code 16 is the only code length code (zero bits), repeating length 8. Repeats of 5, 17, 65 and 256 symbols (each
+    // extending the last, 2 extra bits) fill a 256-symbol alphabet exactly, and a repeat that ends at the end is valid.
+    [TestMethod]
+    public void Read_RepeatEndingExactlyAtAlphabetEnd_Reads()
+    {
+        var writer = new BrotliBitWriter().Bits(3, 2).Bits(0, 10).Bits(1, 2).Bits(0, 18).Bits(2, 2).Bits(2, 2).Bits(2, 2).Bits(1, 2);
+        var reader = ReaderOf(writer);
+
+        var code = BrotliPrefixCodeReader.Read(reader, 256);
+
+        Assert.AreEqual(0, code.Decode(reader));
+    }
+
     // Code length code 1111 (length 5) for symbol 1 alone makes a zero-bit code, so every symbol gets length 1.
     [TestMethod]
     public void Read_CodeLengthCodeOfLengthFive_GivesLengthOneCode()

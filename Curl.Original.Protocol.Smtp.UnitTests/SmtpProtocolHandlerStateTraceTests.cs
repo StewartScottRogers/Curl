@@ -332,7 +332,7 @@ public sealed class SmtpProtocolHandlerStateTraceTests
             TracesStateMachine = true,
         };
 
-        TransferResult result = await handler.ExecuteAsync(context);
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(context));
         Diagnostics.ActEvents(result, events);
 
         string[] states = [.. events.Transcript.Where(line => line.StartsWith("* [SMTP] state", StringComparison.Ordinal))];
@@ -433,8 +433,8 @@ public sealed class SmtpProtocolHandlerStateTraceTests
         {
             TracesStateMachine = true,
         };
-        TransferResult result = await handler.ExecuteAsync(context);
-        var run = new SmtpRun(result, connection, connector, tls);
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(context));
+        var run = new SmtpRun(StampedTimings.Without(result), connection, connector, tls);
         Diagnostics.ActEvents(result, events);
         Diagnostics.Act("sent", SmtpDiagnostics.Show(run.Sent));
         return run;

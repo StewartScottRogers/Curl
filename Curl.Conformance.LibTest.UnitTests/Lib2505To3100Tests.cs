@@ -366,6 +366,21 @@ public sealed class Lib2505To3100Tests
     }
 
     [TestMethod]
+    public async Task Lib3033_TracesToStandardErrorWithoutTheHexColumn()
+    {
+        var (engine, _) = EngineCountingAdds(_ => 1);
+        engine.Multi.EachAddedDoneResult = CurlCode.Ok;
+        engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 1));
+        var run = new PortRun(engine, 3033, "http://x/3033");
+
+        _ = await new Lib3033(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        DebugCallback debug = engine.CreatedEasies[0].Options.Callbacks.Debug!;
+        _ = debug(CurlInfoType.HeaderOut, "ok"u8);
+        StringAssert.EndsWith(run.Error.ToString(), "=> Send header, 2 bytes (0x2)\n0000: ok\n");
+    }
+
+    [TestMethod]
     [DataRow(0L, "[1] signal network change\n[1] should not reuse connection in pool\n")]
     [DataRow(1L, "[1] signal network change\n[2] no network change\n[2] should have reused connection from [1]\n")]
     public async Task Lib3033_WhenTheConnectionCountIsWrong_SaysSoAndEndsMajorBad(long laterConnects, string outputEnd)

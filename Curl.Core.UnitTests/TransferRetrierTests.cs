@@ -409,6 +409,19 @@ public sealed class TransferRetrierTests
     }
 
     [TestMethod]
+    public async Task RunAsync_MaxTimeShorterThanRetryDelay_RetriesOnceLikeCurl()
+    {
+        TransferResult[] attempts = [.. Enumerable.Range(0, 6).Select(_ => Http(503))];
+
+        Run run = await Retry(new RetryPolicy { Retries = 5, Delay = TimeSpan.FromSeconds(3), MaxTime = TimeSpan.FromSeconds(1) }, attempts);
+
+        Expect("run.Waits", Seconds(3), run.Waits);
+        CollectionAssert.AreEqual(Seconds(3), run.Waits);
+        Expect("run.Attempts", 2, run.Attempts);
+        Assert.AreEqual(2, run.Attempts);
+    }
+
+    [TestMethod]
     public async Task RunAsync_AttemptEndingAtMaxTime_IsFinal()
     {
         Run run = await Retry(

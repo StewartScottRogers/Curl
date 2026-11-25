@@ -13,9 +13,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -77,8 +77,10 @@ internal sealed partial class ManagedEasyTransfer
     /// <c>curl_easy_cleanup</c>: removes the handle from the multi handle it is still in, cancelling its perform, as
     /// libcurl's <c>curl_easy_cleanup</c> calls <c>curl_multi_remove_handle</c> (upstream test753, BL-2636), hands the HSTS
     /// cache to <c>CURLOPT_HSTSWRITEFUNCTION</c> (<see cref="SaveHstsToCallback" />),
+    /// writes the handle's alt-svc cache to its <c>CURLOPT_ALTSVC</c> file (<see cref="SaveAltSvcAsync" />) and the cookies of the last HTTP perform to its
+    /// <c>CURLOPT_COOKIEJAR</c> file (<see cref="SaveCookieJarAsync" />),
     /// takes the attached share handle's cookie lock for libcurl's cookie flush and detaches from it, then closes the
-    /// connection a connect-only perform left open or upgraded, if any, and the handle's own idle pooled connections
+    /// connection a connect-only perform left open or upgraded, if any, the handle's WebSocket connection, if any, and the handle's own idle pooled connections
     /// (<see cref="OwnTheConnectionsOpened" />), as libcurl closes the handle's connection cache, FTP's sending <c>QUIT</c>.
     /// </summary>
     /// <returns>A task that completes once they are closed.</returns>

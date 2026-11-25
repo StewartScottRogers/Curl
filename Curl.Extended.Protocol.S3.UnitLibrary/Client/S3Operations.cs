@@ -20,22 +20,57 @@ internal sealed class S3Operations(S3Client client, S3Endpoint endpoint, string 
 {
     /// <summary>Writes the object at <paramref name="key"/> to <paramref name="output"/> (GetObject).</summary>
     /// <param name="key">The object key.</param>
+    /// <param name="query">The URL's own query parameters, sent as they are (for example <c>versionId</c>).</param>
     /// <param name="output">Where the object's bytes go.</param>
     /// <returns>The number of bytes written.</returns>
-    internal Task<long> DownloadAsync(string key, Stream output) =>
-        client.ExchangeAsync("GET", endpoint.PathOf(bucket, key), [], null, response => CopyAsync(response.Body, output));
+    /// <param name="resumeFrom">The <c>-C</c> offset: above zero sends <c>Range: bytes=N-</c> and appends what follows; as curl does over https, a 416 means nothing is left, and a 200 that is not exactly the bytes already held fails with exit 33.</param>
+    /// <param name="rangeText">The <c>-r</c> text as typed, sent as <c>Range: bytes=</c> and the text; whatever status S3 answers is delivered as over https.</param>
+    internal Task<long> DownloadAsync(string key, IReadOnlyList<KeyValuePair<string, string>> query, Stream output, long? resumeFrom = null, string? rangeText = null)
+    {
+        bool resuming = resumeFrom is > 0;
+        string? range = resuming ? string.Create(CultureInfo.InvariantCulture, $"bytes={resumeFrom}-") : rangeText is null ? null : "bytes=" + rangeText;
+        return client.ExchangeAsync("GET", endpoint.PathOf(bucket, key), query, null, response => ReadObjectAsync(response, output, resuming ? resumeFrom : null), range);
+    }
+
+    private async Task<long> ReadObjectAsync(S3HttpResponse response, Stream output, long? resumeFrom)
+    {
+        if (response.StatusCode == S3Client.RangeNotSatisfiable)
+        {
+            return resumeFrom is null
+                ? throw S3Client.ErrorOf(response.StatusCode, await client.ReadTextAsync(response))
+                : 0;
+        }
+
+        return resumeFrom is { } offset && response.StatusCode != 206
+            ? NothingLeftOf(response, offset)
+            : await CopyAsync(response.Body, output);
+    }
+
+    // A resume answered with the whole object: only one exactly the size already held has nothing to add, as over https.
+    private static long NothingLeftOf(S3HttpResponse response, long offset) =>
+        long.TryParse(response.FindHeader("Content-Length"), CultureInfo.InvariantCulture, out long length) && length == offset
+            ? 0
+            : throw new S3TransferException(CurlExitCode.RangeError, "HTTP server does not seem to support byte ranges. Cannot resume.");
+
+    /// <summary>Deletes the object at <paramref name="key"/> (DeleteObject); a 204 is success, any other 3xx or above fails as the other operations do.</summary>
+    /// <param name="key">The object key.</param>
+    /// <param name="query">The URL's own query parameters, sent as they are (for example <c>versionId</c>).</param>
+    /// <returns>Zero: a delete transfers no bytes.</returns>
+    internal Task<long> DeleteAsync(string key, IReadOnlyList<KeyValuePair<string, string>> query) =>
+        client.ExchangeAsync("DELETE", endpoint.PathOf(bucket, key), query, null, _ => Task.FromResult(0L));
 
     /// <summary>Writes, one per line, the common prefixes and then the keys of each page of the listing under <paramref name="prefix"/> (ListObjectsV2).</summary>
     /// <param name="prefix">The prefix the keys start with, empty for the whole bucket.</param>
+    /// <param name="query">The URL's own query parameters; each replaces curl's default of the same name (<c>delimiter</c>), except <c>prefix</c>, which is appended to <paramref name="prefix"/>, and <c>list-type</c> and <c>continuation-token</c>, which curl owns (ADR-1315).</param>
     /// <param name="output">Where the lines go.</param>
     /// <returns>The number of bytes written.</returns>
-    internal async Task<long> ListAsync(string prefix, Stream output)
+    internal async Task<long> ListAsync(string prefix, IReadOnlyList<KeyValuePair<string, string>> query, Stream output)
     {
         long written = 0;
         string? continuationToken = null;
         do
         {
-            S3ObjectListing listing = await client.ExchangeAsync("GET", endpoint.PathOf(bucket, string.Empty), ListQuery(prefix, continuationToken), null, ReadListingAsync);
+            S3ObjectListing listing = await client.ExchangeAsync("GET", endpoint.PathOf(bucket, string.Empty), ListQuery(prefix, query, continuationToken), null, ReadListingAsync);
             byte[] lines = Encoding.UTF8.GetBytes(string.Concat(listing.CommonPrefixes.Concat(listing.Objects.Select(listed => listed.Key)).Select(name => name + "\n")));
             await output.WriteAsync(lines, cancellationToken);
             written += lines.Length;
@@ -76,10 +111,20 @@ internal sealed class S3Operations(S3Client client, S3Endpoint endpoint, string 
         return await client.ExchangeAsync("POST", path, [new("uploadId", started.UploadId)], completion, response => ReadCompletedAsync(response, sent));
     }
 
-    private static KeyValuePair<string, string>[] ListQuery(string prefix, string? continuationToken) =>
-        continuationToken is null
-            ? [new("list-type", "2"), new("delimiter", "/"), new("prefix", prefix)]
-            : [new("list-type", "2"), new("delimiter", "/"), new("prefix", prefix), new("continuation-token", continuationToken)];
+    private static List<KeyValuePair<string, string>> ListQuery(string prefix, IReadOnlyList<KeyValuePair<string, string>> urlQuery, string? continuationToken)
+    {
+        string[] owned = ["list-type", "continuation-token", "prefix", "delimiter"];
+        List<KeyValuePair<string, string>> query = [new("list-type", "2")];
+        query.Add(urlQuery.FirstOrDefault(parameter => parameter.Key == "delimiter") is { Key: not null } delimiter ? delimiter : new("delimiter", "/"));
+        query.Add(new("prefix", prefix + urlQuery.FirstOrDefault(parameter => parameter.Key == "prefix").Value));
+        query.AddRange(urlQuery.Where(parameter => !owned.Contains(parameter.Key)));
+        if (continuationToken is not null)
+        {
+            query.Add(new("continuation-token", continuationToken));
+        }
+
+        return query;
+    }
 
     private static Task<string> ETagOf(S3HttpResponse response) =>
         Task.FromResult(response.FindHeader("ETag") ?? throw new S3TransferException(CurlExitCode.WeirdServerReply, "S3 sent no ETag for an uploaded part"));

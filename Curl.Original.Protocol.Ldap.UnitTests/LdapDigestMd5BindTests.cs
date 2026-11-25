@@ -32,13 +32,14 @@ public sealed class LdapDigestMd5BindTests
     }
 
     [TestMethod]
-    public void AnswerRequest_Rfc2831Challenge_SendsTheDigestAndNotThePassword()
+    public void AnswerRequest_Rfc2831ChallengeWithAuthConf_SendsTheDigestAndNotThePassword()
     {
-        byte[] challenge = Encoding.ASCII.GetBytes("realm=\"elwood.innosoft.com\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\",algorithm=md5-sess,charset=utf-8");
+        byte[] challenge = Encoding.ASCII.GetBytes("realm=\"elwood.innosoft.com\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth-conf\",cipher=\"3des\",algorithm=md5-sess,charset=utf-8");
 
         byte[]? request = LdapDigestMd5Bind.AnswerRequest(Writer, 2, challenge, "chris", "secret", "imap/elwood.innosoft.com", "OA6MHXh6VqTrRk");
 
-        string text = "username=\"chris\",realm=\"elwood.innosoft.com\",nonce=\"OA6MG9tEQGm2hh\",cnonce=\"OA6MHXh6VqTrRk\",nc=00000001,qop=auth,digest-uri=\"imap/elwood.innosoft.com\",response=d388dad90d4bbd760a152321f2143af7,charset=utf-8";
+        string response = LdapDigestMd5Bind.ResponseHex(Encoding.UTF8, "chris", "elwood.innosoft.com", "secret", "OA6MG9tEQGm2hh", "OA6MHXh6VqTrRk", "imap/elwood.innosoft.com", confidential: true);
+        string text = "username=\"chris\",realm=\"elwood.innosoft.com\",nonce=\"OA6MG9tEQGm2hh\",cnonce=\"OA6MHXh6VqTrRk\",nc=00000001,qop=auth-conf,cipher=3des,digest-uri=\"imap/elwood.innosoft.com\",response=" + response + ",charset=utf-8";
         Assert.IsNotNull(request);
         Assert.IsTrue(request.AsSpan(0, request.AsSpan().IndexOf("DIGEST-MD5"u8)).Contains((byte)0xa3), "SASL authentication tag");
         Assert.IsTrue(request.AsSpan().IndexOf("DIGEST-MD5"u8) > 0);
@@ -49,20 +50,20 @@ public sealed class LdapDigestMd5BindTests
     [TestMethod]
     public void AnswerRequest_NoCharset_HashesAndSendsLatin1WithoutCharsetDirective()
     {
-        byte[] challenge = Encoding.ASCII.GetBytes("nonce=\"n\\\"1\", qop=auth,realm=\"r\",realm=\"ignored\",junk");
+        byte[] challenge = Encoding.ASCII.GetBytes("nonce=\"n\\\"1\", qop=auth-conf,cipher=3des,realm=\"r\",realm=\"ignored\",junk");
 
         byte[]? request = LdapDigestMd5Bind.AnswerRequest(Writer, 1, challenge, "usér", "p", "ldap/h", "c");
 
         Assert.IsNotNull(request);
         string sent = Encoding.Latin1.GetString(request);
-        StringAssert.Contains(sent, "username=\"usér\",realm=\"r\",nonce=\"n\\\"1\",cnonce=\"c\",nc=00000001,qop=auth,digest-uri=\"ldap/h\",response=");
+        StringAssert.Contains(sent, "username=\"usér\",realm=\"r\",nonce=\"n\\\"1\",cnonce=\"c\",nc=00000001,qop=auth-conf,cipher=3des,digest-uri=\"ldap/h\",response=");
         Assert.IsFalse(sent.Contains("charset", StringComparison.Ordinal));
     }
 
     [TestMethod]
     public void AnswerRequest_NoRealmUnquotedNonceTrailingBackslash_SendsEmptyRealm()
     {
-        byte[] challenge = Encoding.ASCII.GetBytes("nonce=abc,x=\"y\",z=");
+        byte[] challenge = Encoding.ASCII.GetBytes("qop=auth-conf,cipher=3des,nonce=abc,x=\"y\",z=");
 
         byte[]? request = LdapDigestMd5Bind.AnswerRequest(Writer, 1, challenge, "u", "p", "ldap/h", "c");
 
@@ -71,7 +72,10 @@ public sealed class LdapDigestMd5BindTests
     }
 
     [TestMethod]
-    [DataRow("realm=\"r\",qop=\"auth\"", DisplayName = "No nonce")]
+    [DataRow("realm=\"r\",qop=\"auth-conf\",cipher=\"3des\"", DisplayName = "No nonce")]
+    [DataRow("nonce=\"n\",qop=\"auth\"", DisplayName = "Only auth offered")]
+    [DataRow("nonce=\"n\",qop=\"auth\",x=\"yyyyyyyyyyyyyyyyyyyy\"", DisplayName = "auth-conf stripped by a man in the middle")]
+    [DataRow("nonce=\"n\"", DisplayName = "No qop, so auth")]
     [DataRow("nonce=\"n\",qop=\"auth-int\"", DisplayName = "qop without auth")]
     [DataRow("", DisplayName = "Empty challenge")]
     public void AnswerRequest_ChallengeItCannotAnswer_ReturnsNull(string challenge)
@@ -82,7 +86,7 @@ public sealed class LdapDigestMd5BindTests
     [TestMethod]
     public void AnswerRequest_UnterminatedQuotedValueEndingInBackslash_StillAnswers()
     {
-        byte[]? request = LdapDigestMd5Bind.AnswerRequest(Writer, 1, Encoding.ASCII.GetBytes("nonce=\"abc\",x=\"y\\"), "u", "p", "ldap/h", "c");
+        byte[]? request = LdapDigestMd5Bind.AnswerRequest(Writer, 1, Encoding.ASCII.GetBytes("qop=auth-conf,cipher=3des,nonce=\"abc\",x=\"y\\"), "u", "p", "ldap/h", "c");
 
         Assert.IsNotNull(request);
     }
@@ -120,12 +124,23 @@ public sealed class LdapDigestMd5BindTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_DigestChallengeAnswered_BindsAndReturnsTheEntry()
+    public async Task ExecuteAsync_DigestChallengeOffersOnlyAuth_FailsWith38OperationsErrorAndSendsNoAnswerOrSearch()
     {
         (TransferResult result, byte[] sent, string output) = await RunAsync(HttpAuthSchemes.Digest, ChallengeReply(), BindSuccess2, DigestSearchEntry, DigestSearchDone);
 
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Operations Error"), result);
+        Assert.IsFalse(Encoding.ASCII.GetString(sent).Contains("digest-uri", StringComparison.Ordinal), "No digest-response may be sent.");
+        Assert.IsFalse(sent.Contains((byte)0x63), "No SearchRequest (tag 0x63) may be sent.");
+        Assert.AreEqual(string.Empty, output);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestOverLdapsChallengeOffersOnlyAuth_AnswersQopAuthAndReturnsTheEntry()
+    {
+        (TransferResult result, byte[] sent, string output) = await RunAsync("ldaps", HttpAuthSchemes.Digest, ChallengeReply(), BindSuccess2, DigestSearchEntry, DigestSearchDone);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.IsTrue(Encoding.ASCII.GetString(sent).Contains("digest-uri", StringComparison.Ordinal));
+        StringAssert.Contains(Encoding.ASCII.GetString(sent), "qop=auth,");
         StringAssert.Contains(output, "cn=a");
     }
 
@@ -144,14 +159,17 @@ public sealed class LdapDigestMd5BindTests
         return $"30 {(creds.Length + 14):x2} 02 01 01 61 {(creds.Length + 9):x2} 0a 01 0e 04 00 04 00 87 {creds.Length:x2} {Convert.ToHexString(creds)}";
     }
 
-    private static async Task<(TransferResult Result, byte[] Sent, string Output)> RunAsync(HttpAuthSchemes schemes, params string[] replies)
+    private static Task<(TransferResult Result, byte[] Sent, string Output)> RunAsync(HttpAuthSchemes schemes, params string[] replies) =>
+        RunAsync("ldap", schemes, replies);
+
+    private static async Task<(TransferResult Result, byte[] Sent, string Output)> RunAsync(string scheme, HttpAuthSchemes schemes, params string[] replies)
     {
         var connection = new ScriptedConnection([.. replies.Select(Hex.Bytes)]);
         var handler = new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), LdapDialect.WinLdap, new FakeLogonTokenSource(2));
         var output = new MemoryStream();
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse("ldap://127.0.0.1:18389/dc=example"),
+            Url = CurlUrl.Parse(scheme + "://127.0.0.1:18389/dc=example"),
             Output = output,
             Credentials = new NetworkCredential("cn=admin,dc=x", "pw"),
             Http = new Curl.Protocol.Abstractions.HttpRequestOptions { AuthSchemes = schemes },

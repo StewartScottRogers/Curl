@@ -34,22 +34,36 @@ public sealed partial class HandBuiltTlsProviderTests
         Diagnostics.Arrange("build", "OpenSSL");
         Diagnostics.Arrange("options", "Insecure: true, MinimumVersion: Tls13");
         Diagnostics.Arrange("session cache", "empty, shared with the provider");
-        Diagnostics.Arrange("server", "TLS 1.3 sends no ticket");
+        Diagnostics.Arrange("server", "TLS 1.3 sends one NewSessionTicket record, then 'hello'");
+
+        var (client, serverStream) = InMemoryDuplexStream.CreatePair();
+        var records = new Tls13RecordTestServer(serverStream, new Tls13TestServer(pki.LeafCredential));
+        var serverTask = Task.Run(async () =>
+        {
+            await records.HandshakeAsync();
+            await records.SendAsync(Curl.Tls.TlsContentType.Handshake, new NewSessionTicket(7200, 0, [1], [9, 9, 1], []).Encode());
+            await records.SendAsync(Curl.Tls.TlsContentType.ApplicationData, "hello"u8.ToArray());
+        });
 
         ConnectResult result;
         using (Diagnostics.Phase("TLS handshake"))
         {
-            (result, _) = await HandshakeWithTestServerAsync(provider, new Tls13TestServer(pki.LeafCredential));
+            result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
         }
 
         ActConnectResult(result);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        await serverTask;
+        int read = await result.Connection!.ReadAsync(new byte[5], CancellationToken.None);
         var exported = sessions.Export();
+        Diagnostics.Act("bytes read", read);
         Diagnostics.Act("exported sessions length", exported.Length);
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
-        Diagnostics.Assert("exported sessions", string.Empty, exported);
-        Assert.AreEqual(string.Empty, sessions.Export(), "the test server sends no ticket");
-        await result.Connection!.DisposeAsync();
+        Diagnostics.Assert("bytes read", 5, read);
+        Assert.AreEqual(5, read);
+        Assert.StartsWith("# Your SSL session cache.", exported, "the cache exports the ticket the server sent");
+        Assert.AreEqual(3, exported.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length, "one session line follows the two comment lines");
+        await result.Connection.DisposeAsync();
     }
 
     [TestMethod]

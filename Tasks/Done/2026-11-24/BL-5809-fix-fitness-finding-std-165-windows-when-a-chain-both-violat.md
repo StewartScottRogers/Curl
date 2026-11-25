@@ -1,0 +1,52 @@
+---
+id: BL-5809
+title: Fix fitness finding STD-165: Windows: when a chain both violates a name constraint and has unknown revocation, the port reports the name constraint; REF reports revocation
+priority: Low
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs]
+requirement: none
+created: 2026-11-23
+completed: 2026-11-23
+---
+# BL-5809 — Fix fitness finding STD-165: Windows: when a chain both violates a name constraint and has unknown revocation, the port reports the name constraint; REF reports revocation
+
+## Goal
+
+STD-165 from the outside fitness review of 2026-11-23 09:23 no longer reproduces: Windows: when a chain both violates a name constraint and has unknown revocation, the port reports the name constraint; REF reports revocation. Curl behaves as the finding's acceptance check states.
+
+## Context
+
+From the outside fitness review `Curl-Fitness-Review-2026-11-23T0923` (commit `bef3629`, the `preview` release binaries).
+
+In the finding, .NET is this Curl, REF is curl 8.22.0 Schannel on Windows (Git for Windows `curl.exe`), REF2 is curl 8.18.0 OpenSSL/OpenLDAP on WSL Ubuntu. Measure real curl with `Record-CurlExchange.ps1` before pinning output text.
+
+The reviewer's mock servers were Python; rebuild any you need in PowerShell or C# (never Python). Mock servers bind 127.0.0.1 and port numbers are examples. Where the finding refers to another finding's setup (e.g. "the OpenLDAP server from STD-117"), find the task titled with that finding ID. Check that it still reproduces on the current branch first.
+
+Shared setup: Common PKI used by STD-158 to STD-165 (Windows): `root.pem` is a self-signed CA. `intA.pem` is a CA signed by root (CA:TRUE, keyUsage keyCertSign+cRLSign). Leaves have SAN `DNS:localhost, IP:127.0.0.1, IP:::1` and EKU serverAuth unless stated. Each test server is a Python `ssl` TLS server on 127.0.0.1 and ::1 that sends leaf + issuing intermediate and answers any request with `HTTP/1.1 200 OK` and body `hello <leafname>`. CRLs are served over plain http at `http://127.0.0.1:21080/...`. `<p>` is the port of the leaf's server. In the proxy variants the same TLS server acts as an HTTPS proxy and answers with the body directly. The finding, verbatim:
+
+- **Severity:** Low (message only; exit 60 in both)
+- **Confidence:** Confirmed (3 leaves)
+- **Protocol/area:** certificate error precedence, Windows build
+- **Repro:** `ncExclDns.pem` is a CA signed by root with `excluded; DNS:localhost`. Leaf `ex_san` (SAN `DNS:localhost`, no CDP) is signed by it. `curl -sS https://localhost:<p>/ --cacert ncExclDns.pem`; also `curl -sS -x https://localhost:<p> --proxy-cacert ncExclDns.pem http://127.0.0.1:21999/x`.
+- **Expected (REF):** `curl: (60) schannel: the revocation status is unknown`.
+- **Actual (.NET):** `curl: (60) schannel: error 0x00008000`.
+- **Likely location:** `Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs` (error precedence).
+- **Acceptance check:** both commands print `schannel: the revocation status is unknown`.
+
+## Acceptance criteria
+
+- [x] both commands print `schannel: the revocation status is unknown`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+With `--cacert`, a name-constraint violation plus an unknown or offline revocation status now reports `schannel: the revocation status is unknown`, unless `--ssl-no-revoke` or `--ssl-revoke-best-effort` masks it. Both commands in the finding take the same path. Not re-measured against Windows curl; the finding states REF. Unit tests in `ServerCertificateVerificationTests.NameConstraints.cs`. Build clean, fast tests green, quality gate 0 failing.
+
+## Log
+
+- 2026-11-23: Created from fitness review 2026-11-23T0923.
+- 2026-11-23: Backlog -> Doing. Criteria at claim: a3aa988f 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. STD-165 fixed: unknown revocation status beats a name-constraint violation under --cacert

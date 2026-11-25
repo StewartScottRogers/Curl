@@ -43,6 +43,21 @@ public sealed class ResolveOverridesTests
     }
 
     [TestMethod]
+    public void Parse_AnEntryWhoseBracketedHostIsEmpty_IsIgnoredNotKept()
+    {
+        // An empty host is ignored (measured: ":80:127.0.0.1"); "[]" unbrackets to the same empty host.
+        Diagnostics.Arrange("entry", "[]:80:127.0.0.1");
+
+        var overrides = ResolveOverrides.Parse(["[]:80:127.0.0.1"]);
+
+        Diagnostics.Act("parse error, entries", $"{overrides.ParseError ?? "null"}, {overrides.Entries.Count}");
+        Diagnostics.Assert("parse error, entries", "null, 0", $"{overrides.ParseError ?? "null"}, {overrides.Entries.Count}");
+
+        Assert.IsNull(overrides.ParseError);
+        Assert.IsEmpty(overrides.Entries);
+    }
+
+    [TestMethod]
     public void None_HasNoEntriesAndNoParseError()
     {
         Diagnostics.Arrange("overrides, host, port", "None, example.com, 80");

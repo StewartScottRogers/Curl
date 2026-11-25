@@ -10,7 +10,8 @@ namespace Curl.Extension.SegmentedDownload;
 /// is a 206 of exactly its range of the same representation. A server that ignores <c>Range</c> and sends 200
 /// (§14.2) is written as received; a 200 to a segment, the representation having changed under <c>If-Range</c>,
 /// is written in place of the parts; a failed segment fails the transfer with nothing written; anything else that
-/// cannot be joined runs the transfer again as curl runs it.
+/// cannot be joined runs the transfer again as curl runs it. A first response with neither an entity tag nor
+/// a Last-Modified gives nothing to compare the segments by, so it too runs the transfer again as curl runs it.
 /// </summary>
 /// <param name="count">How many ranges to split into, at least 1.</param>
 internal sealed class SegmentedDownloadTransferHook(int count) : ITransferHook
@@ -34,10 +35,18 @@ internal sealed class SegmentedDownloadTransferHook(int count) : ITransferHook
             return await probe.WriteAsync(context);
         }
 
-        return probe.Code == PartialContent && ContentRange.Parse(probe.Field("Content-Range")) is { } first
-            ? await DownloadSegmentsAsync(probe, first.CompleteLength, context, next)
-            : await next(context);
+        if (FirstRangeOf(probe) is not { } first)
+        {
+            return await next(context);
+        }
+
+        return first.CompleteLength > context.MaxFileSize
+            ? TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Maximum file size exceeded")
+            : await DownloadSegmentsAsync(probe, first.CompleteLength, context, next);
     }
+
+    private static ContentRange? FirstRangeOf(CapturedResponse probe) =>
+        probe.Code == PartialContent && probe.HasStrongETag ? ContentRange.Parse(probe.Field("Content-Range")) : null;
 
     private async Task<TransferResult> DownloadSegmentsAsync(CapturedResponse probe, long completeLength, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
@@ -66,7 +75,7 @@ internal sealed class SegmentedDownloadTransferHook(int count) : ITransferHook
     }
 
     private static string[] IfRangeFor(CapturedResponse probe) =>
-        probe.Field("ETag") is { } tag && tag.StartsWith('"') ? ["If-Range: " + tag] : [];
+        ["If-Range: " + probe.Field("ETag")];
 
     /// <summary>The first response, the ranges asked for and the segments received, in the same order.</summary>
     private sealed record Download(CapturedResponse Probe, IReadOnlyList<SegmentRange> Ranges, CapturedResponse[] Segments, long CompleteLength)

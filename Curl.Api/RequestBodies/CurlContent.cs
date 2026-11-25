@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 
@@ -69,14 +70,13 @@ public abstract class CurlContent
     /// <param name="bytes">The body.</param>
     public static implicit operator CurlContent(ReadOnlyMemory<byte> bytes) => FromBytes(bytes);
 
-    /// <summary>Bytes content of <paramref name="bytes"/>; the same as <see cref="FromBytes"/>.</summary>
-    /// <param name="bytes">The body.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="bytes"/> is <see langword="null"/>.</exception>
-    public static implicit operator CurlContent(byte[] bytes)
-    {
-        ArgumentNullException.ThrowIfNull(bytes);
-        return FromBytes(bytes);
-    }
+    /// <summary>
+    /// Bytes content of <paramref name="bytes"/>; the same as <see cref="FromBytes"/>, and <see langword="null"/>
+    /// (no body) for a <see langword="null"/> array, so a nullable array assigned to <c>CurlRequest.Body</c> sends no body.
+    /// </summary>
+    /// <param name="bytes">The body, or <see langword="null"/> for no body.</param>
+    [return: NotNullIfNotNull(nameof(bytes))]
+    public static implicit operator CurlContent?(byte[]? bytes) => bytes is null ? null : FromBytes(bytes);
 
     /// <summary>
     /// <paramref name="options"/> with this content set as the body of a posting request: the post
@@ -87,4 +87,24 @@ public abstract class CurlContent
     /// <param name="owned">Takes every handle the body creates, to dispose when the request ends.</param>
     /// <returns>The options to perform the request with.</returns>
     internal abstract EasyOptions ApplyTo(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned);
+
+    /// <summary>
+    /// <paramref name="options"/> with this content set as the source of an upload (<c>CURLOPT_UPLOAD</c>,
+    /// ADR-1316), as <c>curl -T</c> does for a non-HTTP scheme. Content that cannot be read as a plain
+    /// upload (a multipart body) is sent as it is for a posting request.
+    /// </summary>
+    /// <param name="options">The options, with <c>CURLOPT_UPLOAD</c> already set.</param>
+    /// <param name="engine">The engine performing the request, whose handles a body may create.</param>
+    /// <param name="owned">Takes every handle the body creates, to dispose when the request ends.</param>
+    /// <returns>The options to perform the request with.</returns>
+    internal virtual EasyOptions ApplyAsUpload(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned) =>
+        ApplyTo(options with { Transfer = options.Transfer with { Upload = false }, Http = options.Http with { Post = true } }, engine, owned);
+
+    /// <summary>The options with the read and seek callbacks of <paramref name="upload"/> and its <paramref name="size"/> as the upload size.</summary>
+    private protected static EasyOptions WithUpload(EasyOptions options, StreamUpload upload, long size) =>
+        options with
+        {
+            Transfer = options.Transfer with { Upload = true, InFileSize = size, CustomRequest = null },
+            Callbacks = options.Callbacks with { Read = upload.Read, Seek = upload.Seek },
+        };
 }

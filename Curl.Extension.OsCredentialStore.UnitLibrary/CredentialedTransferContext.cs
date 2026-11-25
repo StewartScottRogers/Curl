@@ -95,6 +95,7 @@ internal sealed class CredentialedTransferContext(ITransferContext inner, System
     public long? OperationStarted => inner.OperationStarted;
 
     public ProxyEndpoint? Proxy => inner.Proxy;
+    public string? NoProxy => inner.NoProxy;
 
     public MailRequestOptions? Mail => inner.Mail;
 

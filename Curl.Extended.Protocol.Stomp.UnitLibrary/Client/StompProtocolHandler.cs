@@ -18,6 +18,9 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
     /// <summary>The port <c>stomps://</c> connects to when the URL names none.</summary>
     internal const int SecureDefaultPort = 61614;
 
+    /// <summary>The virtual host <c>CONNECT</c> names when no <c>-H "host: ..."</c> gives one (ADR-1285): <c>/</c>, the default of stock brokers.</summary>
+    internal const string DefaultVirtualHost = "/";
+
     private const string SecureScheme = "stomps";
 
     /// <inheritdoc />
@@ -33,7 +36,37 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
             return TransferResult.Failure(CurlExitCode.UrlMalformat, StompClientMessages.NoDestination);
         }
 
+        string? field = LineBreakField(VirtualHostOf(context.Http?.Headers), context.Credentials);
+        if (field is not null)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, $"STOMP {field} holds a line break");
+        }
+
         return await TransferAsync(context, Uri.UnescapeDataString(path)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gives the name of the first <c>CONNECT</c> header value holding a line feed or carriage return (STOMP 1.2 does not
+    /// escape <c>CONNECT</c> headers, so such a value would add headers to the frame), or null when none does.
+    /// </summary>
+    internal static string? LineBreakField(string host, System.Net.NetworkCredential? credentials)
+    {
+        if (host.AsSpan().ContainsAny('\r', '\n'))
+        {
+            return "host";
+        }
+
+        if (credentials is null)
+        {
+            return null;
+        }
+
+        if (credentials.UserName.AsSpan().ContainsAny('\r', '\n'))
+        {
+            return "login";
+        }
+
+        return credentials.Password.AsSpan().ContainsAny('\r', '\n') ? "passcode" : null;
     }
 
     /// <summary>Gives where to connect: the URL's host, its port or the scheme's default, and TLS for <c>stomps</c>.</summary>
@@ -51,8 +84,8 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
     }
 
     /// <summary>
-    /// Gives the <c>CONNECT</c> frame (STOMP 1.2, "CONNECT or STOMP Frame"): version 1.2 only, the URL's host as the
-    /// virtual host, no heart-beating, and <c>login</c> and <c>passcode</c> from <paramref name="credentials"/>.
+    /// Gives the <c>CONNECT</c> frame (STOMP 1.2, "CONNECT or STOMP Frame"): version 1.2 only, <paramref name="host"/> as the
+    /// virtual host (ADR-1285), no heart-beating, and <c>login</c> and <c>passcode</c> from <paramref name="credentials"/>.
     /// </summary>
     internal static StompFrame ConnectFor(string host, System.Net.NetworkCredential? credentials)
     {
@@ -71,19 +104,30 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
     /// in <paramref name="headers"/> (name matched without regard to case), or <see cref="StompClientFlow.SendContentType"/>
     /// when there is none or its value is empty.
     /// </summary>
-    internal static string ContentTypeOf(IReadOnlyList<string>? headers)
+    internal static string ContentTypeOf(IReadOnlyList<string>? headers) =>
+        LastHeaderValue(headers, "content-type") ?? StompClientFlow.SendContentType;
+
+    /// <summary>
+    /// Gives the virtual host for <c>CONNECT</c>'s <c>host</c> (ADR-1285): the value of the last <c>-H "host: ..."</c> in
+    /// <paramref name="headers"/> (name matched without regard to case), or <see cref="DefaultVirtualHost"/> when there is
+    /// none or its value is empty.
+    /// </summary>
+    internal static string VirtualHostOf(IReadOnlyList<string>? headers) =>
+        LastHeaderValue(headers, "host") ?? DefaultVirtualHost;
+
+    private static string? LastHeaderValue(IReadOnlyList<string>? headers, string name)
     {
-        string contentType = StompClientFlow.SendContentType;
+        string? value = null;
         foreach (string header in headers ?? [])
         {
             int colon = header.IndexOf(':', StringComparison.Ordinal);
-            if (colon > 0 && header.AsSpan(0, colon).Trim().Equals("content-type", StringComparison.OrdinalIgnoreCase) && header.AsSpan(colon + 1).Trim().Length > 0)
+            if (colon > 0 && header.AsSpan(0, colon).Trim().Equals(name, StringComparison.OrdinalIgnoreCase) && header.AsSpan(colon + 1).Trim().Length > 0)
             {
-                contentType = header[(colon + 1)..].Trim();
+                value = header[(colon + 1)..].Trim();
             }
         }
 
-        return contentType;
+        return value;
     }
 
     /// <summary>The SEND body: <c>-d</c>'s data when given, else the <c>-T</c> upload's bytes, else none (the receive path).</summary>
@@ -113,7 +157,7 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
             var flow = new StompClientFlow(connection, context.Output, context.Progress, context.CancellationToken);
             try
             {
-                await flow.RunAsync(ConnectFor(context.Url.Host, context.Credentials), destination, await RequestBodyAsync(context).ConfigureAwait(false), ContentTypeOf(context.Http?.Headers)).ConfigureAwait(false);
+                await flow.RunAsync(ConnectFor(VirtualHostOf(context.Http?.Headers), context.Credentials), destination, await RequestBodyAsync(context).ConfigureAwait(false), ContentTypeOf(context.Http?.Headers)).ConfigureAwait(false);
                 return TransferResult.Success(flow.BytesWritten);
             }
             catch (StompClientException failure)

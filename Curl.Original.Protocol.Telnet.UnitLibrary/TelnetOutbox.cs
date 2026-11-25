@@ -11,9 +11,26 @@ namespace Curl.Original.Protocol.Telnet;
 /// reported just there, in the words curl uses for that write (BL-1307, BL-1312).
 /// </summary>
 /// <param name="events">Where the reports go once their turn comes.</param>
-internal sealed class TelnetOutbox(ITransferEvents events)
+/// <param name="runsOnWindows">Whether a failed read is met as curl on Windows meets it.</param>
+internal sealed class TelnetOutbox(ITransferEvents events, bool runsOnWindows)
 {
     private readonly Queue<Step> steps = new();
+
+    private bool writeTried;
+
+    private bool writeFailed;
+
+    /// <summary>
+    /// Tells whether a connection read that fails now is a receive failure. On Linux and
+    /// macOS every failed read is one (BL-5918, ADR-1382). On Windows only a read that
+    /// struck the option negotiation is, as the session lost what the server sent: a reply
+    /// the connection did not take, or replies sent while no data has been written yet
+    /// (BL-5882, ADR-1352).
+    /// </summary>
+    /// <param name="bytesWritten">The bytes written to the output so far.</param>
+    /// <returns><see langword="true" /> when the failed read is a receive failure.</returns>
+    public bool FailedReadIsReceiveError(long bytesWritten) =>
+        !runsOnWindows || writeFailed || (writeTried && bytesWritten == 0);
 
     /// <summary>Queues an information line.</summary>
     /// <param name="text">The line.</param>
@@ -57,9 +74,13 @@ internal sealed class TelnetOutbox(ITransferEvents events)
             if (step.Reply is not { } reply)
             {
                 Report(step);
+                continue;
             }
-            else if (await trySend(reply).ConfigureAwait(false) is { } failure)
+
+            writeTried = true;
+            if (await trySend(reply).ConfigureAwait(false) is { } failure)
             {
+                writeFailed = true;
                 events.ReportInfo(step.DescribeFailure!(failure));
             }
         }

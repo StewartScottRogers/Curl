@@ -190,7 +190,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         long started = context.TimeProvider.GetTimestamp();
         long resolved = context.TimeProvider.GetTimestamp();
         TransferResult result = await TransferAsync(context).ConfigureAwait(false);
-        result = WithTimings(result, started, resolved, context.TimeProvider.GetTimestamp());
+        result = WithTimings(result, started, resolved, context.TimeProvider.GetTimestamp(), context.Upload is not null);
         new FileTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(started));
         return result;
     }
@@ -199,13 +199,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// Adds the transfer's timings to <paramref name="result" />'s report, as curl's FILE
     /// handler reports them: the local path is resolved and connected straight away, and the
     /// transfer is ready and first read at the end, so every <c>%{time_*}</c> is non-zero and
-    /// <c>%{speed_*}</c> follow from the total time. A result with no report keeps its byte
+    /// <c>%{speed_*}</c> follow from the total time; an upload has no first byte read, so its
+    /// <c>%{time_starttransfer}</c> stays 0, as curl reports it (BL-5327). A result with no report keeps its byte
     /// count as <c>%{size_download}</c>.
     /// </summary>
-    private static TransferResult WithTimings(TransferResult result, long started, long resolved, long completed)
+    private static TransferResult WithTimings(TransferResult result, long started, long resolved, long completed, bool isUpload)
     {
         TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
-        var timings = new TransferTimings(started, new ConnectTimings(started, resolved, resolved, null), completed, null, completed, completed);
+        // A download has no connect (%{time_connect} is 0), is ready and first read right after the
+        // path resolves, and is posted when it ends (BL-5387); an upload keeps its BL-5327 timings.
+        var timings = isUpload
+            ? new TransferTimings(started, new ConnectTimings(started, resolved, null, null), completed, completed, null, completed)
+            : new TransferTimings(started, new ConnectTimings(started, resolved, null, null), completed, completed, resolved, completed);
         return result with { Report = report with { Timings = timings } };
     }
     /// <summary>

@@ -19,7 +19,7 @@ library: the protocol core is `Curl.Mcp.Protocol.UnitLibrary`, the tool adapters
 Microsoft's `ModelContextProtocol` and `Microsoft.Extensions.Hosting` packages, ADR-0548).
 It is packed the way Microsoft
 documents it (<https://learn.microsoft.com/dotnet/ai/quickstarts/build-mcp-server>): a NuGet
-package of `PackageType` `McpServer` that `dnx Curl.Mcp` runs.
+package of `PackageType` `McpServer` that `dnx Surly.Curl.Mcp` runs.
 
 ## Projects
 

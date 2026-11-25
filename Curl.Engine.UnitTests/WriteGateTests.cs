@@ -132,6 +132,27 @@ public sealed class WriteGateTests
     }
 
     [TestMethod]
+    public async Task RunExclusive_WhileWriting_MarksThisFlowAsHoldingTheGate()
+    {
+        WriteGate gate = new();
+        using MemoryStream output = new();
+        bool nestedWriteCompleted = false;
+        Diagnostics.Arrange("write", "WriteExclusiveAsync called from inside RunExclusive");
+
+        gate.RunExclusive(() =>
+        {
+            ValueTask nested = gate.WriteExclusiveAsync(output, new byte[] { 1 }, TestContext.CancellationToken);
+            nestedWriteCompleted = nested.IsCompleted;
+        });
+        Diagnostics.Act("nested write completed at once", nestedWriteCompleted);
+
+        Diagnostics.Assert("nested write completed at once", true, nestedWriteCompleted);
+        Assert.IsTrue(nestedWriteCompleted);
+        Assert.AreEqual(1L, output.Length);
+        await Task.CompletedTask;
+    }
+
+    [TestMethod]
     public async Task RunExclusiveAsync_WriteThrows_LetsTheGateGo()
     {
         WriteGate gate = new();

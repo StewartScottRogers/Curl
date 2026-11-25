@@ -101,11 +101,16 @@ internal static class CurlMcpHost
         McpServerRegistry registry = new();
         // tools/list answers in registration order; this is the order the SDK host listed them in (the golden tools-list).
         registry.Add(new ParseUrlMcpTool(urlTool));
-        registry.Add(new TransferMcpTool(new McpTransferTool(engine, cap)));
-        registry.Add(new CurlCommandMcpTool(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap)));
+        registry.Add(new TransferMcpTool(new McpTransferTool(engine, cap, root)));
+        registry.Add(new CurlCommandMcpTool(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap, ExtensionOptionsFor(readEnvironmentVariable))));
         registry.Add(new BuildUrlMcpTool(urlTool));
         registry.Add(new VersionMcpTool(new McpVersionTool(engine, extendedSchemes)));
         registry.Add(new AiHelpMcpResourceProvider(() => ExtensionListing.Markdown(readEnvironmentVariable)));
         return registry;
     }
+
+    /// <summary>The long options the extensions register in this environment, none under <c>CURL_EXTENSIONS=0</c>, which the <c>curl</c> tool's argument check must know as the console's parser does (BL-5564).</summary>
+    internal static IReadOnlyList<McpExtensionOption> ExtensionOptionsFor(Func<string, string?> readEnvironmentVariable) =>
+        [.. ExtensionCommandLineOptions.For(readEnvironmentVariable, Curl.Cli.CommandLineParser.IsCurlLongOption)
+            .Select(option => new McpExtensionOption(option.Name, option.Argument == Curl.Extension.Abstractions.ExtensionOptionArgument.Value))];
 }

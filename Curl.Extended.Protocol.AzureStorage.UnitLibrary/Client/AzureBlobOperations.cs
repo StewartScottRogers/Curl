@@ -36,6 +36,18 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
             ? (int)needed
             : throw new AzureStorageTransferException(CurlExitCode.FilesizeExceeded, $"An Azure Storage upload of {length} bytes needs more than {maxBlockCount} blocks");
     }
+    /// <summary>Deletes the blob <paramref name="endpoint"/> names (Delete Blob, answered 202); a container or a name ending in <c>/</c> is refused, never deleting the container (ADR-1324).</summary>
+    /// <param name="endpoint">The URL's endpoint, whose path is <c>/container/blob</c>; its query (for example <c>snapshot</c>) is sent as it is.</param>
+    /// <returns>Zero: a delete transfers no bytes.</returns>
+    /// <exception cref="AzureStorageTransferException">Exit 3 when the URL names no blob.</exception>
+    internal Task<long> DeleteAsync(AzureStorageEndpoint endpoint)
+    {
+        (_, string container, string blob) = SplitPath(endpoint);
+        return container.Length == 0 || blob.Length == 0 || blob.EndsWith('/')
+            ? throw new AzureStorageTransferException(CurlExitCode.UrlMalformat, "An Azure Storage delete needs a blob name in the URL")
+            : client.ExchangeAsync("DELETE", endpoint, [], null, _ => Task.FromResult(0L));
+    }
+
     /// <summary>Downloads, uploads or lists what <paramref name="endpoint"/> names.</summary>
     /// <param name="endpoint">The URL's endpoint, whose path is <c>/container/blob</c>.</param>
     /// <param name="upload">The bytes to upload, or <see langword="null"/> to download or list.</param>
@@ -43,7 +55,7 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
     /// <returns>The number of bytes written or uploaded.</returns>
     internal Task<long> TransferAsync(AzureStorageEndpoint endpoint, Stream? upload, Stream output)
     {
-        (string container, string blob) = AzureStorageClient.Split(endpoint.Path);
+        (string accountPath, string container, string blob) = SplitPath(endpoint);
         if (container.Length == 0)
         {
             throw new AzureStorageTransferException(CurlExitCode.UrlMalformat, "An az:// URL needs a container after the account");
@@ -52,21 +64,38 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
         bool namesPrefix = blob.Length == 0 || blob.EndsWith('/');
         return upload switch
         {
-            null when namesPrefix => ListAsync(endpoint, container, blob, output),
+            null when namesPrefix => ListAsync(endpoint, accountPath, container, blob, output),
             null => client.ExchangeAsync("GET", endpoint, [], null, response => client.CopyAsync(response.Body, output)),
             _ when namesPrefix => throw new AzureStorageTransferException(CurlExitCode.UrlMalformat, "An Azure Storage upload needs a blob name in the URL"),
             { } bytes => UploadAsync(endpoint, bytes),
         };
     }
 
-    private async Task<long> ListAsync(AzureStorageEndpoint endpoint, string container, string prefix, Stream output)
+    // On a path-style emulator the first segment is the account; the container follows it.
+    private static (string AccountPath, string Container, string Blob) SplitPath(AzureStorageEndpoint endpoint)
+    {
+        int accountEnd = endpoint.AccountInPath ? AccountEnd(endpoint.Path) : 0;
+        string containerPath = endpoint.Path[accountEnd..];
+        (string container, string blob) = AzureStorageClient.Split(containerPath.Length == 0 ? "/" : containerPath);
+        return (endpoint.Path[..accountEnd], container, blob);
+    }
+
+    private static int AccountEnd(string path)
+    {
+        int slash = path.IndexOf('/', 1);
+        return slash < 0 ? path.Length : slash;
+    }
+
+    private async Task<long> ListAsync(AzureStorageEndpoint endpoint, string accountPath, string container, string prefix, Stream output)
     {
         long written = 0;
         string? marker = null;
+        (string urlPrefix, string delimiter, string rest) = SplitListQuery(endpoint.Query);
+        AzureStorageEndpoint listEndpoint = endpoint with { Query = rest };
         do
         {
-            string query = $"restype=container&comp=list&delimiter=%2F&prefix={Uri.EscapeDataString(prefix)}" + (marker is null ? string.Empty : $"&marker={Uri.EscapeDataString(marker)}");
-            AzureBlobListing listing = await client.ExchangeAsync("GET", AzureStorageClient.Operation(endpoint, "/" + Uri.EscapeDataString(container), query), [], null, ReadListingAsync);
+            string query = $"restype=container&comp=list&delimiter={delimiter}&prefix={Uri.EscapeDataString(prefix + urlPrefix)}" + (marker is null ? string.Empty : $"&marker={Uri.EscapeDataString(marker)}");
+            AzureBlobListing listing = await client.ExchangeAsync("GET", AzureStorageClient.Operation(listEndpoint, accountPath + "/" + Uri.EscapeDataString(container), query), [], null, ReadListingAsync);
             written += await client.WriteLinesAsync(listing.BlobPrefixes.Concat(listing.Blobs.Select(blob => blob.Name)), output);
             marker = listing.NextMarker;
         }
@@ -74,6 +103,37 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
         return written;
     }
 
+    /// <summary>Takes the list parameters the operation owns out of the URL's query so each is sent once: the URL's <c>prefix</c> extends the path's, its <c>delimiter</c> replaces <c>/</c>, and <c>restype</c>, <c>comp</c> and <c>marker</c> are dropped.</summary>
+    /// <param name="query">The URL's query, percent-encoded, without a <c>?</c>.</param>
+    /// <returns>The decoded URL prefix, the percent-encoded delimiter, and the query left to send as it is.</returns>
+    internal static (string Prefix, string Delimiter, string Remainder) SplitListQuery(string query)
+    {
+        string prefix = string.Empty;
+        string delimiter = "%2F";
+        List<string> rest = [];
+        foreach (string pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int at = pair.IndexOf('=', StringComparison.Ordinal);
+            string name = Uri.UnescapeDataString(at < 0 ? pair : pair[..at]);
+            string value = at < 0 ? string.Empty : pair[(at + 1)..];
+            switch (name)
+            {
+                case "prefix":
+                    prefix = Uri.UnescapeDataString(value);
+                    break;
+                case "delimiter":
+                    delimiter = value;
+                    break;
+                case "restype" or "comp" or "marker":
+                    break;
+                default:
+                    rest.Add(pair);
+                    break;
+            }
+        }
+
+        return (prefix, delimiter, string.Join('&', rest));
+    }
     private async Task<long> UploadAsync(AzureStorageEndpoint endpoint, Stream upload)
     {
         int size = upload.CanSeek ? BlockSizeFor(upload.Length - upload.Position, blockSize, maxBlockCount) : blockSize;

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using Curl.Protocol.Abstractions;
@@ -10,7 +11,7 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// event once the server confirms, answers each <c>ping</c> with a <c>pong</c> (Engine.IO
 /// "Heartbeat") and ends with exit 56 when no ping arrives within the open packet's
 /// <c>pingInterval</c> + <c>pingTimeout</c> on the transfer's clock (ADR-1210), sends no packet over the open packet's <c>maxPayload</c> and ends with exit 55 instead (ADR-1212), writes each event received as its JSON array and a newline, acknowledges each event
-/// that asks for it with an empty array, and ends when the server disconnects or closes.
+/// that asks for it with an empty array, and ends when the server disconnects or closes, or, when it emitted an event, once the server has sent no further event for a second after the echo of the emitted event (BL-5763, BL-5835, BL-5868), so an emit returns at once when the server stays open.
 /// </summary>
 /// <param name="channel">The WebSocket messages.</param>
 /// <param name="namespaceName">The namespace to connect to, <c>/</c> for the main one.</param>
@@ -18,7 +19,9 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <param name="output">Where received events are written.</param>
 /// <param name="timeProvider">The transfer's clock, which times the heartbeat.</param>
 /// <param name="progress">Told the bytes written so far after each event, so a <c>-m</c> timeout and <c>%{size_download}</c> count them.</param>
-internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider, ITransferProgress progress)
+/// <param name="credentials">The <c>-u</c> user and password sent as the namespace CONNECT packet's <c>auth</c> payload (ADR-1311), or <see langword="null" /> to send none.</param>
+/// <param name="bearerToken">The <c>--oauth2-bearer</c> token sent as the CONNECT packet's <c>auth</c> payload <c>{"token":..}</c> in place of <paramref name="credentials"/> (ADR-1340), or <see langword="null" />.</param>
+internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider, ITransferProgress progress, NetworkCredential? credentials = null, string? bearerToken = null)
 {
     private const char EngineIoOpen = '0';
 
@@ -36,7 +39,13 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
 
     private bool isEnded;
 
+    private bool isEchoSeen;
+
+    private static readonly TimeSpan QuietAfterEcho = TimeSpan.FromSeconds(1);
+
     private readonly CancellationTokenSource heartbeat = new(Timeout.InfiniteTimeSpan, timeProvider);
+
+    private readonly CancellationTokenSource quiet = new(Timeout.InfiniteTimeSpan, timeProvider);
 
     private TimeSpan heartbeatTimeout = Timeout.InfiniteTimeSpan;
 
@@ -66,6 +75,35 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         ReadHandshake(handshake, long.MaxValue, root =>
             root.TryGetProperty("maxPayload", out JsonElement maxPayload) && maxPayload.TryGetInt64(out long bytes) && bytes >= 0 ? bytes : long.MaxValue);
 
+    /// <summary>Gives the CONNECT packet's <c>auth</c> payload: <c>{"token":..}</c> for a bearer token (it wins over <c>-u</c>, as on HTTP; ADR-1340), else <c>{"username":..,"password":..}</c> (ADR-1311), or nothing without either.</summary>
+    internal static string AuthPayloadOf(NetworkCredential? credentials, string? bearerToken = null)
+    {
+        bool hasToken = !string.IsNullOrEmpty(bearerToken);
+        if (!hasToken && credentials is null)
+        {
+            return string.Empty;
+        }
+
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            if (hasToken)
+            {
+                writer.WriteString("token", bearerToken);
+            }
+            else
+            {
+                writer.WriteString("username", credentials!.UserName);
+                writer.WriteString("password", credentials.Password);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
     private static T ReadHandshake<T>(string handshake, T fallback, Func<JsonElement, T> read)
     {
         try
@@ -93,7 +131,8 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
     public async ValueTask<long> RunAsync(CancellationToken cancellationToken)
     {
         using (heartbeat)
-        using (CancellationTokenSource receiving = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, heartbeat.Token))
+        using (quiet)
+        using (CancellationTokenSource receiving = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, heartbeat.Token, quiet.Token))
         {
             try
             {
@@ -101,6 +140,10 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
                 {
                     await AcceptAsync(text, cancellationToken).ConfigureAwait(false);
                 }
+            }
+            catch (OperationCanceledException) when (quiet.IsCancellationRequested && !cancellationToken.IsCancellationRequested && !heartbeat.IsCancellationRequested)
+            {
+                // The server stayed quiet after an echo of the emitted event: the stream is over (ADR-1338).
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -128,7 +171,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         heartbeatTimeout = HeartbeatTimeoutOf(handshake);
         maxPayload = MaxPayloadOf(handshake);
         heartbeat.CancelAfter(heartbeatTimeout);
-        return SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Connect, namespaceName, null, string.Empty), cancellationToken);
+        return SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Connect, namespaceName, null, AuthPayloadOf(credentials, bearerToken)), cancellationToken);
     }
 
     private ValueTask PingedAsync(string payload, CancellationToken cancellationToken)
@@ -184,6 +227,11 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         await output.WriteAsync(line, cancellationToken).ConfigureAwait(false);
         written += line.Length;
         progress.ReportDownloaded(written, null);
+        if (emit is not null && (isEchoSeen |= packet.Data == emit))
+        {
+            quiet.CancelAfter(QuietAfterEcho);
+        }
+
         if (packet.AckId is not null)
         {
             await SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Ack, namespaceName, packet.AckId, "[]"), cancellationToken).ConfigureAwait(false);

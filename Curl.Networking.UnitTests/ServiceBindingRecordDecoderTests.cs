@@ -197,6 +197,16 @@ public sealed class ServiceBindingRecordDecoderTests
     }
 
     [TestMethod]
+    public void Decode_TargetStartingWithANulThenASpace_IsAcceptedAsCurlsCStringIsEmpty()
+    {
+        var record = Decoded("000103002061" + "00");
+
+        Diagnostics.Assert("target", "\0 a", record.TargetName);
+
+        Assert.AreEqual("\0 a", record.TargetName);
+    }
+
+    [TestMethod]
     public void Decode_TargetWithAControlByteAfterANul_IsAcceptedAsCurlsCStringEndsAtTheNul()
     {
         var record = Decoded("000103610001" + "00");

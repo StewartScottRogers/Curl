@@ -35,12 +35,13 @@ public sealed class Cgr169Tests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_SchannelBuildWithoutCert_GivesNoCallback()
+    public async Task AuthenticateAsClientAsync_SchannelBuildWithoutCert_GivesACallbackThatChoosesNoCertificate()
     {
         var handshakeOptions = await CaptureHandshakeOptionsAsync(matchesSchannelBuild: true);
 
         Diagnostics.Act("selection callback", handshakeOptions.LocalCertificateSelectionCallback is null ? "none" : "given");
-        Assert.IsNull(handshakeOptions.LocalCertificateSelectionCallback);
+        Assert.IsNotNull(handshakeOptions.LocalCertificateSelectionCallback);
+        Assert.IsNull(handshakeOptions.LocalCertificateSelectionCallback(null!, "localhost", [], null, []));
     }
 
     private static async Task<SslClientAuthenticationOptions> CaptureHandshakeOptionsAsync(bool matchesSchannelBuild)

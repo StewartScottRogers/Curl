@@ -107,6 +107,30 @@ public sealed class EngineCompositionWsTraceTests
         Assert.AreEqual(tracesWs ? 6 : 1, events.Info.Count(line => line.StartsWith("[WS] ", StringComparison.Ordinal)));
     }
 
+    [TestMethod]
+    public async Task CreateProtocolHandlers_WsTransferWithoutTracesWsArgument_WritesNoWsTraceLines()
+    {
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes(Head101AndText)]);
+        Diagnostics.Arrange("tracesWs argument", "omitted (the libcurl engine's call)");
+        IProtocolHandler ws = EngineComposition
+            .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())
+            .Single(handler => handler.SupportedSchemes.Contains("ws"));
+        InfoRecordingEvents events = new();
+
+        TransferResult result = await ws.ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("ws://127.0.0.1/"),
+            Output = new MemoryStream(),
+            Events = events,
+        });
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+
+        Diagnostics.Assert("[WS] lines", 1, events.Info.Count(line => line.StartsWith("[WS] ", StringComparison.Ordinal)));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(1, events.Info.Count(line => line.StartsWith("[WS] ", StringComparison.Ordinal)));
+    }
+
     private static CommandLineOptions Parse(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "ws://127.0.0.1/"], _ => true);

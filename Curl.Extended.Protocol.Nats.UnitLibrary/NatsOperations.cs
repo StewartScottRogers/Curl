@@ -12,6 +12,9 @@ internal static class NatsOperations
     /// <summary>A delivered message.</summary>
     public const string Message = "MSG";
 
+    /// <summary>A delivered message with headers.</summary>
+    public const string HeaderMessage = "HMSG";
+
     /// <summary>A keep-alive request, answered with <see cref="Pong"/>.</summary>
     public const string Ping = "PING";
 

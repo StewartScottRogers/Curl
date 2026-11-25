@@ -68,6 +68,7 @@ public sealed class TftpDownloadWriterTests
         Assert.AreEqual(Message, result.ErrorMessage);
         Diagnostics.Assert("bytes transferred", 3L, result.BytesTransferred);
         Assert.AreEqual(3, result.BytesTransferred);
+        Assert.AreEqual(3, result.Report?.DownloadSize);
         Diagnostics.Bytes("output written", output.ToArray());
         Diagnostics.Diff("output written", "hel", Encoding.ASCII.GetString(output.ToArray()));
         Assert.AreEqual("hel", Encoding.ASCII.GetString(output.ToArray()));

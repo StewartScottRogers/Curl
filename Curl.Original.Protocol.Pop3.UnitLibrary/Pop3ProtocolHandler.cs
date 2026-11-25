@@ -117,6 +117,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
             PoolScheme = url.Scheme,
         };
         string loginKey = Pop3KeptConnection.LoginKeyOf(context);
+        long started = context.TimeProvider.GetTimestamp();
         ConnectResult connected = await ConnectAsync(target, loginKey, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
@@ -126,6 +127,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
             };
         }
 
+        long connectEnded = context.TimeProvider.GetTimestamp();
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
@@ -140,7 +142,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
             }
 
             ReportConnectionEnd(context.Events, result, session.IsOpen, target, connected.ConnectionNumber);
-            return result;
+            return StampTimings(result, context, started, connected, connectEnded);
         }
     }
 
@@ -184,5 +186,24 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
         }
 
         events.ReportInfo(sessionOpen ? Pop3ConnectionInfoLines.ShuttingDown(connectionNumber) : Pop3ConnectionInfoLines.Closing(connectionNumber));
+    }
+
+    /// <summary>
+    /// Gives a successful transfer the timings behind <c>%{time_connect}</c>, <c>%{time_pretransfer}</c>,
+    /// <c>%{time_posttransfer}</c>, <c>%{time_starttransfer}</c> and <c>%{time_total}</c> (BL-5473):
+    /// the pre- and post-transfer stamps are taken when the connect phase ended and the first byte
+    /// when the transfer completed, so <c>connect &lt;= pretransfer &lt;= starttransfer &lt;= total</c>.
+    /// A failure keeps the report it has.
+    /// </summary>
+    private static TransferResult StampTimings(TransferResult result, ITransferContext context, long started, ConnectResult connected, long connectEnded)
+    {
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        long completed = context.TimeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connected.Timings, connectEnded, connectEnded, completed, completed);
+        return result with { Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { Timings = timings } };
     }
 }

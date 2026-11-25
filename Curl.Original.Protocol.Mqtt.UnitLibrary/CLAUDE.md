@@ -31,6 +31,11 @@ A POST asked for with nothing to publish (`ITransferContext.PostWithoutData`, li
 after the CONNACK, with nothing sent but the CONNECT; an empty `PostData` publishes an empty payload (upstream tests
 1916 and 1917, BL-2673).
 
+A `-m` timeout reads `with N out of M bytes received` from the latest PUBLISH any of whose body arrived: M is its body
+length and N the bytes of it written (`MqttSession.ExpectedTotal` and `PublishBytesWritten`, curl's per-PUBLISH
+`req.size` and `req.bytecount`), while the transfer's byte count (`%{size_download}`) and the progress sink's running
+total count every body (measured against curl 8.22.0, BL-5895).
+
 `-v` and `--trace` (BL-935): after connecting, `MqttSession` reports to
 `ITransferContext.Events` `Using client id '...'`, each packet sent as a header block,
 each fixed header byte (`MqttPacketReader`) and each CONNACK or SUBACK body as header

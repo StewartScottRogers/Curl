@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Curl.Extended.Protocol.Coap.Wire;
 using Curl.Protocol.Abstractions;
@@ -124,6 +125,21 @@ public sealed class CoapProtocolHandlerTests
         Assert.HasCount(3, channel.Sent);
         Assert.IsTrue(channel.Sent.All(sent => sent.MessageId == channel.Sent[0].MessageId));
         CollectionAssert.AreEqual(new[] { 2.0, 4.0, 8.0 }, clock.DueTimes.Select(due => due.TotalSeconds).ToArray());
+        CollectionAssert.AreEqual(Hello, output.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AServerAnsweringAfterOneRetransmission_IsWaitedForAndTheChannelWasConnected()
+    {
+        var clock = new ImmediateTimeProvider();
+        var channel = new ScriptedDatagramChannel((count, sent) => count == 2 ? [Piggybacked(sent, CoapCode.Content, Hello)] : []);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Context("coap://h/", output, clock: clock));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(2, channel.Sent);
+        Assert.IsTrue(channel.IsConnected);
         CollectionAssert.AreEqual(Hello, output.ToArray());
     }
 
@@ -401,6 +417,43 @@ public sealed class CoapProtocolHandlerTests
     [DataRow("%e2%82%ac", "€")]
     public void PercentDecoded_AComponent_DecodesOnlyValidEscapes(string component, string expected) =>
         Assert.AreEqual(expected, Encoding.UTF8.GetString(CoapRequest.PercentDecoded(component)));
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectToServerRefused_EndsWithTheSendExitCode()
+    {
+        var connector = new ScriptedDatagramConnector(DatagramOpenResult.Opened(new RefusingConnectChannel()));
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context("coap://h/r", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.StartsWith("CoAP connect failed: ", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectToServerRefused_ReportsNoConnectionOpened()
+    {
+        var connector = new ScriptedDatagramConnector(DatagramOpenResult.Opened(new RefusingConnectChannel()));
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coap://h/r"), Output = new MemoryStream(), Events = events, TimeProvider = new ImmediateTimeProvider() };
+
+        await Handler(connector).ExecuteAsync(context);
+
+        Assert.IsEmpty(events.OpenedConnections);
+    }
+
+    private sealed class RefusingConnectChannel : IDatagramChannel
+    {
+        public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 5683);
+
+        public void ConnectToServer() => throw new SocketException((int)SocketError.NetworkUnreachable);
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            ValueTask.FromException<DatagramReceived>(new InvalidOperationException());
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     private static CoapProtocolHandler Handler(ScriptedDatagramChannel channel) =>
         Handler(new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel)));

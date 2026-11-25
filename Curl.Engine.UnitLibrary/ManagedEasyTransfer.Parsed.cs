@@ -13,9 +13,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -64,7 +64,7 @@ internal sealed partial class ManagedEasyTransfer
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
         CallbackTransferProgress? callbackProgress = CallbackProgressUnlessToolGave(toolProgress, options, abort, () => options.Behaviour.StandardError ?? Host.StandardError.Value, shared.TimeProvider);
         pauseGate.TickWhilePaused(CallbackTransferProgress.PausedTickOf(callbackProgress), shared.TimeProvider);
-        TransferResult? result = await FollowFinishingMeterAsync(
+        TransferResult? result = await WithHoldTickAsync(callbackProgress, FollowFinishingMeterAsync(
             follower,
             state,
             CreateContext(
@@ -79,12 +79,40 @@ internal sealed partial class ManagedEasyTransfer
                 ContextTokenOf(toolProgress, cancellationToken, abort)),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
             callbackProgress,
-            callbackReads).ConfigureAwait(false);
+            callbackReads)).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
         KeepHandleStateOf(recorder, negotiateFailure, abortedHead is null ? result : abortedHead.ReportOn(result), url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
         return FinishPerformed(LastResult, options, transferUrl, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
+
+    /// <summary>
+    /// Awaits <paramref name="attempt" /> with the once-a-second progress tick of a perform with a progress callback running
+    /// (BL-5796), and with it the live <see cref="TransferInfo.TotalTime" /> (<see cref="Info" />), as libcurl's
+    /// <c>Curl_pgrsUpdate</c> runs on every pass of its loop while a server holds a transfer.
+    /// </summary>
+    /// <param name="callbackProgress">The progress callback's sink, or <see langword="null" /> for none, and no tick.</param>
+    /// <param name="attempt">The attempt, already started.</param>
+    /// <returns>The attempt's result.</returns>
+    private async Task<TransferResult?> WithHoldTickAsync(CallbackTransferProgress? callbackProgress, Task<TransferResult?> attempt)
+    {
+        if (callbackProgress is null)
+        {
+            return await attempt.ConfigureAwait(false);
+        }
+
+        timeIsLive = true;
+        await using ProgressHoldTicker ticker = ProgressHoldTicker.Start(callbackProgress.ReportWhilePaused, () => pauseGate.Directions != 0, shared.TimeProvider);
+        try
+        {
+            return await attempt.ConfigureAwait(false);
+        }
+        finally
+        {
+            timeIsLive = false;
+        }
+    }
+
 
     /// <summary>
     /// Performs the attempt as <see cref="FollowUnlessAbortedAsync" /> does, then ends the built-in progress meter
@@ -131,10 +159,16 @@ internal sealed partial class ManagedEasyTransfer
     {
         LastResult = recorder is null ? result : negotiateFailure!.ReportOn(recorder.ReportOn(result));
         keptDigestChallenges = ChallengesOfLast401(result);
-        keptDigestStaysAvailable = result?.Report?.DigestStaysAvailable ?? false;
+        keptDigestStaysAvailable = DigestStaysAvailableAfter(result);
         keptDigestOrigin = OriginOf(url);
         keptAuthSchemePicked = AuthSchemeKeptAfter(result, keptAuthSchemePicked);
     }
+
+    /// <summary>Whether Digest stays available after a perform: its report says so; never after an abort or without a report.</summary>
+    /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
+    /// <returns>The report's flag, else <see langword="false" />.</returns>
+    internal static bool DigestStaysAvailableAfter(TransferResult? result) =>
+        result?.Report?.DigestStaysAvailable ?? false;
 
     /// <summary>The scheme the handle keeps after a perform: its report's picked scheme, else the one kept before.</summary>
     /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
@@ -235,9 +269,8 @@ internal sealed partial class ManagedEasyTransfer
     /// The progress the context reports to, after starting the attempt's <c>-Y</c>/<c>-y</c> watchdog on
     /// <paramref name="state" /> for every handle, so a library handle's <c>CURLOPT_LOW_SPEED_LIMIT</c> and
     /// <c>CURLOPT_LOW_SPEED_TIME</c> end a too-slow transfer with <c>CURLE_OPERATION_TIMEDOUT</c> as libcurl 8.22.0
-    /// does (BL-3196): the runner's <paramref name="toolProgress" />, after starting the <c>-m</c> watchdog too as the
-    /// runner does when it creates each attempt's context, so every perform, a <c>--retry</c> attempt's too, gets
-    /// fresh ones; else <paramref name="callbackProgress" /> (ADR-0567).
+    /// does (BL-3196), and the <c>-m</c> watchdog too (<c>CURLOPT_TIMEOUT</c>, BL-5291), so every perform, a <c>--retry</c>
+    /// attempt's too, gets fresh ones: the runner's <paramref name="toolProgress" />, else <paramref name="callbackProgress" /> (ADR-0567).
     /// </summary>
     /// <param name="toolProgress">The runner's progress, or <see langword="null" /> for a handle's own.</param>
     /// <param name="callbackProgress">The progress callback's sink, or <see langword="null" />.</param>
@@ -251,12 +284,7 @@ internal sealed partial class ManagedEasyTransfer
         EngineTransferState state)
     {
         shared.Performer.StartLowSpeedWatchdog(state, options.Transfer, Host.DiagnosticLog);
-        if (toolProgress is null)
-        {
-            return callbackProgress;
-        }
-
         shared.Performer.StartMaxTimeWatchdog(state, options.Transfer, Host.DiagnosticLog);
-        return toolProgress.Progress;
+        return toolProgress is null ? callbackProgress : toolProgress.Progress;
     }
 }

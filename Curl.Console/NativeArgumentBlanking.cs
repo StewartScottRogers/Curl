@@ -10,7 +10,8 @@ namespace Curl.Console;
 /// Overwrites the secret values on the process's own argv with asterisks of the same byte length, as curl's
 /// <c>cleanarg()</c> does (STD-048, BL-5093, ADR-1265), so <c>ps</c> and <c>/proc/PID/cmdline</c> do not show
 /// them: the values of <c>-u</c>/<c>--user</c>, <c>-U</c>/<c>--proxy-user</c>, <c>--oauth2-bearer</c>,
-/// <c>--pass</c>, <c>--proxy-pass</c>, <c>-E</c>/<c>--cert</c> and <c>--proxy-cert</c>. The arguments the run
+/// <c>--pass</c>, <c>--proxy-pass</c>, <c>-E</c>/<c>--cert</c>, <c>--proxy-cert</c>, <c>--tlsuser</c>,
+/// <c>--tlspassword</c>, <c>--proxy-tlsuser</c> and <c>--proxy-tlspassword</c>. The arguments the run
 /// parses are managed copies read before the blanking, so the credentials are still used. Linux writes argv
 /// through <c>/proc/self/mem</c>, macOS through <c>_NSGetArgv</c>; Windows argv is not shown to other users
 /// the same way and curl's Windows build does not blank it, so nothing is done there.
@@ -19,7 +20,7 @@ internal static partial class NativeArgumentBlanking
 {
     /// <summary>The long names of the options whose value curl blanks.</summary>
     private static readonly HashSet<string> SecretLongNames =
-        new(["user", "proxy-user", "oauth2-bearer", "pass", "proxy-pass", "cert", "proxy-cert"], StringComparer.Ordinal);
+        new(["user", "proxy-user", "oauth2-bearer", "pass", "proxy-pass", "cert", "proxy-cert", "tlsuser", "tlspassword", "proxy-tlsuser", "proxy-tlspassword"], StringComparer.Ordinal);
 
     /// <summary>
     /// The secret values among <paramref name="arguments"/>: for each, the argument's index and the offset of

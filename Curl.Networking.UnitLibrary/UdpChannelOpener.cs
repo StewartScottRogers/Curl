@@ -17,12 +17,13 @@ public sealed class UdpChannelOpener : IUdpChannelOpener
     private readonly IPAddress? _localAddress;
     private readonly int _localPort;
     private readonly Func<Socket, string, bool> _tryBindToDevice;
+    private readonly bool _connectsToServer;
 
     /// <summary>Creates the opener.</summary>
     /// <param name="localAddress">The local address <see cref="Open" /> binds, or <see langword="null" /> for any address of the server's family.</param>
     /// <param name="localPort">The local port <see cref="Open" /> binds, or <c>0</c> for an ephemeral one.</param>
     public UdpChannelOpener(IPAddress? localAddress = null, int localPort = 0)
-        : this(TcpDialer.TryBindToDevice, localAddress, localPort)
+        : this(TcpDialer.TryBindToDevice, localAddress, localPort, !OperatingSystem.IsWindows())
     {
     }
 
@@ -30,15 +31,17 @@ public sealed class UdpChannelOpener : IUdpChannelOpener
     /// <param name="tryBindToDevice">Binds a socket to the named device, answering whether it did.</param>
     /// <param name="localAddress">The local address <see cref="Open" /> binds, or <see langword="null" /> for any.</param>
     /// <param name="localPort">The local port <see cref="Open" /> binds, or <c>0</c> for an ephemeral one.</param>
-    internal UdpChannelOpener(Func<Socket, string, bool> tryBindToDevice, IPAddress? localAddress = null, int localPort = 0)
+    /// <param name="connectsToServer">Connects each channel's socket to the server, so the kernel reports an ICMP port unreachable on Linux and macOS (BL-5315).</param>
+    internal UdpChannelOpener(Func<Socket, string, bool> tryBindToDevice, IPAddress? localAddress = null, int localPort = 0, bool connectsToServer = false)
     {
         _tryBindToDevice = tryBindToDevice;
         _localAddress = localAddress;
         _localPort = localPort;
+        _connectsToServer = connectsToServer;
     }
 
     /// <inheritdoc />
-    public IDatagramChannel Open(IPEndPoint serverEndPoint) => new UdpDatagramChannel(serverEndPoint, _localAddress, _localPort);
+    public IDatagramChannel Open(IPEndPoint serverEndPoint) => new UdpDatagramChannel(serverEndPoint, static (socket, localEndPoint) => socket.Bind(localEndPoint), _localAddress, _localPort, connectsToServer: _connectsToServer);
 
     /// <inheritdoc />
     public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events)
@@ -50,7 +53,8 @@ public sealed class UdpChannelOpener : IUdpChannelOpener
             serverEndPoint,
             (socket, firstLocalEndPoint) => TcpDialer.BindLocalEnd(socket, (IPEndPoint)firstLocalEndPoint, localPortCount, events),
             localEndPoint.Address,
-            localEndPoint.Port);
+            localEndPoint.Port,
+            connectsToServer: _connectsToServer);
     }
 
     /// <inheritdoc />
@@ -96,6 +100,6 @@ public sealed class UdpChannelOpener : IUdpChannelOpener
             throw;
         }
 
-        return new UdpDatagramChannel(serverEndPoint, socket);
+        return new UdpDatagramChannel(serverEndPoint, socket, _connectsToServer);
     }
 }

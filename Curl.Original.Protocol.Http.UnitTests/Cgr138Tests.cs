@@ -30,7 +30,7 @@ public sealed class Cgr138Tests
     [
         ["cllong", null, false, Fields("200", "content-length", "3"), true, "HTTP/2 200 \r\ncontent-length: 3\r\n\r\n", "", ShutsDown],
         ["clshort", null, false, Fields("200", "content-length", "100"), true, "HTTP/2 200 \r\ncontent-length: 100\r\n\r\n", "hello h2\n", ShutsDown],
-        ["clshort, no DATA", null, false, Fields("200", "content-length", "100"), false, "HTTP/2 200 \r\ncontent-length: 100\r\n\r\n", "", ShutsDown],
+        ["clshort, no DATA", null, false, Fields("200", "content-length", "100"), false, "HTTP/2 200 \r\ncontent-length: 100\r\n", "", ShutsDown],
         ["204body", null, false, Fields("204"), true, "HTTP/2 204 \r\n\r\n", "", ShutsDown],
         ["304 with DATA", null, false, Fields("304"), true, "HTTP/2 304 \r\n\r\n", "", ShutsDown],
         ["1xxes", null, false, Fields("103", "link", "</s.css>"), false, "HTTP/2 103 \r\nlink: </s.css>\r\n", "", ShutsDown],

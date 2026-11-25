@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Mime;
 using Curl.Api.Options.Protocols;
@@ -183,6 +184,9 @@ public sealed class Lib643To661Tests
         {
             var array = (CurlFormArgument[])form.Calls[1][2].Value!;
             Assert.AreEqual((byte)'u', ((byte[])array[0].Value!)[0]);
+            // CURLFORM_CONTENTSLENGTH is strlen(testdata) - 1: 44 bytes of testdata minus one.
+            Assert.AreEqual(CurlFormOption.ContentsLength, array[1].Option);
+            Assert.AreEqual(((byte[])array[0].Value!).Length - 1L, array[1].Value);
         }
 
         if (failingCall == 0)
@@ -283,6 +287,26 @@ public sealed class Lib643To661Tests
         CollectionAssert.AreEqual(new[] { "SetDataCallback -1" }, mime.Parts[2].Calls);
         Assert.AreEqual("lib654", new Lib654().ProgramName);
         Assert.ThrowsExactly<ArgumentNullException>(() => Lib654.BuildParts(null!, "x"));
+    }
+
+    [TestMethod]
+    public async Task Lib655_TracesDataWithoutTheHexColumn()
+    {
+        var engine = new FakeCurlEngine
+        {
+            Performing = o =>
+            {
+                _ = o.Callbacks.Debug!(CurlInfoType.DataOut, "ok"u8);
+                return CurlCode.AbortedByCallback;
+            },
+        };
+        var run = new PortRun(engine, 655, "http://failthis/655", "http://x/655");
+
+        _ = await new Lib655(new ManualTimeProvider(DateTimeOffset.UnixEpoch)).RunAsync(run.Context, CancellationToken.None);
+
+        string error = run.Error.ToString();
+        Assert.Contains("0000: ok", error);
+        Assert.DoesNotContain("6f 6b", error);
     }
 
     [TestMethod]

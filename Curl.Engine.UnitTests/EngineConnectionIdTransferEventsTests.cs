@@ -60,24 +60,48 @@ public sealed class EngineConnectionIdTransferEventsTests
     [TestMethod]
     public void EveryEvent_GoesOnToTheInnerEvents()
     {
-        CountingEvents inner = new();
+        RecordingEvents inner = new();
         EngineConnectionIdTransferEvents events = new(inner, new EngineTransferState(), new ConcurrentDictionary<long, long>(), () => 0, _ => { });
+        ConnectionOpenedEvent opened = Opened(1, isSecond: false);
+        ConnectionReusedEvent reused = new() { Scheme = "http", IsProxy = false, HostName = "h", Port = 80, ConnectionNumber = 1 };
+        TlsHandshakeEvent handshake = new() { ProtocolVersion = SslProtocols.Tls13, CipherSuite = null, NegotiatedApplicationProtocol = null, OfferedApplicationProtocols = [], ServerCertificate = null, CertificateVerified = false };
 
-        events.ReportConnectionOpened(Opened(1, isSecond: false));
-        events.ReportConnectionReused(new ConnectionReusedEvent { Scheme = "http", IsProxy = false, HostName = "h", Port = 80, ConnectionNumber = 1 });
-        events.ReportCertificateVerifyResult(0, isProxy: false);
-        events.ReportTlsEarlyData(0);
+        events.ReportConnectionOpened(opened);
+        events.ReportConnectionReused(reused);
+        events.ReportCertificateVerifyResult(11, isProxy: true);
+        events.ReportTlsEarlyData(12);
         events.ReportInfo("i");
-        events.ReportTlsHandshake(new TlsHandshakeEvent { ProtocolVersion = SslProtocols.Tls13, CipherSuite = null, NegotiatedApplicationProtocol = null, OfferedApplicationProtocols = [], ServerCertificate = null, CertificateVerified = false });
+        events.ReportTlsHandshake(handshake);
         events.ReportTlsData([1], sent: true);
         events.ReportTlsMessage(null!);
         events.ReportTlsTrust(null!);
-        events.ReportRequestHeader([1]);
-        events.ReportResponseHeader([1]);
-        events.ReportDataSent([1]);
-        events.ReportDataReceived([1]);
+        events.ReportRequestHeader([2]);
+        events.ReportResponseHeader([3]);
+        events.ReportDataSent([4]);
+        events.ReportDataReceived([5]);
 
-        Assert.AreEqual(13, inner.Count);
+        Assert.HasCount(13, inner.Calls);
+        Assert.AreSame(opened, inner.Calls[0]);
+        Assert.AreSame(reused, inner.Calls[1]);
+        string[] expectedRest =
+        [
+            "ReportCertificateVerifyResult 11 True",
+            "ReportTlsEarlyData 12",
+            "ReportInfo i",
+        ];
+        CollectionAssert.AreEqual(expectedRest, inner.Calls.Skip(2).Take(3).ToArray());
+        Assert.AreSame(handshake, inner.Calls[5]);
+        string[] expectedTail =
+        [
+            "ReportTlsData 01 True",
+            "ReportTlsMessage",
+            "ReportTlsTrust",
+            "ReportRequestHeader 02",
+            "ReportResponseHeader 03",
+            "ReportDataSent 04",
+            "ReportDataReceived 05",
+        ];
+        CollectionAssert.AreEqual(expectedTail, inner.Calls.Skip(6).ToArray());
     }
 
     private static ConnectionOpenedEvent Opened(long connectionNumber, bool isSecond) => new()
@@ -89,35 +113,35 @@ public sealed class EngineConnectionIdTransferEventsTests
         ConnectionNumber = connectionNumber,
     };
 
-    /// <summary>Counts every event it is given.</summary>
-    private sealed class CountingEvents : ITransferEvents
+    /// <summary>Records every event it is given, by method name and argument, in order.</summary>
+    private sealed class RecordingEvents : ITransferEvents
     {
-        public int Count { get; private set; }
+        public List<object> Calls { get; } = [];
 
-        public void ReportConnectionOpened(ConnectionOpenedEvent opened) => Count++;
+        public void ReportConnectionOpened(ConnectionOpenedEvent opened) => Calls.Add(opened);
 
-        public void ReportConnectionReused(ConnectionReusedEvent reused) => Count++;
+        public void ReportConnectionReused(ConnectionReusedEvent reused) => Calls.Add(reused);
 
-        public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => Count++;
+        public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => Calls.Add($"ReportCertificateVerifyResult {verifyResult} {isProxy}");
 
-        public void ReportTlsEarlyData(long bytes) => Count++;
+        public void ReportTlsEarlyData(long bytes) => Calls.Add($"ReportTlsEarlyData {bytes}");
 
-        public void ReportInfo(string text) => Count++;
+        public void ReportInfo(string text) => Calls.Add($"ReportInfo {text}");
 
-        public void ReportTlsHandshake(TlsHandshakeEvent handshake) => Count++;
+        public void ReportTlsHandshake(TlsHandshakeEvent handshake) => Calls.Add(handshake);
 
-        public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent) => Count++;
+        public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent) => Calls.Add($"ReportTlsData {Convert.ToHexString(bytes)} {sent}");
 
-        public void ReportTlsMessage(TlsMessageEvent message) => Count++;
+        public void ReportTlsMessage(TlsMessageEvent message) => Calls.Add("ReportTlsMessage");
 
-        public void ReportTlsTrust(TlsTrustEvent trust) => Count++;
+        public void ReportTlsTrust(TlsTrustEvent trust) => Calls.Add("ReportTlsTrust");
 
-        public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Count++;
+        public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Calls.Add($"ReportRequestHeader {Convert.ToHexString(bytes)}");
 
-        public void ReportResponseHeader(ReadOnlySpan<byte> bytes) => Count++;
+        public void ReportResponseHeader(ReadOnlySpan<byte> bytes) => Calls.Add($"ReportResponseHeader {Convert.ToHexString(bytes)}");
 
-        public void ReportDataSent(ReadOnlySpan<byte> bytes) => Count++;
+        public void ReportDataSent(ReadOnlySpan<byte> bytes) => Calls.Add($"ReportDataSent {Convert.ToHexString(bytes)}");
 
-        public void ReportDataReceived(ReadOnlySpan<byte> bytes) => Count++;
+        public void ReportDataReceived(ReadOnlySpan<byte> bytes) => Calls.Add($"ReportDataReceived {Convert.ToHexString(bytes)}");
     }
 }

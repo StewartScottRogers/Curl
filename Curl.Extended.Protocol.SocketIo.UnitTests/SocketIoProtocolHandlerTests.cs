@@ -16,7 +16,7 @@ public sealed class SocketIoProtocolHandlerTests
     private const string Open = "0{\"sid\":\"lv_VI97HAXpY6yYWAAAC\",\"upgrades\":[],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}";
 
     [TestMethod]
-    public async Task ExecuteAsync_TheMainNamespace_EmitsAnswersPingsAndWritesEachEvent()
+    public async Task ExecuteAsync_TheMainNamespace_EmitsAnswersPingsAndWritesEveryEventUntilTheDisconnect()
     {
         ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "2", "", "6", "4x", "42[\"news\",{\"a\":1}]", "421[\"question\"]", "43[]", "51-[\"bin\",{\"_placeholder\":true,\"num\":0}]", "41", "42[\"late\"]");
         MemoryStream output = new();

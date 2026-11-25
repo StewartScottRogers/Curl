@@ -217,9 +217,9 @@ public sealed class ServerCertificateRevocationTests
         var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System);
 
         var (chainPolicy, _, _) = verification.ReadTrustAnchors();
-        Diagnostics.Act("chain policy", chainPolicy?.RevocationMode.ToString() ?? "(none: SslStream's NoCheck)");
+        Diagnostics.Act("chain policy", chainPolicy?.RevocationMode.ToString() ?? "(none)");
 
-        Assert.IsNull(chainPolicy);
+        Assert.AreEqual(X509RevocationMode.NoCheck, chainPolicy?.RevocationMode);
     }
 
     [TestMethod]

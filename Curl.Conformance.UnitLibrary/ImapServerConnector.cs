@@ -10,11 +10,13 @@ namespace Curl.Conformance;
 /// <see cref="ImapPort"/> gets its own <see cref="ImapResponder"/> answering from the case's
 /// <c>&lt;servercmd&gt;</c> and <c>&lt;reply&gt;</c> parts, each with the line endings its
 /// <c>crlf</c> attribute forces, as <c>prepro</c> forces them before ftpserver.pl reads the part.
-/// No socket is opened.
+/// Under <c>SLOWDOWN</c> the client reads each connection's greeting and replies one byte at a
+/// time (BL-5937). No socket is opened.
 /// </summary>
 /// <param name="testCase">The expanded case whose <c>&lt;servercmd&gt;</c> and <c>&lt;reply&gt;</c> parts the server answers from.</param>
 /// <param name="backend">The server every connection not to <see cref="ImapPort"/> reaches.</param>
-public sealed class ImapServerConnector(UpstreamTestCase testCase, IConnector backend) : IConnector
+/// <param name="clock">The clock <c>DELAY</c> and <c>SLOWDOWN</c> wait on (the runner's server clock); <see langword="null"/> for the system clock.</param>
+public sealed class ImapServerConnector(UpstreamTestCase testCase, IConnector backend, TimeProvider? clock = null) : IConnector
 {
     /// <summary>The port of the IMAP server, <c>%IMAPPORT</c>.</summary>
     public const int ImapPort = 8997;
@@ -49,12 +51,14 @@ public sealed class ImapServerConnector(UpstreamTestCase testCase, IConnector ba
             ? Server().ConnectAsync(target, cancellationToken)
             : backend.ConnectAsync(target, cancellationToken);
 
-    private LineProtocolServerConnector Server() => server ??= new(CreateResponder);
+    private ReadOnlyMemory<byte> ServerCommands => testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty;
+
+    private LineProtocolServerConnector Server() => server ??= new(CreateResponder, clock, ServerCommands);
 
     private ImapResponder CreateResponder()
     {
         ImapResponder responder = new(
-            LineProtocolServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span),
+            LineProtocolServerCommands.Read(ServerCommands.Span),
             testCase.Sections.Where(part => part.Section == "reply").ToDictionary(part => part.Name, UpstreamTestPartBodies.Served, StringComparer.Ordinal));
         responders.Add(responder);
         return responder;

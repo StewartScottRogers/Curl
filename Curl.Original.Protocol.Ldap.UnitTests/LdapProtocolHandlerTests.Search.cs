@@ -94,7 +94,7 @@ public sealed partial class LdapProtocolHandlerTests
         Diagnostics.Act("sent byte count", connection.Sent.Length);
         Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UrlMalformat, message), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UrlMalformat, message), result);
-        Assert.HasCount(1, connector.Targets);
+        Assert.HasCount(2, connector.Targets);
         Assert.IsEmpty(connection.Sent);
         Assert.IsTrue(connection.IsDisposed);
     }
@@ -139,6 +139,8 @@ public sealed partial class LdapProtocolHandlerTests
     [DataRow("x???(cn=)")]
     [DataRow("x???(&)")]
     [DataRow("x???(cn=a)x")]
+    [DataRow("x???(cn=a(b)")]
+    [DataRow(@"x???(cn=a\2a()")]
     public async Task ExecuteAsync_WinLdapRefusedFilter_UnbindsWithMessageId3AndFailsWith39FilterError(string path)
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.WinLdap, path, BindSuccess1);

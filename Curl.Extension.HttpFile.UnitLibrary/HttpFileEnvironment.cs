@@ -32,7 +32,7 @@ internal static class HttpFileEnvironment
     /// <exception cref="ArgumentExpansionException">The file cannot be read (exit 26), is not a JSON object of objects, or has no such environment (exit 2).</exception>
     public static void Load(string path, string name, ArgumentExpansionContext context, HttpFileVariables variables)
     {
-        byte[] bytes = context.ReadFile(path) ?? throw new ArgumentExpansionException($"http-file: cannot read environment file {path}", CurlExitCode.ReadError);
+        byte[] bytes = context.ReadFile(path) ?? throw new ArgumentExpansionException($"--http-file cannot read environment file '{path}'", CurlExitCode.FailedInit);
         using JsonDocument document = Parse(bytes, path);
         JsonElement root = ObjectOrThrow(document.RootElement, path);
         if (root.TryGetProperty(Shared, out JsonElement shared))

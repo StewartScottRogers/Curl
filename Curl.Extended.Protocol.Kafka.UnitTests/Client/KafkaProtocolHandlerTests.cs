@@ -29,10 +29,10 @@ public sealed class KafkaProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_ProduceRefused_EndsWithWeirdServerReplyNamingTheError()
     {
-        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.ProduceResponse(2, 3)), "kafka://broker/orders", new MemoryStream(), "hi");
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.ProduceResponse(2, 29)), "kafka://broker/orders", new MemoryStream(), "hi");
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-        Assert.AreEqual("Kafka broker answered error 3 (UNKNOWN_TOPIC_OR_PARTITION) for topic orders partition 0", result.ErrorMessage);
+        Assert.AreEqual("Kafka broker answered error 29 (TOPIC_AUTHORIZATION_FAILED) for topic orders partition 0", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -71,6 +71,13 @@ public sealed class KafkaProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void BrokerError_NamesTheCodeAndEscapesControlCharactersInTheTopic()
+    {
+        Assert.AreEqual("Kafka broker answered error 17 (INVALID_TOPIC_EXCEPTION) for topic bad topic partition 0", KafkaClientMessages.BrokerError(17, "bad topic", 0));
+        Assert.AreEqual("Kafka broker answered error 17 (INVALID_TOPIC_EXCEPTION) for topic a\\x0D\\x0Ab partition 0", KafkaClientMessages.BrokerError(17, "a\r\nb", 0));
     }
 
     [TestMethod]
@@ -224,12 +231,12 @@ public sealed class KafkaProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_PlainNotEnabled_EndsWithLoginDeniedNamingTheEnabledMechanisms()
     {
-        ScriptedKafkaConnection connection = new(KafkaSaslTestBytes.HandshakeResponse(1, 33, "SCRAM-SHA-512"));
+        ScriptedKafkaConnection connection = new(KafkaSaslTestBytes.HandshakeResponse(1, 33, "GSSAPI"));
 
         TransferResult result = await new KafkaProtocolHandler(new ScriptedKafkaConnector(ConnectResult.Connected(connection))).ExecuteAsync(Context("kafka://broker/orders", new MemoryStream(), credentials: new NetworkCredential("alice", "s3cret")));
 
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
-        Assert.AreEqual("Kafka broker does not enable SASL PLAIN, it enables: SCRAM-SHA-512", result.ErrorMessage);
+        Assert.AreEqual("Kafka broker does not enable SASL PLAIN, it enables: GSSAPI", result.ErrorMessage);
         Assert.HasCount(1, connection.Writes);
     }
 
@@ -245,14 +252,14 @@ public sealed class KafkaProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_TopicUnknownToMetadata_EndsWithWeirdServerReplyNamingTheError()
+    public async Task ExecuteAsync_TopicRefusedByMetadata_EndsWithWeirdServerReplyNamingTheError()
     {
-        ScriptedKafkaConnection connection = new(KafkaTestBytes.MetadataResponse(1, 3, [(1, "broker", 9092)]));
+        ScriptedKafkaConnection connection = new(KafkaTestBytes.MetadataResponse(1, 29, [(1, "broker", 9092)]));
 
         TransferResult result = await ExecuteAsync(connection, "kafka://broker/orders", new MemoryStream());
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-        Assert.AreEqual("Kafka broker answered error 3 (UNKNOWN_TOPIC_OR_PARTITION) for topic orders partition 0", result.ErrorMessage);
+        Assert.AreEqual("Kafka broker answered error 29 (TOPIC_AUTHORIZATION_FAILED) for topic orders partition 0", result.ErrorMessage);
         Assert.AreEqual(1, connection.Writes.Count);
     }
 

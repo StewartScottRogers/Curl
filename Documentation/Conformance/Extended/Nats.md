@@ -36,7 +36,7 @@ Server-only statements and features curl does not use are `n/a`.
 | Nats:NATS-UNSUB-1 | MUST | UNSUB with max_msgs ends the subscription after that many messages; the client stops reading there. | NatsSubscribeCases.Subscribe_CountTwo_SendsUnsubWithMaxMsgsAndStopsAfterTwo |
 | Nats:NATS-MSG-1 | MUST | MSG gives subject, subscription ID, an optional reply-to and the byte count. | NatsSubscribeCases.Subscribe_MsgPayloadsWithCrLf_AreWrittenWholeUntilTheServerCloses |
 | Nats:NATS-MSG-2 | MUST | A MSG payload is read by its byte count, CR LF inside it included, and is followed by CRLF. | NatsSubscribeCases.Subscribe_MsgPayloadsWithCrLf_AreWrittenWholeUntilTheServerCloses |
-| Nats:NATS-HMSG-1 | MUST | HMSG reaches only a client whose CONNECT set `headers`; one that did not treats HMSG as a protocol error. | NatsSubscribeCases.Subscribe_HmsgWithoutHeadersInConnect_IsAWeirdServerReply |
+| Nats:NATS-HMSG-1 | MUST | HMSG reaches only a client whose CONNECT set `headers`; one that did not treats HMSG as a protocol error. | NatsSubscribeCases.Subscribe_Hmsg_WritesThePayloadWithoutTheHeaders |
 | Nats:NATS-PING-1 | MUST | A client answers the server's PING with PONG, or the server closes the connection. | NatsSubscribeCases.Subscribe_ServerPing_IsAnsweredWithPong |
 | Nats:NATS-PING-2 | SHOULD | A client sends PING after CONNECT and waits for PONG to know its earlier lines were processed. | NatsPublishCases.Publish_PayloadWithCrLf_IsFramedByItsByteCount |
 | Nats:NATS-OK-1 | MUST | `+OK` (sent when `verbose` is on) is accepted and ignored. | NatsConnectCases.Publish_OkAndInfoBeforePong_AreAccepted |
@@ -48,5 +48,5 @@ Server-only statements and features curl does not use are `n/a`.
 
 `-T file` publishes the file's bytes exactly as `-d` publishes its data: the server receives `PUB <subject> <length>`
 and the file's bytes, never a SUB, so an upload never subscribes, fetches or consumes. With `?request` the file is
-the request's payload. When both are given, `-d`'s data is published and the upload is ignored (BL-4951). Pinned by
-`NatsUploadTests` in `Curl.Extended.Protocol.Nats.UnitTests`.
+the request's payload (BL-4951). The command line refuses `-d` with `-T` (exit 2) before anything is sent
+(ADR-1369). Pinned by `NatsUploadTests` in `Curl.Extended.Protocol.Nats.UnitTests`.

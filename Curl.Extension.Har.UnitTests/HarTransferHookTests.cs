@@ -221,6 +221,52 @@ public sealed class HarTransferHookTests
     private static string[] NameValues(JsonElement array) =>
         [.. array.EnumerateArray().Select(pair => pair.GetProperty("name").GetString() + ": " + pair.GetProperty("value").GetString())];
 
+    [TestMethod]
+    public async Task ExecuteAsync_AFollowedRedirectWithUserInfo_WritesNoPasswordInUrlRedirectUrlOrTheSecondHop_Adr1134()
+    {
+        HarTransferHook hook = new(_path);
+        var first = Context(url: "http://bob:URLSECRET5@example.com/r");
+        var second = Context(url: "http://bob:URLSECRET5@example.com/new");
+
+        var result = await hook.ExecuteAsync(first, RedirectingOrigin);
+        await hook.ExecuteAsync(second, Origin(200, "x", effectiveUrl: "http://bob:URLSECRET5@example.com/new"));
+
+        Assert.AreEqual("http://bob:URLSECRET5@example.com/new", result.Report!.RedirectUrl);
+        Assert.DoesNotContain("URLSECRET5", File.ReadAllText(_path));
+        using var har = Read();
+        var entries = har.RootElement.GetProperty("log").GetProperty("entries");
+        Assert.AreEqual("http://REDACTED:REDACTED@example.com/r", entries[0].GetProperty("request").GetProperty("url").GetString());
+        Assert.AreEqual("http://REDACTED:REDACTED@example.com/new", entries[0].GetProperty("response").GetProperty("redirectURL").GetString());
+        Assert.AreEqual("http://REDACTED:REDACTED@example.com/new", entries[1].GetProperty("request").GetProperty("url").GetString());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AUrlWithoutUserInfo_IsWrittenUnchanged_Adr1146()
+    {
+        var entry = await EntryOfAsync(Context(url: "http://example.com/r?a=b@c"), Origin(301, effectiveUrl: "http://example.com/r?a=b@c"));
+
+        Assert.AreEqual("http://example.com/r?a=b@c", entry.GetProperty("request").GetProperty("url").GetString());
+        Assert.AreEqual("http://example.com/new", entry.GetProperty("response").GetProperty("redirectURL").GetString());
+    }
+
+    [TestMethod]
+    [DataRow("http://u:p@example.com", "http://REDACTED:REDACTED@example.com")]
+    [DataRow("http://u@example.com:80/p@q", "http://REDACTED:REDACTED@example.com:80/p@q")]
+    [DataRow("example.com/u@v", "example.com/u@v")]
+    [DataRow("http://example.com", "http://example.com")]
+    [DataRow("x", "x")]
+    [DataRow("", "")]
+    [DataRow("user:secret@example.com/path", "REDACTED:REDACTED@example.com/path")]
+    [DataRow("example.com/?u=http://a@b/", "example.com/?u=http://a@b/")]
+    public void Redacted_AUrl_ReplacesOnlyTheUserInfo(string url, string expected) =>
+        Assert.AreEqual(expected, HarTransferHook.Redacted(url));
+
+    private static async ValueTask<TransferResult> RedirectingOrigin(ITransferContext context)
+    {
+        var result = await Origin(301, effectiveUrl: "http://bob:URLSECRET5@example.com/r")(context);
+        return result with { Report = result.Report! with { RedirectUrl = "http://bob:URLSECRET5@example.com/new" } };
+    }
+
     private static TransferContext Context(HttpRequestOptions? http = null, string url = "http://example.com/r", bool noBody = false, Stream? upload = null) => new()
     {
         Url = CurlUrl.Parse(url),

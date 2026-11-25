@@ -1,0 +1,59 @@
+---
+id: BL-5390
+title: Report DICT, Gopher and TELNET transfer timings and download speed in write-out
+priority: Low
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Original.Protocol.Dict.UnitLibrary, Curl.Original.Protocol.Dict.UnitTests, Curl.Original.Protocol.Gopher.UnitLibrary, Curl.Original.Protocol.Gopher.UnitTests, Curl.Original.Protocol.Telnet.UnitLibrary, Curl.Original.Protocol.Telnet.UnitTests]
+requirement: none
+created: 2026-11-17
+completed: 2026-11-17
+---
+# BL-5390 — Report DICT, Gopher and TELNET transfer timings and download speed in write-out
+
+## Goal
+
+`%{time_connect}`, `%{time_starttransfer}`, `%{time_total}` and `%{speed_download}` for DICT, Gopher and TELNET transfers are non-zero, as curl reports them.
+
+## Context
+
+From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build), finding STD-097 (Low, Confirmed by the orchestrator, 2 runs each: write-out values only). Area: dict://, gopher://, telnet:// write-out, Windows.
+
+The same gap affects the Part B messaging extension protocols (EXT-083, BL-5410), so the fix may belong in a shared engine path for non-HTTP handlers. Coordinate with BL-5410 before writing three copies of timing code; if a shared engine fix is chosen, widen `touches` to the engine files it changes.
+
+**Repro.**
+1. A DICT server on 127.0.0.1:41628: greeting `220 ready`, answers `CLIENT` with `250 ok`, any other command with `150 1 definitions\r\n151 "x" db "Db"\r\nhello\r\n.\r\n250 ok\r\n`, `QUIT` with `221 bye`.
+2. A TCP server on 127.0.0.1:41070 that reads one line, sends `hello gopher\r\n.\r\n` and closes.
+3. `W='%{time_connect} %{time_starttransfer} %{time_total} %{size_download} %{speed_download}\n'`
+   - `curl -sS -m 5 -o NUL -w "$W" dict://127.0.0.1:41628/d:x`
+   - `curl -sS -m 3 -o NUL -w "$W" gopher://127.0.0.1:41070/0x`
+   - `echo x | curl -sS -m 3 -o NUL -w "$W" telnet://127.0.0.1:41070`
+
+**Expected (REF).** Non-zero times, e.g. `0.000704 0.001529 0.001708 88 53789` (DICT), `0.000684 0.000741 0.001677 17 10732` (Gopher), `0.000621 0.107644 0.107990 17 157` (TELNET).
+**Actual (PORT).** `0.000000 0.000000 0.000000 88 0`, `0.000000 0.000000 0.000000 17 0`, `0.000000 0.000000 0.000000 17 0`. Sizes are correct.
+**Where to start.** `DictProtocolHandler.cs`, `GopherProtocolHandler.cs` and `TelnetProtocolHandler.cs` return a `TransferReport` without `Timings` (none of the three files mentions `Timings`). Compare how SMB (`SmbProtocolHandler.StampReport`) and FILE (`FileProtocolHandler.WithTimings`) stamp them.
+
+## Acceptance criteria
+
+- [x] New tests in each of `Curl.Original.Protocol.Dict.UnitTests`, `Curl.Original.Protocol.Gopher.UnitTests` and `Curl.Original.Protocol.Telnet.UnitTests` (a new file each) prove the `TransferReport` carries timings with `time_connect`, `time_starttransfer` and `time_total` set from an injected `TimeProvider` that advances, so they are non-zero.
+- [x] Tests prove download speed is non-zero when bytes and elapsed time are both non-zero.
+- [x] Tests prove the already-correct `size_download` is unchanged.
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] Hand check recorded in the Log: the three commands print non-zero `time_connect`, `time_starttransfer`, `time_total` and `speed_download`. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+- Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
+- Review acceptance check: the three commands print non-zero `time_connect`, `time_starttransfer`, `time_total` and `speed_download`.
+- Related: EXT-083 (BL-5410), the same gap in the messaging extension protocols.
+
+- Decision: stamped by each handler (no shared engine change): Started at transfer start, Connect from the connector, FirstByteReceived = Completed (the reply is read to the server close). Only Ok results are stamped. TELNET now reports DownloadSize = bytes written. Existing tests pinning result equality or stepping-clock milliseconds were adjusted.
+- Hand check 2026-11-17 (PowerShell loopback servers, Curl build): gopher `0.184069 0.553417 0.553417 15 27`, telnet `0.153110 0.540669 0.540669 15 27`, dict `0.065888 0.406618 0.406618 33 81`. Quality run: Dict, Gopher, Telnet libraries at the gates.
+
+## Log
+
+- 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: ab061ebd 5e1ac160 bc933de7 7ae10ef7 d9c86291 a0b49a29.
+- 2026-11-17: Doing -> Done. DICT, Gopher and TELNET write-out report non-zero connect, start-transfer, total times and download speed

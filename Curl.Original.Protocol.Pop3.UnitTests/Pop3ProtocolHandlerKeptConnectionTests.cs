@@ -35,8 +35,8 @@ public sealed class Pop3ProtocolHandlerKeptConnectionTests
         var connector = new QueuedConnector(ConnectResult.Connected(connection, null), ConnectResult.Connected(connection, null, isReused: true));
         var handler = new Pop3ProtocolHandler(connector, new QueuedTlsProvider(), Plain());
 
-        TransferResult first = await handler.ExecuteAsync(Context("1", "u"));
-        TransferResult second = await handler.ExecuteAsync(Context("2", "u"));
+        TransferResult first = StampedTimings.Without(await handler.ExecuteAsync(Context("1", "u")));
+        TransferResult second = StampedTimings.Without(await handler.ExecuteAsync(Context("2", "u")));
         bool closedBeforeExit = connection.IsClosed;
         await connection.CloseAsync();
 
@@ -57,8 +57,7 @@ public sealed class Pop3ProtocolHandlerKeptConnectionTests
         var handler = new Pop3ProtocolHandler(connector, new QueuedTlsProvider(), Plain());
 
         await handler.ExecuteAsync(Context("1", "u"));
-        TransferResult result = await handler.ExecuteAsync(Context("2", "v"));
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(Context("2", "v")));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsTrue(first.IsClosed);
         Assert.AreEqual("CAPA\r\nAUTH PLAIN\r\nAHUAcA==\r\nRETR 1\r\nQUIT\r\n", first.SentText);
@@ -75,8 +74,7 @@ public sealed class Pop3ProtocolHandlerKeptConnectionTests
         var handler = new Pop3ProtocolHandler(connector, new QueuedTlsProvider(), Plain());
 
         await handler.ExecuteAsync(Context("1", "u"));
-        TransferResult result = await handler.ExecuteAsync(Context("2", "u"));
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(Context("2", "u")));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(first.IsClosed);
         Assert.AreEqual("CAPA\r\nAUTH PLAIN\r\nAHUAcA==\r\nRETR 1\r\n", first.SentText);
@@ -91,9 +89,8 @@ public sealed class Pop3ProtocolHandlerKeptConnectionTests
         var connector = new QueuedConnector(ConnectResult.Connected(first, null), ConnectResult.Connected(second, null, connectionNumber: 1));
         var handler = new Pop3ProtocolHandler(connector, new QueuedTlsProvider(), Plain());
 
-        TransferResult failed = await handler.ExecuteAsync(Context("1", "u"));
-        TransferResult result = await handler.ExecuteAsync(Context("2", "u"));
-
+        TransferResult failed = StampedTimings.Without(await handler.ExecuteAsync(Context("1", "u")));
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(Context("2", "u")));
         Assert.AreNotEqual(CurlExitCode.Ok, failed.ExitCode);
         Assert.IsTrue(first.IsClosed);
         Assert.IsNull(first.Session);
@@ -110,8 +107,7 @@ public sealed class Pop3ProtocolHandlerKeptConnectionTests
         var handler = new Pop3ProtocolHandler(connector, new QueuedTlsProvider(), Plain());
 
         await handler.ExecuteAsync(Context("1", "u"));
-        TransferResult failed = await handler.ExecuteAsync(Context("9", "u"));
-
+        TransferResult failed = StampedTimings.Without(await handler.ExecuteAsync(Context("9", "u")));
         Assert.AreNotEqual(CurlExitCode.Ok, failed.ExitCode);
         Assert.IsTrue(connection.IsClosed);
         Assert.AreEqual("CAPA\r\nAUTH PLAIN\r\nAHUAcA==\r\nRETR 1\r\nRETR 9\r\nQUIT\r\n", connection.SentText);

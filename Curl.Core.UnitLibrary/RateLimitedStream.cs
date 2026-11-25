@@ -3,7 +3,7 @@ namespace Curl.Core;
 /// <summary>
 /// Wraps a transfer's stream and holds its throughput at <c>--limit-rate</c>, as curl
 /// 8.21.0 does: no single read or write moves more than one second's worth of bytes, and
-/// before each one it waits, with <see cref="Task.Delay(TimeSpan, TimeProvider, CancellationToken)" />
+/// before each read, and after each write, it waits, with <see cref="Task.Delay(TimeSpan, TimeProvider, CancellationToken)" />
 /// on the injected <see cref="TimeProvider" />, until the bytes already moved would have
 /// taken that long at the rate. Reads and writes share one count and one clock, which
 /// starts when the stream is constructed. Only the asynchronous members move bytes; the
@@ -101,16 +101,16 @@ public sealed class RateLimitedStream : Stream
         WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
     /// <inheritdoc />
-    /// <remarks>Writes in pieces of at most one second's worth of bytes, waiting for the rate before each.</remarks>
+    /// <remarks>Writes in pieces of at most one second's worth of bytes, waiting for the rate after each, the last included, so the average speed of a transfer is the rate, as curl 8.22.0's limiter waits for tokens to turn positive again after the last drain.</remarks>
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         while (!buffer.IsEmpty)
         {
-            await WaitForRateAsync(cancellationToken).ConfigureAwait(false);
             ReadOnlyMemory<byte> piece = buffer[..OneSecondOf(buffer.Length)];
             await inner.WriteAsync(piece, cancellationToken).ConfigureAwait(false);
             bytesMoved += piece.Length;
             buffer = buffer[piece.Length..];
+            await WaitForRateAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 

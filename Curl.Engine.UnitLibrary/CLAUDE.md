@@ -475,6 +475,8 @@ A read-callback upload to an `http` or `https` URL with a known `EasyTransferOpt
 
 `ManagedEasyTransfer.TransferSettingsOf` gives a perform from the options the proxy credential `ProxyCredentialsOf` makes of `EasyAuthenticationOptions.ProxyUserPassword` (split at its first colon), `ProxyUserName` and `ProxyPassword` (each winning over its half), as the curl tool's `-U`, so the chosen proxy carries it when the proxy URL has no user information of its own (the URL's wins, CGR-079, ADR-0825) and the HTTP handler answers a 407 with it (upstream test1588, ADR-0677). Its tests are in `ManagedEasyTransferTests.Proxy.cs`.
 
+A library handle's three options are sent as set (upstream test503). The curl tool's `-U` is not: `TransferProxySelection.TrySelect` percent-decodes it, as curl 8.22.0 does, byte by byte in the encoding credentials are sent in, a `%` without two hex digits kept, and a decoded NUL ending every transfer with exit 3, proxy or none (measured on Windows, BL-5883); `ManagedEasyTransfer` asks for that only under `ToolSettings`. Its tests are `Std202Tests`.
+
 ## CURLOPT_NETRC on a library handle (BL-2696)
 
 A perform from the options with no `ToolInputs` chooses its credentials with `TransferCredentialLookup` once its proxy is chosen (`ManagedEasyTransfer.TryLookUpUrlAndNetrcCredentials`): with no `CURLOPT_USERPWD` user name, the URL's own user name and password whatever `EasyAuthenticationOptions.Netrc` says (upstream test1964, BL-2684), and with `Netrc` not `Ignored` the URL's host looked up in the `.netrc` file. It puts what it finds on the context as `LookedUpCredentials` (`OwnInputsOf`), through a proxy and on a `Duplicate` too, as libcurl's `override_login` does (upstream test2309). The file is `CURLOPT_NETRC_FILE`, else `NETRC`, else `.netrc` in `HOME`, read through `EasyTransferHost.ReadFile` (`ReadDiskFile`, the real disk, by default) and the engine's `ManagedEngineSharedState.ReadEnvironmentVariable`; a required file missing or malformed ends the perform with `CurlCode.ReadError` and the lookup's text before anything is sent. With `Netrc` not `Ignored` and no `CURLOPT_USERPWD` user name, each redirect hop's host is looked up again (`TransferCredentialLookup.ForRedirectHops`, given to the handle's own `RedirectFollower` by `FollowerOf`), so a hop to a host with no entry sends no credentials, `CURLOPT_UNRESTRICTED_AUTH` or not (upstream test2506, BL-2701). Its tests are `ManagedEasyTransferTests.Netrc.cs`.
@@ -513,7 +515,7 @@ When `ManagedCurlEngine`'s internal constructor is given a `readEnvironmentVaria
 
 ## CURLOPT_POSTFIELDS and CURLOPT_POST on an mqtt URL (BL-2673)
 
-`ManagedEasyTransfer.TransferSettingsOf` gives an `mqtt` or `mqtts` URL's handle `PostData` of `EasyHttpOptions.PostFields` (cut to a shorter non-negative `PostFieldSize`; empty fields are an empty payload), so the MQTT handler publishes instead of subscribing, and `PostWithoutData` when `Post` is set with no fields, which the handler fails with exit 43 after the CONNACK, as libcurl's `mqtt_do` does (upstream tests 1916 and 1917). Other schemes get neither. Its tests are `ManagedEasyTransferTests.Mqtt.cs`.
+`ManagedEasyTransfer.TransferSettingsOf` gives an `mqtt` or `mqtts` URL's handle `PostData` of `EasyHttpOptions.PostFields` (cut to a shorter non-negative `PostFieldSize`; empty fields are an empty payload), so the MQTT handler publishes instead of subscribing, and `PostWithoutData` when `Post` is set with no fields, which the handler fails with exit 43 after the CONNACK, as libcurl's `mqtt_do` does (upstream tests 1916 and 1917). A URL whose scheme curl does not serve (an extension's) gets its `PostFields` the same way (BL-5758), and a read-callback post there (a `Curl.Api` stream body) is read up front, to a non-negative `PostFieldSize` or until the callback returns 0, as its `PostData` (BL-5754, ADR-1337). Other schemes get neither. Its tests are `ManagedEasyTransferTests.Mqtt.cs`.
 
 ## CURLOPT_VERBOSE with no debug function (BL-2726)
 
@@ -531,9 +533,9 @@ Under `EasyBehaviourOptions.Verbose` with no `EasyCallbackOptions.Debug`, `Manag
 
 Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransfer` a `TransferCallbackMarshal` (`MultiCallbacks`), which the perform reads once to wrap every `EasyCallbackOptions` delegate. A wrapped callback called on the thread inside the multi handle's perform runs at once; from any other thread it is queued on the handle's `MultiCallbackQueue` and the transfer's thread waits until the next `PerformAsync` or `SocketActionAsync` runs it on its caller's thread, as code inside the transfer (`IsInTransferCallback`), waiting up to `MultiCallbackQueue.FollowUpWait` (20 ms) after each for the next. A queued callback makes `GetTimeout` 0 and counts as one ready socket in a wait. Once the transfer's token is cancelled (removed, or the handle cleaned up) or its perform has ended, a callback runs where it is called (CGR-033, ADR-0901). Their tests are `MultiCallbackQueueTests`, `TransferCallbackMarshalTests` and `Cgr033Tests`.
 
-## smb and smbs disabled (BL-3887)
+## smb and smbs served (BL-5286)
 
-`CreateProtocolHandlers` serves `smb` and `smbs` with a `DisabledProtocolHandler`, which fails every transfer with exit 1 and `Protocol "<scheme>" is disabled` before connecting, as curl 8.22.0's reference builds, which have no SMB, do (ADR-0835). `Curl.Original.Protocol.Smb.UnitLibrary` stays as the client a build with SMB would use. Its tests are `DisabledProtocolHandlerTests`.
+`CreateProtocolHandlers` serves `smb` and `smbs` with `Curl.Original.Protocol.Smb.UnitLibrary`'s `SmbProtocolHandler`, as the OpenSSL reference build does (ADR-1281, superseding ADR-0835). Its tests are `EngineCompositionTests` and `Curl.Original.Protocol.Smb.UnitTests`.
 
 ## CURLINFO_SIZE_DELIVERED (BL-3655)
 
@@ -546,3 +548,11 @@ Once an `http` or `https` request has been sent and the transfer is neither an u
 ## Telnet standard input in Windows text mode (BL-3641)
 
 `TransferContextFactory` gives a `telnet` transfer without `-T` its standard input through a `WindowsTextModeReadStream` while `ReadsTelnetStandardInputInTextMode` is set (by default on Windows), so a Ctrl-Z ends it and CR LF goes as LF, as curl 8.22.0's Windows build reads `stdin` in text mode; a `-T` source is sent unchanged, and the library handle's factory, whose standard input is `Stream.Null`, turns it off (CGR-112, ADR-0848). Its tests are `Cgr112Tests`.
+
+## A second multi handle polling the first's wait sockets (BL-5943)
+
+A wait or poll answers `PollIn` for an engine socket number of another multi handle's transfer
+while that handle has a callback queued or the transfer's perform has finished and is not yet
+reported (`TransferSocketWait.IsReadableOn`), so `curl_multi_waitfds` sockets polled on a second
+handle wake it at once, as real descriptors do (upstream test2407, ADR-1390). Its tests are
+`ManagedMultiTransferTests.SecondHandlePoll.cs`.

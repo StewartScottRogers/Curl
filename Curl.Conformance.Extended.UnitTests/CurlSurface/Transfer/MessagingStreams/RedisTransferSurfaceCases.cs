@@ -98,7 +98,7 @@ public sealed class RedisTransferSurfaceCases
             {
                 CurlRunResult result = await RunAsync(Route(scheme, Value), "-sS", "-w", WriteOutFormat, Url(scheme));
 
-                AssertRun(result, requirement, "manual: -w", 0, $"v\n0||{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|6379|2|0.000000", string.Empty);
+                AssertRun(result, requirement, "manual: -w", 0, $"v\n0||{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|6379|2|0.000001", string.Empty);
             });
 
     [TestMethod]
@@ -118,7 +118,7 @@ public sealed class RedisTransferSurfaceCases
                     requirement,
                     "manual: -w; ADR-1079: an error reply is exit 8",
                     8,
-                    $"8|{ServerErrorMessage}|{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|6379|0|0.000000",
+                    $"8|{ServerErrorMessage}|{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|6379|0|0.000001",
                     $"curl: (8) {ServerErrorMessage}\n");
             });
 

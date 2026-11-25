@@ -24,6 +24,33 @@ public sealed class McpCurlToolTests
     }
 
     [TestMethod]
+    public async Task RunAsync_StderrHoldingCrCrLf_ReturnsTheBytesCurlWroteWithoutTranslatingLineEnds()
+    {
+        // curl.exe -v on Windows writes a server header line as "< ...\r\r\n" (measured 2026-11-21, BL-5684).
+        const string error = "* Trying\r\n< HTTP/1.1 200 OK\r\r\n< \r\r\n";
+        RecordingRunner runner = new(0, string.Empty, error);
+
+        McpCurlToolResult result = await new McpCurlTool(runner, McpConfinementRoot.NotConfigured, new McpResponseCap(256))
+            .RunAsync(["-v", "http://h/"], null, CancellationToken.None);
+
+        Assert.AreEqual(error, result.StandardError!.Content);
+        Assert.AreEqual(Encoding.UTF8.GetByteCount(error), result.StandardError.TotalBytes);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StdoutHoldingCrLfAndLoneLf_ReturnsTheBytesUnchanged()
+    {
+        const string body = "a\r\nb\nc";
+        RecordingRunner runner = new(0, body, string.Empty);
+
+        McpCurlToolResult result = await new McpCurlTool(runner, McpConfinementRoot.NotConfigured, Cap)
+            .RunAsync(["http://h/"], null, CancellationToken.None);
+
+        Assert.AreEqual(body, result.StandardOutput!.Content);
+        Assert.AreEqual(6, result.StandardOutput.TotalBytes);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Exit22_GivesAToolErrorCarryingCurlsStderrMessage()
     {
         RecordingRunner runner = new(22, string.Empty, "curl: (22) The requested URL returned error: 404\n");

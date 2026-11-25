@@ -17,4 +17,7 @@ public enum AzureStorageRequestFailure
 
     /// <summary>The bearer token is empty or holds a character outside RFC 6750 §2.1's visible ASCII.</summary>
     InvalidBearerToken,
+
+    /// <summary>The account key is not base64 ("Authorize with Shared Key").</summary>
+    InvalidSharedKey,
 }

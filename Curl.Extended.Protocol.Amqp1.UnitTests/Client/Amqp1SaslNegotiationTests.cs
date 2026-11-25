@@ -51,7 +51,8 @@ public sealed class Amqp1SaslNegotiationTests
     {
         var failure = await NegotiateAsync(new([.. SaslHeader, .. Mechanisms((object)"PLAIN")]), new NetworkCredential("u", "p"));
 
-        Assert.AreEqual("AMQP 1.0 server does not offer the SASL PLAIN mechanism", failure!.Message);
+        Assert.AreEqual(CurlExitCode.LoginDenied, failure!.ExitCode);
+        Assert.AreEqual("AMQP 1.0 server does not offer the SASL PLAIN mechanism", failure.Message);
     }
 
     [TestMethod]

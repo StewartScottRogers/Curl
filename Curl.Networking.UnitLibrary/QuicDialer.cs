@@ -126,6 +126,7 @@ public sealed class QuicDialer
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
     internal async ValueTask<MultiplexedConnectResult> DialAsync(QuicDialRequest request, CancellationToken cancellationToken)
     {
+        request = WithoutDefaultConnectTimeout(request);
         var lastFailure = default(MultiplexedConnectResult);
         foreach (var address in request.Addresses)
         {
@@ -164,6 +165,7 @@ public sealed class QuicDialer
         IPEndPoint proxyEndPoint,
         CancellationToken cancellationToken)
     {
+        request = WithoutDefaultConnectTimeout(request);
         var remaining = request.ConnectTimeout - _timeProvider.GetElapsedTime(request.Started);
         var (result, _) = remaining <= TimeSpan.Zero
             ? (TimedOut(request), false)
@@ -175,6 +177,12 @@ public sealed class QuicDialer
 
         return result;
     }
+
+    // curl's default 300 s connect timeout does not govern a QUIC handshake: ngtcp2's own 10 s
+    // handshake timeout (exit 55) does, so the default counts as no --connect-timeout (BL-5659).
+    // The engine hands every connector a TimeSpan, so an explicit 300 s reads the same.
+    private static QuicDialRequest WithoutDefaultConnectTimeout(QuicDialRequest request) =>
+        request.ConnectTimeout == TcpConnector.DefaultConnectTimeout ? request with { ConnectTimeout = null } : request;
 
     // One address: curl's Trying line (none through a tunnel), the ClientHello's suites and
     // --cert certificate, then the connect; the certificate is disposed once the handshake no

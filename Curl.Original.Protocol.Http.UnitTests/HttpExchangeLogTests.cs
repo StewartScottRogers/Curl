@@ -143,6 +143,37 @@ public sealed class HttpExchangeLogTests
     }
 
     [TestMethod]
+    [DataRow("Location", "http://u:LOCSECRET8@host/plain", "http://REDACTED:REDACTED@host/plain")]
+    [DataRow("Content-Location", "http://u:LOCSECRET8@host/plain", "http://REDACTED:REDACTED@host/plain")]
+    [DataRow("location", "https://u@host:8443/p?q=a@b", "https://REDACTED:REDACTED@host:8443/p?q=a@b")]
+    [DataRow("LOCATION", "http://host/plain", "http://host/plain")]
+    [DataRow("Location", "http://host?x=u:p@h", "http://host?x=u:p@h")]
+    [DataRow("Location", "http://host", "http://host")]
+    [DataRow("Location", "/plain", "/plain")]
+    [DataRow("Location", "not a url", "not a url")]
+    [DataRow("Location", "://u:p@host", "://u:p@host")]
+    [DataRow("Link", "<http://lu:LINKSECRET@host/a>; rel=\"next\", <http://host/b>; rel=\"prev\", <https://x@h:1/c?q=a@b>; rel=\"last\"", "<http://REDACTED:REDACTED@host/a>; rel=\"next\", <http://host/b>; rel=\"prev\", <https://REDACTED:REDACTED@h:1/c?q=a@b>; rel=\"last\"")]
+    [DataRow("refresh", "5; url=http://fu:REFRESHSECRET@host/b", "5; url=http://REDACTED:REDACTED@host/b")]
+    [DataRow("Refresh", "5", "5")]
+    [DataRow("Content-Security-Policy", "report-uri http://cs:CSPSECRET@host/r", "report-uri http://REDACTED:REDACTED@host/r")]
+    [DataRow("X-Upstream", "https://xu:XHDRSECRET@host/q", "https://REDACTED:REDACTED@host/q")]
+    [DataRow("WWW-Authenticate", "Bearer realm=\"http://wu:WWWSECRET@host/r\"", "Bearer realm=\"http://REDACTED:REDACTED@host/r\"")]
+    [DataRow("Link", "</rel>; rel=next; u=://a@b", "</rel>; rel=next; u=://REDACTED:REDACTED@b")]
+    public void ReplyRead_UrlHeader_LogsItWithUserInfoRedacted(string name, string value, string expected)
+    {
+        RecordingDiagnosticLog log = new();
+        HttpResponseHead head = new(new HttpStatusLine(new Version(1, 1), 302, string.Empty), [new(name, value)], ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty);
+        Diagnostics.Arrange("header", name + ": " + value);
+
+        new HttpExchangeLog(log, DiagnosticLogComponents.Http).ReplyRead(head);
+
+        string actual = log.MessagesAt(DiagnosticLogLevel.Verbose).Single();
+        Diagnostics.Act("logged", actual);
+        Diagnostics.Assert("logged", "header received " + name + ": " + expected, actual);
+        Assert.AreEqual("header received " + name + ": " + expected, actual);
+    }
+
+    [TestMethod]
     [DataRow(true, null, "body framed chunked")]
     [DataRow(false, 7L, "body framed by Content-Length 7")]
     [DataRow(false, null, "body framed until the connection closes")]

@@ -20,6 +20,7 @@ public sealed class OciHttpHeadReporter(ITransferEvents events, Stream? headerOu
     private Version? httpVersion;
     private string? contentType;
     private long headerSize;
+    private List<KeyValuePair<string, string>> headers = [];
 
     /// <summary>Gets a reporter that shows nothing.</summary>
     public static OciHttpHeadReporter None => new(NoTransferEvents.Instance, null);
@@ -35,7 +36,7 @@ public sealed class OciHttpHeadReporter(ITransferEvents events, Stream? headerOu
     /// <returns>The report, or <see langword="null"/>.</returns>
     public TransferReport? ReportWith(long downloadSize) => httpVersion is null
         ? null
-        : new TransferReport { ResponseCode = responseCode, HttpVersion = httpVersion, ContentType = contentType, HeaderSize = headerSize, DownloadSize = downloadSize };
+        : new TransferReport { ResponseCode = responseCode, HttpVersion = httpVersion, ContentType = contentType, HeaderSize = headerSize, ResponseHeaders = headers.ToArray(), DownloadSize = downloadSize };
 
     /// <summary>Reports a request head exactly as written, its CRLFs and final empty line included.</summary>
     /// <param name="head">The head's bytes.</param>
@@ -68,10 +69,23 @@ public sealed class OciHttpHeadReporter(ITransferEvents events, Stream? headerOu
             httpVersion = parts[0] == "HTTP/1.0" ? new Version(1, 0) : new Version(1, 1);
             responseCode = parts.Length > 1 && int.TryParse(parts[1], out int code) ? code : 0;
             contentType = null;
+            headers = [];
         }
-        else if (line.StartsWith(ContentTypePrefix, StringComparison.OrdinalIgnoreCase))
+        else
         {
-            contentType = line[ContentTypePrefix.Length..].Trim();
+            RememberHeaderField(line);
+        }
+    }
+
+    private void RememberHeaderField(string line)
+    {
+        if (line.IndexOf(':', StringComparison.Ordinal) is > 0 and int colon)
+        {
+            headers.Add(new(line[..colon], line[(colon + 1)..].Trim()));
+            if (line.StartsWith(ContentTypePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                contentType = line[ContentTypePrefix.Length..].Trim();
+            }
         }
     }
 }

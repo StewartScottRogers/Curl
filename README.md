@@ -20,10 +20,10 @@ Curl serves two groups of URL schemes, each protocol in its own class library.
 
 - **Original**, curl's own, behaving like upstream curl: `http`, `https`, `ftp`, `ftps`,
   `file`, `dict`, `gopher`, `gophers`, `imap`, `imaps`, `ldap`, `ldaps`, `mqtt`, `mqtts`,
-  `pop3`, `pop3s`, `rtsp`, `scp`, `sftp`, `smtp`, `smtps`, `telnet`,
-  `tftp`, `ws` and `wss`. `smb` and `smbs` are known but disabled in every build: a transfer
-  fails with exit 1 and `Protocol "smb" is disabled`, and `curl -V` does not list them, as
-  curl 8.22.0 does (ADR-0835, ADR-1263).
+  `pop3`, `pop3s`, `rtsp`, `scp`, `sftp`, `smb`, `smbs`, `smtp`, `smtps`, `telnet`,
+  `tftp`, `ws` and `wss`. `smb` and `smbs` are served by the SMB client and listed by
+  `curl -V`, as in the OpenSSL reference build (ADR-1281, which supersedes ADR-0835 and
+  ADR-1263).
 - **Extended**, schemes Curl adds that curl refuses: `amqp`, `amqps`, `amqp1`, `amqp1s`,
   `az`, `abfs`, `abfss`, `coap`, `coaps`, `dns`, `gs`, `grpc`, `grpcs`, `kafka`, `kafkas`,
   `mcp`, `mcps`, `mcp+stdio`, `mqtt5`, `mqtt5s`, `mqtt5+ws`, `nats`, `natss`, `oci`,
@@ -47,8 +47,8 @@ Every resource is a file of the rolling [`preview` release](https://github.com/S
 | Resource | What it is | Download | Use |
 | --- | --- | --- | --- |
 | `curl` / `curl.exe` | The drop-in command-line tool, one native executable per platform | [Windows x64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-win-x64.zip), [Windows Arm64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-win-arm64.zip), [Linux x64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-linux-x64.tar.gz), [Linux Arm64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-linux-arm64.tar.gz), [macOS Apple silicon](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-osx-arm64.tar.gz), [macOS Intel](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-osx-x64.tar.gz), or the one-line installer below | Extract and run `curl --version` |
-| [`Curl.Api`](Curl.Api) | New .NET work: an async, HttpClient-shaped client | `Curl.Api` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Curl.Api --prerelease` from a folder source ([DOWNLOAD.md](DOWNLOAD.md#curlapi-net-client-for-new-code)) |
-| [`Libcurl`](Libcurl) | Porting C or libcurl code to .NET: the libcurl API one call for one call | `Libcurl` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Libcurl --prerelease` from a folder source ([DOWNLOAD.md](DOWNLOAD.md#libcurl-libcurl-api-for-porting-c-code)) |
+| [`Curl.Api`](Curl.Api) | New .NET work: an async, HttpClient-shaped client | `Surly.Curl.Api` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Surly.Curl.Api --prerelease` from a folder source ([DOWNLOAD.md](DOWNLOAD.md#curlapi-net-client-for-new-code)) |
+| [`Libcurl`](Libcurl) | Porting C or libcurl code to .NET: the libcurl API one call for one call | `Surly.Libcurl` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Surly.Libcurl --prerelease` from a folder source ([DOWNLOAD.md](DOWNLOAD.md#libcurl-libcurl-api-for-porting-c-code)) |
 | [`Curl.Mcp`](Curl.Mcp) | MCP server for AI agents | Seven `.nupkg` files on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | [MCP setup](https://stewartscottrogers.github.io/Curl/mcp/), [DOWNLOAD.md](DOWNLOAD.md#curlmcp-mcp-server-for-ai-agents) |
 
 Which to use:
@@ -130,7 +130,7 @@ as the command line ([ADR-0506](Documentation/Planning/Decisions/ADR-0506-libcur
 | [`Libcurl`](Libcurl) | For porting C or libcurl code to .NET: the libcurl API one call for one call. libcurl's API in C#, call for call: `CurlGlobal.Init()`, `CurlEasy` with `SetOption`, `Perform` and `GetInfo`, and the multi, share, URL, MIME, header and WebSocket interfaces. For code ported from C, and the future home of a native C ABI built with native AOT. Tested by `Libcurl.UnitTests`. |
 | [`Curl.Api.UnitLibrary`](Curl.Api.UnitLibrary) | The seam both stand on: the engine contracts (`ICurlEngine`, `IEasyTransfer`), result codes (`CurlCode` and the rest), the option groups (`EasyHttpOptions`, `EasyTlsOptions` and the rest), `TransferInfo` and the callback delegates. Either API can be rewritten another way without touching the engine. |
 | [`Curl.Engine.UnitLibrary`](Curl.Engine.UnitLibrary) | The transfer engine, moved out of `Curl.Console` so the executable and both APIs share it. |
-| [`Curl.Mcp`](Curl.Mcp) | A Model Context Protocol server over stdio, so AI agents (GitHub Copilot, Claude and others) use Curl as a tool: `curl`, `transfer`, `parse_url`, `build_url` and `version`, plus the `--ai-help` text as resources. File access is confined to `CURL_MCP_ROOT`. Run it with `dnx Curl.Mcp`; setup is in [its README](Curl.Mcp/README.md). Tested by `Curl.Mcp.UnitTests` and `Curl.Mcp.IntegrationTests`. |
+| [`Curl.Mcp`](Curl.Mcp) | A Model Context Protocol server over stdio, so AI agents (GitHub Copilot, Claude and others) use Curl as a tool: `curl`, `transfer`, `parse_url`, `build_url` and `version`, plus the `--ai-help` text as resources. File access is confined to `CURL_MCP_ROOT`. Run it with `dnx Surly.Curl.Mcp`; setup is in [its README](Curl.Mcp/README.md). Tested by `Curl.Mcp.UnitTests` and `Curl.Mcp.IntegrationTests`. |
 | [`Curl.Mcp.UnitLibrary`](Curl.Mcp.UnitLibrary) | All of `Curl.Mcp`'s tool logic, base class library only: the path confinement, the tool implementations, the result and error types. |
 
 Where it stands: the engine is extracted and `Curl.Api.UnitLibrary`'s seam is defined.

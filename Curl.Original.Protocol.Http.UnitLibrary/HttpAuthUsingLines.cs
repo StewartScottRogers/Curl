@@ -22,32 +22,45 @@ internal static class HttpAuthUsingLines
     /// <param name="authorization">The value the request sends, empty for none after a 401, or <see langword="null" />.</param>
     /// <param name="answersChallenge"><see langword="true" /> when the request answers a challenge.</param>
     /// <param name="headerNamesAuthorization"><see langword="true" /> when an <c>-H</c> value names <c>Authorization</c>.</param>
+    /// <param name="ntlmType3WentOut"><see langword="true" /> when the request sends no value because the side's NTLM Type 3 went out in an earlier request.</param>
     /// <returns>The line, or <see langword="null" />.</returns>
-    internal static string? AuthUsing(HttpAuthRequest request, string? authorization, bool answersChallenge, bool headerNamesAuthorization) =>
-        PickedScheme(request, authorization, answersChallenge, headerNamesAuthorization) is { } scheme
+    internal static string? AuthUsing(HttpAuthRequest request, string? authorization, bool answersChallenge, bool headerNamesAuthorization, bool ntlmType3WentOut = false) =>
+        PickedScheme(request, authorization, answersChallenge, headerNamesAuthorization, ntlmType3WentOut) is { } scheme
             ? $"{(request.IsProxy ? "Proxy" : "Server")} auth using {scheme} with user '{request.Credential?.UserName}'"
             : null;
 
     /// <summary>
     /// Gives the scheme curl names for the request: Negotiate when
-    /// <see cref="HttpNegotiateInfoLines.PicksNegotiate" /> says so; Digest for a first request
-    /// with <c>--digest</c> alone and a user, which sends no value yet; none for an
+    /// <see cref="HttpNegotiateInfoLines.PicksNegotiate" /> says so; for a request that sends no
+    /// value, the one <see cref="SchemeWithoutValue" /> gives; none for an
     /// <c>--aws-sigv4</c> or <c>--httpsig-*</c> request, whose authenticator writes its own <c>AWS_SIGV4</c> or <c>HTTPSIG</c> line
     /// after its signing lines (BL-629); and otherwise the scheme the value starts with.
     /// </summary>
-    private static string? PickedScheme(HttpAuthRequest request, string? authorization, bool answersChallenge, bool headerNamesAuthorization)
+    private static string? PickedScheme(HttpAuthRequest request, string? authorization, bool answersChallenge, bool headerNamesAuthorization, bool ntlmType3WentOut)
     {
         if (HttpNegotiateInfoLines.PicksNegotiate(request, authorization, answersChallenge))
         {
             return "Negotiate";
         }
 
-        if (authorization is null)
+        return authorization is null
+            ? SchemeWithoutValue(request, answersChallenge, ntlmType3WentOut)
+            : SchemeOfSentValue(request, authorization, headerNamesAuthorization);
+    }
+
+    /// <summary>
+    /// Gives the scheme curl names for a request that sends no value: NTLM once its Type 3 went
+    /// out, as curl 8.22.0 keeps NTLM picked for a side it sends no header to (measured,
+    /// BL-5932); Digest when <see cref="PicksDigestBeforeAnyValue" /> says so; otherwise none.
+    /// </summary>
+    private static string? SchemeWithoutValue(HttpAuthRequest request, bool answersChallenge, bool ntlmType3WentOut)
+    {
+        if (ntlmType3WentOut)
         {
-            return PicksDigestBeforeAnyValue(request, answersChallenge) ? "Digest" : null;
+            return "NTLM";
         }
 
-        return SchemeOfSentValue(request, authorization, headerNamesAuthorization);
+        return PicksDigestBeforeAnyValue(request, answersChallenge) ? "Digest" : null;
     }
 
     /// <summary>

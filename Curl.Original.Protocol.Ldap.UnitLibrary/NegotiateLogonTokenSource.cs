@@ -11,14 +11,17 @@ namespace Curl.Original.Protocol.Ldap;
 /// seals and unseals a plaintext session after the bind with its <see cref="NegotiateAuthentication.Wrap" /> and
 /// <see cref="NegotiateAuthentication.Unwrap" />.
 /// </summary>
-public sealed class NegotiateLogonTokenSource : ILdapLogonTokenSource
+public sealed class NegotiateLogonTokenSource(NetworkCredential? credential = null) : ILdapLogonTokenSource
 {
+    /// <inheritdoc />
+    public ILdapLogonTokenSource ForCredential(NetworkCredential explicitCredential) => new NegotiateLogonTokenSource(explicitCredential);
+
     /// <inheritdoc />
     public ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName, ProtectionLevel protection) =>
         new NegotiateLogonAuthentication(new NegotiateAuthentication(new NegotiateAuthenticationClientOptions
         {
             Package = package == LdapLogonPackage.Ntlm ? "NTLM" : "Negotiate",
-            Credential = CredentialCache.DefaultNetworkCredentials,
+            Credential = credential ?? CredentialCache.DefaultNetworkCredentials,
             TargetName = targetName,
             RequiredProtectionLevel = protection,
         }));

@@ -84,6 +84,29 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_WithACertFileThatDoesNotExistAndTwoAddresses_StopsAtTheFirstWithoutATryingLineForTheSecond()
+    {
+        // A TLS setup failure fails every address alike, so the dial does not go on (AF-0827).
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
+        var events = new RecordingTransferEvents();
+        var options = new TlsClientOptions(Insecure: true, ClientCertificate: Escaped(Path.Combine(_certificateDirectory, "missing.pem")));
+        var connector = Connector(
+            opener,
+            new ManualTimeProvider(),
+            options,
+            matchesSchannelBuild: false,
+            resolver: new FakeDnsResolver(System.Net.IPAddress.Loopback, System.Net.IPAddress.Parse("127.0.0.2")));
+        Diagnostics.Arrange("resolver addresses", "127.0.0.1, 127.0.0.2");
+
+        var result = await ConnectMultiplexedAsync(connector, Target(events), writesErrorMessage: false);
+
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.SslCertProblem, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslCertProblem, result.ExitCode);
+        Assert.IsFalse(events.Info.Contains("  Trying 127.0.0.2:443..."));
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_WithTls13Ciphers_OffersOnlyTheSuitesItNames()
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(cipherSuite: 0x1302) };

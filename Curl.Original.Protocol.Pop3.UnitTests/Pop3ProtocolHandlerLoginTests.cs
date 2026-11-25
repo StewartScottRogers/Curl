@@ -476,6 +476,22 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Assert.AreEqual(Capa + "AUTH NTLM\r\nVDE=\r\nVDM=\r\n" + List + Quit, run.Sent);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
+    [TestMethod]
+    [DataRow("LOGIN", "u", "AUTH LOGIN dQ==\r\n", DisplayName = "BL-5477 STD-156: LOGIN --sasl-ir, +OK before the password prompt")]
+    [DataRow("CRAM-MD5", null, "AUTH CRAM-MD5\r\n", DisplayName = "BL-5477 STD-156: CRAM-MD5 --sasl-ir, +OK before the challenge")]
+    [DataRow("DIGEST-MD5", null, "AUTH DIGEST-MD5\r\n", DisplayName = "BL-5810 STD-166: DIGEST-MD5 --sasl-ir, +OK before the challenge")]
+    public async Task ExecuteAsync_SaslIrOkBeforeFirstChallenge_Exit67LoginDenied(string mechanism, string? initialResponse, string authLine)
+    {
+        var sasl = new RankedSaslAuthenticator((mechanism, initialResponse is null ? null : Encoding.ASCII.GetBytes(initialResponse), [Encoding.ASCII.GetBytes("p")]));
+        Pop3Run run = await RunAsync(
+            Greeting + "+OK\r\nSASL " + mechanism + "\r\n.\r\n+OK auth\r\n" + ListReply + Bye,
+            mail: new MailRequestOptions { SaslInitialResponse = true, LoginOptions = "AUTH=" + mechanism },
+            sasl: sasl);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
+        Assert.AreEqual(Capa + authLine, run.Sent.Replace("QUIT\r\n", string.Empty, StringComparison.Ordinal));
+    }
+
     private static ScriptedSaslAuthenticator PlainAndLogin() =>
         new(("PLAIN", ["\0u\0p"]), ("LOGIN", ["u", "p"]));
 
@@ -483,7 +499,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
         string replies,
         NetworkCredential? credential = null,
         MailRequestOptions? mail = null,
-        ScriptedSaslAuthenticator? sasl = null,
+        ISaslAuthenticator? sasl = null,
         string url = Url,
         bool noCredential = false)
     {
@@ -508,9 +524,8 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Diagnostics.Arrange("mail options", mail is null ? "(none)" : $"login options {Pop3Diagnostics.Show(mail.LoginOptions)}, bearer {Pop3Diagnostics.Show(mail.BearerToken)}, sasl ir {mail.SaslInitialResponse}");
         Diagnostics.Arrange("sasl", sasl is null ? "(no authenticator)" : "scripted");
 
-        TransferResult result = await new Pop3ProtocolHandler(connector, tls, sasl).ExecuteAsync(context);
-
-        var run = new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, tls, sasl).ExecuteAsync(context));
+        var run = new Pop3Run(StampedTimings.Without(result), connection, connector, tls, output.ToArray(), progress);
         Diagnostics.ActRun(run);
         return run;
     }

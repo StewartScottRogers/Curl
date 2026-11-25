@@ -43,4 +43,10 @@ public sealed record EasyOptions
 
     /// <summary>The <c>CURLOPT_*FUNCTION</c> callbacks. Default: every one unset.</summary>
     public EasyCallbackOptions Callbacks { get; init; } = new();
+
+    /// <summary>
+    /// The options of Curl's extensions this transfer sets (BL-5617, ADR-1319), by long option name without <c>--</c>; a flag's value is empty.
+    /// A host that activates extensions reads them; one that does not ignores them. Default none.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ExtensionOptions { get; init; } = System.Collections.Frozen.FrozenDictionary<string, string>.Empty;
 }

@@ -34,9 +34,13 @@ public sealed class LdapValueBase64RuleTests
     }
 
     [TestMethod]
-    [DataRow("a\nb", "\tv:: YQpi\n\n\n", DisplayName = "line feed")]
-    [DataRow(":colon", "\tv:: OmNvbG9u\n\n\n", DisplayName = "leading colon")]
-    [DataRow("<lt", "\tv:: PGx0\n\n\n", DisplayName = "leading less-than")]
+    [DataRow("a\nb", "\tv: a\nb\n\n\n", DisplayName = "line feed")]
+    [DataRow(":colon", "\tv: :colon\n\n\n", DisplayName = "leading colon")]
+    [DataRow("<lt", "\tv: <lt\n\n\n", DisplayName = "leading less-than")]
+    [DataRow("x\vy", "\tv: x\vy\n\n\n", DisplayName = "vertical tab")]
+    [DataRow("x\fy", "\tv: x\fy\n\n\n", DisplayName = "form feed")]
+    [DataRow("\rlead", "\tv: \rlead\n\n\n", DisplayName = "leading carriage return")]
+    [DataRow("\nlead", "\tv: \nlead\n\n\n", DisplayName = "leading line feed")]
     [DataRow("\tlead", "\tv:: CWxlYWQ=\n\n\n", DisplayName = "leading tab")]
     [DataRow("plain", "\tv: plain\n\n\n", DisplayName = "plain")]
     public void Format_OpenLdapValue_IsBase64WhenCurlsRuleSaysSo(string value, string expectedAfterDn)

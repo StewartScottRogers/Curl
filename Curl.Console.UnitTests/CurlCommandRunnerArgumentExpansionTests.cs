@@ -53,7 +53,7 @@ public sealed class CurlCommandRunnerArgumentExpansionTests
         int exitCode = await RunAsync(["--test-request-file", "missing.http", "http://h/"], _ => null);
 
         Assert.AreEqual(26, exitCode);
-        Assert.AreEqual("curl: cannot read missing.http" + Environment.NewLine, Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.AreEqual("curl: cannot read missing.http" + Environment.NewLine + "curl: try 'curl --help' or 'curl --manual' for more information" + Environment.NewLine, Encoding.UTF8.GetString(standardError.ToArray()));
         Assert.AreEqual(0, standardOutput.Length);
         Assert.IsEmpty(groups);
         Assert.IsEmpty(http.Contexts);

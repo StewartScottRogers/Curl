@@ -2,9 +2,10 @@ namespace Curl.Original.Protocol.Http;
 
 /// <summary>
 /// An upload stream that cannot seek but says whether curl's seek callback could still take it
-/// back to its start for a resend, as the curl tool's <c>lseek</c> of stdin can when stdin is a
-/// file and cannot when it is a pipe off Windows (ADR-0524, BL-2337). A stream that does not
-/// implement it is taken as one that can.
+/// back to its start for a resend: curl rewinds only a reader it has read from, and the curl
+/// tool's <c>lseek</c> of stdin succeeds when stdin is a file and fails when it is a pipe off
+/// Windows (ADR-0524, ADR-1373, BL-2337, BL-5910). A stream that does not implement it is taken
+/// as one that can.
 /// </summary>
 public interface IRewindableUpload
 {

@@ -16,7 +16,7 @@ public sealed partial class ReadmeTests
 {
     private static readonly string[] SampleNames =
     [
-        "usings", "create", "send", "options", "upload", "cancel", "progress", "multipart", "websocket", "concurrent", "httpclient",
+        "usings", "create", "send", "options", "trust", "upload", "cancel", "progress", "multipart", "websocket", "concurrent", "httpclient",
     ];
 
     [GeneratedRegex(@"<!-- sample: (\w+) -->\r?\n```csharp\r?\n(.*?)\r?\n```", RegexOptions.Singleline)]
@@ -111,6 +111,28 @@ public sealed partial class ReadmeTests
 
         Assert.AreEqual(5, easy.PerformedOptions!.Http.MaxRedirects);
         CollectionAssert.AreEqual(new[] { "Accept: application/json", "X-Trace: 42" }, easy.PerformedOptions.Http.HttpHeaders.ToArray());
+    }
+
+    [TestMethod]
+    public async Task Sample_Trust_SkipsBothChecksForOneRequestAndTrustsTheAuthorityForTheOther()
+    {
+        List<ScriptedEasyTransfer> handles = [];
+        await using CurlClient client = ClientOver(() =>
+        {
+            ScriptedEasyTransfer easy = Scripted();
+            handles.Add(easy);
+            return easy;
+        });
+        byte[] authority = [4, 5, 6];
+
+        await ReadmeSamples.TrustTestServerAsync(client, authority, CancellationToken.None);
+
+        Assert.HasCount(2, handles);
+        Assert.IsFalse(handles[0].PerformedOptions!.Tls.Origin.VerifyPeer);
+        Assert.IsFalse(handles[0].PerformedOptions!.Tls.Origin.VerifyHost);
+        Assert.IsTrue(handles[1].PerformedOptions!.Tls.Origin.VerifyPeer);
+        Assert.IsTrue(handles[1].PerformedOptions!.Tls.Origin.VerifyHost);
+        CollectionAssert.AreEqual(authority, handles[1].PerformedOptions!.Tls.Origin.CertificateAuthorityBlob!.Value.ToArray());
     }
 
     [TestMethod]
@@ -278,6 +300,6 @@ public sealed partial class ReadmeTests
     [TestMethod]
     public void Sample_Usings_AreTheOnesTheSamplesNeed()
     {
-        Assert.AreEqual("using System.Net;\nusing Curl.Api;\nusing Curl.Api.Errors;\nusing Curl.Api.Options.Http;", SourceSample("usings"));
+        Assert.AreEqual("using System.Net;\nusing Curl.Api;\nusing Curl.Api.Codes;\nusing Curl.Api.Errors;\nusing Curl.Api.Options.Authentication;\nusing Curl.Api.Options.Http;", SourceSample("usings"));
     }
 }

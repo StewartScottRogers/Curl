@@ -385,9 +385,8 @@ public sealed class ImapProtocolHandlerAdversarialTests
         var handler = new ImapProtocolHandler(new EachCallConnector(connections), new QueuedTlsProvider());
         ScriptedConnection[] used = [.. connections];
 
-        TransferResult first = await handler.ExecuteAsync(Context(Host + "INBOX;UID=1"));
-        TransferResult second = await handler.ExecuteAsync(Context(Host + "INBOX;UID=1"));
-
+        TransferResult first = StampedTimings.Without(await handler.ExecuteAsync(Context(Host + "INBOX;UID=1")));
+        TransferResult second = StampedTimings.Without(await handler.ExecuteAsync(Context(Host + "INBOX;UID=1")));
         Assert.AreEqual(TransferResult.Success(22), first);
         Assert.AreEqual(TransferResult.Success(22), second);
         Assert.AreEqual(Encoding.Latin1.GetString(used[0].Sent), Encoding.Latin1.GetString(used[1].Sent));
@@ -403,7 +402,7 @@ public sealed class ImapProtocolHandlerAdversarialTests
         var handler = new ImapProtocolHandler(new EachCallConnector(connections), new QueuedTlsProvider());
         TransferContext[] contexts = [.. Enumerable.Range(0, Transfers).Select(_ => Context(Host + "INBOX;UID=1"))];
 
-        TransferResult[] results = await Task.WhenAll(contexts.Select(context => Task.Run(async () => await handler.ExecuteAsync(context))));
+        TransferResult[] results = await Task.WhenAll(contexts.Select(context => Task.Run(async () => StampedTimings.Without(await handler.ExecuteAsync(context)))));
 
         for (int index = 0; index < Transfers; index++)
         {

@@ -13,9 +13,9 @@ using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -240,7 +240,15 @@ internal sealed partial class ManagedEasyTransfer
             return Finish(CurlCode.UrlMalformat, TransferPerformer.UrlRejectionText(rejection), new TransferInfo { EffectiveUrl = urlText });
         }
 
-        EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
+        EngineTransferSettings settings;
+        try
+        {
+            settings = ToolSettings ?? TransferSettingsOf(options, scheme => createDispatcher(options, PerformShared.WithoutFtpPwdStop(), null, null, rtspSession, WebSocketConnection.PerformConnection).Serves(scheme));
+        }
+        catch (ExtensionPostReadFailedException exception)
+        {
+            return Finish(exception.Code, exception.Message, new TransferInfo { EffectiveUrl = urlText });
+        }
         long transferId = TransferIdOf(ToolEvents);
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
         performedHsts = PerformShared.Hsts;

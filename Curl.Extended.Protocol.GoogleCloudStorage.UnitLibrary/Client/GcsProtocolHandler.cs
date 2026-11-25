@@ -6,7 +6,8 @@ namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 
 /// <summary>
 /// Serves <c>gs://bucket/object</c> (ADR-1099): with <c>-T</c> it uploads the object, with an empty name or one ending in
-/// <c>/</c> it lists the names under it, otherwise it downloads the object. <c>--oauth2-bearer</c> sends an OAuth 2.0
+/// <c>/</c> it lists the names under it, otherwise it downloads the object, sending <c>-r</c> and <c>-C</c> as a
+/// <c>Range</c> header; an upload or a listing refuses both (ADR-1359). <c>--oauth2-bearer</c> sends an OAuth 2.0
 /// access token; otherwise <c>--user ACCESS_ID:SECRET</c> signs with an HMAC key; with neither the requests go
 /// unauthenticated, for public objects. A region other than <c>auto</c> is named in curl's own
 /// <c>--aws-sigv4 provider1:provider2:region:service</c> form (ADR-1191). The server is <see cref="GcsEndpoint"/>; the requests are <see cref="GcsOperations"/>.
@@ -22,7 +23,8 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (GcsRequestMethod.RefusalOf(context) is { } refusal)
+        string objectName = ObjectNameOf(context.Url);
+        if (RefusalOf(context, objectName) is { } refusal)
         {
             return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
         }
@@ -35,10 +37,10 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
 
         GcsHmacKey? hmacKey = context.Credentials is { } user ? new GcsHmacKey(user.UserName, user.Password, RegionOf(context)) : null;
         GcsHttpHeadReporter headReporter = new(context.Events, context.HeaderOutput);
-        GcsOperations operations = new(new GcsClient(connector, context, endpoint, BearerTokenOf(context), hmacKey, headReporter), context.Url.Host, context.CancellationToken);
+        GcsOperations operations = new(new GcsClient(connector, context, endpoint, BearerTokenOf(context), hmacKey, headReporter), GcsEndpoint.BucketOf(context.Url.OriginalString, context.Url.Host), context.CancellationToken);
         try
         {
-            long downloaded = await TransferAsync(operations, context, ObjectNameOf(context.Url));
+            long downloaded = await TransferAsync(operations, context, objectName);
             return TransferResult.Success(downloaded) with { Report = headReporter.ReportWith(context.Upload is null ? downloaded : 0) };
         }
         catch (GcsTransferException failure)
@@ -67,14 +69,21 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
         return path[Math.Min(1, path.Length)..];
     }
 
+    // An unsendable method is refused first; then -r and -C, which only an object download honours.
+    private static string? RefusalOf(ITransferContext context, string objectName) =>
+        GcsRequestMethod.RefusalOf(context)
+        ?? (context.Upload is null && !NamesPrefix(objectName) ? null : GcsByteRangeRefusal.RefusalOf(context));
+
+    private static bool NamesPrefix(string objectName) => objectName.Length == 0 || objectName.EndsWith('/');
+
     private static Task<long> TransferAsync(GcsOperations operations, ITransferContext context, string objectName)
     {
-        bool namesPrefix = objectName.Length == 0 || objectName.EndsWith('/');
+        bool namesPrefix = NamesPrefix(objectName);
         context.Progress.ReportTransferStarted();
         return context.Upload switch
         {
-            null when namesPrefix => operations.ListAsync(objectName, context.Output),
-            null => operations.DownloadAsync(objectName, context.Output),
+            null when namesPrefix => operations.ListAsync(objectName, GcsEndpoint.QueryOf(context.Url.Query), context.Output),
+            null => operations.DownloadAsync(objectName, context.Output, context.ResumeFrom, context.RangeText),
             _ when namesPrefix => throw new GcsTransferException(CurlExitCode.UrlMalformat, "A Cloud Storage upload needs an object name in the URL"),
             { } upload => operations.UploadAsync(objectName, upload),
         };

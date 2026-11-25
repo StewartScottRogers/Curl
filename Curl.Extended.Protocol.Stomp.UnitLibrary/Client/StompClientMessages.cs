@@ -15,6 +15,9 @@ internal static class StompClientMessages
     /// <summary>The server sent an <c>ERROR</c> frame with <paramref name="message"/>, its <c>message</c> header.</summary>
     internal static string ServerError(string? message) => $"STOMP server sent ERROR: {message}";
 
+    /// <summary>The server sent an <c>ERROR</c> frame with <paramref name="message"/> and a non-empty body, <paramref name="body"/> (ADR-1285).</summary>
+    internal static string ServerError(string? message, string body) => $"STOMP server sent ERROR: {message}: {body}";
+
     /// <summary>The server sent a frame the exchange did not expect.</summary>
     internal static string UnexpectedFrame(string command) => $"Unexpected STOMP {command} frame";
 

@@ -486,6 +486,40 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// The same 401 from an HTTP/1.0 server answered before any of an unrewindable upload of
+    /// unknown length was read, as within curl's <c>Expect: 100-continue</c> wait: curl needs no
+    /// rewind, so the chunked resend to the HTTP/1.0 server fails with exit 25 before any rewind
+    /// check, whatever the platform (measured, BL-5910 Notes; upstream test1072).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http10ChallengeBeforeAnUnrewindableBodyIsRead_ReturnsUploadFailedRatherThanSendFailRewind()
+    {
+        string http10Challenge = ChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+        TurnTakingConnection first = new(65536, http10Challenge + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
+        UnrewindableStream body = new("hello"u8.ToArray()) { RewindsUntilRead = true };
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Body = new StreamBody(body, null, "application/octet-stream") },
+            Events = events,
+        };
+        HttpProtocolHandler handler = new(QueueConnector.For(first, second), new ScriptedAuthenticator(null, DigestValue));
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, an unrewindable stream body of unknown length not yet read, {OneLine(http10Challenge)}");
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.IsFalse(body.HasBeenRead);
+        Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual("Chunky upload is not supported by HTTP 1.0", result.ErrorMessage);
+        CollectionAssert.DoesNotContain(events.Events.ToList(), "* seek callback returned error 2");
+    }
+    /// <summary>
     /// A 401 answered for a body that cannot seek but rewinds through <see cref="IUploadRewinder" />,
     /// as libcurl's read callback does through <c>CURLOPT_SEEKFUNCTION</c>: the body is rewound once
     /// and the retry sends it again whole (BL-2463).
@@ -928,6 +962,14 @@ public sealed partial class HttpProtocolHandlerTests
 
         Diagnostics.Assert("starts with an empty user", expected, actual);
         Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public void StartsWithAnEmptyUser_AwsSigV4WithServiceName_HoldsOnEveryPlatform()
+    {
+        HttpRequestOptions options = new() { AwsSigV4 = "xyz", ServiceName = "svc" };
+
+        Assert.IsTrue(HttpProtocolHandler.StartsWithAnEmptyUser(options, false));
     }
 
     /// <summary>

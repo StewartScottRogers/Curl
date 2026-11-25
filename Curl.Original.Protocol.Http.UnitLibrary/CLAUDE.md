@@ -6,6 +6,11 @@ HTTP/1.0, HTTP/1.1, HTTP/2 and HTTP/3. Also serves ipfs and ipns, which curl rew
 
 **URL schemes:** `http`, `https`, `ipfs`, `ipns`
 
+`HttpProtocolHandler` is one partial class with one concern per file (ADR-1392):
+`HttpProtocolHandler.cs` holds the constructor, the properties and `ExecuteAsync`, and
+`HttpProtocolHandler.<Concern>.cs` everything else, each file saying above the class what it
+holds. Put a new member in the file whose concern it is, or in a new one.
+
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and, of the
 hand-built libraries ADR-0120 lets a protocol use, `Curl.Http2.UnitLibrary` (HPACK and
 the HTTP/2 frame layer) and `Curl.Http3.UnitLibrary` (QPACK and the HTTP/3 frame layer,
@@ -33,8 +38,10 @@ Its `Http2Session` then carries the transfer's later requests (BL-866): a 401 re
 as HEADERS on stream 3 of the same connection, the session is handed to the connection like
 any HTTP/2 session so the next URL continues it, and `-v` ends with `left intact`. Stream 1
 is opened half closed (`Http2Connection.OpenUpgradedStream`) and read to its end, so it
-closes with its response; a body the handler ignores (the 401 before a retry) is not read
-but reset with STREAM_CLOSED, as on any HTTP/2 stream (BL-970, ADR-0343). The first stream
+closes with its response; a body the handler ignores (the 401 before a retry) on it is not
+read but reset with STREAM_CLOSED (BL-970, ADR-0343). On any other stream whose request has
+ended, an ignored body is read to its end and the stream is not reset (BL-5906, ADR-1357);
+one whose request has not ended is reset with STREAM_CLOSED. The first stream
 opened after the upgrade is preceded by curl's extra SETTINGS, INITIAL_WINDOW_SIZE 65536.
 
 HTTP/3 (BL-731, ADR-0172) does the same over QUIC: for `--http3-only`, and for `--http3`

@@ -34,6 +34,43 @@ public sealed class S3ProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DeleteMethod_DeletesTheObjectSignedWithSigV4()
+    {
+        QueuedS3Connector connector = new("HTTP/1.1 204 No Content\r\n\r\n");
+        TransferContext context = DeleteContext("s3://bucket/dir/a%20b.txt?versionId=3");
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(context);
+
+        Assert.AreEqual((CurlExitCode.Ok, 0L), (result.ExitCode, result.BytesTransferred));
+        string sent = connector.Connections[0].Written;
+        Assert.StartsWith("DELETE /bucket/dir/a%20b.txt?versionId=3 HTTP/1.1\r\n", sent);
+        Assert.Contains("SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=", sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DeleteOfMissingObject_FailsLikeTheOtherOperations()
+    {
+        QueuedS3Connector connector = new("HTTP/1.1 404 Not Found\r\nContent-Length: 37\r\n\r\n<Error><Code>NoSuchKey</Code></Error>");
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(DeleteContext("s3://bucket/gone"));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow("s3://bucket")]
+    [DataRow("s3://bucket/dir/")]
+    public async Task ExecuteAsync_DeleteOfABucketOrPrefix_IsRefusedBeforeSending(string url)
+    {
+        QueuedS3Connector connector = new();
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(DeleteContext(url));
+
+        Assert.AreEqual((CurlExitCode.UrlMalformat, "An S3 delete needs an object key in the URL"), (result.ExitCode, result.ErrorMessage));
+        Assert.IsEmpty(connector.Targets);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoCredentials_SendsAnUnsignedRequestToTheVirtualHost()
     {
         QueuedS3Connector connector = new(QueuedS3Connector.Ok(string.Empty));
@@ -133,6 +170,31 @@ public sealed class S3ProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("s3://bucket/?prefix=logs/", "GET /bucket?list-type=2&delimiter=%2F&prefix=logs%2F HTTP/1.1\r\n")]
+    [DataRow("s3://bucket/?max-keys=1", "GET /bucket?list-type=2&delimiter=%2F&prefix=&max-keys=1 HTTP/1.1\r\n")]
+    [DataRow("s3://bucket/dir/?prefix=a+b&delimiter=&list-type=1", "GET /bucket?list-type=2&delimiter=&prefix=dir%2Fa%20b HTTP/1.1\r\n")]
+    public async Task ExecuteAsync_ListingWithAQuery_SendsItWithTheListParameters(string url, string expectedRequestLine)
+    {
+        QueuedS3Connector connector = new(QueuedS3Connector.Ok(Listing(string.Empty, "false", string.Empty)));
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(Context(url, new MemoryStream(), new NetworkCredential("AKID", "secret")));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.StartsWith(expectedRequestLine, connector.Connections[0].Written);
+        Assert.Contains("Authorization: AWS4-HMAC-SHA256", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_KeyWithAQuery_SendsTheQueryWithTheGetObject()
+    {
+        QueuedS3Connector connector = new(QueuedS3Connector.Ok("x"));
+
+        await Handler(connector, Minio).ExecuteAsync(Context("s3://bucket/k?versionId=v%201", new MemoryStream()));
+
+        Assert.StartsWith("GET /bucket/k?versionId=v%201 HTTP/1.1\r\n", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TrailingSlash_ListsEveryPageWithTheDelimiter()
     {
         QueuedS3Connector connector = new(
@@ -146,6 +208,28 @@ public sealed class S3ProtocolHandlerTests
         Assert.AreEqual("dir/sub/\ndir/a\ndir/b\n", Encoding.UTF8.GetString(output.ToArray()));
         Assert.StartsWith("GET /bucket?list-type=2&delimiter=%2F&prefix=dir%2F HTTP/1.1\r\n", connector.Connections[0].Written);
         Assert.StartsWith("GET /bucket?list-type=2&delimiter=%2F&prefix=dir%2F&continuation-token=t%2F1%3D HTTP/1.1\r\n", connector.Connections[1].Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectionResetMidBody_FailsWithExit56AndCurlsRecvFailureText()
+    {
+        QueuedS3Connector connector = new(QueuedS3Connector.ResetAfter + "HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nhello");
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(Context("s3://bucket/big.bin", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectionClosedBeforeContentLength_FailsWithExit18AndRemainingBytes()
+    {
+        QueuedS3Connector connector = new("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nhello");
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(Context("s3://bucket/big.bin", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
+        Assert.AreEqual("transfer closed with 5 bytes remaining to read", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -243,6 +327,15 @@ public sealed class S3ProtocolHandlerTests
         Output = output,
         Credentials = credentials,
         Upload = upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload)),
+        TimeProvider = new FixedTimeProvider(),
+    };
+
+    private static TransferContext DeleteContext(string url) => new()
+    {
+        Url = CurlUrl.Parse(url),
+        Output = new MemoryStream(),
+        Credentials = new NetworkCredential("AKID", "secret"),
+        Http = new Curl.Protocol.Abstractions.HttpRequestOptions { CustomMethod = "DELETE" },
         TimeProvider = new FixedTimeProvider(),
     };
 

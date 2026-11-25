@@ -1070,6 +1070,109 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsNull(verification.DefaultCaBundleFile);
     }
 
+    // A host that sets no CA option (Curl.Api) reads CURL_CA_BUNDLE as the console does (BL-5642).
+    [TestMethod]
+    public void VerifyChain_OpenSslBuildWithCurlCaBundleSet_TrustsThatFile()
+    {
+        var bundle = WriteCaFile("env-bundle.crt", s_serverCertificate.ExportCertificatePem());
+        var verification = EnvironmentBundleVerification(new TlsClientOptions(), OpenSslBuild, bundle);
+
+        var verdict = verification.VerifyChain([s_serverCertificate.RawData], CertificateHost);
+
+        Assert.AreEqual(bundle, verification.DefaultCaBundleFile);
+        Assert.IsTrue(verdict.IsAccepted);
+    }
+
+    [TestMethod]
+    public void VerifyChain_OpenSslBuildWithCurlCaBundleNamingAMissingFile_IsExit77()
+    {
+        var bundle = Path.Combine(_caFileDirectory, "missing-env-bundle.crt");
+        var verification = EnvironmentBundleVerification(new TlsClientOptions(), OpenSslBuild, bundle);
+
+        var verdict = verification.VerifyChain([s_serverCertificate.RawData], CertificateHost);
+
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, verdict.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild, false, false)]
+    [DataRow(OpenSslBuild, true, false)]
+    [DataRow(OpenSslBuild, false, true)]
+    public void DefaultCaBundleFile_CurlCaBundleSetButSchannelOrCaFileOrInsecure_IsNone(
+        bool matchesSchannelBuild, bool withCaCertificateFile, bool insecure)
+    {
+        var bundle = WriteCaFile("env-bundle.crt", s_serverCertificate.ExportCertificatePem());
+        var options = new TlsClientOptions(Insecure: insecure, CaCertificateFile: withCaCertificateFile ? bundle : null);
+        var verification = EnvironmentBundleVerification(options, matchesSchannelBuild, bundle);
+
+        Assert.IsNull(verification.DefaultCaBundleFile);
+    }
+
+    // curl treats an empty CURL_CA_BUNDLE as unset (AF-0930).
+    [TestMethod]
+    public void DefaultCaBundleFile_CurlCaBundleIsEmpty_IsNone()
+    {
+        var verification = EnvironmentBundleVerification(new TlsClientOptions(), OpenSslBuild, string.Empty);
+
+        Assert.IsNull(verification.DefaultCaBundleFile);
+    }
+
+    // STD-178: the proxy is verified against the built-in bundle, never CURL_CA_BUNDLE.
+    [TestMethod]
+    public void DefaultCaBundleFile_ProxyWithCurlCaBundleSet_IsTheBuiltInBundle()
+    {
+        var env = WriteCaFile("env-bundle.crt", s_serverCertificate.ExportCertificatePem());
+        var builtIn = WriteCaFile("built-in.crt", s_serverCertificate.ExportCertificatePem());
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == "CURL_CA_BUNDLE" ? env : null,
+            DefaultCaBundleCandidates = [Path.Combine(_caFileDirectory, "absent.crt"), builtIn],
+        }.ForProxy();
+
+        Assert.IsTrue(verification.IsProxy);
+        Assert.AreEqual(builtIn, verification.DefaultCaBundleFile);
+    }
+
+    [TestMethod]
+    public void DefaultCaBundleFile_ProxyWithCaDirectorySet_IsTheSystemStore()
+    {
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == "SSL_CERT_DIR" ? "/capath" : null,
+        }.ForHandshake(NoDiagnosticLog.Instance, CancellationToken.None, isProxy: true);
+
+        Assert.IsNull(verification.DefaultCaBundleFile);
+    }
+
+    [TestMethod]
+    public void DefaultCaBundleFile_ProxyWithEmptyCaDirectory_IsTheBuiltInBundle()
+    {
+        var builtIn = WriteCaFile("built-in-empty-dir.crt", s_serverCertificate.ExportCertificatePem());
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == "SSL_CERT_DIR" ? string.Empty : null,
+            DefaultCaBundleCandidates = [builtIn],
+        }.ForProxy();
+
+        Assert.AreEqual(builtIn, verification.DefaultCaBundleFile);
+    }
+
+    [TestMethod]
+    public void IsProxy_ForHandshakeWithoutProxy_IsFalse()
+    {
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), OpenSslBuild, TimeProvider.System)
+            .ForHandshake(NoDiagnosticLog.Instance, CancellationToken.None);
+
+        Assert.IsFalse(verification.IsProxy);
+    }
+
+    private static ServerCertificateVerification EnvironmentBundleVerification(
+        TlsClientOptions options, bool matchesSchannelBuild, string bundle) =>
+        new(options, matchesSchannelBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == "CURL_CA_BUNDLE" ? bundle : null,
+        };
+
     [TestMethod]
     public void ConfigureCaBundleCandidates_AreCurlConfiguresSearchOrder()
     {

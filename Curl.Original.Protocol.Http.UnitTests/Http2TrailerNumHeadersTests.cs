@@ -21,10 +21,10 @@ public sealed class Http2TrailerNumHeadersTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [DataRow(2, 1, 3)]
-    [DataRow(1, 1, 2)]
-    [DataRow(0, 2, 2)]
-    [DataRow(0, 1, 1)]
+    [DataRow(2, 1, 2)]
+    [DataRow(1, 1, 1)]
+    [DataRow(0, 2, 0)]
+    [DataRow(0, 1, 0)]
     public async Task ExecuteAsync_Http2Trailers_ReportTheirOwnCountAndKeepTheHead(int headFields, int trailerFields, int allHeaders)
     {
         HpackEncoder server = new();

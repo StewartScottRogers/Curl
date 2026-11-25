@@ -79,7 +79,7 @@ internal sealed class ConcatenatedReadStream : Stream
 
     /// <summary>One flag per segment read at most once per fill; none is set when no segment is a callback.</summary>
     private static bool[] ReadOnceMarks(int count, IReadOnlyCollection<int>? callbackSegments, IReadOnlyCollection<int>? fileSegments) =>
-        MarkSegments(count, callbackSegments is { Count: > 0 } ? [.. callbackSegments, .. fileSegments ?? []] : []);
+        MarkSegments(count, [.. callbackSegments ?? [], .. fileSegments ?? []]);
 
     /// <summary>One known length or <see langword="null" /> per segment, from <paramref name="lengths" />.</summary>
     private static long?[] LengthsByIndex(int count, IReadOnlyDictionary<int, long> lengths)

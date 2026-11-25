@@ -65,12 +65,12 @@ public sealed class SignalRReferenceHubTests
     }
 
     [TestMethod]
-    public void TryRead_UnmaskedFrameWithA16BitLength_ReadsItsPayload()
+    public void TakeWholeFrame_UnmaskedFrameWithA16BitLength_ReadsItsPayload()
     {
         byte[] payload = [.. Enumerable.Repeat((byte)'a', 300)];
         byte[] frame = SignalRReferenceFrame.Write(0x01, payload);
 
-        int taken = SignalRReferenceFrame.TryRead(frame, out SignalRReferenceFrame? read);
+        int taken = SignalRReferenceFrame.TakeWholeFrame(frame, out SignalRReferenceFrame? read);
 
         Assert.AreEqual(frame.Length, taken);
         Assert.IsNotNull(read);
@@ -82,9 +82,9 @@ public sealed class SignalRReferenceHubTests
     [TestMethod]
     [DataRow(new byte[] { 0x81 })]
     [DataRow(new byte[] { 0x81, 0x85, 1, 2, 3, 4, 5 })]
-    public void TryRead_PartOfAFrame_TakesNothing(byte[] pending)
+    public void TakeWholeFrame_PartOfAFrame_TakesNothing(byte[] pending)
     {
-        int taken = SignalRReferenceFrame.TryRead(pending, out SignalRReferenceFrame? read);
+        int taken = SignalRReferenceFrame.TakeWholeFrame(pending, out SignalRReferenceFrame? read);
 
         Assert.AreEqual(0, taken);
         Assert.IsNull(read);
@@ -93,7 +93,7 @@ public sealed class SignalRReferenceHubTests
     [TestMethod]
     public void TryRead_RequestWithABodyNotYetWhole_TakesNothing()
     {
-        int taken = SignalRReferenceRequest.TryRead("POST / HTTP/1.1\r\nContent-Length: 4\r\n\r\nab"u8, out SignalRReferenceRequest? request);
+        int taken = SignalRReferenceRequest.TakeWholeRequest("POST / HTTP/1.1\r\nContent-Length: 4\r\n\r\nab"u8, out SignalRReferenceRequest? request);
 
         Assert.AreEqual(0, taken);
         Assert.IsNull(request);
@@ -102,7 +102,7 @@ public sealed class SignalRReferenceHubTests
     [TestMethod]
     public void TryRead_RequestWithABody_ReadsItAndItsHeaders()
     {
-        int taken = SignalRReferenceRequest.TryRead("POST /n HTTP/1.1\r\ncontent-length: 2\r\n\r\nokNEXT"u8, out SignalRReferenceRequest? request);
+        int taken = SignalRReferenceRequest.TakeWholeRequest("POST /n HTTP/1.1\r\ncontent-length: 2\r\n\r\nokNEXT"u8, out SignalRReferenceRequest? request);
 
         Assert.AreEqual(41, taken);
         Assert.AreEqual("ok", request!.Body);

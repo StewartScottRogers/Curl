@@ -90,6 +90,7 @@ public sealed class ImapProtocolHandlerListTests
     [DataRow("INBOX?NEW", "SEARCH NEW", DisplayName = "INBOX?NEW (measured)")]
     [DataRow("INBOX?SUBJECT%20hi", "SEARCH SUBJECT hi", DisplayName = "INBOX?SUBJECT%20hi decoded (measured)")]
     [DataRow("INBOX?SUBJECT%C3%A9", "SEARCH SUBJECT\u00C3\u00A9", DisplayName = "INBOX?SUBJECT%C3%A9 sent as the bytes (measured)")]
+    [DataRow("INBOX?UID%203:*", "SEARCH UID 3:*", DisplayName = "INBOX?UID%203:* stays SEARCH, not UID SEARCH (measured)")]
     [DataRow("INBOX;SECTION=TEXT?ALL", "SEARCH ALL", DisplayName = "a SECTION does not stop the search")]
     public async Task ExecuteAsync_MailboxAndQuery_SelectsSearchesAndWritesTheSearchResponse(string path, string search)
     {

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Curl.Extension.Abstractions.Transfer;
 
 namespace Curl.Extension.RecordReplay;
@@ -14,6 +15,36 @@ namespace Curl.Extension.RecordReplay;
 /// <param name="record">Where exchanges are recorded to, or <see langword="null" /> without <c>--record</c>.</param>
 internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, ExchangeDirectory? record) : ITransferHook
 {
+    /// <summary>What a recorded URL puts in place of a user and password (ADR-1134 uses the same text for <c>url.full</c>).</summary>
+    internal const string RedactedUserInfo = "REDACTED:REDACTED";
+
+    /// <summary>Puts <see cref="RedactedUserInfo" /> in place of any user information in <paramref name="url" />.</summary>
+    /// <param name="url">The URL as given.</param>
+    /// <returns>The URL with no credentials; a URL with no user information is returned unchanged.</returns>
+    internal static string Redacted(string url)
+    {
+        var schemeEnd = url.IndexOf("://", StringComparison.Ordinal);
+        var firstDelimiter = url.IndexOfAny(['/', '?', '#']);
+        var authorityStart = schemeEnd >= 0 && (firstDelimiter < 0 || schemeEnd < firstDelimiter) ? schemeEnd + 3 : 0;
+        var authorityEnd = url.IndexOfAny(['/', '?', '#'], authorityStart);
+        var authority = authorityEnd < 0 ? url[authorityStart..] : url[authorityStart..authorityEnd];
+        var at = authority.LastIndexOf('@');
+        return at < 0 ? url : url[..authorityStart] + RedactedUserInfo + url[(authorityStart + at)..];
+    }
+
+    private static readonly Regex UrlFieldLine = new(@"^[^\r\n:]+:[^\r\n]*", RegexOptions.Multiline | RegexOptions.CultureInvariant);
+
+    private static readonly Regex UserInfo = new(@"(?<=//)[^/?#\s<>""]*@", RegexOptions.CultureInvariant);
+
+    /// <summary>Puts <see cref="RedactedUserInfo" /> in place of the user information of every URL in every header line of <paramref name="head" />.</summary>
+    /// <param name="head">The head bytes as received.</param>
+    /// <returns>The head with no credentials in those lines; a head with none is returned unchanged.</returns>
+    internal static byte[] RedactedHead(byte[] head)
+    {
+        var text = Encoding.Latin1.GetString(head);
+        var redacted = UrlFieldLine.Replace(text, line => UserInfo.Replace(line.Value, RedactedUserInfo + "@"));
+        return redacted == text ? head : Encoding.Latin1.GetBytes(redacted);
+    }
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
         if (context.Http is null)
@@ -22,7 +53,7 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
         }
 
         var method = ExchangeKey.MethodOf(context);
-        var url = context.Url.OriginalString;
+        var url = Redacted(context.Url.OriginalString);
         var key = ExchangeKey.For(method, url, context.PostData is { } data ? data.Span : default);
         if (replay is not null)
         {
@@ -104,21 +135,27 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
         await context.Output.WriteAsync(body.ToArray(), context.CancellationToken);
         if (result is { IsSuccess: true, Report: { } report })
         {
-            await TryRecordAsync(directory, key, request with { StatusCode = report.ResponseCode, Head = head.ToArray(), Body = body.ToArray() }, context.CancellationToken);
+            var failure = await TryRecordAsync(directory, key, request with { StatusCode = report.ResponseCode, Head = RedactedHead(head.ToArray()), Body = body.ToArray() }, context.CancellationToken);
+            if (failure is not null)
+            {
+                return failure;
+            }
         }
 
         return result;
     }
 
-    private static async Task TryRecordAsync(ExchangeDirectory directory, string key, RecordedExchange exchange, CancellationToken cancellationToken)
+    /// <summary>Writes the exchange; a failure is exit 23 naming <c>--record</c> and the directory, as --har names its file.</summary>
+    private static async Task<TransferResult?> TryRecordAsync(ExchangeDirectory directory, string key, RecordedExchange exchange, CancellationToken cancellationToken)
     {
         try
         {
             await directory.WriteAsync(key, exchange, cancellationToken);
+            return null;
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            // A record directory that cannot be written leaves the transfer as it was.
+            return TransferResult.Failure(CurlExitCode.WriteError, $"Failed writing the --record directory {directory.Path}");
         }
     }
 

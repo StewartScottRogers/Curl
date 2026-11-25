@@ -21,6 +21,19 @@ public sealed class UdpDatagramChannelTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
+    public void Constructor_BoundSocketConnectFails_DisposesSocketAndRethrows()
+    {
+        var boundSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        var serverOfOtherFamily = new IPEndPoint(IPAddress.IPv6Loopback, 69);
+        Diagnostics.Arrange("socket family and server family", "InterNetwork and InterNetworkV6");
+
+        var exception = Assert.Throws<Exception>(() => new UdpDatagramChannel(serverOfOtherFamily, boundSocket, connectsToServer: true));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        var rebind = Assert.ThrowsExactly<ObjectDisposedException>(() => boundSocket.Bind(new IPEndPoint(IPAddress.Any, 0)));
+        Diagnostics.Assert("socket after failed connect", nameof(ObjectDisposedException), rebind.GetType().Name);
+    }
+    [TestMethod]
     public void Constructor_WithNullServerEndPoint_ThrowsArgumentNullException()
     {
         Diagnostics.Arrange("server end point", "null");

@@ -41,7 +41,7 @@ internal static class SocksProxyTunnel
     /// (<see cref="CurlExitCode.Proxy" />) with curl's message, or exit 6 (43 for bad <c>--dns-servers</c> options) when the host does
     /// not resolve.
     /// </returns>
-    public static ValueTask<ConnectResult?> OpenAsync(
+    public static async ValueTask<ConnectResult?> OpenAsync(
         IConnection connection,
         ProxyEndpoint proxy,
         string host,
@@ -50,10 +50,25 @@ internal static class SocksProxyTunnel
         Socks5AuthenticationOptions socks5Authentication,
         ITransferEvents events,
         ITransferEvents? trace,
-        CancellationToken cancellationToken) =>
-        proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a
-            ? Socks4Handshake.RunAsync(connection, proxy, host, port, resolve, trace, cancellationToken)
-            : Socks5Handshake.RunAsync(connection, proxy, host, port, resolve, socks5Authentication, events, trace, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await (proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a
+                ? Socks4Handshake.RunAsync(connection, proxy, host, port, resolve, trace, cancellationToken)
+                : Socks5Handshake.RunAsync(connection, proxy, host, port, resolve, socks5Authentication, events, trace, cancellationToken)).ConfigureAwait(false);
+        }
+        catch (SocksSendFailedException failure)
+        {
+            // A socket error while writing a request is curl's own send message for that step (BL-5423).
+            return Failed(failure.ProxyError, failure.Message);
+        }
+        catch (IOException failure) when (CurlSocketErrorText.ReceiveFailure(failure) is { } receiveFailure)
+        {
+            // A socket error while reading a reply (a reset) is curl's exit 97 "Recv failure: ..." (BL-5382).
+            return Failed(CurlProxyCode.ReceiveConnect, receiveFailure);
+        }
+    }
 
     /// <summary>
     /// Writes <c>[SOCKS] </c> and <paramref name="line" /> to <paramref name="trace" />, when there is one.
@@ -104,12 +119,36 @@ internal static class SocksProxyTunnel
     /// </summary>
     /// <param name="connection">The connection to the proxy.</param>
     /// <param name="bytes">The handshake message.</param>
+    /// <param name="sendFailureCode">The <c>CURLPX_SEND_*</c> code curl reports when this step's write fails (BL-5423).</param>
+    /// <param name="sendFailureMessage">The message curl reports when this step's write fails.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes once the bytes are flushed.</returns>
-    public static async ValueTask SendAsync(IConnection connection, byte[] bytes, CancellationToken cancellationToken)
+    public static async ValueTask SendAsync(
+        IConnection connection,
+        byte[] bytes,
+        CurlProxyCode sendFailureCode,
+        string sendFailureMessage,
+        CancellationToken cancellationToken)
     {
-        await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException failure) when (CurlSocketErrorText.SendFailure(failure) is not null)
+        {
+            throw new SocksSendFailedException(sendFailureCode, sendFailureMessage, failure);
+        }
+    }
+
+    /// <summary>Carries a failed handshake write from <see cref="SendAsync" /> to <see cref="OpenAsync" />.</summary>
+    /// <param name="proxyError">The <c>CURLPX_SEND_*</c> code of the step.</param>
+    /// <param name="message">curl's message for the step.</param>
+    /// <param name="inner">The socket failure.</param>
+    private sealed class SocksSendFailedException(CurlProxyCode proxyError, string message, IOException inner)
+        : Exception(message, inner)
+    {
+        public CurlProxyCode ProxyError { get; } = proxyError;
     }
 
     /// <summary>

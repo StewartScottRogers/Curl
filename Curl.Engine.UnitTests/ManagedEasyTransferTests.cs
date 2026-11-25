@@ -217,6 +217,15 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(HttpAuthSchemes.Digest, ManagedEasyTransfer.AuthSchemeKeptAfter(picked, HttpAuthSchemes.Basic));
     }
 
+    [TestMethod]
+    public void DigestStaysAvailableAfter_NoResultOrNoReport_IsFalseElseTheReportsFlag()
+    {
+        Assert.IsFalse(ManagedEasyTransfer.DigestStaysAvailableAfter(null));
+        Assert.IsFalse(ManagedEasyTransfer.DigestStaysAvailableAfter(TransferResult.Success(0) with { Report = null }));
+        Assert.IsFalse(ManagedEasyTransfer.DigestStaysAvailableAfter(TransferResult.Success(0) with { Report = new TransferReport { DigestStaysAvailable = false } }));
+        Assert.IsTrue(ManagedEasyTransfer.DigestStaysAvailableAfter(TransferResult.Success(0) with { Report = new TransferReport { DigestStaysAvailable = true } }));
+    }
+
     /// <summary><c>curl_easy_reset</c> forgets the scheme the last perform picked (BL-2709).</summary>
     [TestMethod]
     public async Task Reset_AfterAPerformThatPickedBasic_NextPerformReportsNoHttpAuthUsed()

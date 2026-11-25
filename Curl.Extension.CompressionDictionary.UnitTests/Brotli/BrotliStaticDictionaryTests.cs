@@ -54,4 +54,16 @@ public sealed class BrotliStaticDictionaryTests
     [DataRow(4, 121 * WordsOfLengthFour)]
     public void WriteWord_BadLengthOrTransform_Throws(int length, int reference) =>
         Assert.ThrowsExactly<BrotliFormatException>(() => BrotliStaticDictionary.WriteWord(new BrotliOutput([]), length, reference));
+
+    // RFC 7932 section 8 allows copy lengths 4 to 24: the first word of each boundary length is written unchanged.
+    [TestMethod]
+    [DataRow(4)]
+    [DataRow(24)]
+    public void WriteWord_BoundaryLength_WritesFirstWordOfThatLength(int length)
+    {
+        var output = new BrotliOutput([]);
+        BrotliStaticDictionary.WriteWord(output, length, 0);
+
+        Assert.AreEqual(length, output.ToArray().Length);
+    }
 }

@@ -65,8 +65,10 @@ public static class CommandLineParser
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
     /// <returns>
     /// The parsed options, or the first refusal met; every refusal carries
-    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>, except a <c>-d @file</c> that
-    /// cannot be read, which carries <see cref="Curl.Protocol.Abstractions.CurlExitCode.ReadError"/>.
+    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>, except a <c>-d @file</c>, a
+    /// <c>--url @file</c> or a <c>-K</c> file that cannot be read, which carry
+    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.ReadError"/>, and a <c>--proto-default</c> naming an
+    /// unknown scheme, which carries <see cref="Curl.Protocol.Abstractions.CurlExitCode.UnsupportedProtocol"/>.
     /// Never throws for a non-null list, unless reading standard input for <c>-d @-</c> fails.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="arguments"/> is <see langword="null"/>.</exception>
@@ -81,8 +83,10 @@ public static class CommandLineParser
     /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
     /// <returns>
     /// The parsed options, or the first refusal met; every refusal carries
-    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>, except a <c>-d @file</c> that
-    /// cannot be read, which carries <see cref="Curl.Protocol.Abstractions.CurlExitCode.ReadError"/>.
+    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>, except a <c>-d @file</c>, a
+    /// <c>--url @file</c> or a <c>-K</c> file that cannot be read, which carry
+    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.ReadError"/>, and a <c>--proto-default</c> naming an
+    /// unknown scheme, which carries <see cref="Curl.Protocol.Abstractions.CurlExitCode.UnsupportedProtocol"/>.
     /// Never throws for non-null arguments, unless reading standard input for <c>-d @-</c> fails.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="arguments"/> or <paramref name="pathExists"/> is <see langword="null"/>.</exception>
@@ -101,8 +105,10 @@ public static class CommandLineParser
     /// <param name="dataFileReader">Reads the file, or standard input, a <c>-d</c> / <c>--data</c> value starting with <c>@</c> or a <c>-K</c> / <c>--config</c> value names.</param>
     /// <returns>
     /// The parsed options, or the first refusal met; every refusal carries
-    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>, except a <c>-d @file</c> that
-    /// cannot be read, which carries <see cref="Curl.Protocol.Abstractions.CurlExitCode.ReadError"/>.
+    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>, except a <c>-d @file</c>, a
+    /// <c>--url @file</c> or a <c>-K</c> file that cannot be read, which carry
+    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.ReadError"/>, and a <c>--proto-default</c> naming an
+    /// unknown scheme, which carries <see cref="Curl.Protocol.Abstractions.CurlExitCode.UnsupportedProtocol"/>.
     /// Never throws for non-null arguments, unless reading standard input for <c>-d @-</c> fails.
     /// </returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
@@ -628,9 +634,10 @@ public static class CommandLineParser
 
     /// <summary>
     /// Expands <paramref name="template"/> and applies the result, first taking the next argument when
-    /// <paramref name="valueIsNextArgument"/> and the expansion was not refused. A value whose template opens
-    /// with a reference that was replaced (<see cref="VariableExpansion.Expand"/> then returns a new string)
-    /// is applied with <see cref="CommandLineOptions.ApplyingValueLedByVariableBytes"/> set.
+    /// <paramref name="valueIsNextArgument"/> and the expansion was not refused. A value in which a reference was
+    /// replaced (<see cref="VariableExpansion.Expand"/> then returns a new string) is applied with
+    /// <see cref="CommandLineOptions.ApplyingExpandedValue"/> set, and, when its template opens with a reference,
+    /// with <see cref="CommandLineOptions.ApplyingValueLedByVariableBytes"/> set too.
     /// </summary>
     private static CommandLineRefusal? ApplyExpandedValue(CommandLineOptions options, CommandLineOption option, string argument, string template, bool valueIsNextArgument, ArgumentReader reader)
     {
@@ -645,8 +652,10 @@ public static class CommandLineParser
             reader.TryTakeNext(out _);
         }
 
-        options.ApplyingValueLedByVariableBytes = template.StartsWith("{{", StringComparison.Ordinal) && !ReferenceEquals(value, template);
+        options.ApplyingExpandedValue = !ReferenceEquals(value, template);
+        options.ApplyingValueLedByVariableBytes = options.ApplyingExpandedValue && template.StartsWith("{{", StringComparison.Ordinal);
         refusal = option.Apply(options, value, argument, reader.PathExists, reader.DataFileReader);
+        options.ApplyingExpandedValue = false;
         options.ApplyingValueLedByVariableBytes = false;
         return refusal;
     }

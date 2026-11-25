@@ -47,6 +47,10 @@ Authentication Specification).
 | OciRegistry:TOKEN-Response-3 | SHOULD | A client caches a token until its `expires_in` and may refresh it with `refresh_token`. | n/a: one transfer asks for at most one token and keeps none past it |
 | OciRegistry:TOKEN-Scope-1 | MUST | A push asks for the `repository:<name>:push,pull` scope. | OciTokenAuthCases.ManifestPush_AsksForThePushAndPullScope |
 
+## Ranges and resume
+
+`oci://` moves only whole manifests and blobs, so the ranged blob pull and the resumed pull are workflows the client does not use. `-r`/`--range`, and `-C`/`--continue-at` other than offset 0, fail with exit 4 and `oci:// does not support <option>; it transfers only whole manifests and blobs` before any connection, pulls and pushes alike, so `-C -` leaves a partial file as it was instead of appending the whole artifact to it. `-C 0`, and `-C -` with no partial file, ask for the whole transfer and are let through (ADR-1358, `OciByteRangeRefusalTests`).
+
 ## Request methods
 
 `oci://` sends only the methods its operations need: GET to pull, and with `-T` the push's HEAD, POST, PUT and PATCH. `-X GET` without `-T` and `-X PUT` with it are accepted, since they name what is sent anyway. `-I`/`--head` and every other `-X` (`DELETE`, `HEAD`, `POST`, ...) fail with exit 4 and `oci:// does not support ...` before any connection, so a destructive method is never reported done while a GET was sent instead (ADR-1238, `OciRegistryRequestMethodTests`).

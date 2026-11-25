@@ -18,12 +18,12 @@ namespace Curl.Engine;
 /// <remarks>
 /// <para>
 /// The lookup is libcurl 8.21.0's <c>url_set_conn_peer</c> (ADR-0226, BL-733 Notes), as curl.se's build with
-/// HTTP/2 and HTTP/3 runs it, except that with no version option on Windows only <c>h1</c> may be switched to, as the Schannel build allows (ADR-1238). The version option names the origin versions an entry is
+/// HTTP/2 and HTTP/3 runs it, except that with no version option on Windows only <c>h1</c> may be switched to, as the measured Schannel build allows (ADR-1313, ADR-1238). The version option names the origin versions an entry is
 /// looked up under, in order, and the destination versions it may name:
 /// </para>
 /// <list type="table">
 /// <listheader><term>Option</term><description>Looked up under; may switch to</description></listheader>
-/// <item><term>none</term><description><c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c> (and <c>h3</c> only when the build acts as a QUIC build, ADR-1268)</description></item>
+/// <item><term>none</term><description><c>h2</c>, <c>h1</c>; <c>h1</c> alone on Windows, <c>h1</c>, <c>h2</c> and <c>h3</c> elsewhere (ADR-1313)</description></item>
 /// <item><term><c>--http1.1</c></term><description><c>h1</c>; <c>h1</c></description></item>
 /// <item><term><c>--http2</c></term><description><c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c></description></item>
 /// <item><term><c>--http3</c></term><description><c>h3</c>, <c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c>, <c>h3</c></description></item>
@@ -36,8 +36,8 @@ namespace Curl.Engine;
 /// fallback (<see cref="HttpVersionPreference.Http3Only" />), and <c>h1</c> or <c>h2</c> to TCP, whose handshake
 /// offers that version alone through ALPN (<see cref="HttpVersionPreference.Http11" />, with the HTTP handler
 /// setting the offer, BL-948). An entry naming the origin itself is
-/// no route; one naming <c>h3</c> makes a transfer without a version option race HTTP/3 against TCP as
-/// <c>--http3</c> does (only when the build acts as a QUIC build, ADR-1268), falling back to TCP when QUIC fails (measured), and one naming <c>h2</c> or <c>h1</c>
+/// no route; off Windows one naming <c>h3</c> makes a transfer without a version option race HTTP/3 against TCP as
+/// <c>--http3</c> does (ADR-1309; on Windows that entry is ignored, ADR-1313), falling back to TCP when QUIC fails (measured), and one naming <c>h2</c> or <c>h1</c>
 /// makes TCP the first attempt of <c>--http3</c>'s race (<see cref="HttpRequestOptions.TriesTcpBeforeQuic" />,
 /// BL-948). None is used for plain <c>http</c> or
 /// for an origin a <c>--connect-to</c> mapping matches, and no header received over plain <c>http</c>
@@ -70,11 +70,9 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private static readonly IReadOnlySet<AltSvcAlpn> EveryAlpn = new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 };
 
-    private static readonly IReadOnlySet<AltSvcAlpn> NoQuicBuildAlpns = new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 };
+    private readonly bool isWindows;
 
     private readonly AltSvcCache cache;
-
-    private readonly bool actsAsQuicBuild;
 
     private readonly string file;
 
@@ -84,11 +82,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private readonly bool usesOverHttp;
 
-    private readonly bool isWindows;
-
-    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp, bool isWindows, bool actsAsQuicBuild)
+    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp, bool isWindows)
     {
-        this.actsAsQuicBuild = actsAsQuicBuild;
         this.usesOverHttp = usesOverHttp;
         this.isWindows = isWindows;
         this.cache = cache;
@@ -118,8 +113,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// up as an <c>https</c> one does: the harness's stand-in for curl's debug build under
     /// <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
     /// </param>
-    /// <param name="onWindows">Whether to look alternatives up as the Windows build does; <see langword="null" /> asks the running system (tests pin either).</param>
-    /// <param name="actsAsQuicBuild">Whether the build acts as a QUIC build; off, an <c>h3</c> entry is ignored when no version option is given (BL-5099).</param>
+    /// <param name="onWindows">Whether to look alternatives up as the Windows Schannel build does; <see langword="null" /> asks the running system (tests pin either).</param>
     /// <returns>The cache.</returns>
     internal static async Task<AltSvcTransferCache> OpenAsync(
         EasyHttpOptions http,
@@ -128,8 +122,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         TimeProvider clock,
         IDiagnosticLog? diagnosticLog = null,
         bool usesOverHttp = false,
-        bool? onWindows = null,
-        bool actsAsQuicBuild = false)
+        bool? onWindows = null)
     {
         string file = http.AltSvc ?? string.Empty;
         HttpVersion requestedVersion = http.HttpVersion;
@@ -139,7 +132,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             cache.ReadFile(await ReadTextAsync(file, fileSystem).ConfigureAwait(false));
         }
 
-        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp, onWindows ?? OperatingSystem.IsWindows(), actsAsQuicBuild);
+        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp, onWindows ?? OperatingSystem.IsWindows());
     }
 
     /// <summary>
@@ -212,18 +205,10 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             return;
         }
 
-        FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(file, FileWriteMode.Truncate, AltSvcFileCreateMode, CancellationToken.None)
+        // A file that cannot be replaced is not reported, as curl does not.
+        await fileSystem
+            .TryReplaceFileAsync(file, Encoding.Latin1.GetBytes(cache.FormatFile(Environment.NewLine)), AltSvcFileCreateMode, CancellationToken.None)
             .ConfigureAwait(false);
-        if (opened.Content is not { } content)
-        {
-            return;
-        }
-
-        await using (content.ConfigureAwait(false))
-        {
-            await content.WriteAsync(Encoding.Latin1.GetBytes(cache.FormatFile(Environment.NewLine))).ConfigureAwait(false);
-        }
     }
 
     private static async Task<string> ReadTextAsync(string file, IFileSystem fileSystem)
@@ -255,7 +240,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             return null;
         }
 
-        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion, isWindows, actsAsQuicBuild);
+        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion, isWindows);
         return cache.FindForOrigin(lookedUpUnder, url.IdnHost, url.Port, allowed);
     }
 
@@ -263,18 +248,17 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// The origin versions an entry is looked up under, in curl's order, and the destination versions the
     /// transfer may switch to, for a version option (curl 8.21.0's <c>Curl_http_neg_init</c> and
     /// <c>url_set_conn_peer</c>): <c>-0</c> and <c>--http2-prior-knowledge</c> look nothing up. With no version
-    /// option on Windows the transfer may switch to <c>h1</c> alone, as curl 8.22.0's Schannel build, built with
-    /// neither HTTP/2 nor HTTP/3, allows no other ALPN, so an <c>h2</c> or <c>h3</c> entry leaves the origin
-    /// (BL-4912, ADR-1238); a version option asks for what Curl offers on every platform (ADR-0141).
+    /// option the transfer may switch to <c>h1</c> alone on Windows, as the measured curl 8.22.0 Schannel build,
+    /// which lists neither HTTP2 nor HTTP3, does, and to <c>h1</c>, <c>h2</c> and <c>h3</c> elsewhere (ADR-1313,
+    /// restoring ADR-1238's Windows answer that ADR-1309 removed).
     /// </summary>
     /// <param name="version">The version option.</param>
     /// <param name="isWindows">Whether the running system is Windows.</param>
     /// <returns>The origin versions looked up under and the destination versions allowed.</returns>
-    /// <param name="actsAsQuicBuild">Whether the build acts as a curl built with a QUIC library; without it, and with no version option, an <c>h3</c> entry is ignored off Windows (BL-5099).</param>
-    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version, bool isWindows, bool actsAsQuicBuild = false) =>
+    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version, bool isWindows) =>
         version switch
         {
-            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], NoVersionOptionDestinations(isWindows, actsAsQuicBuild)),
+            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], NoVersionOptionDestinations(isWindows)),
             HttpVersion.Http11 => ([AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1 }),
             HttpVersion.Http2 => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 }),
             HttpVersion.Http3 => ([AltSvcAlpn.H3, AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
@@ -283,12 +267,11 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         };
 
     /// <summary>
-    /// The destination versions a transfer with no version option may switch to: <c>h1</c> alone on Windows,
-    /// as the Schannel build, and <c>h1</c> and <c>h2</c> elsewhere, plus <c>h3</c> only when the build acts as a QUIC build
-    /// (<paramref name="actsAsQuicBuild" />, ADR-1268), as the OpenSSL builds.
+    /// The destination versions a transfer with no version option may switch to: <c>h1</c> alone on Windows, as the
+    /// Schannel build, and every version elsewhere (ADR-1313).
     /// </summary>
-    private static IReadOnlySet<AltSvcAlpn> NoVersionOptionDestinations(bool isWindows, bool actsAsQuicBuild) =>
-        isWindows ? SchannelBuildAlpns : actsAsQuicBuild ? EveryAlpn : NoQuicBuildAlpns;
+    private static IReadOnlySet<AltSvcAlpn> NoVersionOptionDestinations(bool isWindows) =>
+        isWindows ? SchannelBuildAlpns : EveryAlpn;
 
     /// <summary>
     /// The version a connection to the origin itself uses when its entry names <paramref name="destination" />:

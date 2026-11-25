@@ -45,26 +45,18 @@ public sealed class HttpVersionMappingTests
     }
 
     [TestMethod]
-    [DataRow(HttpVersion.None, true, "http/1.1")]
-    [DataRow(HttpVersion.None, false, "h2,http/1.1")]
-    [DataRow(HttpVersion.Http10, true, "http/1.1")]
-    [DataRow(HttpVersion.Http10, false, "http/1.1")]
-    [DataRow(HttpVersion.Http11, true, "http/1.1")]
-    [DataRow(HttpVersion.Http11, false, "http/1.1")]
-    [DataRow(HttpVersion.Http2, true, "h2,http/1.1")]
-    [DataRow(HttpVersion.Http2, false, "h2,http/1.1")]
-    [DataRow(HttpVersion.Http2PriorKnowledge, true, "h2")]
-    [DataRow(HttpVersion.Http2PriorKnowledge, false, "h2")]
-    [DataRow(HttpVersion.Http3, true, "h2,http/1.1")]
-    [DataRow(HttpVersion.Http3, false, "h2,http/1.1")]
-    [DataRow(HttpVersion.Http3Only, true, "h2,http/1.1")]
-    [DataRow(HttpVersion.Http3Only, false, "h2,http/1.1")]
-    public void HttpOverTlsApplicationProtocolsOf_OffersWhatThePlatformsCurlOffers(HttpVersion version, bool isWindows, string expected)
+    [DataRow(HttpVersion.None, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http10, "http/1.1")]
+    [DataRow(HttpVersion.Http11, "http/1.1")]
+    [DataRow(HttpVersion.Http2, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http2PriorKnowledge, "h2")]
+    [DataRow(HttpVersion.Http3, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http3Only, "h2,http/1.1")]
+    public void HttpOverTlsApplicationProtocolsOf_OffersWhatThePlatformsCurlOffers(HttpVersion version, string expected)
     {
         Diagnostics.Arrange("version", version);
-        Diagnostics.Arrange("isWindows", isWindows);
 
-        string actual = string.Join(',', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(version, isWindows));
+        string actual = string.Join(',', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(version));
 
         Diagnostics.Act("offered", actual);
 
@@ -73,22 +65,7 @@ public sealed class HttpVersionMappingTests
     }
 
     [TestMethod]
-    [OSCondition(OperatingSystems.Windows)]
-    public void CreateTcpConnector_NoVersionOptionOnWindows_OffersHttp11Only()
-    {
-        Diagnostics.Arrange("arguments", Url);
-
-        string actual = OfferedBy(Url);
-
-        Diagnostics.Act("offered", actual);
-
-        Diagnostics.Assert("offered", "http/1.1", actual);
-        Assert.AreEqual("http/1.1", actual);
-    }
-
-    [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
-    public void CreateTcpConnector_NoVersionOptionOffWindows_OffersH2ThenHttp11()
+    public void CreateTcpConnector_NoVersionOption_OffersH2ThenHttp11()
     {
         Diagnostics.Arrange("arguments", Url);
 

@@ -61,7 +61,7 @@ internal static class GoldenToolsResponses
                     "default": "GET"
                   },
                   "headers": {
-                    "description": "Extra request headers, in the order sent; an empty value sends the header empty.",
+                    "description": "Extra request headers, in the order sent. An empty value removes the header, including a default one such as Accept, as curl -H 'Accept:' does; an empty value with sendEmpty true sends the header empty, as curl -H 'Accept;' does.",
                     "type": [
                       "array",
                       "null"
@@ -83,6 +83,10 @@ internal static class GoldenToolsResponses
                             "string",
                             "null"
                           ]
+                        },
+                        "sendEmpty": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "required": [

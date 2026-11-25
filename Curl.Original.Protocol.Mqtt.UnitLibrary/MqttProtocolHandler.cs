@@ -122,7 +122,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
 
         long started = context.TimeProvider.GetTimestamp();
         MqttDiagnosticLog log = new(context.DiagnosticLog);
-        TransferResult result = await TransferAsync(context, log).ConfigureAwait(false);
+        TransferResult result = await TransferAsync(context, log, started).ConfigureAwait(false);
         log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
         return result;
     }
@@ -156,7 +156,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
     /// <summary>
     /// Connects, then runs the session over the connection and disposes it.
     /// </summary>
-    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, MqttDiagnosticLog log)
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, MqttDiagnosticLog log, long started)
     {
         if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
         {
@@ -172,6 +172,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         }
 
         context.Progress.ReportTransferStarted();
+        long requestStarted = context.TimeProvider.GetTimestamp();
         TransferResult result;
         string? followingLine = null;
         await using (connection.ConfigureAwait(false))
@@ -194,10 +195,31 @@ public sealed class MqttProtocolHandler : IProtocolHandler
                 result = WithRequestSize(new TransferResult(failure.ExitCode, session.BytesWritten, failure.Message), session.BytesSent);
                 followingLine = failure.FollowingLine;
             }
+            catch (OperationCanceledException) when (TimedOut(context))
+            {
+                result = WithRequestSize(new TransferResult(CurlExitCode.OperationTimedOut, session.BytesWritten, TimedOutMessage(context, started, session.PublishBytesWritten, session.ExpectedTotal)), session.BytesSent);
+            }
         }
 
         ReportConnectionEnd(context.Events, result, followingLine, connected.ConnectionNumber);
-        return result;
+        return StampTimings(result, context.TimeProvider, started, connected.Timings, requestStarted);
+    }
+
+    // The limit -m set has passed: the watchdog cancels the token only then.
+    private static bool TimedOut(ITransferContext context) =>
+        context.MaxTime is { } limit && limit > TimeSpan.Zero && context.CancellationToken.IsCancellationRequested;
+
+    private static string TimedOutMessage(ITransferContext context, long started, long bytesReceived, long? expectedTotal) =>
+        string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"Operation timed out after {(long)context.TimeProvider.GetElapsedTime(context.OperationStarted ?? started).TotalMilliseconds} milliseconds with {bytesReceived}{(expectedTotal is { } total ? $" out of {total}" : string.Empty)} bytes received");
+
+    // Adds the timings behind %{time_*} and %{speed_download} to the report; the engine then leaves %{size_upload} at the report's 0, as curl prints for MQTT (BL-5475).
+    private static TransferResult StampTimings(TransferResult result, TimeProvider timeProvider, long started, ConnectTimings? connect, long requestStarted)
+    {
+        long completed = timeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connect, requestStarted, requestStarted, requestStarted, completed);
+        return result with { Report = result.Report! with { Timings = timings } };
     }
 
     /// <summary>

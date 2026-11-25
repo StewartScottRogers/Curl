@@ -65,6 +65,12 @@ public sealed record SshOptions
     public bool Compression { get; init; }
 
     /// <summary>
+    /// Gets the <c>CURLOPT_SSH_AUTH_TYPES</c> bit mask of the login methods that may be tried
+    /// (BL-5670); every bit by default.
+    /// </summary>
+    public uint AuthenticationMask { get; init; } = uint.MaxValue;
+
+    /// <summary>
     /// Gets libcurl's <c>CURLOPT_SSH_HOSTKEYFUNCTION</c>: given the host key's type name and blob, it
     /// answers whether to accept the key, in place of the known-hosts check; <see langword="null" /> when
     /// not set. It is not asked when a <c>--hostpubmd5</c> or <c>--hostpubsha256</c> fingerprint is given,

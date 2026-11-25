@@ -14,7 +14,8 @@ namespace Curl.Mcp;
 /// </summary>
 /// <param name="engine">The transfer engine whose easy handle runs the request.</param>
 /// <param name="cap">The most bytes of response body the tool returns.</param>
-public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap)
+/// <param name="root">The folder a CA file must lie in; <see langword="null" /> means none is configured, so a CA file is refused.</param>
+public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap, McpConfinementRoot? root = null)
 {
     /// <summary>
     /// Runs <paramref name="request" />, unless a field is invalid or
@@ -32,15 +33,23 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap)
             return McpTransferToolResult.Failed(check.Failure!);
         }
 
+        McpToolFailure? refused = null;
+        string? caFilePath = ConfinePath("caFile", request.CaFile, ref refused);
+        string? proxyCaFilePath = ConfinePath("proxyCaFile", request.ProxyCaFile, ref refused);
+        if (refused is not null)
+        {
+            return McpTransferToolResult.Failed(refused);
+        }
+
         if (cancellationToken.IsCancellationRequested)
         {
             return McpTransferToolResult.Failed(McpToolFailure.Cancelled);
         }
 
         await using IEasyTransfer transfer = engine.CreateEasy();
-        using McpCappedCaptureStream body = new(cap);
+        using McpCappedCaptureStream body = new(request.MaxBodyBytes is int maxBodyBytes ? new McpResponseCap(Math.Min(maxBodyBytes, cap.RequestCeilingBytes)) : cap);
         McpResponseHeaderCollector headers = new();
-        transfer.Options = McpTransferOptions.Build(request, check.Body) with
+        transfer.Options = McpTransferOptions.Build(request, check.Body, caFilePath, proxyCaFilePath) with
         {
             Callbacks = new EasyCallbackOptions { Write = data => WriteBody(body, data), Header = headers.Collect },
         };
@@ -55,6 +64,24 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap)
         }
 
         return ToResult(code, transfer, body, headers, cancellationToken);
+    }
+
+    /// <summary>The resolved path of <paramref name="path" /> inside the root, or <see langword="null" /> when it is unset or refused (then <paramref name="refused" /> names the field, unless an earlier field already did).</summary>
+    private string? ConfinePath(string field, string? path, ref McpToolFailure? refused)
+    {
+        if (path is null)
+        {
+            return null;
+        }
+
+        McpPathCheck check = (root ?? McpConfinementRoot.NotConfigured).Check(path);
+        if (!check.IsAllowed)
+        {
+            refused ??= McpToolFailure.PathRefused(field, check.Reason);
+            return null;
+        }
+
+        return check.ResolvedPath;
     }
 
     /// <summary>The write callback: keeps the chunk (up to the cap) and reports all of it taken, since libcurl aborts the transfer on a short count.</summary>

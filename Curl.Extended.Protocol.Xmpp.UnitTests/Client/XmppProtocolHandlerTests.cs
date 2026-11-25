@@ -82,6 +82,23 @@ public sealed class XmppProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DiscoAnswerHoldingLineEnds_WritesLfAndEntitizedCrOnEveryPlatform()
+    {
+        ScriptedXmppConnection connection = Script(false, [
+            Features("PLAIN"), Success, BindFeatures, BindResult,
+            "<iq type='result' id='disco'><query xmlns='http://jabber.org/protocol/disco#info'>\r\n<x note='a&#xD;&#xA;b'>c&#xD;&#xA;d\r\ne\rf</x>\n<y><![CDATA[g\r\nh]]></y></query></iq>", Close]);
+        MemoryStream output = new();
+
+        TransferResult result = await ExecuteAsync(connection, "xmpp://example.com", Juliet, output);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        CollectionAssert.AreEqual(
+            Encoding.UTF8.GetBytes("<query xmlns=\"http://jabber.org/protocol/disco#info\">\n<x note=\"a&#xD;&#xA;b\">c&#xD;\nd\ne\nf</x>\n<y><![CDATA[g\nh]]></y></query>\n"),
+            output.ToArray(),
+            Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_DiscoItemsWithNode_SendsTheItemsQueryForTheNode()
     {
         ScriptedXmppConnection connection = Script(false, [Features("PLAIN"), Success, BindFeatures, BindResult, "<iq type='result' id='disco'/>", Close]);

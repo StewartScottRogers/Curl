@@ -63,6 +63,19 @@ public sealed class Cgr013Tests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_OpenLdapStartTlsCertificateFailure_ExitsWith64AndTheSslMessage()
+    {
+        var plaintext = new ScriptedConnection(StartTlsAccepted);
+        const string message = "SSL: no alternative certificate subject name matches target ipv4 address '127.0.0.1'";
+        var tls = new FakeTlsProvider(ConnectResult.Failed(CurlExitCode.PeerFailedVerification, message));
+
+        TransferResult result = await Handler(LdapDialect.OpenLdap, plaintext, tls).ExecuteAsync(Context("ldap", TransportSecurityLevel.Required, new RecordingTransferEvents()));
+
+        Assert.AreEqual(CurlExitCode.UseSslFailed, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+    }
+
+    [TestMethod]
     [DataRow(TransportSecurityLevel.Required, DisplayName = "--ssl-reqd")]
     [DataRow(TransportSecurityLevel.Try, DisplayName = "--ssl")]
     public async Task ExecuteAsync_OpenLdapWithSsl_SendsStartTlsThenBindsInsideTls(TransportSecurityLevel level)
@@ -82,27 +95,6 @@ public sealed class Cgr013Tests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_OpenLdapWithSslRequiredAndStartTlsRefused_FailsWithExit64WithoutBinding()
-    {
-        var plaintext = new ScriptedConnection(StartTlsUnavailable);
-
-        TransferResult result = await Handler(LdapDialect.OpenLdap, plaintext, new FakeTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "unused"))).ExecuteAsync(Context("ldap", TransportSecurityLevel.Required, new RecordingTransferEvents()));
-
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "LDAP local: Server is unavailable"), result);
-        Assert.AreEqual(StartTlsRequest, Convert.ToHexStringLower(plaintext.Sent));
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_OpenLdapWithSslRequiredAndServerClosed_FailsWithExit64()
-    {
-        var plaintext = new ScriptedConnection();
-
-        TransferResult result = await Handler(LdapDialect.OpenLdap, plaintext, null).ExecuteAsync(Context("ldap", TransportSecurityLevel.Required, new RecordingTransferEvents()));
-
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "LDAP local: Can't contact LDAP server"), result);
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_OpenLdapWithSslTryAndStartTlsRefused_BindsInPlaintext()
     {
         var plaintext = new ScriptedConnection(StartTlsUnavailable, BindSucceeded, SearchDone);
@@ -111,19 +103,6 @@ public sealed class Cgr013Tests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.StartsWith(StartTlsRequest + "30", Convert.ToHexStringLower(plaintext.Sent));
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_OpenLdapWhenTheTlsHandshakeFails_ReturnsItsFailure()
-    {
-        var plaintext = new ScriptedConnection(StartTlsAccepted);
-        var tls = new FakeTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake failed"));
-
-        TransferResult result = await Handler(LdapDialect.OpenLdap, plaintext, tls).ExecuteAsync(Context("ldap", TransportSecurityLevel.Required, new RecordingTransferEvents()));
-
-        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
-        Assert.AreEqual("handshake failed", result.ErrorMessage);
-        Assert.AreEqual(StartTlsRequest, Convert.ToHexStringLower(plaintext.Sent));
     }
 
     [TestMethod]

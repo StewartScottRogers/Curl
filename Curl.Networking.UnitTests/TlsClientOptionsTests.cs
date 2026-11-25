@@ -36,6 +36,19 @@ public sealed class TlsClientOptionsTests
     }
 
     [TestMethod]
+    public void Constructor_WithNoArguments_DoesNotAllowBeastSoTheEmptyFragmentMitigationStaysOn()
+    {
+        Diagnostics.Arrange("options", "new TlsClientOptions()");
+
+        var options = new TlsClientOptions();
+
+        Diagnostics.Act("allow beast", options.AllowBeast);
+        Diagnostics.Assert("allow beast", false, options.AllowBeast);
+
+        Assert.IsFalse(options.AllowBeast);
+    }
+
+    [TestMethod]
     public void With_EveryProperty_CopiesTheOptionsWithTheNewValues()
     {
         var original = new TlsClientOptions();

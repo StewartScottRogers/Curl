@@ -16,6 +16,20 @@ public sealed class LdapFilterEncoderTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
+    [DataRow("(cn=a(b)")]
+    [DataRow(@"(cn=a\2a()")]
+    [DataRow("((cn=a))")]
+    [DataRow("(uid=alice) ")]
+    [DataRow("(cn=user0*)  ")]
+    public void Encode_OpenLdapUnescapedParenthesisOrDoubleParentheses_ReturnsNull(string filter)
+    {
+        Diagnostics.Arrange("filter", filter);
+        byte[]? actual = Encoder(LdapDialect.OpenLdap).Encode(filter);
+        Diagnostics.Assert("refused", true, actual is null);
+        Assert.IsNull(actual);
+    }
+
+    [TestMethod]
     [DataRow("(cn=*)", "87 02 63 6e")]
     [DataRow("(cn=a*)", "a4 84 00 00 00 0d 04 02 63 6e 30 84 00 00 00 03 80 01 61")]
     [DataRow("(cn=*a)", "a4 84 00 00 00 0d 04 02 63 6e 30 84 00 00 00 03 82 01 61")]
@@ -40,6 +54,7 @@ public sealed class LdapFilterEncoderTests
     [DataRow("cn=a", "a3 84 00 00 00 07 04 02 63 6e 04 01 61")]
     [DataRow("(cn>=a)", "a5 84 00 00 00 07 04 02 63 6e 04 01 61")]
     [DataRow("(cn>=*)", "a5 84 00 00 00 07 04 02 63 6e 04 01 2a")]
+    [DataRow("((cn=a))", "a3 84 00 00 00 07 04 02 63 6e 04 01 61")]
     public void Encode_WinLdap_WritesWhatWinLdapWrites(string filter, string expected)
     {
         Diagnostics.Arrange("filter", filter);
@@ -55,6 +70,14 @@ public sealed class LdapFilterEncoderTests
 
     [TestMethod]
     [DataRow("(cn=)")]
+    [DataRow("(cn=**)")]
+    [DataRow("(cn:=)")]
+    [DataRow("(cn:dn:=)")]
+    [DataRow("(cn<=)")]
+    [DataRow("(cn>=)")]
+    [DataRow("(cn~=)")]
+    [DataRow("(cn~= )")]
+    [DataRow("(&(cn<=)(uid=alice))")]
     [DataRow("()")]
     [DataRow("(&)")]
     [DataRow("(|)")]
@@ -66,6 +89,8 @@ public sealed class LdapFilterEncoderTests
     [DataRow("(uid=a")]
     [DataRow("(&(a=b)")]
     [DataRow("(~=a)")]
+    [DataRow("(cn=a(b)")]
+    [DataRow(@"(cn=a\2a()")]
     public void Encode_FilterWinLdapRefuses_ReturnsNull(string filter)
     {
         Diagnostics.Arrange("filter", filter);

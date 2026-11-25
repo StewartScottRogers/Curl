@@ -72,4 +72,4 @@ How a finding maps to its task:
 | Auditor truthfulness | Pipeline `docs` |
 | Auditor process | Pipeline `direct`; unless its key ends `:cost-outlier`, `lane: no` and a first criterion measured on the live logs after the fix (ADR-0761) |
 | Any other auditor | Pipeline `feature` |
-| The project folders its location names (never an audit path) | `touches`; none when it names no repository folder, so the task runs alone |
+| The files its location names (never an audit path; the folder when a named file no longer exists) | `touches`; none when it names no repository file or folder, so the task runs alone. A whole project as `touches` kept every other task in it waiting (AF-0810) |

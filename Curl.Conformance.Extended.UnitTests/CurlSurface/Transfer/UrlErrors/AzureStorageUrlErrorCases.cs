@@ -8,9 +8,8 @@ public sealed class AzureStorageUrlErrorCases
 {
     internal static UrlErrorScheme For(string scheme) => scheme switch
     {
-        "az" => new(scheme, Path: "/c/x", RefusedTarget: "localhost.blob.core.windows.net:443"),
-        "abfs" => new(scheme, UserInfo: "fs@", RefusedTarget: "localhost.dfs.core.windows.net:443"),
-        _ => new(scheme, UserInfo: "fs@", RefusedTarget: "localhost.dfs.core.windows.net:443"),
+        "az" => new(scheme, Path: "/c/x", RefusedTarget: "localhost:1"),
+        _ => new(scheme, UserInfo: "fs@", RefusedTarget: "localhost:1"),
     };
 
     [TestMethod]

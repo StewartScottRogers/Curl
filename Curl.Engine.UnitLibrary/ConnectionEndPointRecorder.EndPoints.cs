@@ -17,7 +17,55 @@ internal sealed partial class ConnectionEndPointRecorder
     /// </summary>
     private int connectionsOpened;
 
-    /// <summary>Whether the transfer's first connection has been recorded.</summary>
+    /// <summary>Gets the connect timings of the transfer's first connection, or <see langword="null" /> when none was given.</summary>
+    internal ConnectTimings? FirstConnectTimings { get; private set; }
+
+    /// <summary>Gets the local end of the first datagram channel the transfer opened, or <see langword="null" /> when none was opened or it has none to report.</summary>
+    internal IPEndPoint? DatagramLocalEndPoint { get; private set; }
+
+    /// <summary>Gets the timestamp at which the first datagram channel opened, or <see langword="null" /> when none was opened.</summary>
+    internal long? DatagramOpenedAt { get; private set; }
+
+    /// <summary>
+    /// Remembers the local end and the open time of the first datagram channel, which only the
+    /// schemes that report them (not TFTP, whose unconnected socket curl reports as none) put on their report (BL-5493).
+    /// </summary>
+    /// <param name="local">The channel's local end point, or <see langword="null" />.</param>
+    /// <param name="openedAt">The timestamp the channel opened at.</param>
+    /// <returns><see langword="true" /> when this channel is the transfer's first datagram channel and was recorded; <see langword="false" /> when an earlier one was.</returns>
+    internal bool RecordDatagramChannel(IPEndPoint? local, long openedAt)
+    {
+        if (DatagramOpenedAt is not null)
+        {
+            return false;
+        }
+
+        DatagramLocalEndPoint = local;
+        DatagramOpenedAt = openedAt;
+        return true;
+    }
+
+    /// <summary>
+    /// Replaces the end points of the first datagram channel with those of the channel as it now
+    /// carries the transfer, after it moved to the next resolved address (BL-5532). Only the channel
+    /// that is the transfer's first datagram channel and its first recorded connection may call it
+    /// (<c>EndPointRecordingDatagramConnector</c> wraps no other, BL-5536). Nothing changes when no
+    /// datagram channel was recorded.
+    /// </summary>
+    /// <param name="remote">The channel's server end point now.</param>
+    /// <param name="local">The channel's local end point now, or <see langword="null" />.</param>
+    internal void ReRecordDatagramChannel(IPEndPoint? remote, IPEndPoint? local)
+    {
+        if (DatagramOpenedAt is null || remote is null)
+        {
+            return;
+        }
+
+        DatagramLocalEndPoint = local;
+        remoteEndPoint = remote;
+    }
+
+    /// <summary>Whether the transfer''s first connection has been recorded.</summary>
     private bool connectionRecorded;
 
     /// <summary>The local end of the first connection, or <see langword="null" /> when unknown.</summary>
@@ -48,18 +96,24 @@ internal sealed partial class ConnectionEndPointRecorder
     /// Whether the connection came from the pool rather than being opened, which curl does not
     /// count in <c>%{num_connects}</c>.
     /// </param>
-    internal void Record(IPEndPoint? local, EndPoint? remote, bool reused = false)
+    /// <param name="timings">The connect's timings, kept for the first connection: the source of <c>%{time_connect}</c> for a handler that reports none.</param>
+    /// <returns><see langword="true" /> when this connection became the transfer's first recorded connection.</returns>
+    internal bool Record(IPEndPoint? local, EndPoint? remote, bool reused = false, ConnectTimings? timings = null)
     {
         if (remote is not (IPEndPoint or UnixDomainSocketEndPoint))
         {
-            return;
+            return false;
         }
 
         connectionsOpened += reused ? 0 : 1;
-        if (!connectionRecorded)
+        if (connectionRecorded)
         {
-            RecordFirstConnection(local, remote);
+            return false;
         }
+
+        RecordFirstConnection(local, remote);
+        FirstConnectTimings = timings;
+        return true;
     }
 
     /// <summary>Keeps the end points of the transfer's first connection.</summary>
@@ -78,6 +132,7 @@ internal sealed partial class ConnectionEndPointRecorder
     {
         connectionsOpened = 0;
         connectionRecorded = false;
+        FirstConnectTimings = null;
         localEndPoint = null;
         remoteEndPoint = null;
         unixSocketRemoteIp = null;

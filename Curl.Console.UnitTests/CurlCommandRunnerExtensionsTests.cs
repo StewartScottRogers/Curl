@@ -30,7 +30,7 @@ public sealed class CurlCommandRunnerExtensionsTests
         Assert.AreEqual(0, exitCode);
         string listing = string.Concat(ExtensionListing.Lines(environment).Select(line => line + Environment.NewLine));
         StringAssert.StartsWith(StandardOutputText(), listing);
-        StringAssert.Contains(StandardOutputText(), "Options: --log-level, --log-file.");
+        StringAssert.Contains(StandardOutputText(), "Options: --log-level <level>, --log-file <file>.");
         Assert.AreEqual(0, standardError.Length);
         Assert.IsEmpty(file.Contexts);
     }

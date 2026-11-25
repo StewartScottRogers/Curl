@@ -15,6 +15,7 @@ using Curl.Original.Protocol.Ldap;
 using Curl.Original.Protocol.Mqtt;
 using Curl.Original.Protocol.Pop3;
 using Curl.Original.Protocol.Rtsp;
+using Curl.Original.Protocol.Smb;
 using Curl.Original.Protocol.Smtp;
 using Curl.Original.Protocol.Ssh;
 using Curl.Original.Protocol.Telnet;
@@ -103,8 +104,8 @@ public sealed partial class EngineCompositionTests
             ["pop3"] = typeof(Pop3ProtocolHandler),
             ["pop3s"] = typeof(Pop3ProtocolHandler),
             ["rtsp"] = typeof(RtspProtocolHandler),
-            ["smb"] = typeof(DisabledProtocolHandler),
-            ["smbs"] = typeof(DisabledProtocolHandler),
+            ["smb"] = typeof(SmbProtocolHandler),
+            ["smbs"] = typeof(SmbProtocolHandler),
             ["scp"] = typeof(SshProtocolHandler),
             ["sftp"] = typeof(SshProtocolHandler),
             ["smtp"] = typeof(SmtpProtocolHandler),

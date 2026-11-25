@@ -122,6 +122,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             return credentialsRefused;
         }
 
+        long started = context.TimeProvider.GetTimestamp();
         ConnectResult connected = await connector
             .ConnectAsync(CreateTarget(context), context.CancellationToken)
             .ConfigureAwait(false);
@@ -131,6 +132,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
 
         context.Progress.ReportTransferStarted();
+        long requestStarted = context.TimeProvider.GetTimestamp();
         TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
@@ -138,7 +140,21 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
 
         ReportConnectionEnd(context.Events, result, connected.ConnectionNumber);
-        return result;
+        return StampTimings(result, context.TimeProvider, started, connected.Timings, requestStarted);
+    }
+
+    // Adds the timings behind %{time_*} and %{speed_download} to the report the transfer made (BL-5390).
+    // The first byte is stamped with the completion time: the reply is read until the server closes.
+    private static TransferResult StampTimings(TransferResult result, TimeProvider timeProvider, long started, ConnectTimings? connect, long requestStarted)
+    {
+        if (result.ExitCode != CurlExitCode.Ok)
+        {
+            return result;
+        }
+
+        long completed = timeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connect, requestStarted, requestStarted, requestStarted, completed);
+        return result with { Report = result.Report! with { Timings = timings } };
     }
 
     private static async ValueTask<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context, GopherDiagnosticLog log)

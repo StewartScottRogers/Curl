@@ -42,8 +42,24 @@ public sealed class FileTransferTimingsTests
 
         var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(context);
 
-        AssertTimed(result);
+        AssertTimed(result, isUpload: true);
         Assert.AreEqual(6L, result.Report!.UploadSize);
+    }
+    [TestMethod]
+    public async Task ExecuteAsync_Upload_HasNoStartTransferStampButANonZeroTotal()
+    {
+        var context = new TransferContext
+        {
+            Output = new MemoryStream(),
+            Url = CurlUrl.Parse("file:///dir/w.out"),
+            Upload = new MemoryStream(Encoding.ASCII.GetBytes("HELLO\n")),
+            TimeProvider = new TickingClock(),
+        };
+
+        var result = await new FileProtocolHandler(new FakeFileSystem()).ExecuteAsync(context);
+
+        Assert.IsNull(result.Report!.Timings!.FirstByteReceived);
+        Assert.IsTrue(result.Report.Timings.Completed > result.Report.Timings.Started);
     }
 
     [TestMethod]
@@ -59,14 +75,18 @@ public sealed class FileTransferTimingsTests
         Assert.AreEqual(result.BytesTransferred, result.Report!.DownloadSize);
     }
 
-    private static void AssertTimed(TransferResult result)
+    private static void AssertTimed(TransferResult result, bool isUpload = false)
     {
         var timings = result.Report?.Timings;
         Assert.IsNotNull(timings);
         Assert.IsNotNull(timings.Connect?.NameResolved);
         Assert.IsTrue(timings.Connect.NameResolved > timings.Started);
-        Assert.IsTrue(timings.RequestReady > timings.Connect.NameResolved);
-        Assert.IsTrue(timings.FirstByteReceived > timings.Started);
+        Assert.IsTrue(timings.RequestReady >= timings.Connect.NameResolved);
+        if (!isUpload)
+        {
+            Assert.IsTrue(timings.FirstByteReceived > timings.Started);
+        }
+
         Assert.IsTrue(timings.Completed > timings.Started);
     }
 

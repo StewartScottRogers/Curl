@@ -9,7 +9,7 @@ public static class GcsExtension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "gs",
-        "Reads and writes Google Cloud Storage objects at gs://bucket/object over the XML API: an object name downloads it, -T uploads it, an empty name or one ending in / lists the names under it; --oauth2-bearer TOKEN sends an OAuth access token, --user ACCESS_ID:SECRET signs with an HMAC key (GOOG4-HMAC-SHA256), and STORAGE_EMULATOR_HOST names an emulator.",
+        "Reads and writes Google Cloud Storage objects at gs://bucket/object over the XML API: an object name downloads it, -T uploads it, an empty name or one ending in / lists the names under it; --oauth2-bearer TOKEN sends an OAuth access token, --user ACCESS_ID:SECRET signs with an HMAC key (GOOG4-HMAC-SHA256), and STORAGE_EMULATOR_HOST names an emulator. A gs:// URL uses gs_proxy, else https_proxy or HTTPS_PROXY, else ALL_PROXY, as wss:// does (ADR-1297).",
         ["gs"],
         [],
         new Uri("https://cloud.google.com/storage/docs/xml-api/overview"));

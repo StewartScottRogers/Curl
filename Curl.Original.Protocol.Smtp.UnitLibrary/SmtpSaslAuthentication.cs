@@ -373,9 +373,15 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// answered, since RFC 4422 section 3.6 has the mechanism finish before success (BL-5012).
     /// </summary>
     private ExchangeOutcome Outcome(SmtpReply reply, bool messageSent, string mechanism) =>
-        reply.Code == Authenticated && messageSent && (challengesHanded > 0 || !mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase))
+        reply.Code == Authenticated && messageSent && challengesHanded >= ChallengesRequired(mechanism)
             ? ExchangeOutcome.Accepted
             : ExchangeOutcome.Refused;
+
+    /// <summary>How many server challenges a mechanism must have had answered before a <c>235</c> is genuine (BL-5810).</summary>
+    private static int ChallengesRequired(string mechanism) =>
+        mechanism.Equals("DIGEST-MD5", StringComparison.OrdinalIgnoreCase) ? 2
+        : mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("LOGIN", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("CRAM-MD5", StringComparison.OrdinalIgnoreCase) ? 1
+        : 0;
 
     /// <summary>
     /// Sends <c>AUTH</c>, with the initial response on the line when it goes there. curl makes

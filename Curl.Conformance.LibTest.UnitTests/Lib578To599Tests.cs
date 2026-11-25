@@ -327,6 +327,17 @@ public sealed class Lib578To599Tests
     }
 
     [TestMethod]
+    public async Task Lib583_GivenExactlyThreeArguments_RunsTheTransfer()
+    {
+        var run = new PortRun(new FakeCurlEngine(), 583, "sftp://x/583", "u:", "pub");
+
+        LibTestResult result = await new Lib583().RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.Contains("curl_multi_remove_handle() succeeded\n", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib583_TooFewArgumentsAddFailingOrEasyInitFailing_Stops()
     {
         var tooFew = new PortRun(new FakeCurlEngine(), 583, "sftp://x/", "u:");

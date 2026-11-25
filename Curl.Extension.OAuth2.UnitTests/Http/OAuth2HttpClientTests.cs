@@ -182,6 +182,28 @@ public sealed class OAuth2HttpClientTests
     }
 
     [TestMethod]
+    public async Task PostFormAsync_CloseDelimitedBodyOfExactlyTheLimit_IsRead()
+    {
+        var connection = new RecordedConnection("HTTP/1.1 200 OK\r\n\r\n" + new string('a', OAuth2HttpBodyReader.MaxBodyLength));
+
+        var result = await new OAuth2HttpClient(new RecordedConnector(connection)).PostFormAsync(TokenEndpoint, ClientCredentials, CancellationToken.None);
+
+        Assert.IsTrue(result.Succeeded);
+        Assert.AreEqual(OAuth2HttpBodyReader.MaxBodyLength, result.Response!.Body.Length);
+    }
+
+    [TestMethod]
+    public async Task PostFormAsync_ContentLengthOfExactlyTheLimit_IsRead()
+    {
+        var connection = new RecordedConnection($"HTTP/1.1 200 OK\r\nContent-Length: {OAuth2HttpBodyReader.MaxBodyLength}\r\n\r\n" + new string('a', OAuth2HttpBodyReader.MaxBodyLength));
+
+        var result = await new OAuth2HttpClient(new RecordedConnector(connection)).PostFormAsync(TokenEndpoint, ClientCredentials, CancellationToken.None);
+
+        Assert.IsTrue(result.Succeeded);
+        Assert.AreEqual(OAuth2HttpBodyReader.MaxBodyLength, result.Response!.Body.Length);
+    }
+
+    [TestMethod]
     public async Task PostFormAsync_ConnectionResetWhileReading_FailsAsARecvError()
     {
         var connection = new RecordedConnection(null);

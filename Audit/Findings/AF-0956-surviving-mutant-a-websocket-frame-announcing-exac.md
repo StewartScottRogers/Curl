@@ -1,0 +1,51 @@
+---
+id: AF-0956
+title: Surviving mutant: a WebSocket frame announcing exactly 2^63-1 bytes can be refused as longer than 63 bits
+auditor: quality
+severity: Medium
+status: closed
+reason: Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
+key: quality:Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:PayloadLength-gt:surviving-mutant
+reproduction: mutation Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:261:>
+task: BL-5732
+tasks: BL-5725, BL-5732
+found: 2026-11-21
+found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
+scorecard: 2026-11-21_1740.md
+duplicate-of:
+closed: 2026-11-22
+closed-how: mechanical
+closed-by: 2026-11-22_1351.md
+---
+# AF-0956 - Surviving mutant: a WebSocket frame announcing exactly 2^63-1 bytes can be refused as longer than 63 bits
+
+## Summary
+
+Medium finding from the quality auditor at `Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:261`: Surviving mutant: a WebSocket frame announcing exactly 2^63-1 bytes can be refused as longer than 63 bits. Reported by an auditor flagged unreliable in 2026-11-21_1740.md.
+
+## Evidence
+
+Location: `Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:261`
+
+Line 261: if (length > long.MaxValue) throw Violation("frame length longer than 63 bits not supported"); mutated to >= survived. A 64-bit length of exactly long.MaxValue is legal, and the mutant turns it into a protocol violation. Only a 10-byte header is needed to test it, but Decode_64BitLengthWithTheTopBitSet_StopsWithAViolation covers only 0x8000000000000000.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:261:> -Member PayloadLength -ExcludeBaselineFailures -TimeoutSeconds 600
+```
+
+- Expected: outcome killed
+- Actual: outcome survived
+
+## Re-audits
+
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: yes | Ran the -Site command: resolvedLine 261, outcome survived. Line 261 is still 'if (length > long.MaxValue)' in PayloadLength.
+- 2026-11-22 | 2026-11-22_1351.md | reproduces: no | Ran the -Site command: 'if (length > long.MaxValue)' -> '>=' was killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
+## Log
+
+- 2026-11-21: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_1351.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

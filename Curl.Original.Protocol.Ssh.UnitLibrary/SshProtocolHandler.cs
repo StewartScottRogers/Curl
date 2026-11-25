@@ -417,7 +417,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         ITransferEvents events = context.Events;
         SshTransport transport = session.Transport;
         SshUserKeySource userKeys = new(fileSystem, readEnvironmentVariable, target.Options, credentialEncoding);
-        SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector) { Trace = trace };
+        SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector) { Trace = trace, AllowedMethodMask = target.Options.AuthenticationMask };
         await authentication.RequestServiceAsync(connectPhase).ConfigureAwait(false);
         transport.DiagnosticLog.HostKeyPresented(hostKey);
         await CheckHostKeyAsync(hostKey, target, events, trace, connectPhase).ConfigureAwait(false);

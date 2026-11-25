@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false, bool refusedByEveryReferenceBuild = false, bool refusedWithoutEch = false, bool refusedWithoutCAres = false)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false, bool refusedWithoutEch = false, bool refusedWithoutCAres = false)
     {
         RefusedWhenTurnedOn = refusedWhenTurnedOn;
         LongName = longName;
@@ -19,7 +19,6 @@ public sealed class CommandLineOption
         EndsBundle = endsBundle;
         ShortNameTurnsOff = shortNameTurnsOff;
         RefusedByWindowsSchannelBuild = refusedByWindowsSchannelBuild;
-        RefusedByEveryReferenceBuild = refusedByEveryReferenceBuild;
         RefusedByBuildsWithoutEch = refusedWithoutEch;
         RefusedByBuildsWithoutCAres = refusedWithoutCAres;
     }
@@ -74,13 +73,6 @@ public sealed class CommandLineOption
     /// build refuses the option with exit 2, and so does Curl when it reads as that build.
     /// </summary>
     public bool RefusedByWindowsSchannelBuild { get; }
-
-    /// <summary>
-    /// <see langword="true"/> for a row returned by <see cref="RefusedWithoutQuic"/>: every reference build -
-    /// Schannel on Windows, OpenSSL without a QUIC library on Linux and macOS - refuses the option with exit 2,
-    /// and so does Curl unless the parse reads as a QUIC build (<see cref="CommandLineOptions.ActsAsQuicBuild"/>, ADR-0540).
-    /// </summary>
-    public bool RefusedByEveryReferenceBuild { get; }
 
     /// <summary>
     /// <see langword="true"/> for a row returned by <see cref="RefusedWithoutEch"/>: every reference build -
@@ -147,30 +139,6 @@ public sealed class CommandLineOption
             ShortNameTurnsOff,
             warnsAboutLeadingUnicode: false,
             refusedByWindowsSchannelBuild: true);
-    }
-
-    /// <summary>
-    /// Returns this flag row refused with <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> unless
-    /// the parse reads as a curl built with a QUIC library (<see cref="CommandLineOptions.ActsAsQuicBuild"/>), and
-    /// otherwise applied as before. Every reference build lacks one - the Schannel build on Windows and the OpenSSL
-    /// build from the release tarball on Linux and macOS - so <c>--http3</c> and <c>--http3-only</c> are refused on
-    /// every platform, as curl 8.22.0 refuses them there (gap finding GF-0089, ADR-0540). The row has no
-    /// <see cref="Negate"/>, so its <c>--no-</c> spelling stays refused as not reversible.
-    /// </summary>
-    /// <returns>The row, refused on every reference build.</returns>
-    public CommandLineOption RefusedWithoutQuic()
-    {
-        return new CommandLineOption(
-            LongName,
-            ShortName,
-            TakesValue,
-            Refusing(options => !options.ActsAsQuicBuild, Apply),
-            negate: null,
-            TakesSubject,
-            EndsBundle,
-            ShortNameTurnsOff,
-            warnsAboutLeadingUnicode: false,
-            refusedByEveryReferenceBuild: true);
     }
 
     /// <summary>
