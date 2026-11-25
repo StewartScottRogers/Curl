@@ -1,5 +1,5 @@
 ---
-id: BL-5961
+id: BL-5964
 title: Stream a resumable upload's remainder from the file instead of copying it into memory
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5961 — Stream a resumable upload's remainder from the file instead of copying it into memory
+# BL-5964 — Stream a resumable upload's remainder from the file instead of copying it into memory
 
 ## Goal
 

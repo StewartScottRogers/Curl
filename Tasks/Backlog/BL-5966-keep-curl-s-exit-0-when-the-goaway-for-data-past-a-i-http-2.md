@@ -1,5 +1,5 @@
 ---
-id: BL-5963
+id: BL-5966
 title: Keep curl's exit 0 when the GOAWAY for DATA past a -I HTTP/2 response cannot be sent
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5963 — Keep curl's exit 0 when the GOAWAY for DATA past a -I HTTP/2 response cannot be sent
+# BL-5966 — Keep curl's exit 0 when the GOAWAY for DATA past a -I HTTP/2 response cannot be sent
 
 ## Goal
 

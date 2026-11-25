@@ -1,5 +1,5 @@
 ---
-id: BL-5962
+id: BL-5965
 title: Resume a resumable upload after an HTTP/2 stream reset or a cut-off response
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5962 — Resume a resumable upload after an HTTP/2 stream reset or a cut-off response
+# BL-5965 — Resume a resumable upload after an HTTP/2 stream reset or a cut-off response
 
 ## Goal
 
