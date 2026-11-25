@@ -1,4 +1,4 @@
-# ADR-1394: Resumable upload also resumes after exit 16, 18 and 92
+# ADR-1398: Resumable upload also resumes after exit 16, 18 and 92
 
 - Status: Accepted
 - Date: 2026-11-25

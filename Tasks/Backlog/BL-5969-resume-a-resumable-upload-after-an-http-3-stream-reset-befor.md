@@ -18,7 +18,7 @@ A resumable upload over `--http3` whose request stream is reset or closed before
 
 ## Context
 
-- Found while delivering BL-5965 (ADR-1394), which made exits 16, 18 and 92 resumable but left HTTP/3 out of its scope.
+- Found while delivering BL-5965 (ADR-1398), which made exits 16, 18 and 92 resumable but left HTTP/3 out of its scope.
 - `Curl.Original.Protocol.Http.UnitLibrary/Http3StreamConnection.cs` exits 95 (`HTTP3`) for a request stream reset before any body byte (`Reset`) and for one closed before the response head (`ReceiveEnd`); after body bytes a reset exits 18, which already resumes.
 - `ResumableUploadSession.ConnectionBreaks` lists the resumable exit codes. Decide whether 95 belongs there and record it in an ADR.
 
