@@ -1539,8 +1539,16 @@ public sealed class HttpProtocolHandler(
             plan.RecordSchemesOffered(actedOn);
             exchange.AuthSchemesOffered = plan.AuthSchemesOffered;
             exchange.ProxyAuthSchemesOffered = plan.ProxyAuthSchemesOffered;
-            retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
-            headReader.ReleaseDeferredHeaders();
+            try
+            {
+                retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                // A challenge's lines go before the failure that refuses its retry, as the redirect limit's does (BL-5932).
+                headReader.ReleaseDeferredHeaders();
+            }
+
             ReportNtlmConnectionClosure(plan, actedOn);
             fail = FailModeOf(plan, retry, actedOn);
             ThrowIfFailingBeforeBody(fail, actedOn);
@@ -1927,6 +1935,7 @@ public sealed class HttpProtocolHandler(
             HeaderReceived = (statusLine, header) =>
             {
                 ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
+                ReportNtlmAuthRestart(plan, statusLine, header);
                 cookiesStored = StoreCookie(context, options, header, cookiesStored);
                 StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
                 StoreHsts(context, options.HstsStore, header);
@@ -2266,11 +2275,25 @@ public sealed class HttpProtocolHandler(
         if (plan.ProxyAuthRequest is { } proxyRequest)
         {
             ReportInfoLines(plan.Context.Events, plan.ProxyAuthorizationInfoLines);
-            ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(proxyRequest, plan.ProxyAuthorization, plan.ProxyAuthorizationAnswersChallenge, headerNamesAuthorization));
+            ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(proxyRequest, plan.ProxyAuthorization, plan.ProxyAuthorizationAnswersChallenge, headerNamesAuthorization, plan.ProxyNtlmType3WentOut));
         }
 
         ReportInfoLines(plan.Context.Events, plan.AuthorizationInfoLines);
-        ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge, headerNamesAuthorization));
+        ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge, headerNamesAuthorization, plan.NtlmType3WentOut));
+    }
+
+    /// <summary>
+    /// Reports <see cref="HttpNtlmInfoLines.AuthRestartedLine" /> before a bare <c>NTLM</c>
+    /// challenge that starts the origin's or the proxy's handshake again
+    /// (<see cref="HttpNtlmInfoLines.RestartsAuth" />, BL-5932).
+    /// </summary>
+    private static void ReportNtlmAuthRestart(HttpRequestPlan plan, HttpStatusLine statusLine, HttpResponseHeader header)
+    {
+        if (HttpNtlmInfoLines.RestartsAuth(plan.AuthRequest, plan.NtlmType3WentOut, statusLine, header)
+            || (plan.ProxyAuthRequest is { } proxyRequest && HttpNtlmInfoLines.RestartsAuth(proxyRequest, plan.ProxyNtlmType3WentOut, statusLine, header)))
+        {
+            plan.Context.Events.ReportInfo(HttpNtlmInfoLines.AuthRestartedLine);
+        }
     }
 
     /// <summary>
@@ -3392,6 +3415,15 @@ public sealed class HttpProtocolHandler(
     private static bool IsNtlmType3(string value) =>
         value.StartsWith(NtlmType3Prefix, StringComparison.Ordinal);
 
+    /// <summary>
+    /// Decides whether a retry sends one side no value because that side's NTLM Type 3 went out
+    /// in an earlier request, libcurl's <c>NTLMSTATE_LAST</c>: <paramref name="next" /> is
+    /// <see langword="null" />, and <paramref name="previous" /> was the Type 3 or the request
+    /// before already followed one (<paramref name="wentOutBefore" />).
+    /// </summary>
+    private static bool SendsNothingAfterNtlmType3(bool wentOutBefore, string? previous, string? next) =>
+        next is null && (wentOutBefore || (previous is not null && IsNtlmType3(previous)));
+
     /// <summary>The start of every NTLM Type 3 value, as <see cref="NtlmType1Prefix" /> is of Type 1.</summary>
     private const string NtlmType3Prefix = "NTLM TlRMTVNTUAADAAAA";
 
@@ -4112,6 +4144,20 @@ public sealed class HttpProtocolHandler(
         public IReadOnlyList<string> AuthorizationInfoLines { get; init; } = [];
 
         /// <summary>
+        /// Gets a value indicating whether the request sends no <c>Authorization</c> because the
+        /// origin's NTLM Type 3 went out in an earlier request
+        /// (<see cref="SendsNothingAfterNtlmType3" />).
+        /// </summary>
+        public bool NtlmType3WentOut { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the request sends no <c>Proxy-Authorization</c> because
+        /// the proxy's NTLM Type 3 went out in an earlier request
+        /// (<see cref="SendsNothingAfterNtlmType3" />).
+        /// </summary>
+        public bool ProxyNtlmType3WentOut { get; init; }
+
+        /// <summary>
         /// Gets why the authenticator refused to make the value the transfer's first request is
         /// sent with, which fails the exchange once connected (<see cref="CreateFirstAuthorizationAsync" />);
         /// <see langword="null" /> when it did not refuse.
@@ -4373,6 +4419,8 @@ public sealed class HttpProtocolHandler(
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,
                 AuthorizationInfoLines = authorizationInfoLines ?? AuthorizationInfoLines,
+                NtlmType3WentOut = SendsNothingAfterNtlmType3(NtlmType3WentOut, Authorization, authorization),
+                ProxyNtlmType3WentOut = SendsNothingAfterNtlmType3(ProxyNtlmType3WentOut, ProxyAuthorization, proxyAuthorization),
                 AuthorizationFailure = authorizationFailure ?? AuthorizationFailure,
                 StreamRefusedRetries = StreamRefusedRetries,
                 DowngradedToHttp11 = DowngradedToHttp11,
