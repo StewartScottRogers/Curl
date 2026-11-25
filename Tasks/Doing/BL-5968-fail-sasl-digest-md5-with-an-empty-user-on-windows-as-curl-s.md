@@ -32,3 +32,4 @@ Found in BL-5963. Measured with `Record-CurlExchange.ps1 -Smtp -SmtpReply 'EHLO=
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 73e6648d 04c510bc 71fbd602 7c8712e7.
