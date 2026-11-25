@@ -31,3 +31,4 @@ Found in BL-5905: upstream test 251 sat on the passing list while Curl hung agai
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-24: Backlog -> Doing. Criteria at claim: 0bfd023c 1201ce2f 3d836d5e.
