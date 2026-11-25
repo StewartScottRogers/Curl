@@ -13,7 +13,9 @@ namespace Curl.Original.Protocol.Http;
 /// with 8.18.0, <c>--http2-prior-knowledge -v -H "Expect: 100-continue" -d x=1</c>): a 100 sends
 /// it at once, a 200 lets the wait run out and then sends it, and a 500 or a followed redirect
 /// leaves it unsent. A stopped upload resets its stream with STREAM_CLOSED, and a 200 that ends
-/// the stream before the held body goes out fails the send with exit 55 (BL-5972). <c>-f</c> on
+/// the stream before the held body goes out fails the send with exit 55 (BL-5972). A 500 that
+/// arrives after the wait ran out, with the body waiting for window, stops it part way, resets
+/// the stream once the response is read and leaves the connection intact (BL-5973). <c>-f</c> on
 /// a status that ended the stream with the body unsent resets it too (BL-5975). The clock is
 /// a fake one, advanced only for a 200.
 /// </summary>
@@ -25,6 +27,73 @@ public sealed class Http2ContinueWaitStatusTests
     private const string AbortUpload = "* abort upload";
 
     private const int SettingsFrameLength = 9;
+
+    /// <summary>How the response to a stopped upload ends.</summary>
+    public enum Answer500
+    {
+        /// <summary>The head ends the stream.</summary>
+        EndsAtHead,
+
+        /// <summary>Window opens, and DATA then ends the stream.</summary>
+        EndsAfterWindow,
+
+        /// <summary>DATA ends the stream with the window still shut.</summary>
+        EndsBeforeWindow,
+    }
+
+    [TestMethod]
+    [DataRow(Answer500.EndsAtHead, 65535, DisplayName = "the head ends the stream: nothing more goes")]
+    [DataRow(Answer500.EndsAfterWindow, 65536, DisplayName = "window opens first: what was read goes")]
+    [DataRow(Answer500.EndsBeforeWindow, 65535, DisplayName = "the response ends before window opens")]
+    public async Task ExecuteAsync_A500AfterTheWaitRanOutWhileTheBodyWaitsForWindow_StopsTheUploadAndKeepsTheConnection(Answer500 answer, int expectedBodyBytes)
+    {
+        byte[] error = Response(Headers("500", endsStream: answer == Answer500.EndsAtHead))[SettingsFrameLength..];
+        byte[] end = Response(Data("err\n"))[SettingsFrameLength..];
+        byte[] window =
+        [
+            .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateWindowUpdate(0, 65535)),
+            .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateWindowUpdate(1, 65535)),
+        ];
+        // The answer waits for the initial window's 65535 body bytes; the end, in
+        // EndsAfterWindow, for the one-byte DATA frame the opened window lets out.
+        List<(Func<byte[], bool> After, byte[] Bytes)> stages =
+        [
+            (_ => true, Response()),
+            (written => written.Length > 65535, error),
+        ];
+        if (answer == Answer500.EndsAfterWindow)
+        {
+            stages.Add((_ => true, window));
+            stages.Add((written => written is [0, 0, 1, 0, 0, ..], end));
+        }
+        else if (answer == Answer500.EndsBeforeWindow)
+        {
+            stages.Add((_ => true, end));
+        }
+
+        StagedConnection connection = new(stages);
+        RecordingTransferEvents events = new();
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+
+        Task<TransferResult> transfer = StartAsync(connection, events, time, body: new byte[200000]);
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Http2Frame[] data = [.. (await FramesSentAsync(connection.Written)).Where(frame => frame.Type == Http2FrameType.Data)];
+        Assert.AreEqual(expectedBodyBytes, data.Sum(frame => frame.Payload.Length));
+        Assert.IsFalse(data.Any(frame => (frame.Flags & 0x1) != 0));
+        CollectionAssert.AreEqual(new[] { "1:5" }, await ResetsSentAsync(connection.Written));
+        Assert.IsFalse(events.Events.Any(line => line.Contains("sent off", StringComparison.Ordinal)));
+        AssertInOrder(
+            events.Events,
+            "* Done waiting for 100-continue",
+            "< HTTP/2 500 \r\n",
+            StopSending,
+            "* abort upload after having sent 65536 bytes",
+            "< \r\n",
+            "* Connection #0 to host h:80 left intact");
+    }
 
     [TestMethod]
     public async Task ExecuteAsync_A100DuringTheWait_PrintsItsHeadAndSendsTheBodyWithoutWaiting()
@@ -247,7 +316,8 @@ public sealed class Http2ContinueWaitStatusTests
         RecordingTransferEvents events,
         FakeTimeProvider time,
         bool followsRedirects = false,
-        HttpFailMode fail = HttpFailMode.None)
+        HttpFailMode fail = HttpFailMode.None,
+        byte[]? body = null)
     {
         TransferContext context = new()
         {
@@ -261,7 +331,7 @@ public sealed class Http2ContinueWaitStatusTests
                 FollowRedirects = followsRedirects,
                 Fail = fail,
                 Headers = ["Expect: 100-continue"],
-                Body = new BytesBody("x=1"u8.ToArray(), "application/x-www-form-urlencoded"),
+                Body = new BytesBody(body ?? "x=1"u8.ToArray(), "application/x-www-form-urlencoded"),
             },
         };
 
@@ -271,6 +341,67 @@ public sealed class Http2ContinueWaitStatusTests
 
     private static async Task<int> BodyBytesSentAsync(byte[] written) =>
         (await FramesSentAsync(written)).Where(frame => frame.Type == Http2FrameType.Data).Sum(frame => frame.Payload.Length);
+
+    /// <summary>
+    /// A server that gives each stage's bytes in turn, each once the stage's condition holds of
+    /// the client's latest write or, for a total, of everything written.
+    /// </summary>
+    private sealed class StagedConnection(IReadOnlyList<(Func<byte[], bool> After, byte[] Bytes)> stages) : IConnection
+    {
+        private readonly MemoryStream written = new();
+
+        private TaskCompletionSource wrote = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private byte[] latest = [];
+
+        private int stage;
+
+        private int offset;
+
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public byte[] Written => written.ToArray();
+
+        public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            if (stage == stages.Count)
+            {
+                return 0;
+            }
+
+            (Func<byte[], bool> after, byte[] bytes) = stages[stage];
+            while (offset == 0 && !after(latest) && !after(Written))
+            {
+                await wrote.Task.WaitAsync(cancellationToken);
+                wrote = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            int read = Math.Min(buffer.Length, bytes.Length - offset);
+            bytes.AsMemory(offset, read).CopyTo(buffer);
+            offset += read;
+            if (offset == bytes.Length)
+            {
+                stage++;
+                offset = 0;
+            }
+
+            return read;
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        {
+            written.Write(buffer.Span);
+            latest = buffer.ToArray();
+            wrote.TrySetResult();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     /// <summary><paramref name="inner" />, except that it fails the write of an RST_STREAM frame.</summary>
     private sealed class FailsTheResetConnection(IConnection inner) : IConnection

@@ -20,8 +20,9 @@ namespace Curl.Original.Protocol.Http;
 /// stop sending it (<see cref="SendUnlessStoppedAsync" />, BL-319 and BL-395 Notes); the next
 /// read waits for it. On a stream (<see cref="IsMultiplexedStream" />) the status is the response's
 /// own: a <c>100</c> sends the body at once, a status of 300 or above during the wait leaves it
-/// unsent (<see cref="StoppedStreamUpload" />), and no body is stopped part way (curl
-/// 8.18.0's nghttp2 build, measured, BL-5970 Notes). Disposing this only ends a wait still holding
+/// unsent (<see cref="StoppedStreamUpload" />) (curl 8.18.0's nghttp2 build, measured, BL-5970
+/// Notes), and one that arrives on an HTTP/2 stream after the wait ran out stops the body part
+/// way (measured, BL-5973 Notes); an HTTP/3 body being sent goes on. Disposing this only ends a wait still holding
 /// the body: the connection it wraps belongs to the handler.
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
@@ -183,7 +184,20 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
         await HoldOrEndWaitAsync(first != wait, wait, waitEnded).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         WaitRanOut = first == wait;
+        StopStreamUploadAtErrorStatusAfterTimeout();
         return WaitRanOut || (statusLineRead.IsCompletedSuccessfully && statusLineRead.Result);
+    }
+
+    /// <summary>
+    /// Once the wait has run out, has the HTTP/2 stream stop its body at a status of 300 or above
+    /// (<see cref="Http2StreamConnection.StopsUploadAtErrorStatus" />).
+    /// </summary>
+    private void StopStreamUploadAtErrorStatusAfterTimeout()
+    {
+        if (Http2Stream is { } stream)
+        {
+            stream.StopsUploadAtErrorStatus = WaitRanOut;
+        }
     }
 
     /// <summary>
@@ -216,10 +230,11 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// <c>417 Expectation Failed</c> (BL-319 Notes) or any other redirect or error
     /// (<c>HTTP error before end of send, stop sending</c>, BL-395 Notes). A 1xx or 2xx lets
     /// the body go on, and so does any status that held the body until the wait ran out
-    /// (<see cref="SendHeldBodyAsync" />). Never on a stream (<see cref="IsMultiplexedStream" />),
-    /// where a body being sent goes on.
+    /// (<see cref="SendHeldBodyAsync" />). On an HTTP/2 stream the stream itself says so
+    /// (<see cref="Http2StreamConnection.IsUploadStopped" />); on an HTTP/3 one, never.
     /// </summary>
-    internal bool StopsSending => !IsMultiplexedStream && !sendsHeldBody && statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300;
+    internal bool StopsSending => Http2Stream?.IsUploadStopped
+        ?? (!IsMultiplexedStream && !sendsHeldBody && statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300);
 
     /// <summary>
     /// Gets a value indicating whether a status of 300 or above arrived on a stream
@@ -244,7 +259,8 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// <summary>
     /// Writes one piece of the body, unless a status of 300 or above arrives first: a write
     /// still under way when it arrives is cancelled, as curl 8.21.0 stops sending there
-    /// (measured, BL-319 and BL-395 Notes).
+    /// (measured, BL-319 and BL-395 Notes). On a stream a write under way is left to end by
+    /// itself, and counts as written (<see cref="Http2StreamConnection.IsUploadStopped" />).
     /// </summary>
     /// <param name="bytes">The piece to send.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
@@ -264,7 +280,7 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
         using CancellationTokenSource sending = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task sent = HttpConnectionSend.WriteAsync(connection, bytes, sending.Token).AsTask();
         await Task.WhenAny(sent, statusLineRead!).ConfigureAwait(false);
-        if (!sent.IsCompleted && StopsSending)
+        if (!sent.IsCompleted && !IsMultiplexedStream && StopsSending)
         {
             await sending.CancelAsync().ConfigureAwait(false);
         }

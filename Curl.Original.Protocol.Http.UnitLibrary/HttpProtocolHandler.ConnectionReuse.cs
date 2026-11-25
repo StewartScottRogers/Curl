@@ -19,12 +19,17 @@ public sealed partial class HttpProtocolHandler
     /// <remarks>
     /// Over HTTP/2 and HTTP/3 the stream, not the connection, ends with the response, so the connection
     /// carries another request once the exchange ran whole unless the peer sent GOAWAY or
-    /// closed it (<see cref="IHttpStreamSession.AcceptsNewStreams" />).
+    /// closed it (<see cref="IHttpStreamSession.AcceptsNewStreams" />); an upload a status cut
+    /// short ends only its stream too (measured over HTTP/2, BL-5973 Notes).
     /// </remarks>
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams, bool foundExcess) =>
-        DeliveredWhole(head, upload, headReader, delivery)
-            && (streams?.AcceptsNewStreams
-                ?? (!foundExcess && !ReceivedUnwantedBody(plan, head) && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options))));
+        (streams is not null || !upload.CutShort)
+            && DeliveredResponseWhole(head, headReader, delivery)
+            && (streams?.AcceptsNewStreams ?? PersistsOverHttp1(plan, head, headReader, foundExcess));
+
+    /// <summary>What <see cref="KeepsAlive" /> asks of an HTTP/1.x connection beyond a whole exchange.</summary>
+    private static bool PersistsOverHttp1(HttpRequestPlan plan, HttpResponseHead head, HttpResponseHeadReader headReader, bool foundExcess) =>
+        !foundExcess && !ReceivedUnwantedBody(plan, head) && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options));
 
     /// <summary>
     /// Decides whether body bytes arrived with the head of a response to <c>-I</c>, which wants
@@ -65,8 +70,11 @@ public sealed partial class HttpProtocolHandler
     /// from stream 1 (BL-866).
     /// </summary>
     private static bool DeliveredWhole(HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
-        !upload.CutShort
-            && (delivery == HttpBodyDelivery.Deliver || HttpDownloadConditions.IsServerAnswer(head, delivery))
+        !upload.CutShort && DeliveredResponseWhole(head, headReader, delivery);
+
+    /// <summary>Decides what <see cref="DeliveredWhole" /> does of the response alone, whatever became of the request body.</summary>
+    private static bool DeliveredResponseWhole(HttpResponseHead head, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+        (delivery == HttpBodyDelivery.Deliver || HttpDownloadConditions.IsServerAnswer(head, delivery))
             && (!headReader.SwitchedProtocols || headReader.IsSwitchedToHttp2());
 
     /// <summary>

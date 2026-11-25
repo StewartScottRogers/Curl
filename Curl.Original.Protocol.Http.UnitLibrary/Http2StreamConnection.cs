@@ -42,7 +42,17 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>The length of an RST_STREAM frame's payload: its error code.</summary>
     internal const int ResetPayloadLength = 4;
 
-    private readonly Queue<ReadOnlyMemory<byte>> received = new();
+    private readonly ConcurrentQueue<ReadOnlyMemory<byte>> received = new();
+
+    /// <summary>Held by whichever of the response read and the body write is taking a frame.</summary>
+    private readonly SemaphoreSlim receiving = new(1, 1);
+
+    /// <summary>How many times a frame has been taken (<see cref="ReceiveFrameAsync" />).</summary>
+    private volatile int framesTaken;
+
+    private ReadOnlyMemory<byte> withheldData;
+
+    private bool isErrorStatusReceived;
 
     private readonly MemoryStream trailers = new();
 
@@ -87,6 +97,19 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     /// <summary>Gets or sets whether curl reports no data of this end, although <see cref="EndedWithEmptyData" />.</summary>
     internal bool LeavesEmptyDataUnreported { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether a final status of 300 or above stops the request's body being sent, as
+    /// it does once the wait for <c>100 Continue</c> has run out.
+    /// </summary>
+    internal bool StopsUploadAtErrorStatus { get; set; }
+
+    /// <summary>
+    /// Gets whether such a status has arrived under <see cref="StopsUploadAtErrorStatus" />: a
+    /// body write then no longer waits for window, keeping what it could not send for when window
+    /// opens, and the request is not ended.
+    /// </summary>
+    internal bool IsUploadStopped => StopsUploadAtErrorStatus && isErrorStatusReceived;
 
     /// <summary>The body length the final head promises (RFC 9113 section 8.1.1), or <see langword="null" /> when it promises none.</summary>
     private long? promisedBodyLength;
@@ -181,6 +204,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         while (unread.IsEmpty)
         {
+            int framesSeen = framesTaken;
             if (received.TryDequeue(out unread))
             {
                 continue;
@@ -191,7 +215,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
                 return 0;
             }
 
-            await ReceiveFrameAsync(cancellationToken).ConfigureAwait(false);
+            await ReceiveFrameAsync(framesSeen, cancellationToken).ConfigureAwait(false);
         }
 
         int count = Math.Min(unread.Length, buffer.Length);
@@ -219,14 +243,15 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>
     /// Ends the request with an empty DATA frame carrying END_STREAM, then grows the stream's
     /// receive window, unless it has ended already - it had no body, or the last body write
-    /// ended it - or the response has ended, after which nothing more is sent unless
-    /// <see cref="SendBodyAfterResponseEnd" /> asked for it.
+    /// ended it - or its upload is stopped (<see cref="IsUploadStopped" />), or the response has
+    /// ended, after which nothing more is sent unless <see cref="SendBodyAfterResponseEnd" />
+    /// asked for it.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the frame is written.</returns>
     public async ValueTask EndRequestAsync(CancellationToken cancellationToken)
     {
-        if (isRequestEnded || StopsSendingData)
+        if (isRequestEnded || IsUploadStopped || StopsSendingData)
         {
             return;
         }
@@ -249,7 +274,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         while (!isResponseEnded)
         {
             received.Clear();
-            await ReceiveFrameAsync(cancellationToken).ConfigureAwait(false);
+            await ReceiveFrameAsync(framesTaken, cancellationToken).ConfigureAwait(false);
         }
 
         received.Clear();
@@ -423,18 +448,18 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         while (!data.IsEmpty && !StopsSendingData)
         {
-            bool isLast = bodyBytesSent + data.Length == bodyLength;
-            int sent = await session.WriteDataAsync(streamId, data, isLast, cancellationToken).ConfigureAwait(false);
-            bodyBytesSent += sent;
+            int framesSeen = framesTaken;
+            int sent = await WriteDataFrameAsync(data, cancellationToken).ConfigureAwait(false);
             data = data[sent..];
-            isRequestEnded = isLast && data.IsEmpty;
             if (sent == 0)
             {
-                await ReceiveFrameAsync(cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                FrameLog.FrameSent("DATA", streamId, sent);
+                if (IsUploadStopped)
+                {
+                    withheldData = data.ToArray();
+                    return;
+                }
+
+                await ReceiveFrameAsync(framesSeen, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -484,11 +509,67 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
+    /// Takes the stream's next frame (<see cref="TakeNextFrameAsync" />) and then sends what it
+    /// can of any withheld DATA. The response read and the body write may both ask at once: one
+    /// takes at a time, and one that waited while the other took a frame leaves it at that, to
+    /// look at what that frame brought before asking again.
+    /// </summary>
+    /// <param name="framesSeen"><see cref="framesTaken" /> as it was before the caller last looked.</param>
+    /// <param name="cancellationToken">Cancels the wait and the read.</param>
+    private async ValueTask ReceiveFrameAsync(int framesSeen, CancellationToken cancellationToken)
+    {
+        await receiving.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (framesSeen == framesTaken)
+            {
+                await TakeNextFrameAsync(cancellationToken).ConfigureAwait(false);
+                await SendWithheldDataAsync(cancellationToken).ConfigureAwait(false);
+                framesTaken++;
+            }
+        }
+        finally
+        {
+            receiving.Release();
+        }
+    }
+
+    /// <summary>
+    /// Sends what the windows now allow of the DATA a status of 300 or above left waiting
+    /// (<see cref="IsUploadStopped" />), unless the response has ended: curl 8.18.0 sends what it
+    /// had already read of the body when window opens, and nothing after the response's end
+    /// (measured, BL-5973 Notes).
+    /// </summary>
+    private async ValueTask SendWithheldDataAsync(CancellationToken cancellationToken)
+    {
+        if (!withheldData.IsEmpty && !isResponseEnded)
+        {
+            int sent = await WriteDataFrameAsync(withheldData, cancellationToken).ConfigureAwait(false);
+            withheldData = withheldData[sent..];
+        }
+    }
+
+    /// <summary>Sends as much of <paramref name="data" /> as the windows allow in DATA, giving how much went.</summary>
+    private async ValueTask<int> WriteDataFrameAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+    {
+        bool isLast = bodyBytesSent + data.Length == bodyLength;
+        int sent = await session.WriteDataAsync(streamId, data, isLast, cancellationToken).ConfigureAwait(false);
+        bodyBytesSent += sent;
+        isRequestEnded = isLast && sent == data.Length;
+        if (sent > 0)
+        {
+            FrameLog.FrameSent("DATA", streamId, sent);
+        }
+
+        return sent;
+    }
+
+    /// <summary>
     /// Takes the next frame the session handed this stream, reading one from the connection
     /// first when none is waiting; a frame read for another stream goes to that stream and
     /// leaves this one to call again.
     /// </summary>
-    private async ValueTask ReceiveFrameAsync(CancellationToken cancellationToken)
+    private async ValueTask TakeNextFrameAsync(CancellationToken cancellationToken)
     {
         if (malformedResponseFailure is not null)
         {
@@ -733,6 +814,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
         received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));
         isFinalHeadReceived = statusCode >= 200;
+        isErrorStatusReceived = statusCode >= 300;
         promisedBodyLength = PromisedBodyLengthOf(statusCode, fields);
         return true;
     }

@@ -21,7 +21,8 @@ connection intact.
 
 Curl does the same on every platform. HTTP/3 follows HTTP/2: curl's wait is the same code for
 both, though HTTP/3 was not measured. A final status that arrives after the wait has run out,
-while the body is being sent, still does not stop the body on a stream (unmeasured).
+while the body is being sent, still does not stop the body on a stream (unmeasured; since
+measured over HTTP/2, where it does stop it: ADR-1409, BL-5973).
 
 ## Consequences
 
