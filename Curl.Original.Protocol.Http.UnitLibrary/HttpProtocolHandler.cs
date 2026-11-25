@@ -123,9 +123,10 @@ namespace Curl.Original.Protocol.Http;
 /// That resend keeps an <c>-H</c> <c>Expect: 100-continue</c> line's wait, so it can draw
 /// another 417 and another resend. Every resend counts as a followed redirect in
 /// <see cref="TransferReport.RedirectCount" />, with or without <c>-L</c>, and one that would
-/// pass <see cref="HttpRequestOptions.MaxRedirects" /> is not sent: the 417's head is written
-/// and the transfer ends with exit 47, <c>Maximum (N) redirects followed</c>. Measured on curl
-/// 8.21.0 (BL-396 Notes).
+/// pass <see cref="HttpRequestOptions.MaxRedirects" /> is not sent: the 417's head is written,
+/// its body is read and discarded as before a resend, <c>-v</c> reports what became of the
+/// connection and then <c>Maximum (N) redirects followed</c>, and the transfer ends with exit
+/// 47. Measured on curl 8.21.0 (BL-396 Notes) and 8.22.0 (BL-5944 Notes).
 /// </para>
 /// <para>
 /// With a cookie store, every request, an authentication retry included, asks it afresh for
@@ -1422,20 +1423,24 @@ public sealed class HttpProtocolHandler(
     /// the request goes out again on a new connection - after it died, or as a retry such as the
     /// resend after a 417 (measured, BL-1446 Notes) - the line saying so follows. A connection left intact
     /// that another transfer still shares, on a stream of its own, is reported by the last
-    /// transfer on it, not this one (BL-717).
+    /// transfer on it, not this one (BL-717). A resend <c>--max-redirs</c> refused is reported
+    /// after the connection's end (<see cref="HttpAttemptOutcome.RefusedResendMessage" />).
     /// </summary>
     private static void ReportConnectionEnd(ITransferContext context, ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome)
     {
-        if (outcome.ReportsLeftIntact && connect.Connection!.IsSharedWithAnotherTransfer)
+        // curl 8.21.0 reports a multiplexed connection left intact only when its last transfer ends (measured, BL-717 Notes).
+        if (!(outcome.ReportsLeftIntact && connect.Connection!.IsSharedWithAnotherTransfer))
         {
-            // curl 8.21.0 reports a multiplexed connection left intact only when its last transfer ends (measured, BL-717 Notes).
-            return;
+            context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
+            if (outcome.Retry is not null)
+            {
+                context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url, OptionsOf(context).CommandLineTextEncoding));
+            }
         }
 
-        context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
-        if (outcome.Retry is not null)
+        if (outcome.RefusedResendMessage is { } refused)
         {
-            context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url, OptionsOf(context).CommandLineTextEncoding));
+            context.Events.ReportInfo(refused);
         }
     }
 
@@ -1545,7 +1550,7 @@ public sealed class HttpProtocolHandler(
             }
             finally
             {
-                // A challenge's lines go before the failure that refuses its retry, as the redirect limit's does (BL-5932).
+                // A challenge's lines go before any failure that ends the exchange while its answer is made (BL-5932).
                 headReader.ReleaseDeferredHeaders();
             }
 
@@ -1589,11 +1594,46 @@ public sealed class HttpProtocolHandler(
             ? FailedAfterBody(actedOn!, exchange.Report(body), body.BytesWritten)
             : Succeeded(delivery, actedOn!, exchange.Report(body));
         LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection), body.FoundExcess))
+        HttpAttemptOutcome completed = new(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection), body.FoundExcess))
         {
             FailedAfterBody = failsAfterBody,
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
             UpgradedSession = UpgradedSessionOf(connection),
+        };
+        return RefusingResendPastRedirectLimit(plan, actedOn!.StatusLine.StatusCode, exchangeLog, completed);
+    }
+
+    /// <summary>
+    /// Ends an exchange whose response asks for a resend that would pass
+    /// <see cref="HttpRequestOptions.MaxRedirects" /> with exit 47 and no resend; any other
+    /// outcome is given back as it is. curl counts each resend after a 417 and each
+    /// authentication retry after a 401 or 407 as a followed redirect, with or without
+    /// <c>-L</c>, sharing the count with the hops <c>-L</c> followed before this request, and
+    /// <c>--max-redirs 0</c> refuses even the first (417: measured, BL-396 Notes; 401 and 407:
+    /// curl 8.22.0, <c>--max-redirs 0</c> with <c>--digest</c> or <c>--anyauth</c> ends with
+    /// exit 47). curl refuses it only once the response is done, so its body was discarded as
+    /// before a resend and its connection ends as a successful exchange's does, ahead of
+    /// <c>Maximum (N) redirects followed</c> (measured, BL-5944 Notes). The send of a body a
+    /// probe held back, which a 2xx asks for, is no redirect.
+    /// </summary>
+    private static HttpAttemptOutcome RefusingResendPastRedirectLimit(HttpRequestPlan plan, int statusCode, HttpExchangeLog exchangeLog, HttpAttemptOutcome outcome)
+    {
+        int limit = plan.Options.MaxRedirects;
+        if (outcome.Retry is null || statusCode / 100 == 2 || limit < 0 || plan.RedirectsFollowed < limit)
+        {
+            return outcome;
+        }
+
+        HttpTransferException refusal = new(CurlExitCode.TooManyRedirects, HttpTransferMessages.MaximumRedirectsFollowed(limit));
+        exchangeLog.Failed(refusal.ExitCode, refusal);
+        TransferReport report = outcome.Result.Report!;
+        TransferResult refused = TransferResult.Failure(refusal.ExitCode, refusal.Message, report.DownloadSize) with { Report = report };
+        return new HttpAttemptOutcome(refused, null, outcome.KeepsAlive)
+        {
+            FailedAfterBody = true,
+            LeftIntactAfterServerClosed = outcome.LeftIntactAfterServerClosed,
+            UpgradedSession = outcome.UpgradedSession,
+            RefusedResendMessage = refusal.Message,
         };
     }
 
@@ -1641,12 +1681,12 @@ public sealed class HttpProtocolHandler(
             : report;
 
     /// <summary>
-    /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c>, <c>--max-redirs</c>'s and <c>--max-filesize</c>'s messages as a <c>-v</c> line, as
+    /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c> and <c>--max-filesize</c>'s messages as a <c>-v</c> line, as
     /// curl 8.22.0's <c>failf</c> does, before the head's held empty line (measured, BL-3617).
     /// </summary>
     private static void ReportReturnedError(ITransferEvents events, HttpTransferException failure)
     {
-        if (failure.ExitCode is CurlExitCode.HttpReturnedError or CurlExitCode.TooManyRedirects or CurlExitCode.FilesizeExceeded)
+        if (failure.ExitCode is CurlExitCode.HttpReturnedError or CurlExitCode.FilesizeExceeded)
         {
             events.ReportInfo(failure.Message);
         }
@@ -3060,24 +3100,20 @@ public sealed class HttpProtocolHandler(
     /// <c>Expect</c> and with the body <paramref name="upload" /> rewinds; <see langword="null" />
     /// when the response is the result. A resend after a 417 that arrived while the body was
     /// being sent keeps an <c>-H</c> <c>Expect: 100-continue</c> wait, so it can draw another
-    /// (measured, BL-396 Notes).
+    /// (measured, BL-396 Notes). A resend past <c>--max-redirs</c> is given too, and refused
+    /// once the response is done (<see cref="RefusingResendPastRedirectLimit" />).
     /// </summary>
-    /// <exception cref="HttpTransferException">
-    /// The resend would pass <see cref="HttpRequestOptions.MaxRedirects" /> (exit 47).
-    /// </exception>
     private async ValueTask<HttpRequestPlan?> RetryOfAsync(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload, CancellationToken cancellationToken)
     {
         EndUnchallengedAuthorizations(plan, head.StatusLine.StatusCode);
         if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
         {
-            ThrowIfRedirectLimitReached(plan);
             RewindForResend(plan, upload);
             return plan.WithProxyAuthorization(proxyAuthorization, KeptAuthorizationForProxyRetry(plan)).DowngradedAfter(head).FailingUploadRewind(upload.RewindFailure);
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
-            ThrowIfRedirectLimitReached(plan);
             RewindForResend(plan, upload);
             return authorized.DowngradedAfter(head).FailingUploadRewind(upload.RewindFailure);
         }
@@ -3095,9 +3131,6 @@ public sealed class HttpProtocolHandler(
     /// rewinds for a 417 <see cref="RetriesWithoutExpect" /> accepts; <see langword="null" />
     /// for any other response.
     /// </summary>
-    /// <exception cref="HttpTransferException">
-    /// The resend would pass <see cref="HttpRequestOptions.MaxRedirects" /> (exit 47).
-    /// </exception>
     private static HttpRequestPlan? RetryWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload)
     {
         if (!RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort))
@@ -3106,7 +3139,6 @@ public sealed class HttpProtocolHandler(
         }
 
         plan.Context.Events.ReportInfo(bodyLeftUnsent ? HttpConnectionInfoLines.Got417WhileWaiting : HttpConnectionInfoLines.Got417WhileSending);
-        ThrowIfRedirectLimitReached(plan);
         ReportUploadAbandoned(plan.Context.Events, upload, bodyLeftUnsent);
         return plan.WithoutExpect(upload.Rewound(plan.Framing.Body!), keepsCustomWait: !bodyLeftUnsent).FailingUploadRewind(upload.RewindFailure);
     }
@@ -3165,25 +3197,6 @@ public sealed class HttpProtocolHandler(
         if (plan.ProxyAuthorization is { } proxySent && statusCode != 407)
         {
             Authenticator.EndAuthorization(proxySent);
-        }
-    }
-
-    /// <summary>
-    /// Ends the transfer with exit 47 when one more resend would pass
-    /// <see cref="HttpRequestOptions.MaxRedirects" />: curl counts each resend after a
-    /// 417 and each authentication retry after a 401 or 407 as a followed redirect, with or
-    /// without <c>-L</c>, sharing the count with the hops <c>-L</c> followed before this
-    /// request, and <c>--max-redirs 0</c> refuses even the first (417: measured, BL-396 Notes;
-    /// 401 and 407: curl 8.22.0, <c>--max-redirs 0</c> with <c>--digest</c> or <c>--anyauth</c>
-    /// ends with exit 47). The refused response's head is written first.
-    /// </summary>
-    /// <exception cref="HttpTransferException">The limit is reached (exit 47).</exception>
-    private static void ThrowIfRedirectLimitReached(HttpRequestPlan plan)
-    {
-        int limit = plan.Options.MaxRedirects;
-        if (limit >= 0 && plan.RedirectsFollowed >= limit)
-        {
-            throw new HttpTransferException(CurlExitCode.TooManyRedirects, HttpTransferMessages.MaximumRedirectsFollowed(limit));
         }
     }
 
@@ -4457,9 +4470,16 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Gets a value indicating whether the exchange ran whole and only <c>--fail-with-body</c>
-        /// failed it, so its connection ends as a successful one's does.
+        /// or <c>--max-redirs</c> failed it, so its connection ends as a successful one's does.
         /// </summary>
         public bool FailedAfterBody { get; init; }
+
+        /// <summary>
+        /// Gets the <c>Maximum (N) redirects followed</c> line <c>-v</c> writes after the
+        /// connection's end when <c>--max-redirs</c> refused the resend the response asked for,
+        /// or <see langword="null" />.
+        /// </summary>
+        public string? RefusedResendMessage { get; init; }
 
         /// <summary>
         /// Gets the transfer's retries on a fresh connection so far, this one included, as
