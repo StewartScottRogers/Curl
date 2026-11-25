@@ -8,7 +8,7 @@ depends-on: [BL-5866]
 touches: [Curl.Extension.ResumableUpload.UnitLibrary, Curl.Extension.ResumableUpload.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-25
 ---
 # BL-5869 — Fix fitness finding EXT-119: --resumable-upload silently bypasses --har, --record, -v and --trace-ascii
 
@@ -39,9 +39,9 @@ Shared setup: **Shared mock for EXT-115, EXT-116, EXT-119, EXT-109, EXT-111** (H
 
 ## Acceptance criteria
 
-- [ ] the first command creates `ru.har` with 3 entries (OPTIONS, POST, PATCH) and a non-empty `rurec`; `-v` shows `> PATCH /files/1`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command creates `ru.har` with 3 entries (OPTIONS, POST, PATCH) and a non-empty `rurec`; `-v` shows `> PATCH /files/1`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -52,6 +52,10 @@ Cause confirmed: `ResumableUploadTransferHook.ExecuteAsync` sends OPTIONS/POST/P
 Design for the next claim: make `ResumableUploadSession.SendAsync(method, uri, headers, body, offset)` run each request through `next` instead of the connector. Build a private `ITransferContext` wrapper in the library (Upload => null, Url => uri, Http with CustomMethod and Body = the slice read from the seekable body into memory, Headers plus the flow's headers; cross-origin: drop Authorization, Cookie and Proxy-Authorization from `-H`; NoBody for HEAD; PostWithoutData for the bodyless POST; Output via WithOutputs to a MemoryStream). Read `TransferResult.Report` (ResponseCode, ResponseHeaders) for the `ResumableUploadExchange`; map exit 56 and 55 to `canResume: true` and any other failure to `canResume: false` with the result's exit code and message. curl's stack then does auth, TLS, proxy, User-Agent and tracing, so `ResumableUploadRequestHeaders`, the whole `Http/` folder and `ResumableUploadInterruptibleConnection` can go, and the 3-argument (services) `ExecuteAsync` with them. About 28 tests in `ResumableUploadTransferHookTests` use `ScriptedConnector` and must be rewritten against a scripted `next`; add a test that each request reaches `next` (OPTIONS, POST, PATCH). Measure real exchanges against the shared mock after `dotnet build Curl.Console`. This is large (about 15 files deleted, 3 rewritten, tests rewritten, ADR, the library's CLAUDE.md): if the claim finds it past one run, split it before editing.
 
 Check BL-5866 first: with requests through `next`, `--dpop` is applied by its own hook, so BL-5866's header code may be gone or moot.
+- 2026-11-25 claim: done as designed (ADR-1377). ResumableUploadSession calls next with a ResumableUploadRequestContext per request; the copied HTTP/1.1 client (Http/), ResumableUploadInterruptibleConnection and ResumableUploadRequestHeaders are deleted, and the hook no longer needs TransferHookServices. Exit codes 52, 55 and 56 resume; any other failure ends the upload. Hook tests rewritten against ScriptedNext. Catalogue unchanged (resumable already sits outside Har and RecordReplay), so ExtensionTransferHookCatalogue.cs was not edited.
+- Measured with Curl.Console against a PowerShell HttpListener tus mock on 127.0.0.1:27020: the first command exits 0 and ru.har holds OPTIONS, POST and PATCH entries, rurec holds 3 exchanges; -v shows > OPTIONS /tus, > POST /tus, > PATCH /files/1; --trace-ascii writes 2605 bytes.
+- Measure-CodeQuality for Curl.Extension.ResumableUpload.UnitLibrary: 0 failing members. dotnet build clean, fast tests green (platform-neutral: no paths, certificates or OS text in the new tests).
+
 
 ## Log
 
@@ -59,3 +63,4 @@ Check BL-5866 first: with requests through `next`, `--dpop` is applied by its ow
 - 2026-11-24: Backlog -> Doing. Criteria at claim: 0f6d8102 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Backlog. Needs ResumableUploadRequestHeaders.cs and the hook catalogue, held by BL-5866 in Doing; waits for it. No code edited; design in Notes.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 0f6d8102 69116afe 3d836d5e.
+- 2026-11-25: Doing -> Done. --resumable-upload sends OPTIONS, creation and PATCH through curl's transfer, so --har, --record, -v and --trace-ascii see them
