@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins <see cref="CommandLineOptions.PostDataWithTypedTextAsUtf8"/> (BL-5915, ADR-1351): typed body text in UTF-8
+/// Pins <see cref="CommandLineOptions.PostDataWithTypedTextAsUtf8"/> (BL-5915, ADR-1360): typed body text in UTF-8
 /// on the Windows build too, every other byte as in <see cref="CommandLineOptions.PostData"/>.
 /// </summary>
 [TestClass]

@@ -9,7 +9,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins that a typed <c>-d</c> body reaches the <c>xmpp</c> and <c>xmpps</c> handler as UTF-8, on the Windows
-/// build too, whose other schemes get it in the ANSI code page (BL-5915, ADR-1351). The handler sends those
+/// build too, whose other schemes get it in the ANSI code page (BL-5915, ADR-1360). The handler sends those
 /// bytes as the message body (<c>XmppUploadTests</c>).
 /// </summary>
 [TestClass]

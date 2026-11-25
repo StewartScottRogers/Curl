@@ -61,7 +61,7 @@ carried unchanged, so the transfer fails with exit 43, `XMPP message body is not
 
 Text typed on the command line (`-d`, `--data-ascii`, `--data-raw`, `--data-binary`, `--json`) reaches an `xmpp` or
 `xmpps` transfer as UTF-8 on every platform, so `-d café` sends `<body>café</body>` on Windows too, though curl's own
-protocols get such text in the ANSI code page there (ADR-0838, ADR-1351; `XmppPostDataUtf8Tests` pins it). The bytes of
+protocols get such text in the ANSI code page there (ADR-0838, ADR-1360; `XmppPostDataUtf8Tests` pins it). The bytes of
 a file, a config file line or an `--expand-` value in which a variable was replaced are not re-spelled: on Windows,
 non-ASCII text in an `--expand-` value, or in a config file read in the ANSI code page, is refused unless its bytes are
 valid UTF-8.

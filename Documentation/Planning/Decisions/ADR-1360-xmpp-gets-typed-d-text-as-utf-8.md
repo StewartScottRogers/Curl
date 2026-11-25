@@ -1,4 +1,4 @@
-# ADR-1351: xmpp gets typed -d text as UTF-8
+# ADR-1360: xmpp gets typed -d text as UTF-8
 
 - Status: Accepted
 - Date: 2026-11-24

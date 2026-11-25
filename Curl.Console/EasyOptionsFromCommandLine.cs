@@ -92,7 +92,7 @@ internal static class EasyOptionsFromCommandLine
     /// <c>--proto</c>, <c>--proto-redir</c>, the <c>--ssl*</c> level, <c>-l</c>, <c>--upload-flags</c>,
     /// <c>--proxy-header</c>, <c>-p</c>, <c>--unix-socket</c>, <c>--happy-eyeballs-timeout-ms</c> and the
     /// <c>-G</c> / <c>--url-query</c> query (BL-2357). For an <c>xmpp</c> or <c>xmpps</c> URL, whose body is UTF-8
-    /// text, the <c>-d</c> body is <see cref="CommandLineOptions.PostDataWithTypedTextAsUtf8"/> (ADR-1351).
+    /// text, the <c>-d</c> body is <see cref="CommandLineOptions.PostDataWithTypedTextAsUtf8"/> (ADR-1360).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="url">The transfer's URL, or <see langword="null" /> where the body is not sent.</param>

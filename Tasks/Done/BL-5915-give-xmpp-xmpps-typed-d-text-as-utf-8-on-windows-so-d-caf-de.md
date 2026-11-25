@@ -39,7 +39,7 @@ XMPP handler prefers. The path to the handler is `EasyOptionsFromCommandLine`, `
 
 ## Notes
 
-- Design (ADR-1351): no context or engine change. `CommandLineOptions.PostDataWithTypedTextAsUtf8` spells typed body
+- Design (ADR-1360): no context or engine change. `CommandLineOptions.PostDataWithTypedTextAsUtf8` spells typed body
   text in UTF-8; `EasyOptionsFromCommandLine.TransferSettingsOf` gives it to an `xmpp` / `xmpps` URL. Simpler than the
   optional context member the Context suggested, which every wrapping `ITransferContext` would have had to forward.
 - Files, config file lines and `--expand-` values with a replaced variable keep their bytes: they are not typed text.
