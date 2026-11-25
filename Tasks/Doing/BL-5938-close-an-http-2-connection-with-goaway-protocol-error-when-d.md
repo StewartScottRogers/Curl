@@ -31,3 +31,4 @@ Found in BL-5922. `Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2Fr
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: a36d99c1 03f53697 3d836d5e.
