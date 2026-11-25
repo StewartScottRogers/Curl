@@ -18,7 +18,7 @@ With `--oauth2-bearer`, Curl chooses the same login as curl 8.22.0 over IMAP, PO
 
 ## Context
 
-Found in BL-5880 (ADR-1347). Two cases it left:
+Found in BL-5880 (ADR-1361). Two cases it left:
 
 - No `-u`: measured, curl 8.22.0 with `--oauth2-bearer tok --login-options AUTH=PLAIN imap://...` against `AUTH=PLAIN` sends `AUTHENTICATE PLAIN`; Curl sends nothing after `CAPABILITY` (exit 67), because `SaslMechanismRanking.CanUsePassword` needs a credential. Measure the other mechanisms, POP3 and SMTP.
 - A redirect that withholds the token (`MailRequestOptions.BearerTokenWithheld`, upstream test779): only `ImapAuthentication` reads it, and only to hold back `LOGIN`. The SASL request has no token then, so a password mechanism may be chosen over IMAP, POP3 or SMTP, and POP3 may send `APOP` or `USER`/`PASS`. Measure what curl sends when the server offers `PLAIN` or `USER`.

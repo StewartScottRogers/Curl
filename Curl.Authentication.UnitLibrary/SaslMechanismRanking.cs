@@ -44,7 +44,7 @@ internal static class SaslMechanismRanking
     // password is empty or there is no credential; GSSAPI only with a user name naming a domain or realm, or an empty one
     // (curl's Curl_auth_user_contains_domain); the bearer mechanisms only with a token; the
     // others only with a user, and with a token only when AUTH= named them or any (*)
-    // (measured, ADR-0123, ADR-0139, ADR-1347).
+    // (measured, ADR-0123, ADR-0139, ADR-1361).
     private static readonly (string Name, Func<SaslRequest, bool> CanUse, bool RunsOnSecurityContext)[] CurlPreferenceOrder =
     [
         (External, CanUseExternal, false),

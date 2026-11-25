@@ -1,4 +1,4 @@
-# ADR-1347: --oauth2-bearer prefers only the bearer mechanisms until an AUTH= login option
+# ADR-1361: --oauth2-bearer prefers only the bearer mechanisms until an AUTH= login option
 
 - Status: Accepted
 - Date: 2026-11-24
