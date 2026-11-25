@@ -1,5 +1,5 @@
 ---
-id: BL-5935
+id: BL-5937
 title: Send the upstream mail stand-ins' replies one byte at a time under SLOWDOWN
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5935 — Send the upstream mail stand-ins' replies one byte at a time under SLOWDOWN
+# BL-5937 — Send the upstream mail stand-ins' replies one byte at a time under SLOWDOWN
 
 ## Goal
 

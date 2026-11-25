@@ -32,7 +32,7 @@ Found in BL-5905: upstream test 251 sat on the passing list while Curl hung agai
 - The pacing is a connection wrapper that `FtpServerConnector` puts round each control connection, so each read waits and then takes one byte. A sender pushing bytes on a timer was rejected: on the wait-skipping clock they pile up and one read takes many. A read cancelled during its wait takes nothing.
 - 10 ms a byte, as upstream's `docs/tests/FILEFORMAT.md` gives for `SLOWDOWN`. `SLOWDOWNDATA` keeps its 5 ms, unchanged here.
 - `SLOWDOWN` counts only alone on its line, so `SLOWDOWNDATA` does not switch it on. `FtpControlChannelResponder.cs` needed no change.
-- The three listed `SLOWDOWN` cases are 250, 251 (FTP) and 853 (POP3); all pass. The mail stand-ins still ignore `SLOWDOWN`: filed as BL-5935.
+- The three listed `SLOWDOWN` cases are 250, 251 (FTP) and 853 (POP3); all pass. The mail stand-ins still ignore `SLOWDOWN`: filed as BL-5937.
 - Verification: `dotnet build` clean; one full fast run, whose only failures seen were two new tests with wrong test data, fixed, then `Curl.Conformance.UnitTests` rerun green (4379 passed); `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`: 0 failing members.
 - Platform: the change is in memory on an injected clock, with nothing platform-specific.
 - No ADR: this follows upstream's server as the harness already does (ADR-0013).
