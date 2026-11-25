@@ -1,10 +1,9 @@
 using System.Net;
-using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.ResumableUpload.Transfer;
 
-/// <summary>Makes a resumable upload's last response the transfer's: its body, its <c>-i</c> and <c>-D</c> headers, and its result.</summary>
+/// <summary>Makes a resumable upload's last response the transfer's: its body, its <c>-i</c> and <c>-D</c> headers as curl's handler wrote them, and its result.</summary>
 internal static class ResumableUploadOutcome
 {
     /// <summary>Writes <paramref name="response" /> to the transfer's outputs and gives the transfer's result.</summary>
@@ -16,7 +15,7 @@ internal static class ResumableUploadOutcome
     {
         var fail = context.Http?.Fail ?? HttpFailMode.None;
         var failed = fail != HttpFailMode.None && response.StatusCode >= 400;
-        var head = Encoding.Latin1.GetBytes(FormatHead(response));
+        var head = response.Head;
         if (!(failed && fail == HttpFailMode.Fail))
         {
             await WriteHeadAsync(context.HeaderOutput, head, context.CancellationToken);
@@ -37,17 +36,6 @@ internal static class ResumableUploadOutcome
         return failed
             ? TransferResult.Failure(CurlExitCode.HttpReturnedError, $"The requested URL returned error: {response.StatusCode}") with { Report = report }
             : TransferResult.Success(response.Body.Length) with { Report = report };
-    }
-
-    private static string FormatHead(ResumableUploadExchange response)
-    {
-        var head = new StringBuilder($"HTTP/1.1 {response.StatusCode} {response.ReasonPhrase}\r\n");
-        foreach (var (name, value) in response.Headers)
-        {
-            head.Append(name).Append(": ").Append(value).Append("\r\n");
-        }
-
-        return head.Append("\r\n").ToString();
     }
 
     private static async Task WriteHeadAsync(Stream? output, byte[] head, CancellationToken cancellationToken)

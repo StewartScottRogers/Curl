@@ -18,9 +18,6 @@ public sealed class ResumableUploadTransferHook : ITransferHook
     /// <summary>How many times a broken step is tried again unless the constructor says otherwise.</summary>
     public const int DefaultMaxResumptions = 3;
 
-    /// <summary>The failure when the host gives no connector.</summary>
-    public const string NoServicesMessage = "The resumable upload needs curl's connector, which this transfer was not given.";
-
     /// <summary>Initializes a new instance of the <see cref="ResumableUploadTransferHook" /> class.</summary>
     /// <param name="maxResumptions">How many times a step broken by its connection is tried again.</param>
     public ResumableUploadTransferHook(int maxResumptions = DefaultMaxResumptions)
@@ -33,19 +30,9 @@ public sealed class ResumableUploadTransferHook : ITransferHook
     public int MaxResumptions { get; }
 
     /// <inheritdoc />
-    public ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
+    public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(next);
-        return IsResumableUpload(context) ? ValueTask.FromResult(TransferResult.Failure(CurlExitCode.FailedInit, NoServicesMessage)) : next(context);
-    }
-
-    /// <inheritdoc />
-    public async ValueTask<TransferResult> ExecuteAsync(
-        ITransferContext context, TransferHookServices services, Func<ITransferContext, ValueTask<TransferResult>> next)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(next);
         if (!IsResumableUpload(context))
         {
@@ -53,10 +40,10 @@ public sealed class ResumableUploadTransferHook : ITransferHook
         }
 
         var body = await SeekableAsync(context.Upload!, context.CancellationToken);
-        await using var session = new ResumableUploadSession(services.Connector, context);
+        var target = TargetOf(context.Url);
+        var session = new ResumableUploadSession(context, next, target);
         try
         {
-            var target = TargetOf(context.Url);
             var options = await session.SendAsync("OPTIONS", target, []);
             IResumableUploadProtocol protocol = OffersTus(options) ? TusUploadProtocol.Instance : new IetfUploadProtocol(context.Http?.CustomMethod ?? "PUT");
             var response = await new ResumableUploadFlow(protocol, session, MaxResumptions).UploadAsync(target, body);
