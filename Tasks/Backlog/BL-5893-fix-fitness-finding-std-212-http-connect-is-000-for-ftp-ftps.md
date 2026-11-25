@@ -4,8 +4,8 @@ title: Fix fitness finding STD-212: %{http_connect} is 000 for FTP, FTPS, SFTP, 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpProtocolHandler.cs, Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs, Curl.Original.Protocol.Dict.UnitLibrary/DictProtocolHandler.cs, Curl.Original.Protocol.Gopher.UnitLibrary/GopherProtocolHandler.cs, Curl.Original.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs, Curl.Engine.UnitLibrary/TransferHeaderStore.cs]
+depends-on: [BL-5915]
+touches: [Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.ProxyConnect.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.OsErrno.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/AbortedHeadRecordingTransferEvents.cs, Curl.Engine.UnitTests/Std212Tests.cs]
 requirement: none
 created: 2026-11-24
 completed:
@@ -45,7 +45,29 @@ The finding, verbatim:
 
 ## Notes
 
+- 2026-11-24 (lane 13): reproduced and diagnosed; no code changed. Requeued only because the
+  test belongs in `Curl.Engine.UnitTests`, which BL-5915 (in Doing) names whole.
+- Measured through a loopback proxy that answers `CONNECT` with `200` and then stays silent
+  (`-sS -m 2 -x ... -p -w "%{http_connect}|%{response_code}|%{http_code}|%{num_connects}"`):
+  Curl prints `000|200|200|1` (exit 28) for `dict://`, `gopher://` and `telnet://`;
+  `C:\Windows\System32\curl.exe` prints `200|000|000|1` (exit 28) for `dict://` and
+  `gopher://` (its Telnet run did not end within 10 s with standard input redirected).
+- Fix, one shared engine path, no handler or `TransferHeaderStore` edits (touches changed to match):
+  1. `%{http_connect}`: `EndPointRecordingConnector` hands each connect result's non-zero
+     `ConnectResult.ProxyConnectResponseCode` (success and failure, `ConnectAsync` and
+     `ConnectMultiplexedSessionAsync`) to `ConnectionEndPointRecorder`, which keeps the last,
+     clears it in `Clear`, and puts it on `TransferReport.ProxyConnectResponseCode` when the
+     handler's report has 0, building a report as `WithConnectFailure` does. The cancellation
+     path in `EndPointReportingProtocolHandler` already calls `ReportOn`, so a `-m` timeout gets
+     it too. Check `ManagedEasyTransfer.NumConnectsOf` for a refused tunnel on a non-HTTP scheme.
+  2. `%{response_code}` 200: not `TransferHeaderStore`. With `-m` or `-Y`,
+     `AbortedHeadRecordingTransferEvents` takes the status of the `CONNECT` reply lines that
+     `ConnectTunnelVerboseLines.ReportReplyLine` reports as response headers. They come before
+     `ReportConnectionOpened`, so reset `responseCode` and `httpVersion` there (keep
+     `headerSize`).
+
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: ca22b4f3 69116afe 3d836d5e.
+- 2026-11-24: Doing -> Backlog. Waits for BL-5915, which holds Curl.Engine.UnitTests; diagnosed and planned in Notes, no code changed.
