@@ -549,6 +549,33 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.IsNull(verdict.ErrorMessage);
     }
 
+    // STD-191: the OpenSSL build reported "unable to get local issuer certificate (20)" for these.
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildUniversalStringSubjectInsideTheExcludedDirectoryName_IsExcludedSubtreeViolation()
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteEncodedValue(UniversalStringOrganizationName("Evil"));
+        }
+
+        var failure = Verify(Constraints(excludedName: DirectoryName("O=Evil")), Host, true, subjectName: new X500DistinguishedName(writer.Encode()), matchesSchannelBuild: false);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The verify result is read from the platform's own chain statuses, pinned on the Windows and Linux chain engines.
+    public void VerifyPeer_OpenSslBuildSubjectEmailAddressInTheExcludedEmailDomain_IsExcludedSubtreeViolation()
+    {
+        var failure = Verify(Constraints(excludedName: GeneralName(1, "other.org")), Host, true, subject: "E=evil@other.org, CN=localhost", matchesSchannelBuild: false);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
+    }
+
     private static int FindViolationOfCommonName(string commonName, byte[] constraints, bool matchesSchannelBuild = false)
     {
         var subject = new X500DistinguishedNameBuilder();
@@ -567,11 +594,11 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     }
 
     private (CurlExitCode ExitCode, string Message)? Verify(
-        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null, X509ChainStatus[]? chainStatus = null, bool bestEffort = false, X509ChainStatus[]? belowAnchorStatus = null, bool matchesSchannelBuild = true)
+        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null, X509ChainStatus[]? chainStatus = null, bool bestEffort = false, X509ChainStatus[]? belowAnchorStatus = null, bool matchesSchannelBuild = true, X500DistinguishedName? subjectName = null)
     {
         using var root = CreateAuthority("CN=Constraint Root", null, null);
         using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, constraints);
-        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames, subject, alternativeNames);
+        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames, subject, alternativeNames, subjectName);
         var caFile = Path.Combine(_directory, "anchor.pem");
         File.WriteAllText(caFile, intermediate.ExportCertificatePem());
         var verification = new ServerCertificateVerification(
