@@ -7,7 +7,7 @@ public sealed partial class HttpProtocolHandler
 {
     /// <summary>
     /// How long ending the stream of a failed or timed-out transfer may wait for a peer that
-    /// has stopped taking what is written (ADR-1418).
+    /// has stopped taking what is written (ADR-1421).
     /// </summary>
     private static readonly TimeSpan StreamCleanupLimit = TimeSpan.FromSeconds(1);
 

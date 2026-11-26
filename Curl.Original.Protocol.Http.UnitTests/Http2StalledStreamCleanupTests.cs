@@ -10,7 +10,7 @@ namespace Curl.Original.Protocol.Http;
 /// <summary>
 /// What a failed or timed-out HTTP/2 transfer does when the peer stops taking what is written,
 /// so its RST_STREAM never goes out: it gives the write up after one second on its
-/// <see cref="TimeProvider" /> and ends with its own exit code (BL-6006, ADR-1418).
+/// <see cref="TimeProvider" /> and ends with its own exit code (BL-6006, ADR-1421).
 /// </summary>
 [TestClass]
 public sealed class Http2StalledStreamCleanupTests

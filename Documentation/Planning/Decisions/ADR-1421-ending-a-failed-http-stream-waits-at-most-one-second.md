@@ -1,4 +1,4 @@
-# ADR-1418 — Ending a failed HTTP stream waits at most one second
+# ADR-1421 — Ending a failed HTTP stream waits at most one second
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

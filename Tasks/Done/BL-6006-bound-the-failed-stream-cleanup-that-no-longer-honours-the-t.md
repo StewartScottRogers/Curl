@@ -34,7 +34,7 @@ Fix: run the cleanup under its own short bounded token, made from the injected `
 
 ## Notes
 
-- Decided (ADR-1418): the cleanup limit is one second on the transfer's `TimeProvider`
+- Decided (ADR-1421): the cleanup limit is one second on the transfer's `TimeProvider`
   (`context.TimeProvider`, the handler's only injected clock). The timed-out path
   (`HttpProtocolHandler.ResponseExchange.cs`) is bounded the same way. No stream (HTTP/1.x)
   means no timer: a Console retry test counts every short timer.

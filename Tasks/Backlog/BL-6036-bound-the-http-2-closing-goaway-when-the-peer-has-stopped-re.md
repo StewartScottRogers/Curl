@@ -18,7 +18,7 @@ Closing an HTTP/2 connection ends within a bounded time when the peer has stoppe
 
 ## Context
 
-Found in BL-6006 (ADR-1418). `Http2Session.ShutDownAsync` is run with `CancellationToken.None` (`HttpProtocolHandler.ConnectionExchange.cs`, `PoolEntry`), so a GOAWAY the peer never takes waits for ever. A session has no `TimeProvider`.
+Found in BL-6006 (ADR-1421). `Http2Session.ShutDownAsync` is run with `CancellationToken.None` (`HttpProtocolHandler.ConnectionExchange.cs`, `PoolEntry`), so a GOAWAY the peer never takes waits for ever. A session has no `TimeProvider`.
 
 ## Acceptance criteria
 

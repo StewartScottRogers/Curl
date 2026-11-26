@@ -1462,4 +1462,4 @@ Each option and the specific reason it lost.
 | [1418](ADR-1418-a-windows-telnet-read-that-fails-on-an-unanswered-upload-exits-56.md) | A Windows TELNET read that fails on an unanswered upload exits 56 (BL-6012) | Accepted | 2026-11-26 |
 | [1419](ADR-1419-an-expired-crl-that-lists-a-certificate-below-an-anchor-still-revokes-it.md) | An expired CRL that lists a certificate below an anchor still revokes it (BL-6009) | Accepted | 2026-11-26 |
 | [1420](ADR-1420-a-z-telnet-session-holds-back-later-transfers.md) | Under -Z a telnet session holds back later transfers, and telnet -t values are not judged at setup (BL-6017) | Accepted | 2026-11-26 |
-| [1418](ADR-1418-ending-a-failed-http-stream-waits-at-most-one-second.md) | Ending a failed HTTP stream waits at most one second (BL-6006) | Accepted | 2026-11-26 |
+| [1421](ADR-1421-ending-a-failed-http-stream-waits-at-most-one-second.md) | Ending a failed HTTP stream waits at most one second (BL-6006) | Accepted | 2026-11-26 |
