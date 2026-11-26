@@ -46,7 +46,7 @@ The finding, verbatim:
 
 - Cause: `OcspSignatureAlgorithm.FindRsaPssRule` read only the hash, so verification assumed
   salt = hash length and MGF1 over the same hash. It now reads all of `RSASSA-PSS-params` and
-  verifies through `Curl.Cryptography`'s `RsaPssVerification` (ADR-1424).
+  verifies through `Curl.Cryptography`'s `RsaPssVerification` (ADR-1432).
 - First criterion: met by unit tests, not by a live run. The reviewer's servers were not rebuilt.
   `OcspSignatureAlgorithmTests` verifies salts 64, 32 and 0 through the rule `OcspStapleVerifier`
   uses for every OCSP signature; the finding says salt 32 already matched curl, so the signature
@@ -63,4 +63,4 @@ The finding, verbatim:
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: b5c69ea0 69116afe 3d836d5e.
-- 2026-11-26: Doing -> Done. OCSP RSASSA-PSS signatures are verified with their stated salt length and MGF1 hash (ADR-1424).
+- 2026-11-26: Doing -> Done. OCSP RSASSA-PSS signatures are verified with their stated salt length and MGF1 hash (ADR-1432).

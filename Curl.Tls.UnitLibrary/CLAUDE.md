@@ -209,7 +209,7 @@ and Encrypted Client Hello (BL-706, ADR-0233).
   `OcspCertificateFields`, and maps signature and `CertID` hash OIDs with
   `OcspSignatureAlgorithm`, which verifies an RSASSA-PSS signature with the MGF1 hash and
   salt length its parameters state, through `Curl.Cryptography`'s `RsaPssVerification`
-  (ADR-1424). With `RequestOcspStatus` (and the settings' `TimeProvider`)
+  (ADR-1432). With `RequestOcspStatus` (and the settings' `TimeProvider`)
   both handshakes run it once the verifier accepts the chain, expose `CertificateStatus`,
   and fail anything but good with `bad_certificate_status_response` and
   `TlsHandshakeFailure.CertificateStatusRejection`.

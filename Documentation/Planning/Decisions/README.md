@@ -1473,4 +1473,4 @@ Each option and the specific reason it lost.
 | [1429](ADR-1429-percent-escapes-in-extension-protocol-urls-become-bytes-and-text-fields-must-be-utf-8.md) | Percent-escapes in extension protocol URLs become bytes, and text fields must be UTF-8 (BL-6030) | Accepted | 2026-11-26 |
 | [1430](ADR-1430-the-schannel-build-matches-other-names-against-name-constraints-as-cryptoapi-does.md) | The Schannel build matches otherNames against name constraints as CryptoAPI does (BL-6011) | Accepted | 2026-11-26 |
 | [1431](ADR-1431-only-a-sha-1-certid-names-a-certificate-in-an-ocsp-response.md) | Only a SHA-1 CertID names a certificate in an OCSP response (BL-6027) | Accepted | 2026-11-26 |
-| [1424](ADR-1424-ocsp-rsassa-pss-signatures-are-verified-with-their-stated-salt-and-mask-hash.md) | OCSP RSASSA-PSS signatures are verified with their stated salt and mask hash (BL-6010) | Accepted | 2026-11-26 |
+| [1432](ADR-1432-ocsp-rsassa-pss-signatures-are-verified-with-their-stated-salt-and-mask-hash.md) | OCSP RSASSA-PSS signatures are verified with their stated salt and mask hash (BL-6010) | Accepted | 2026-11-26 |

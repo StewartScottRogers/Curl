@@ -1,4 +1,4 @@
-# ADR-1424: OCSP RSASSA-PSS signatures are verified with their stated salt and mask hash
+# ADR-1432: OCSP RSASSA-PSS signatures are verified with their stated salt and mask hash
 
 - Status: Accepted
 - Date: 2026-11-26
