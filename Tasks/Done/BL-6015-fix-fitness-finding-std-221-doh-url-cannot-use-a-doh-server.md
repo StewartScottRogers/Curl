@@ -53,7 +53,7 @@ The finding, verbatim:
   (`PublishAot=false`) run in WSL Ubuntu. Ubuntu curl and Curl both printed
   `Host www.test.local:1 was resolved.`, `IPv4: 192.0.2.20`, `Trying 192.0.2.20:1...`, exit 28.
 - The same run showed Curl on Linux omits `Connection timed out after N milliseconds`, with
-  or without `--doh-url`: filed as BL-6036. One connection for both queries: BL-6035.
+  or without `--doh-url`: filed as BL-6039. One connection for both queries: BL-6038.
 - `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reported one member,
   `IsHttp2ExchangeFailure`, at 90% branch (the false path). The test
   `...WhenTheConnectionThrowsWhatNoHttp2ExchangeFailureIs_LetsItEscape` was added for it and

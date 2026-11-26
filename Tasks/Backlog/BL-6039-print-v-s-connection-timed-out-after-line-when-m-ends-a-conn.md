@@ -1,5 +1,5 @@
 ---
-id: BL-6036
+id: BL-6039
 title: Print -v's Connection timed out after line when -m ends a connect on Linux
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6036 — Print -v's Connection timed out after line when -m ends a connect on Linux
+# BL-6039 — Print -v's Connection timed out after line when -m ends a connect on Linux
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-6035
+id: BL-6038
 title: Send --doh-url's A and AAAA queries on one HTTP/2 connection, as curl multiplexes them
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6035 — Send --doh-url's A and AAAA queries on one HTTP/2 connection, as curl multiplexes them
+# BL-6038 — Send --doh-url's A and AAAA queries on one HTTP/2 connection, as curl multiplexes them
 
 ## Goal
 
