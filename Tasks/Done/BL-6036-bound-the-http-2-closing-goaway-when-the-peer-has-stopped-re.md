@@ -27,7 +27,7 @@ Found in BL-6006 (ADR-1421). `Http2Session.ShutDownAsync` is run with `Cancellat
 
 ## Notes
 
-- `Http2Session.ShutDownAsync` now runs under a one-second limit on the session's `TimeProvider`, linked to the caller's token, covering the frame-lock wait, RST_STREAM, GOAWAY and flush (ADR-1426: same limit as ADR-1421; no change to `IConnectionSession`).
+- `Http2Session.ShutDownAsync` now runs under a one-second limit on the session's `TimeProvider`, linked to the caller's token, covering the frame-lock wait, RST_STREAM, GOAWAY and flush (ADR-1433: same limit as ADR-1421; no change to `IConnectionSession`).
 - Added to `touches` (named by no other task in Doing): `HttpProtocolHandler.ConnectionExchange.cs`, `HttpProtocolHandler.StreamSessions.cs` and `HttpH2cUpgradeConnection.cs`, so production sessions get the transfer's `TimeProvider`. The new constructor parameters are optional (null means the system clock), which leaves existing tests unchanged.
 - Not measured against curl: curl writes its GOAWAY without blocking, so it has no output or exit code to match.
 - Verified: build 0 warnings; format clean on the changed files; fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary`: 100% line, 100% branch, 0 failing members. Tests are in `Http2StalledGoAwayTests.cs`.

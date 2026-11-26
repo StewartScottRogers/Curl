@@ -192,7 +192,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// connection, or after a write was cancelled part way, since the peer was not taking it and
     /// these writes could wait for ever (BL-6006). A connection that fails the write is closing anyway, so that is not an error.
     /// A peer that stops reading only now is waited for <see cref="ClosingLimit" /> on the session's
-    /// <see cref="TimeProvider" />, the wait for the frame lock included; the frames are then given up (BL-6036, ADR-1426).
+    /// <see cref="TimeProvider" />, the wait for the frame lock included; the frames are then given up (BL-6036, ADR-1433).
     /// </summary>
     /// <param name="cancellationToken">Cancels the writes.</param>
     /// <returns>A task that completes when the frames are written or given up, or at once when none is due.</returns>

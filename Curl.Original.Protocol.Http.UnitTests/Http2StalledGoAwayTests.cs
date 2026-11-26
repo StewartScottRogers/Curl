@@ -10,7 +10,7 @@ namespace Curl.Original.Protocol.Http;
 /// <summary>
 /// What closing an HTTP/2 connection does when the peer stops taking what is written before any
 /// write was cancelled, so its GOAWAY never goes out: it gives the closing frames up after one
-/// second on the session's <see cref="TimeProvider" /> (BL-6036, ADR-1426).
+/// second on the session's <see cref="TimeProvider" /> (BL-6036, ADR-1433).
 /// </summary>
 [TestClass]
 public sealed class Http2StalledGoAwayTests

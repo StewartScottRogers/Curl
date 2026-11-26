@@ -1,4 +1,4 @@
-# ADR-1426 — Closing an HTTP/2 connection waits at most one second
+# ADR-1433 — Closing an HTTP/2 connection waits at most one second
 
 - **Status:** Accepted
 - **Date:** 2026-11-26
