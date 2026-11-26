@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary/Lib655.cs]
+touches: [Curl.Conformance.LibTest.UnitLibrary/Lib655.cs, Curl.Conformance.LibTest.UnitTests/Lib643To661Tests.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5985 — Re-fix AF-0967: Surviving mutant: the lib655 port's debug trace can dump with the hex column (noHex true -> false)
 
@@ -36,12 +36,26 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib655.cs line 46`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib655.cs line 46`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killing test: `Lib643To661Tests.Lib655_TracesDataWithTheTimeAndWithoutTheHexColumn`
+  (renamed from `Lib655_TracesDataWithoutTheHexColumn`). It now asserts that standard error
+  starts with `00:00:00.000000 => Send data, 2 bytes (0x2)\n0000: ok\n`, which pins both
+  `traceTime: true` and `noHex: true`. The old assertions pinned only the missing hex column.
+- By hand, 2026-11-25: with `traceTime: true` changed to `false` at Lib655.cs:46, that test
+  failed (1 failed, 1242 passed in `Curl.Conformance.LibTest.UnitTests`). Reverted: `dotnet build`
+  gave 0 warnings and 0 errors, and the full fast tests passed.
+- The title names `noHex` but the audit's mutation hits `traceTime`, the first `true` on the line;
+  the one assertion kills either.
+- No production code changed, so no ADR and no quality run. The `feature` pipeline stages were
+  not delegated: the change is one test assertion. `touches` gained the test file; no other task
+  in Doing on `origin/work/dark-factory` named it.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 5f7f3096 9742157d.
+- 2026-11-25: Doing -> Done. A fast test now pins lib655's trace time prefix and missing hex column, killing the AF-0967 mutant
