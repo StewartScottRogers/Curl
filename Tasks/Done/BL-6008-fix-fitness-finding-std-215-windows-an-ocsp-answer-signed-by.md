@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Tls.UnitLibrary/OcspStapleVerifier.cs]
+touches: [Curl.Tls.UnitLibrary/OcspStapleVerifier.cs, Curl.Tls.UnitLibrary/OcspCertificateFields.cs, Curl.Tls.UnitLibrary/CLAUDE.md, Curl.Tls.UnitTests/OcspStapleVerifierTests.cs, Curl.Tls.UnitTests/OcspTestPki.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.AnchorOcsp.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6008 — Fix fitness finding STD-215: Windows: an OCSP answer signed by an expired delegated responder is trusted below an intermediate anchor
 
@@ -41,13 +41,28 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the `q_respexp_good_crlrev` command exits 60 "…has been revoked"; the `w_respexp_good` command exits 60 "the revocation status is unknown"; a leaf answered by a valid delegated responder still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the `q_respexp_good_crlrev` command exits 60 "…has been revoked"; the `w_respexp_good` command exits 60 "the revocation status is unknown"; a leaf answered by a valid delegated responder still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: `OcspCertificateFields` now carries `NotAfter`, and `OcspStapleVerifier` refuses a delegated
+  responder past it (ADR-1418). A not-yet-valid responder stays accepted, as REF accepts it; the
+  OpenSSL `--cert-status` side of that is BL-6035.
+- `touches` widened to the certificate reader, the library's CLAUDE.md and the tests. No task in
+  Doing on `origin/work/dark-factory` named any of them.
+- End to end on Windows, 2026-11-26, with the built `curl.exe` and a throwaway C# file-based app
+  serving a fresh intermediate anchor, OCSP, CRL and TLS on 127.0.0.1, direct and as an HTTPS
+  proxy: `w_respexp_good` exit 60 "schannel: the revocation status is unknown";
+  `q_respexp_good_crlrev` exit 60 "...has been revoked"; a leaf answered by a valid delegated
+  responder exit 0 with its body. REF's expected output is the finding's own measurement.
+- `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary`: 0 failing members.
+- The `/feature` sub-agent stages were not spawned: the change is a few lines in two files, and
+  the run has a cost cap.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 0fe8ae9d 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. Curl refuses an OCSP answer from an expired delegated responder, so the CRL decides
