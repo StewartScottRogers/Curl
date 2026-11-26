@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs]
+touches: [Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs, Curl.Conformance.LibTest.UnitTests/Lib578To599Tests.cs, Curl.Conformance.LibTest.UnitTests/FakeMultiTransfer.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5993 — Fix AF-0999: Surviving mutant: the lib582 port can wait 10 s with no sockets and 100 ms with sockets (== -> !=)
 
@@ -32,12 +32,19 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs line 177`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs line 177`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by `Lib578To599Tests.Lib582_WithNoTimer_Waits100MillisecondsWithoutSocketsAndTenSecondsWithThem`:
+  with `== 0` changed to `!= 0` it fails (first wait 10 s, expected 100 ms); reverted, it passes.
+- The production code was already right, so `Lib582Run.cs` is unchanged and no quality run was needed.
+- Added to `touches`: `Lib578To599Tests.cs` (the test) and `FakeMultiTransfer.cs` (now records each
+  wait's timeout in `WaitTimeouts`). No other task in Doing on `origin/work/dark-factory` names either.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 636ae3a2 9742157d.
+- 2026-11-25: Doing -> Done. A new Lib582 test pins the 100 ms and 10 s select timeouts and kills the AF-0999 mutant.

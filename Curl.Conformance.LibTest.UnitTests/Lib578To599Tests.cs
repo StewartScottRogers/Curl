@@ -259,6 +259,30 @@ public sealed class Lib578To599Tests
     }
 
     [TestMethod]
+    public async Task Lib582_WithNoTimer_Waits100MillisecondsWithoutSocketsAndTenSecondsWithThem()
+    {
+        var engine = new FakeCurlEngine();
+        FakeMultiTransfer multi = engine.Multi;
+        multi.Waiting = () =>
+        {
+            if (multi.WaitTimeouts.Count == 1)
+            {
+                Socket(multi, First, CurlPoll.In | CurlPoll.Out);
+            }
+            else
+            {
+                multi.DoneResult = CurlCode.Ok;
+            }
+        };
+        multi.SocketActing = (_, _) => (CurlMultiCode.Ok, 1);
+        var (lib582, run) = Create582(engine, new ManualTimeProvider(DateTimeOffset.UnixEpoch));
+
+        await lib582.TestAsync(run.Steps, CurlGlobal.Init(engine), CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(10) }, multi.WaitTimeouts);
+    }
+
+    [TestMethod]
     public async Task Lib582_AddSelectOrTimeoutFailing_StopsTheLoop()
     {
         var addFails = new FakeCurlEngine();
