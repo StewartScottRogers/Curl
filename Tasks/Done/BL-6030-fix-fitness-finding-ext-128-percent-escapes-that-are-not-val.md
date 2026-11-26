@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Redis.UnitLibrary/Client/RedisUrlCommand.cs, Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5UrlTopic.cs, Curl.Extended.Protocol.Nats.UnitLibrary/NatsSubject.cs, Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtocolHandler.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0UrlQueue.cs, Curl.Extended.Protocol.Kafka.UnitLibrary/Client/KafkaAddress.cs, Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppProtocolHandler.cs, Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppRequests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6030 — Fix fitness finding EXT-128: percent-escapes that are not valid UTF-8 in extended-protocol URLs are sent literally, so the transfer acts on a different key, topic, subject, queue or body (exit 0)
 
@@ -42,13 +42,28 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] after `curl -sS redis://127.0.0.1:28379/SET/m2/%FF%00`, `redis-cli --no-raw GET m2` prints `"\xff\x00"`; `curl -sS -d x mqtt5://127.0.0.1:28883/b%FF` exits non-zero naming invalid UTF-8 in the topic; the XMPP command exits 43.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] after `curl -sS redis://127.0.0.1:28379/SET/m2/%FF%00`, `redis-cli --no-raw GET m2` prints `"\xff\x00"`; `curl -sS -d x mqtt5://127.0.0.1:28883/b%FF` exits non-zero naming invalid UTF-8 in the topic; the XMPP command exits 43.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: `UrlPercentDecoding` in `Curl.Extension.Abstractions.UnitLibrary` (ADR-1418). Redis arguments are the
+  decoded bytes; MQTT 5, NATS, STOMP, AMQP 0-9-1, Kafka and XMPP refuse non-UTF-8 text with exit 3, an XMPP
+  query body with exit 43.
+- Checked with the built `curl.exe` on 2026-11-26: against a loopback stand-in (no Docker Redis) the `SET`
+  command sent `$2 m2`, `$2 FF 00` on the wire, which a server stores as `"\xff\x00"`; the MQTT 5 command ended
+  `curl: (3) The MQTT topic in the URL is not valid UTF-8`; the XMPP command ended with exit 43.
+- Build clean (0 warnings), fast tests passed. Measure-CodeQuality for the 8 changed libraries: 0 failing
+  members. It was scored from the coverage of those libraries' own 8 test projects (reports trimmed to the 8
+  assemblies), because the `-Library` run reaches most of the solution and would have passed the shift deadline.
+- `touches` widened: `Curl.Extension.Abstractions.UnitLibrary` (shared decoder), each library's message file and
+  its `.UnitTests`. No other task in Doing named them.
+- The same `Uri.UnescapeDataString` defect is likely in other extensions the finding does not list (amqp1, s3,
+  gcs, az, dns, mcp stdio); filed as BL-6035.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 6b921d2e 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. Non-UTF-8 percent-escapes become bytes for Redis and are refused by MQTT 5, NATS, STOMP, AMQP, Kafka and XMPP
