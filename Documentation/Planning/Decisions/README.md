@@ -1469,3 +1469,4 @@ Each option and the specific reason it lost.
 | [1425](ADR-1425-the-trace-file-opens-at-the-first-trace-event.md) | The trace file opens at the first trace event (BL-6023) | Accepted | 2026-11-26 |
 | [1426](ADR-1426-dpop-signs-inside-the-resumable-upload.md) | --dpop signs inside --resumable-upload, one proof per request (BL-6029) | Accepted | 2026-11-26 |
 | [1427](ADR-1427-cache-dir-refuses-a-path-under-an-existing-file.md) | --cache-dir refuses a path under an existing file (BL-6032) | Accepted | 2026-11-26 |
+| [1426](ADR-1426-the-resumable-upload-creation-request-has-no-body.md) | The resumable upload creation request has no body (BL-6034) | Accepted | 2026-11-26 |
