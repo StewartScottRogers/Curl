@@ -30,3 +30,4 @@ Found while verifying BL-5998: `dotnet format Curl.Original.Protocol.Http.UnitLi
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 1a65582d 779790c0.
