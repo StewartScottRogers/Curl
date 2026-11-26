@@ -18,7 +18,7 @@ When a telnet transfer under `-Z` fails with exit 43 during its session, the HTT
 
 ## Context
 
-Found by BL-6017 (ADR-1418). Measured on curl 8.22.0 Schannel on Windows, 2026-11-26: a loopback telnet server
+Found by BL-6017 (ADR-1420). Measured on curl 8.22.0 Schannel on Windows, 2026-11-26: a loopback telnet server
 sends `IAC DO NEW-ENVIRON`, `IAC DO TTYPE`, then `SB NEW-ENVIRON SEND`, `SB TTYPE SEND` and `SB XDISPLOC SEND`;
 command `-sS -m 5 -Z [--parallel-max 1] -w "[%{exitcode}]\n" telnet://... -t NEW_ENV=nocomma --next -sS -w
 "[%{exitcode}]\n" http://.../hello`, standard input `NUL` (the same for a 40-character `TTYPE`).

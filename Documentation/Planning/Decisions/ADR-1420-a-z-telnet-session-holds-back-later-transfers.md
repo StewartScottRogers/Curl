@@ -1,4 +1,4 @@
-# ADR-1418: Under -Z a telnet session holds back later transfers, and telnet -t values are not judged at setup
+# ADR-1420: Under -Z a telnet session holds back later transfers, and telnet -t values are not judged at setup
 
 - Status: Accepted
 - Date: 2026-11-26

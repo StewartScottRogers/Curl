@@ -2415,7 +2415,7 @@ internal sealed class CurlCommandRunner(
     /// Starts one transfer of a <c>-Z</c> run in the slot it waited for, unless the run has ended or failed
     /// early. curl 8.22.0 runs a whole <c>telnet</c> session inside one call of its <c>-Z</c> loop, so for a
     /// <c>telnet</c> transfer this completes, and later transfers start, only once the session has ended
-    /// (STD-183, BL-6017, ADR-1418).
+    /// (STD-183, BL-6017, ADR-1420).
     /// </summary>
     /// <param name="run">The run.</param>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>

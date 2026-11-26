@@ -43,7 +43,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Reproduced on the branch. Measured curl 8.22.0 Schannel (ADR-1418): it judges no `-t` value at setup; 43 comes
+- Reproduced on the branch. Measured curl 8.22.0 Schannel (ADR-1420): it judges no `-t` value at setup; 43 comes
   only after a server `SB ... SEND`. Removed BL-5811's setup check (`BadTelnetOptionValueFailure`).
 - Under `-Z` curl's telnet session holds back later transfers, so the runner now awaits a telnet transfer before
   starting the next one; without that the repro printed `hello` first.
