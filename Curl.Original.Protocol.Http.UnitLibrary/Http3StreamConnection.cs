@@ -189,7 +189,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// <summary>
     /// Reads what has already arrived of a response <c>-f</c> failed, without waiting for more,
     /// and drops its body: curl takes those frames in with the head, so a stream whose end came
-    /// with them is closed and not cancelled (measured, BL-5983, ADR-1413). A read that fails
+    /// with them is closed and not cancelled (measured, BL-5983, ADR-1414). A read that fails
     /// stops the reading, and the stream is left to be cancelled.
     /// </summary>
     /// <returns>A task that completes at the response's end or when nothing more has arrived.</returns>

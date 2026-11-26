@@ -1,4 +1,4 @@
-# ADR-1413: A transfer -f fails over HTTP/3 keeps its connection
+# ADR-1414: A transfer -f fails over HTTP/3 keeps its connection
 
 - Status: Accepted. Decided by Claude under Stewart's delegation.
 - Date: 2026-11-25
