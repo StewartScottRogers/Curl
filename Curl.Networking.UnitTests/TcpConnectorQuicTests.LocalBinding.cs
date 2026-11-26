@@ -533,19 +533,22 @@ public sealed partial class TcpConnectorQuicTests
     private void ActBoundFrom(QuicServerChannelOpener opener) =>
         Diagnostics.Act("bound from", string.Join(", ", opener.BoundFrom));
 
-    // The port after the held one must be free for the range tests to bind it; other tests running in parallel
-    // take ephemeral ports, so look for a pair whose second port is free instead of going inconclusive.
+    // The pair is taken below 32768, under the ephemeral range of Windows (49152 up), Linux (32768 up) and
+    // macOS (49152 up). An ephemeral pair raced: Windows hands out ephemeral ports in order, so a test running
+    // in parallel that bound port 0 took the next port in the moment between the probe letting it go and the
+    // opener binding it, and a held port of 65535 left no next port to probe (BL-5980). The held port is even,
+    // so the next one is never held by the other call of this method.
     private static Socket BindUdpSocketWhosePortIsFollowedByAFreeOne()
     {
         for (var attempt = 0; attempt < 100; attempt++)
         {
+            var port = 20000 + (2 * Random.Shared.Next(6000));
             var candidate = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            candidate.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-            var nextPort = ((IPEndPoint)candidate.LocalEndPoint!).Port + 1;
             try
             {
+                candidate.Bind(new IPEndPoint(IPAddress.Loopback, port));
                 using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                probe.Bind(new IPEndPoint(IPAddress.Loopback, nextPort));
+                probe.Bind(new IPEndPoint(IPAddress.Loopback, port + 1));
                 return candidate;
             }
             catch (SocketException)
