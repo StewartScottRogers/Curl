@@ -38,3 +38,4 @@ a request whose body is `Http.Body` (`-F`, a streamed `-d`) sends the whole body
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 3707fcbc e2022751 3d836d5e.
