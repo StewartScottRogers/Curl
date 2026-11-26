@@ -24,6 +24,8 @@ public sealed class Http3ClientSession : IAsyncDisposable
     private readonly CancellationTokenSource stopReadingPeerStreams = new();
     private readonly Lock gate = new();
     private readonly SemaphoreSlim openingStreams = new(1, 1);
+    private readonly SemaphoreSlim writingDecoderStream = new(1, 1);
+    private Stream? qpackDecoderStream;
     private volatile Http3ControlStreamReader? controlStream;
     private Exception? connectionError;
     private long connectionErrorCode;
@@ -123,7 +125,8 @@ public sealed class Http3ClientSession : IAsyncDisposable
                 beforeFirstStream?.Invoke();
                 await Http3LocalUnidirectionalStreams.OpenControlStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), localSettings, cancellationToken).ConfigureAwait(false);
                 await Http3LocalUnidirectionalStreams.OpenQpackEncoderStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
-                await Http3LocalUnidirectionalStreams.OpenQpackDecoderStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+                qpackDecoderStream = await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false);
+                await Http3LocalUnidirectionalStreams.OpenQpackDecoderStreamAsync(qpackDecoderStream, cancellationToken).ConfigureAwait(false);
             }
 
             IMultiplexedStream stream = await Connection.OpenBidirectionalStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -156,6 +159,28 @@ public sealed class Http3ClientSession : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Aborts a request stream of this session with <c>H3_REQUEST_CANCELLED</c>, then writes its
+    /// QPACK Stream Cancellation on the decoder stream, one stream at a time.
+    /// </summary>
+    internal async ValueTask CancelRequestStreamAsync(IMultiplexedStream stream, CancellationToken cancellationToken)
+    {
+        stream.Abort((long)Http3ErrorCode.RequestCancelled);
+        await writingDecoderStream.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            Decoder.CancelStream(stream.StreamId);
+
+            // The decoder stream opened with the session's first request stream.
+            await qpackDecoderStream!.WriteAsync(Decoder.TakeDecoderStreamBytes(), cancellationToken).ConfigureAwait(false);
+            await qpackDecoderStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            writingDecoderStream.Release();
+        }
+    }
+
     /// <summary>Stops new request streams, as after the peer refused one with <c>H3_REQUEST_REJECTED</c>.</summary>
     public void StopNewStreams() => isStoppedByRefusedStream = true;
 
@@ -170,6 +195,7 @@ public sealed class Http3ClientSession : IAsyncDisposable
         await PeerStreamsReading.ConfigureAwait(false);
         stopReadingPeerStreams.Dispose();
         openingStreams.Dispose();
+        writingDecoderStream.Dispose();
         foreach (IMultiplexedStream stream in openedStreams.Concat(acceptedStreams))
         {
             await stream.DisposeAsync().ConfigureAwait(false);

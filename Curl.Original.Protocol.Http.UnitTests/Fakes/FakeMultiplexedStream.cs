@@ -30,7 +30,7 @@ public sealed class FakeMultiplexedStream(long streamId, byte[] incoming, int ch
     /// <summary>
     /// Gets the exception every write throws, or <see langword="null" /> to accept writes.
     /// </summary>
-    public Exception? WriteException { get; init; }
+    public Exception? WriteException { get; set; }
 
     /// <summary>Gets every byte the client wrote, in order.</summary>
     public MemoryStream Written { get; } = new();

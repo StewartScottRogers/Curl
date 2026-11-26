@@ -49,6 +49,9 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
     /// <summary>Runs in each wait, before it answers.</summary>
     public Action? Waiting { get; set; }
 
+    /// <summary>The timeout of every wait, in order.</summary>
+    public List<TimeSpan> WaitTimeouts { get; } = [];
+
     /// <summary>When set, one done message with this code is read for the transfer added last.</summary>
     public CurlCode? DoneResult { get; set; }
 
@@ -124,6 +127,7 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public ValueTask<(CurlMultiCode Code, int ReadySockets)> WaitAsync(Memory<CurlWaitSocket> extraSockets, TimeSpan timeout, CancellationToken cancellationToken)
     {
+        WaitTimeouts.Add(timeout);
         Waiting?.Invoke();
         for (int i = 0; i < extraSockets.Length; i++)
         {

@@ -110,17 +110,15 @@ public sealed class QpackDecoder
 
     /// <summary>
     /// Records that a request stream was reset or abandoned before its field section was
-    /// decoded, and queues a Stream Cancellation instruction (RFC 9204 section 4.4.2) when
-    /// the dynamic table is in use.
+    /// decoded, and queues a Stream Cancellation instruction (RFC 9204 section 4.4.2), also
+    /// with a dynamic table of capacity zero, where the RFC lets it be left out but curl's
+    /// nghttp3 sends it (measured, BL-5978).
     /// </summary>
     /// <param name="streamId">The stream.</param>
     public void CancelStream(long streamId)
     {
         blockedStreams.Remove(streamId);
-        if (maximumTableCapacity > 0)
-        {
-            QpackPrimitives.WriteInteger(decoderStreamBytes, streamId, 6, 0x40);
-        }
+        QpackPrimitives.WriteInteger(decoderStreamBytes, streamId, 6, 0x40);
     }
 
     /// <summary>

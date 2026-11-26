@@ -290,7 +290,7 @@ public sealed class Lib643To661Tests
     }
 
     [TestMethod]
-    public async Task Lib655_TracesDataWithoutTheHexColumn()
+    public async Task Lib655_TracesDataWithTheTimeAndWithoutTheHexColumn()
     {
         var engine = new FakeCurlEngine
         {
@@ -304,9 +304,7 @@ public sealed class Lib643To661Tests
 
         _ = await new Lib655(new ManualTimeProvider(DateTimeOffset.UnixEpoch)).RunAsync(run.Context, CancellationToken.None);
 
-        string error = run.Error.ToString();
-        Assert.Contains("0000: ok", error);
-        Assert.DoesNotContain("6f 6b", error);
+        StringAssert.StartsWith(run.Error.ToString(), "00:00:00.000000 => Send data, 2 bytes (0x2)\n0000: ok\n");
     }
 
     [TestMethod]

@@ -45,8 +45,9 @@ for byte.
    non-zero Required Insert Count; an Insert Count Increment only when the queued decoder
    stream bytes are taken, and only for insertions no acknowledgement already covers. This
    reproduces appendix B's decoder stream exactly (`84`, `01`, `48`).
-2. **Stream Cancellation** is sent for a cancelled stream whenever the advertised table
-   capacity is above 0, and never when it is 0 (RFC 9204 section 4.4.2 allows omitting it).
+2. **Stream Cancellation** is sent for every cancelled stream, whatever the advertised table
+   capacity (ADR-1410, which measured curl's nghttp3 sending it at capacity 0 and replaced
+   this point's omission at capacity 0).
 3. **Required Insert Count** must equal the largest referenced absolute index plus one;
    a larger one is `QPACK_DECOMPRESSION_FAILED`, which section 2.2.1 permits.
 4. A section beyond the Insert Count blocks its stream while fewer than the advertised

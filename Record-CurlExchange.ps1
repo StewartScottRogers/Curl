@@ -113,6 +113,11 @@
     1000, RespondAfterBodyBytes 0 holds each answer until curl's one-second wait for
     100 Continue has expired, so curl has begun sending the body before the answer
     comes: a deterministic early answer to an Expect: 100-continue upload (BL-3827).
+    With -Http2Origin, the HTTP/2 request is answered (as -ProxyStatus, -Http2Frames and
+    the like say) once this many DATA bytes have arrived, from 1 up, instead of at its
+    HEADERS, and no WINDOW_UPDATE is sent until then; 65535, the initial window, answers
+    an upload curl has stopped to wait for window, so the DATA recorded after the answer
+    shows whether curl goes on sending (BL-5973).
 
 .PARAMETER RequestReadMilliseconds
     How long each read of an HTTP request waits for its next byte before the request is
@@ -564,6 +569,38 @@
     frame's content is text, with \r and \n as CR and LF.
     Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2Frames 'H :status: 200|X-Upper: v','D! hello h2\n' -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-upper
 
+.PARAMETER Http3StalledOrigin
+    Serve HTTP/3 on UDP ListenAddress and Port over System.Net.Quic (msquic) with the
+    throwaway certificate of -Tls, so curl needs -k and an HTTP/3 build (BL-5978). Every
+    request is answered with a HEADERS frame holding the status of the first Response's
+    status line (200 when it has none) and, when that Response has a body (at most 16383
+    bytes), one DATA frame carrying it. Its stream is never ended, so -m ends the transfer,
+    unless -Http3EndStream is given. transcript.txt holds one line per QUIC event with the milliseconds since the
+    server was made: connections accepted, streams opened, bytes received (their count and
+    the first 64 in hex, so the client's QPACK decoder stream shows), FINs, the client's
+    stop-sendings ("writes closed by the client"), its stream resets ("read ended") and the
+    end of the connection, the last three with System.Net.Quic's error name and, where
+    there is one, the application error code. request.bin holds the request streams' bytes.
+    Needs pwsh; refused with every other server mode.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http3StalledOrigin -Port 18443 -Response 'HTTP/1.1 200 OK\r\n\r\nhello' -Curl <HTTP/3 curl> -CurlArgs '--http3-only','-k','-v','-m','2','https://127.0.0.1:18443/x' -OutDirectory fixtures\h3-stall
+
+.PARAMETER Http3EndStream
+    With -Http3StalledOrigin, end each answered stream (FIN) together with the answer, so
+    the origin does not stall, to measure how curl treats a response that is complete
+    (BL-5983: -f failing a 500).
+
+.PARAMETER Http3ResetCode
+    With -Http3StalledOrigin, reset the first request stream the origin answers (RESET_STREAM
+    with this application error code, such as 0x102 for H3_INTERNAL_ERROR) 500 ms after its
+    answer, so the head and any body have arrived; that answer never ends its stream. Later
+    requests are answered as without it, so -Http3EndStream lets a second URL finish. The
+    default, -1, resets nothing (BL-5997).
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http3StalledOrigin -Http3EndStream -Http3ResetCode 0x102 -Port 18443 -Response 'HTTP/1.1 200 OK\r\n\r\nhello' -Curl <HTTP/3 curl> -CurlArgs '--http3-only','-k','-v','-m','5','https://127.0.0.1:18443/x','https://127.0.0.1:18443/y' -OutDirectory fixtures\h3-reset
+
+.PARAMETER Http3ResetBeforeAnswer
+    With -Http3ResetCode, send the first request stream no answer at all: reset it as soon
+    as its request arrives.
+
 .PARAMETER ProxyAlpn
     With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
     to measure curl falling back to an HTTP/1.1 CONNECT when the proxy will not speak
@@ -753,6 +790,10 @@ param(
     [int] $Http2ResetCode = -1,
     [ValidatePattern('^(|push|nostatus|status:.*)$')] [string] $Http2Answer = '',
     [switch] $Http2NoSettings,
+    [switch] $Http3StalledOrigin,
+    [switch] $Http3EndStream,
+    [ValidateRange(-1, 4611686018427387903)] [long] $Http3ResetCode = -1,
+    [switch] $Http3ResetBeforeAnswer,
     [string[]] $Http2HeaderField = @(),
     [string[]] $Http2Frames = @(),
     [string] $Curl,
@@ -789,6 +830,12 @@ if ($Http2Origin -and $Http2Origin -ne 'alpn' -and $Tls) { throw '-Http2Origin h
 if ($Http2 -and -not $Tls -and -not $Http2Origin) { throw '-Http2 is an HTTPS proxy that picks h2 by ALPN, so it needs -Tls.' }
 if ($Http2 -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $NoServer -or $UnixSocket -or $Tftp)) { throw '-Http2 serves one HTTPS proxy connection, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -NoServer, -UnixSocket or -Tftp.' }
 if ($Http2 -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http2 needs PowerShell 7 (pwsh): Windows PowerShell 5.1''s .NET Framework cannot pick a protocol by ALPN as a TLS server.' }
+
+if ($Http3StalledOrigin -and ($Http2 -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $NoServer -or $UnixSocket -or $Tftp -or $UdpSink)) { throw '-Http3StalledOrigin serves HTTP/3 on UDP -Port, so it cannot be combined with -Http2, -Http2Origin, -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket, -Tftp or -UdpSink.' }
+if ($Http3StalledOrigin -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http3StalledOrigin needs PowerShell 7 (pwsh): Windows PowerShell 5.1''s .NET Framework has no System.Net.Quic.' }
+if ($Http3EndStream -and -not $Http3StalledOrigin) { throw '-Http3EndStream ends the streams of -Http3StalledOrigin, so it needs that switch.' }
+if ($Http3ResetCode -ge 0 -and -not $Http3StalledOrigin) { throw '-Http3ResetCode resets a stream of -Http3StalledOrigin, so it needs that switch.' }
+if ($Http3ResetBeforeAnswer -and $Http3ResetCode -lt 0) { throw '-Http3ResetBeforeAnswer resets with the code of -Http3ResetCode, so it needs that parameter.' }
 
 function Get-ReferenceCurlPath {
     # Git for Windows ships its curl in <Git>\ucrt64\bin from 2.56.0 (curl 8.22.0) and in
@@ -2200,7 +2247,7 @@ $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
-$tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $DohPort.Count -gt 0) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
+$tlsCertificate = if ($Tls -or $Http3StalledOrigin -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $DohPort.Count -gt 0) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
 if ($null -ne $tlsCertificate) {
     $publicKeyInfo = Get-SubjectPublicKeyInfo -Certificate $tlsCertificate
     $publicKeySha256 = [System.Convert]::ToBase64String([System.Security.Cryptography.SHA256]::Create().ComputeHash($publicKeyInfo))
@@ -2263,7 +2310,7 @@ public sealed class RecorderUnixSocketListener
     if (Test-Path -LiteralPath $UnixSocket) { Remove-Item -LiteralPath $UnixSocket -Force }
     $listener = New-Object RecorderUnixSocketListener($UnixSocket)
     $server = [System.Management.Automation.PowerShell]::Create()
-} elseif (-not $NoServer -and -not $Tftp) {
+} elseif (-not $NoServer -and -not $Tftp -and -not $Http3StalledOrigin) {
     $listener = New-Object System.Net.Sockets.TcpListener($ListenAddress, $Port)
     $listener.Start()
     $server = [System.Management.Automation.PowerShell]::Create()
@@ -2324,6 +2371,7 @@ public sealed class RecorderHttp2Proxy
     public string Answer { get; set; } = "";
     private readonly string[] _headerFields;
     public string[] Frames { get; set; } = new string[0];
+    public int AnswerAfterDataBytes { get; set; } = -1;
 
     public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode, string[] headerFields)
     {
@@ -2516,6 +2564,9 @@ public sealed class RecorderHttp2Proxy
         int tunnelStream = 0;
         if (upgraded) { tunnelStream = 1; AnswerConnect(stream, 1, false); }
         bool answered = false;
+        // With AnswerAfterDataBytes, the answer and every WINDOW_UPDATE wait for that much DATA.
+        bool answerPending = false;
+        int heldWindow = 0;
         while (true)
         {
             byte[] head = ReadExact(stream, 9);
@@ -2535,7 +2586,19 @@ public sealed class RecorderHttp2Proxy
                     if ((flags & 0x8) != 0) { start = 1; end = length - payload[0]; }
                     Note("> DATA" + frame + " " + (end - start) + " bytes: " + Escape(payload, start, end - start));
                     tunnel.Write(payload, start, end - start);
-                    if (end > start)
+                    if (answerPending)
+                    {
+                        heldWindow += length;
+                        if (tunnel.Length >= AnswerAfterDataBytes)
+                        {
+                            answerPending = false;
+                            AnswerConnect(stream, tunnelStream, false);
+                            WriteFrame(stream, 8, 0, 0, BigEndian32(heldWindow));
+                            WriteFrame(stream, 8, 0, tunnelStream, BigEndian32(heldWindow));
+                            Note("< WINDOW_UPDATE streams 0 and " + tunnelStream + " increment " + heldWindow);
+                        }
+                    }
+                    else if (end > start)
                     {
                         WriteFrame(stream, 8, 0, 0, BigEndian32(length));
                         WriteFrame(stream, 8, 0, streamId, BigEndian32(length));
@@ -2568,7 +2631,8 @@ public sealed class RecorderHttp2Proxy
                         if (tunnelStream == 0)
                         {
                             tunnelStream = streamId;
-                            AnswerConnect(stream, streamId, connect);
+                            if (AnswerAfterDataBytes >= 0 && !connect) { answerPending = true; }
+                            else { AnswerConnect(stream, streamId, connect); }
                         }
                     }
                     break;
@@ -2822,6 +2886,7 @@ public sealed class RecorderHttp2Proxy
     $http2Proxy.OmitSettings = [bool]$Http2NoSettings
     $http2Proxy.Answer = $Http2Answer
     $http2Proxy.Frames = [string[]] $Http2Frames
+    $http2Proxy.AnswerAfterDataBytes = $RespondAfterBodyBytes
 }
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
@@ -3410,6 +3475,218 @@ public sealed class RecorderTftpResponder
     $tftpReplies = [string[]] @($tftpSteps | ForEach-Object { $tftpOverrides[$_][0] })
     $tftpResponder = New-Object RecorderTftpResponder($ListenAddress, $Port, [byte[]] (ConvertFrom-EscapedResponse -Text $TftpData), [bool] $TftpNoOack, $TftpIdleMilliseconds, $tftpSteps, $tftpReplies)
 }
+$http3Origin = $null
+if ($Http3StalledOrigin) {
+    # System.Net.Quic (msquic) is the server; the HTTP/3 frames are the few bytes written here.
+    # The QPACK field section is two zero prefix bytes, then static index 25 (':status: 200')
+    # or, for another status, a literal value with that entry's name.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Net;
+using System.Net.Quic;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+public sealed class RecorderHttp3StalledOrigin
+{
+    private readonly StringBuilder _log = new StringBuilder();
+    private readonly MemoryStream _received = new MemoryStream();
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly CancellationTokenSource _stop = new CancellationTokenSource();
+    private readonly List<object> _kept = new List<object>();
+    private readonly IPEndPoint _endPoint;
+    private readonly X509Certificate2 _certificate;
+    private readonly byte[] _body;
+    private readonly string _status;
+    private readonly bool _endsStream;
+    private QuicListener _listener;
+    private readonly long _resetCode;
+    private readonly bool _resetsBeforeAnswer;
+    private int _connections;
+    private int _requests;
+
+    public RecorderHttp3StalledOrigin(IPAddress address, int port, X509Certificate2 certificate, string status, byte[] body, bool endsStream, long resetCode, bool resetsBeforeAnswer)
+    {
+        if (body.Length > 16383) { throw new ArgumentException("The HTTP/3 body must be at most 16383 bytes."); }
+        _endPoint = new IPEndPoint(address, port);
+        _certificate = certificate;
+        _status = status;
+        _body = body;
+        _endsStream = endsStream;
+        _resetCode = resetCode;
+        _resetsBeforeAnswer = resetsBeforeAnswer;
+    }
+
+    public string Log { get { lock (_log) { return _log.ToString(); } } }
+
+    public byte[] Received { get { lock (_received) { return _received.ToArray(); } } }
+
+    public void Start()
+    {
+        var protocols = new List<SslApplicationProtocol> { SslApplicationProtocol.Http3 };
+        _listener = QuicListener.ListenAsync(new QuicListenerOptions
+        {
+            ListenEndPoint = _endPoint,
+            ApplicationProtocols = protocols,
+            ConnectionOptionsCallback = (connection, hello, token) => new ValueTask<QuicServerConnectionOptions>(new QuicServerConnectionOptions
+            {
+                DefaultStreamErrorCode = 0x10c,
+                DefaultCloseErrorCode = 0x100,
+                IdleTimeout = TimeSpan.FromMinutes(5),
+                MaxInboundBidirectionalStreams = 100,
+                MaxInboundUnidirectionalStreams = 10,
+                ServerAuthenticationOptions = new SslServerAuthenticationOptions { ServerCertificate = _certificate, ApplicationProtocols = protocols },
+            }),
+        }).AsTask().GetAwaiter().GetResult();
+        Task.Run(AcceptConnectionsAsync);
+    }
+
+    public void Finish()
+    {
+        // Give the client's last frames a moment to arrive before the endpoint goes.
+        Thread.Sleep(1000);
+        _stop.Cancel();
+        _listener.DisposeAsync().AsTask().Wait(2000);
+    }
+
+    private async Task AcceptConnectionsAsync()
+    {
+        while (!_stop.IsCancellationRequested)
+        {
+            try
+            {
+                QuicConnection connection = await _listener.AcceptConnectionAsync(_stop.Token);
+                int number = ++_connections;
+                Record("connection " + number + " accepted");
+                Task serve = Task.Run(() => ServeConnectionAsync(connection, number));
+            }
+            catch (Exception error)
+            {
+                if (!_stop.IsCancellationRequested) { Record("accept failed: " + error.Message); }
+                return;
+            }
+        }
+    }
+
+    private async Task ServeConnectionAsync(QuicConnection connection, int number)
+    {
+        try
+        {
+            QuicStream control = await connection.OpenOutboundStreamAsync(QuicStreamType.Unidirectional, _stop.Token);
+            lock (_kept) { _kept.Add(connection); _kept.Add(control); }
+            // Stream type 0 (control), then an empty SETTINGS frame.
+            await control.WriteAsync(new byte[] { 0x00, 0x04, 0x00 }, _stop.Token);
+            while (true)
+            {
+                QuicStream stream = await connection.AcceptInboundStreamAsync(_stop.Token);
+                lock (_kept) { _kept.Add(stream); }
+                string name = "connection " + number + " stream " + stream.Id;
+                Record(name + " opened (" + stream.Type + ")");
+                Task read = Task.Run(() => ReadStreamAsync(stream, name));
+                if (stream.Type == QuicStreamType.Bidirectional)
+                {
+                    Task watch = Task.Run(() => WatchWritesAsync(stream, name));
+                }
+            }
+        }
+        catch (QuicException error)
+        {
+            Record("connection " + number + " ended: " + Describe(error));
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task ReadStreamAsync(QuicStream stream, string name)
+    {
+        var buffer = new byte[16384];
+        bool isAnswered = false;
+        try
+        {
+            while (true)
+            {
+                int count = await stream.ReadAsync(buffer, _stop.Token);
+                if (count == 0) { Record(name + " received FIN"); return; }
+                Record(name + " received " + BitConverter.ToString(buffer, 0, Math.Min(count, 64)).Replace("-", string.Empty).ToLowerInvariant() + " (" + count + " bytes)");
+                if (stream.Type != QuicStreamType.Bidirectional) { continue; }
+                lock (_received) { _received.Write(buffer, 0, count); }
+                if (isAnswered) { continue; }
+                isAnswered = true;
+                bool isReset = Interlocked.Increment(ref _requests) == 1 && _resetCode >= 0;
+                if (!isReset || !_resetsBeforeAnswer)
+                {
+                    bool endsStream = _endsStream && !isReset;
+                    await AnswerAsync(stream, endsStream);
+                    Record(name + " sent HEADERS :status " + _status + " and DATA of " + _body.Length + " bytes, stream " + (endsStream ? "ended" : "left open"));
+                }
+                if (isReset) { Task reset = Task.Run(() => ResetAsync(stream, name)); }
+            }
+        }
+        catch (QuicException error) { Record(name + " read ended: " + Describe(error)); }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task ResetAsync(QuicStream stream, string name)
+    {
+        // RESET_STREAM drops what is not yet delivered, so an answer is given time to arrive.
+        try { await Task.Delay(_resetsBeforeAnswer ? 0 : 500, _stop.Token); }
+        catch (OperationCanceledException) { return; }
+        Record(name + " reset with 0x" + _resetCode.ToString("x"));
+        stream.Abort(QuicAbortDirection.Write, _resetCode);
+    }
+
+    private async Task AnswerAsync(QuicStream stream, bool endsStream)
+    {
+        var answer = new MemoryStream();
+        if (_status == "200")
+        {
+            answer.Write(new byte[] { 0x01, 0x03, 0x00, 0x00, 0xd9 }, 0, 5);
+        }
+        else
+        {
+            // HEADERS of 8 bytes: the prefix, a literal naming static index 25, a 3-byte value.
+            answer.Write(new byte[] { 0x01, 0x08, 0x00, 0x00, 0x5f, 0x0a, 0x03 }, 0, 7);
+            answer.Write(Encoding.ASCII.GetBytes(_status), 0, 3);
+        }
+
+        if (_body.Length > 0)
+        {
+            // DATA, its length as a two-byte variable-length integer.
+            answer.Write(new byte[] { 0x00, (byte)(0x40 | (_body.Length >> 8)), (byte)_body.Length }, 0, 3);
+            answer.Write(_body, 0, _body.Length);
+        }
+        await stream.WriteAsync(answer.ToArray(), endsStream, _stop.Token);
+    }
+
+    private async Task WatchWritesAsync(QuicStream stream, string name)
+    {
+        try { await stream.WritesClosed; }
+        catch (QuicException error) { Record(name + " writes closed by the client: " + Describe(error)); }
+        catch (OperationCanceledException) { }
+    }
+
+    private static string Describe(QuicException error)
+    {
+        return error.QuicError + (error.ApplicationErrorCode.HasValue ? " 0x" + error.ApplicationErrorCode.Value.ToString("x") : string.Empty);
+    }
+
+    private void Record(string line)
+    {
+        lock (_log) { _log.Append(_clock.ElapsedMilliseconds).Append(" ms ").Append(line).Append('\n'); }
+    }
+}
+'@
+    $body = [System.Text.Encoding]::GetEncoding(28591).GetString($responseBytes[0])
+    $status = if ($body -match '^HTTP/\S+ (\d{3})') { $Matches[1] } else { '200' }
+    $bodyStart = $body.IndexOf("`r`n`r`n")
+    $body = if ($bodyStart -ge 0) { $body.Substring($bodyStart + 4) } else { '' }
+    $http3Origin = New-Object RecorderHttp3StalledOrigin($ListenAddress, $Port, $tlsCertificate, $status, [System.Text.Encoding]::GetEncoding(28591).GetBytes($body), [bool] $Http3EndStream, $Http3ResetCode, [bool] $Http3ResetBeforeAnswer)
+}
 # The sink never answers; the datagrams wait in its receive buffer until curl exits.
 $udpSinkClient = $null
 if ($UdpSink) {
@@ -3419,6 +3696,9 @@ if ($UdpSink) {
 try {
     if ($NoServer -or $Tftp) {
         $serverRun = $null
+    } elseif ($Http3StalledOrigin) {
+        $serverRun = $null
+        $http3Origin.Start()
     } elseif ($Http2) {
         $serverRun = $null
         $http2Proxy.Start()
@@ -3506,6 +3786,11 @@ try {
     }
 
     if ($null -ne $tftpResponder) { $tftpResponder.Stop() }
+    if ($null -ne $http3Origin) {
+        $http3Origin.Finish()
+        $requests = @(, @(, $http3Origin.Received))
+        [void] $transcript.Append($http3Origin.Log)
+    }
 
     $udpDatagrams = New-Object System.Text.StringBuilder
     if ($null -ne $udpSinkClient) {
@@ -3549,7 +3834,7 @@ if ($Tftp) {
 if ($null -ne $dnsResponder) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'dns.txt'), $dnsResponder.Log, [System.Text.Encoding]::ASCII)
 }
-if ($Smtp -or $Imap -or $Pop3 -or $Script -or $Http2) {
+if ($Smtp -or $Imap -or $Pop3 -or $Script -or $Http2 -or $Http3StalledOrigin) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
 $curlExecutable = $Curl

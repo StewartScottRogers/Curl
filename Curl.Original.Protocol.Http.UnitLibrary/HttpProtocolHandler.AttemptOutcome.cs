@@ -62,20 +62,28 @@ public sealed partial class HttpProtocolHandler
         public Http2Session? UpgradedSession { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether the exchange ran on a stream of an HTTP/2
-        /// connection, which a transfer that times out or that <c>-f</c> fails leaves intact
-        /// (BL-5974, BL-5977).
+        /// Gets or sets a value indicating whether the exchange ran on a stream of an HTTP/2 or
+        /// HTTP/3 connection, which a transfer that times out or that <c>-f</c> fails leaves
+        /// intact (BL-5974, BL-5977, BL-5978, BL-5983).
         /// </summary>
-        public bool RanOnHttp2Stream { get; set; }
+        public bool RanOnMultiplexedStream { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether that stream is an HTTP/3 one, whose connection
+        /// <c>--max-filesize</c> and a failed write leave intact too (BL-5996).
+        /// </summary>
+        public bool RanOnHttp3Stream { get; set; }
 
         /// <summary>
         /// Gets a value indicating whether the exchange timed out, or <c>-f</c> failed it before
-        /// its body, on an HTTP/2 stream: curl ends only the stream, reports the connection left
-        /// intact and keeps it for the next transfer. No retry may follow on it, so it does not
-        /// count towards <see cref="ReportsLeftIntact" />.
+        /// its body, on an HTTP/2 or HTTP/3 stream, or <c>--max-filesize</c> or a failed write
+        /// ended it on an HTTP/3 one (<see cref="FailsOnlyItsStream" />): curl ends only the
+        /// stream, reports the connection left intact and keeps it for the next transfer. No
+        /// retry may follow on it, so it does not count towards <see cref="ReportsLeftIntact" />.
         /// </summary>
-        public bool EndedOnlyItsHttp2Stream =>
-            RanOnHttp2Stream && !FailedAfterBody && Result.ExitCode is CurlExitCode.OperationTimedOut or CurlExitCode.HttpReturnedError;
+        public bool EndedOnlyItsStream =>
+            !FailedAfterBody && RanOnMultiplexedStream
+                && (Result.ExitCode == CurlExitCode.OperationTimedOut || FailsOnlyItsStream(Result.ExitCode, RanOnHttp3Stream));
 
         /// <summary>
         /// Gets a value indicating whether the connection is reported left intact: it

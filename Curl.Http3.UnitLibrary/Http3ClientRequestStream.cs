@@ -59,6 +59,17 @@ public sealed class Http3ClientRequestStream
         Stream.WriteAsync(ReadOnlyMemory<byte>.Empty, endStream: true, cancellationToken);
 
     /// <summary>
+    /// Gives up the request, as curl does: aborts the QUIC stream with
+    /// <c>H3_REQUEST_CANCELLED</c> (RESET_STREAM while the request is unfinished, STOP_SENDING
+    /// while the response is), then tells the server's QPACK encoder with a Stream Cancellation
+    /// on the decoder stream (RFC 9204 section 4.4.2).
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the cancellation is written.</returns>
+    public ValueTask CancelAsync(CancellationToken cancellationToken) =>
+        session.CancelRequestStreamAsync(Stream, cancellationToken);
+
+    /// <summary>
     /// Reads the next response frame, or DATA payload into <paramref name="buffer" />, or the end
     /// of the stream. Throws the session's <see cref="Http3ClientSession.ConnectionError" /> when
     /// there is one before or during the read.

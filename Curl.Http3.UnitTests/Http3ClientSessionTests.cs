@@ -50,6 +50,21 @@ public sealed class Http3ClientSessionTests
     }
 
     [TestMethod]
+    public async Task CancelAsync_ARequestStream_AbortsItAndWritesItsCancellationOnTheDecoderStream()
+    {
+        InMemoryMultiplexedConnection connection = new();
+        await using Http3ClientSession session = new(connection, LocalSettings);
+        await session.OpenRequestStreamAsync(null, CancellationToken.None);
+        Http3ClientRequestStream second = await session.OpenRequestStreamAsync(null, CancellationToken.None);
+
+        await second.CancelAsync(CancellationToken.None);
+
+        Assert.AreEqual((long)Http3ErrorCode.RequestCancelled, connection.BidirectionalStreams[1].AbortedWith);
+        Assert.IsNull(connection.BidirectionalStreams[0].AbortedWith);
+        CollectionAssert.AreEqual(new byte[] { 0x03, 0x44 }, connection.UnidirectionalStreams[2].Written.ToArray());
+    }
+
+    [TestMethod]
     public async Task EndRequestStream_WithAndWithoutLimit_ReportsStreamsLeftAndInUse()
     {
         InMemoryMultiplexedConnection limited = new() { BidirectionalStreamLimit = 10 };

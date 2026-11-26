@@ -366,18 +366,19 @@ public sealed class Lib2505To3100Tests
     }
 
     [TestMethod]
-    public async Task Lib3033_TracesToStandardErrorWithoutTheHexColumn()
+    public async Task Lib3033_TracesToStandardErrorWithTimesAndWithoutTheHexColumn()
     {
         var (engine, _) = EngineCountingAdds(_ => 1);
         engine.Multi.EachAddedDoneResult = CurlCode.Ok;
         engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 1));
         var run = new PortRun(engine, 3033, "http://x/3033");
+        var time = new ManualTimeProvider(new DateTimeOffset(2026, 10, 16, 14, 5, 6, TimeSpan.Zero));
 
-        _ = await new Lib3033(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+        _ = await new Lib3033(time).RunAsync(run.Context, CancellationToken.None);
 
         DebugCallback debug = engine.CreatedEasies[0].Options.Callbacks.Debug!;
         _ = debug(CurlInfoType.HeaderOut, "ok"u8);
-        StringAssert.EndsWith(run.Error.ToString(), "=> Send header, 2 bytes (0x2)\n0000: ok\n");
+        Assert.AreEqual("14:05:06.000000 => Send header, 2 bytes (0x2)\n0000: ok\n", run.Error.ToString());
     }
 
     [TestMethod]

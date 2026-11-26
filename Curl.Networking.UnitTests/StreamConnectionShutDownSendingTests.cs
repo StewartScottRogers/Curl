@@ -45,7 +45,9 @@ public sealed class StreamConnectionShutDownSendingTests
         await using var connection = new StreamConnection(client.GetStream(), remoteEndPoint: null);
 
         Task shutDown = Task.Run(() => connection.ShutDownSendingAsync(CancellationToken.None).AsTask());
-        Task finished = await Task.WhenAny(shutDown, Task.Delay(TimeSpan.FromSeconds(2)));
+        // A blocked shutdown stays blocked while the peer is open, so a long wait still catches it;
+        // a short one failed whenever a loaded machine was slow to schedule the shutdown (BL-5980).
+        Task finished = await Task.WhenAny(shutDown, Task.Delay(TimeSpan.FromSeconds(30)));
         peer.Dispose();
 
         Assert.AreSame(shutDown, finished, "ShutDownSendingAsync blocked reading a socket with nothing waiting.");

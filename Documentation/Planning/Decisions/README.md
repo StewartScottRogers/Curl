@@ -1450,3 +1450,11 @@ Each option and the specific reason it lost.
 | [1406](ADR-1406-a-red-only-an-interactive-session-can-fix-gets-a-revert-a-lane-can-make.md) | A red CI that only an interactive session can fix gets a revert a lane can make (BL-5175) | Accepted | 2026-11-25 |
 | [1407](ADR-1407-a-timed-out-http-2-transfers-connection-carries-the-next-transfer.md) | A timed-out HTTP/2 transfer's connection carries the next transfer (BL-5976) | Accepted | 2026-11-25 |
 | [1408](ADR-1408-a-transfer-f-fails-over-http-2-keeps-its-connection.md) | A transfer `-f` fails over HTTP/2 keeps its connection (BL-5977) | Accepted | 2026-11-25 |
+| [1409](ADR-1409-a-status-of-300-or-above-stops-an-http-2-upload-part-way.md) | A status of 300 or above stops an HTTP/2 upload part way (BL-5973) | Accepted | 2026-11-25 |
+| [1410](ADR-1410-a-timed-out-http-3-transfer-cancels-its-stream-and-keeps-its-connection.md) | A timed-out HTTP/3 transfer cancels its stream and keeps its connection (BL-5978) | Accepted | 2026-11-25 |
+| [1411](ADR-1411-a-status-of-300-or-above-stops-an-http-3-upload-part-way.md) | A status of 300 or above stops an HTTP/3 upload part way (BL-5979) | Accepted | 2026-11-25 |
+| [1412](ADR-1412-a-cancelled-http-3-streams-quic-close-line-is-written-by-the-next-read.md) | A cancelled HTTP/3 stream's quic close line is written by the next read (BL-5982) | Accepted | 2026-11-25 |
+| [1413](ADR-1413-the-http-3-peer-idle-timeout-line-is-written-for-each-stream-opened-on-an-idle-connection.md) | The HTTP/3 peer idle timeout line is written for each stream opened on an idle connection (BL-5995) | Accepted | 2026-11-25 |
+| [1414](ADR-1414-a-transfer-f-fails-over-http-3-keeps-its-connection.md) | A transfer -f fails over HTTP/3 keeps its connection (BL-5983) | Accepted | 2026-11-25 |
+| [1415](ADR-1415-a-max-filesize-or-write-failure-over-http-3-keeps-its-connection.md) | A --max-filesize or write failure over HTTP/3 keeps its connection (BL-5996) | Accepted | 2026-11-25 |
+| [1416](ADR-1416-a-stream-the-server-resets-over-http-3-keeps-its-connection.md) | A stream the server resets over HTTP/3 keeps its connection (BL-5997) | Accepted | 2026-11-25 |
