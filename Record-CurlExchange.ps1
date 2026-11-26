@@ -589,6 +589,18 @@
     the origin does not stall, to measure how curl treats a response that is complete
     (BL-5983: -f failing a 500).
 
+.PARAMETER Http3ResetCode
+    With -Http3StalledOrigin, reset the first request stream the origin answers (RESET_STREAM
+    with this application error code, such as 0x102 for H3_INTERNAL_ERROR) 500 ms after its
+    answer, so the head and any body have arrived; that answer never ends its stream. Later
+    requests are answered as without it, so -Http3EndStream lets a second URL finish. The
+    default, -1, resets nothing (BL-5997).
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http3StalledOrigin -Http3EndStream -Http3ResetCode 0x102 -Port 18443 -Response 'HTTP/1.1 200 OK\r\n\r\nhello' -Curl <HTTP/3 curl> -CurlArgs '--http3-only','-k','-v','-m','5','https://127.0.0.1:18443/x','https://127.0.0.1:18443/y' -OutDirectory fixtures\h3-reset
+
+.PARAMETER Http3ResetBeforeAnswer
+    With -Http3ResetCode, send the first request stream no answer at all: reset it as soon
+    as its request arrives.
+
 .PARAMETER ProxyAlpn
     With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
     to measure curl falling back to an HTTP/1.1 CONNECT when the proxy will not speak
@@ -780,6 +792,8 @@ param(
     [switch] $Http2NoSettings,
     [switch] $Http3StalledOrigin,
     [switch] $Http3EndStream,
+    [ValidateRange(-1, 4611686018427387903)] [long] $Http3ResetCode = -1,
+    [switch] $Http3ResetBeforeAnswer,
     [string[]] $Http2HeaderField = @(),
     [string[]] $Http2Frames = @(),
     [string] $Curl,
@@ -820,6 +834,8 @@ if ($Http2 -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http2 needs Pow
 if ($Http3StalledOrigin -and ($Http2 -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $NoServer -or $UnixSocket -or $Tftp -or $UdpSink)) { throw '-Http3StalledOrigin serves HTTP/3 on UDP -Port, so it cannot be combined with -Http2, -Http2Origin, -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket, -Tftp or -UdpSink.' }
 if ($Http3StalledOrigin -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http3StalledOrigin needs PowerShell 7 (pwsh): Windows PowerShell 5.1''s .NET Framework has no System.Net.Quic.' }
 if ($Http3EndStream -and -not $Http3StalledOrigin) { throw '-Http3EndStream ends the streams of -Http3StalledOrigin, so it needs that switch.' }
+if ($Http3ResetCode -ge 0 -and -not $Http3StalledOrigin) { throw '-Http3ResetCode resets a stream of -Http3StalledOrigin, so it needs that switch.' }
+if ($Http3ResetBeforeAnswer -and $Http3ResetCode -lt 0) { throw '-Http3ResetBeforeAnswer resets with the code of -Http3ResetCode, so it needs that parameter.' }
 
 function Get-ReferenceCurlPath {
     # Git for Windows ships its curl in <Git>\ucrt64\bin from 2.56.0 (curl 8.22.0) and in
@@ -3490,9 +3506,12 @@ public sealed class RecorderHttp3StalledOrigin
     private readonly string _status;
     private readonly bool _endsStream;
     private QuicListener _listener;
+    private readonly long _resetCode;
+    private readonly bool _resetsBeforeAnswer;
     private int _connections;
+    private int _requests;
 
-    public RecorderHttp3StalledOrigin(IPAddress address, int port, X509Certificate2 certificate, string status, byte[] body, bool endsStream)
+    public RecorderHttp3StalledOrigin(IPAddress address, int port, X509Certificate2 certificate, string status, byte[] body, bool endsStream, long resetCode, bool resetsBeforeAnswer)
     {
         if (body.Length > 16383) { throw new ArgumentException("The HTTP/3 body must be at most 16383 bytes."); }
         _endPoint = new IPEndPoint(address, port);
@@ -3500,6 +3519,8 @@ public sealed class RecorderHttp3StalledOrigin
         _status = status;
         _body = body;
         _endsStream = endsStream;
+        _resetCode = resetCode;
+        _resetsBeforeAnswer = resetsBeforeAnswer;
     }
 
     public string Log { get { lock (_log) { return _log.ToString(); } } }
@@ -3596,15 +3617,30 @@ public sealed class RecorderHttp3StalledOrigin
                 lock (_received) { _received.Write(buffer, 0, count); }
                 if (isAnswered) { continue; }
                 isAnswered = true;
-                await AnswerAsync(stream);
-                Record(name + " sent HEADERS :status " + _status + " and DATA of " + _body.Length + " bytes, stream " + (_endsStream ? "ended" : "left open"));
+                bool isReset = Interlocked.Increment(ref _requests) == 1 && _resetCode >= 0;
+                if (!isReset || !_resetsBeforeAnswer)
+                {
+                    bool endsStream = _endsStream && !isReset;
+                    await AnswerAsync(stream, endsStream);
+                    Record(name + " sent HEADERS :status " + _status + " and DATA of " + _body.Length + " bytes, stream " + (endsStream ? "ended" : "left open"));
+                }
+                if (isReset) { Task reset = Task.Run(() => ResetAsync(stream, name)); }
             }
         }
         catch (QuicException error) { Record(name + " read ended: " + Describe(error)); }
         catch (OperationCanceledException) { }
     }
 
-    private async Task AnswerAsync(QuicStream stream)
+    private async Task ResetAsync(QuicStream stream, string name)
+    {
+        // RESET_STREAM drops what is not yet delivered, so an answer is given time to arrive.
+        try { await Task.Delay(_resetsBeforeAnswer ? 0 : 500, _stop.Token); }
+        catch (OperationCanceledException) { return; }
+        Record(name + " reset with 0x" + _resetCode.ToString("x"));
+        stream.Abort(QuicAbortDirection.Write, _resetCode);
+    }
+
+    private async Task AnswerAsync(QuicStream stream, bool endsStream)
     {
         var answer = new MemoryStream();
         if (_status == "200")
@@ -3624,7 +3660,7 @@ public sealed class RecorderHttp3StalledOrigin
             answer.Write(new byte[] { 0x00, (byte)(0x40 | (_body.Length >> 8)), (byte)_body.Length }, 0, 3);
             answer.Write(_body, 0, _body.Length);
         }
-        await stream.WriteAsync(answer.ToArray(), _endsStream, _stop.Token);
+        await stream.WriteAsync(answer.ToArray(), endsStream, _stop.Token);
     }
 
     private async Task WatchWritesAsync(QuicStream stream, string name)
@@ -3649,7 +3685,7 @@ public sealed class RecorderHttp3StalledOrigin
     $status = if ($body -match '^HTTP/\S+ (\d{3})') { $Matches[1] } else { '200' }
     $bodyStart = $body.IndexOf("`r`n`r`n")
     $body = if ($bodyStart -ge 0) { $body.Substring($bodyStart + 4) } else { '' }
-    $http3Origin = New-Object RecorderHttp3StalledOrigin($ListenAddress, $Port, $tlsCertificate, $status, [System.Text.Encoding]::GetEncoding(28591).GetBytes($body), [bool] $Http3EndStream)
+    $http3Origin = New-Object RecorderHttp3StalledOrigin($ListenAddress, $Port, $tlsCertificate, $status, [System.Text.Encoding]::GetEncoding(28591).GetBytes($body), [bool] $Http3EndStream, $Http3ResetCode, [bool] $Http3ResetBeforeAnswer)
 }
 # The sink never answers; the datagrams wait in its receive buffer until curl exits.
 $udpSinkClient = $null
