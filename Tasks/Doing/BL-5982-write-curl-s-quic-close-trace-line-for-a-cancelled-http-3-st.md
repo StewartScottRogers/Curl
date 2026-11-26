@@ -31,3 +31,4 @@ ADR-1410 (BL-5978): curl 8.18.0 writes the line during the next transfer on the 
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 8375b780 c3b70efa 3d836d5e.
