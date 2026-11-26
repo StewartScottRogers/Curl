@@ -169,6 +169,9 @@ internal sealed class FtpSession(
 
     private const string OutOfMemoryMessage = "Out of memory";
 
+    /// <summary>The key the engine reads a cancelled transfer's report from, spelled as <c>EndPointReportingProtocolHandler.ReportDataKey</c> spells it.</summary>
+    private const string CancelledReportDataKey = "Curl.Engine.TransferReport";
+
     /// <summary>The parser a wildcard download's <c>LIST</c> reply goes to instead of the output; <see langword="null" /> otherwise.</summary>
     private FtpFileListParser? listParser;
 
@@ -359,6 +362,18 @@ internal sealed class FtpSession(
         catch (FtpControlConversationFailedException lost)
         {
             result = lost.Result;
+        }
+        catch (OperationCanceledException cancelled)
+        {
+            // A cancellation that leaves the session, -m passing during the data connect for one, still
+            // reports what was read: the engine takes this report off the exception (STD-111, BL-6016).
+            cancelled.Data[CancelledReportDataKey] = new TransferReport
+            {
+                ResponseCode = lastReplyCode,
+                FtpEntryPath = entryPath,
+                PseudoHeaders = PseudoHeadersOf(TransferResult.Failure(CurlExitCode.OperationTimedOut, cancelled.Message)),
+            };
+            throw;
         }
 
         trace.Ended(result.ExitCode);

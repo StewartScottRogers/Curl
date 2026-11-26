@@ -139,6 +139,30 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_CancelledNonHttpTransferWithHandlerReport_CountsItsConnectionsAndTimesIt_BL6016()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("ftp", _ =>
+            {
+                recorder.Record(new IPEndPoint(IPAddress.Loopback, 50000), new IPEndPoint(IPAddress.Loopback, 21), timings: new ConnectTimings(1, null, 5, null));
+                OperationCanceledException cancelled = new();
+                cancelled.Data["Curl.Engine.TransferReport"] = new TransferReport { ResponseCode = 227 };
+                throw cancelled;
+            }),
+            recorder);
+
+        OperationCanceledException thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await handler.ExecuteAsync(ContextOf(time, url: "ftp://127.0.0.1/f")));
+
+        TransferReport report = EndPointReportingProtocolHandler.ReportCarriedBy(thrown)!;
+        Assert.AreEqual(227, report.ResponseCode);
+        Assert.AreEqual(1, report.ConnectionCount);
+        Assert.IsNotNull(report.Timings);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_CancelledBeforeConnecting_CarriesTimingsOnly_BL5843()
     {
         ManualTimeProvider time = new();

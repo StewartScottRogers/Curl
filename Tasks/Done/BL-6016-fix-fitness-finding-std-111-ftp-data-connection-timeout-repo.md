@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs]
+touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Original.Protocol.Ftp.UnitTests/FtpNumHeadersTests.cs, Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerTimingsTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6016 — Fix fitness finding STD-111: FTP data-connection timeout reports %{num_headers} 0 and %{response_code} 000 (PARTLY FIXED)
 
@@ -39,13 +39,29 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the commands print `[4]` and `[4|227]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the commands print `[4]` and `[4|227]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: `-m` passing during the data connect leaves `FtpSession.RunAsync` as an `OperationCanceledException`, so no
+  report was built. The session now puts a report (last reply code, colon reply lines, entry path) on the exception
+  under `Curl.Engine.TransferReport`, the way the HTTP handler does (BL-5862), and rethrows, so the engine's watchdog
+  still words the failure. No new decision, so no ADR.
+- `touches` widened: `EndPointReportingProtocolHandler` took any handler report on a cancellation to mean the handler
+  had counted its connections, which only HTTP does, so `%{num_connects}` would have become 0. No other task in Doing
+  named these files.
+- `--connect-timeout 3` does not end the data dial in curl 8.22.0 or Curl; both commands end at `-m 8`.
+- Measured 2026-11-26 with `Record-CurlExchange.ps1 -Ftp`, real curl 8.22.0 against Curl: with the four colon replies
+  `220`, `230` (to `USER`), `500` (to `EPSV`) and `227`, and a `PWD` reply holding no colon, both print `[4]` and
+  `[4|227]`, exit 28. With every reply holding a colon both print 6; the count is the colon reply lines read.
+  `%{num_connects}` 1 and `%{ftp_entry_path}` `/` match too.
+- Quality: `Measure-CodeQuality.ps1` for the FTP and Engine libraries, 0 failing members. Fast tests green.
+- Left: `-v` closing lines and `%{size_header}` differ on this path (BL-6049).
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 8df5245c 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. FTP -m timeout during the data connect now reports num_headers and response_code as curl does

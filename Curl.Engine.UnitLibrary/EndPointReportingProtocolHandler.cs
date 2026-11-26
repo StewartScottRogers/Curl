@@ -64,14 +64,17 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
             TransferReport? handlerReport = ReportCarriedBy(cancelled);
             TransferResult connected = recorder.ReportOn(
                 TransferResult.Failure(CurlExitCode.OperationTimedOut, cancelled.Message) with { Report = handlerReport },
-                handlerCountsConnections: handlerReport is not null);
+                handlerCountsConnections: handlerReport is not null && CountsItsConnections(context));
             cancelled.Data[ReportDataKey] = StampTimingsAndUploadSize(connected, context, started, UploadedBy(context, UploadPosition(context) - uploadStart, true), true).Report;
             throw;
         }
 
-        result = recorder.ReportOn(result, handlerCountsConnections: result.Report is not null && context.Url.Scheme is "http" or "https");
+        result = recorder.ReportOn(result, handlerCountsConnections: result.Report is not null && CountsItsConnections(context));
         return StampTimingsAndUploadSize(result, context, started, UploadedBy(context, UploadPosition(context) - uploadStart, result.IsSuccess));
     }
+
+    // Only the HTTP handler counts its connections on its report; every other scheme's are counted by the recorder.
+    private static bool CountsItsConnections(ITransferContext context) => context.Url.Scheme is "http" or "https";
 
     // Gives a report with no timings the transfer's connect and total times and, when it sent none itself, the bytes the upload stream gave (BL-5410). A failure with no report stays without one (BL-5421), and one that never connected sent nothing.
     private TransferResult StampTimingsAndUploadSize(TransferResult result, ITransferContext context, long started, long uploaded, bool cancelled = false)

@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using Curl.Original.Protocol.Ftp.Fakes;
 using Curl.Protocol.Abstractions;
 
@@ -106,5 +108,40 @@ public sealed class FtpNumHeadersTests
         FtpRun run = await FtpRun.ExecuteAsync(FileUrl, "220 hi: there\r\n530 no: way\r\n");
 
         Assert.AreEqual(2, NumHeaders(run.Report));
+    }
+
+    /// <summary>
+    /// STD-111 (BL-6016): <c>-m</c> passing during the passive data connect cancels the transfer, and the
+    /// cancellation carries the report the engine reads. Measured 2026-11-26 with
+    /// <c>Record-CurlExchange.ps1 -Ftp</c>: curl 8.22.0 prints <c>[6|227]</c> for these six replies.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_CancelledDuringTheDataConnect_CarriesTheReplyCountAndLastCodeOnTheCancellation()
+    {
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "220 hi: x\r\n331 pw: x\r\n230 ok: x\r\n257 \"/\" is: cwd\r\n500 no: refused\r\n227 Entering: (10,255,255,1,10,10)\r\n"));
+        var handler = new FtpProtocolHandler(
+            new QueuedConnector(ConnectResult.Connected(control)),
+            new CancellingDataConnector(),
+            new QueuedListener(),
+            new QueuedTlsProvider(),
+            new NamedDnsResolver(new Dictionary<string, IPAddress[]>()),
+            new NamedNetworkInterfaceLookup(new Dictionary<string, IPAddress[]>()));
+        var context = new TransferContext { Url = CurlUrl.Parse(FileUrl), Output = new MemoryStream(), FtpSkipPasvIp = false };
+
+        OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await handler.ExecuteAsync(context));
+
+        var report = (TransferReport)cancelled.Data["Curl.Engine.TransferReport"]!;
+        Assert.AreEqual(227, report.ResponseCode);
+        Assert.AreEqual(6, NumHeaders(report));
+        Assert.AreEqual("/", report.FtpEntryPath);
+    }
+
+    /// <summary>A data connector whose dial ends as a cancelled one does.</summary>
+    private sealed class CancellingDataConnector : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            throw new OperationCanceledException();
     }
 }
