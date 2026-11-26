@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.DeadlineAtNow.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5990 — Fix AF-0996: Surviving mutant: the multi handle can treat a transfer whose deadline is exactly now as still settled (<= -> <)
 
@@ -32,12 +32,25 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs line 273`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs line 273`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killing test: `ManagedMultiTransferTests.SocketActionAsync_DeadlineExactlyNow_LetsTheTransferGoOnUntilItTimesOut`
+  (new file `Curl.Engine.UnitTests/ManagedMultiTransferTests.DeadlineAtNow.cs`, added to `touches`;
+  no other task in Doing named it). With `<=` changed to `<` by hand it fails with
+  `expected: (Ok, 0)`, `actual: (Ok, 1)`; with `<=` restored the fast tests all pass.
+- No production change: line 273 was already right; only the test was missing.
+- `TimerManualTimeProvider` moves only timestamps, not `GetUtcNow`, which `IsSettled` reads, so the
+  test uses its own clock that stops exactly on the deadline. The transfer ends a real second after
+  the action starts: correct code waits for it (up to 30 s), so load cannot fail the test; the
+  mutant returns at once with the transfer still running.
+- Pipeline `feature` collapsed to writing the one test in the session: no behaviour, design or
+  document changes, so no ADR and no stage agents.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: f9a44c83 9742157d.
+- 2026-11-25: Doing -> Done. A fast test now stops the clock exactly on a socket-waiting transfer's deadline and kills AF-0996's <= to < mutant
