@@ -1,4 +1,4 @@
-# ADR-1426: The resumable upload creation request has no body
+# ADR-1428: The resumable upload creation request has no body
 
 - Status: Accepted
 - Date: 2026-11-26

@@ -19,7 +19,7 @@ without asking for authentication.
 
 ## Context
 
-Found in BL-6034 (EXT-129, ADR-1426), which fixed the creation request only. The append `PATCH` in
+Found in BL-6034 (EXT-129, ADR-1428), which fixed the creation request only. The append `PATCH` in
 `Transfer/ResumableUploadFlow.cs` has a body, so curl's HTTP handler sends it as an empty probe (`Content-Length: 0`,
 `HttpProtocolHandler.FirstAuthorization.cs`) and, after a 2xx, again with the body; measured with a loopback tus mock:
 `OPTIONS(0) POST(0) PATCH(0) PATCH(3)`. tus appends nothing for the empty one. The IETF draft's probe carries

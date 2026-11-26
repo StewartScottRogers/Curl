@@ -19,7 +19,7 @@ internal sealed class ResumableUploadFlow(IResumableUploadProtocol protocol, Res
     public async Task<ResumableUploadExchange> UploadAsync(Uri target, Stream body)
     {
         // The creation has no body, only Content-Length: 0: curl's handler sends a request with a body, however empty,
-        // as a --digest or --ntlm probe and again after a 2xx, creating a second upload resource (EXT-129, ADR-1426).
+        // as a --digest or --ntlm probe and again after a 2xx, creating a second upload resource (EXT-129, ADR-1428).
         IReadOnlyList<KeyValuePair<string, string>> creationHeaders = [.. protocol.CreationHeaders(body.Length), new("Content-Length", "0")];
         var creation = await ResumeAsync(_ => session.SendAsync(protocol.CreationMethod, target, creationHeaders));
         if (!creation.IsSuccess)

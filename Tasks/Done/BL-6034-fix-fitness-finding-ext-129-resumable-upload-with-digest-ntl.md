@@ -43,7 +43,7 @@ The finding, verbatim:
 ## Notes
 
 - Cause: the creation request carried an empty upload stream, so curl's handler treated it as a request with a body,
-  sent it as the `--digest`/`--ntlm` probe, and after the 2xx sent it again. Fix (ADR-1426): creation has no body,
+  sent it as the `--digest`/`--ntlm` probe, and after the 2xx sent it again. Fix (ADR-1428): creation has no body,
   only `Content-Length: 0`; a request without a body also drops `-H "Transfer-Encoding: ..."`, which would give it one.
 - `touches` widened (no other task in Doing names these): `ResumableUploadSession.cs`, the library's `CLAUDE.md` and
   the hook tests.
