@@ -47,7 +47,7 @@ public sealed class CacheDirectory(string path)
         {
             var full = Path.GetFullPath(path);
             var names = full[Path.GetPathRoot(full.AsSpan()).Length..].Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (names.All(name => name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0) && !File.Exists(full))
+            if (names.All(name => name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0) && !IsOrLiesUnderAFile(full))
             {
                 return path;
             }
@@ -58,6 +58,19 @@ public sealed class CacheDirectory(string path)
         }
 
         throw new ArgumentException($"--cache-dir cannot use '{path}'");
+    }
+
+    private static bool IsOrLiesUnderAFile(string fullPath)
+    {
+        for (var current = fullPath; current is not null; current = Path.GetDirectoryName(current))
+        {
+            if (File.Exists(current))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private string EntryPath(string key) => Path.Combine(_path, key + ".entry");

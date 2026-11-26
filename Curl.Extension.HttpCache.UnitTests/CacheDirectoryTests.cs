@@ -168,4 +168,30 @@ public sealed class CacheDirectoryTests
 
         Assert.AreEqual($"--cache-dir cannot use '{file}'", exception.Message);
     }
+
+    [TestMethod]
+    [DataRow("recfile/sub")]
+    [DataRow("recfile/sub/deeper")]
+    [DataRow("recfile/")]
+    public void Constructor_PathAtOrUnderAnExistingFile_ThrowsMessageNamingOptionAndPath(string relativePath)
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(Path.Combine(_directory, "recfile"), "x");
+        var path = _directory + "/" + relativePath;
+
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => new CacheDirectory(path));
+
+        Assert.AreEqual($"--cache-dir cannot use '{path}'", exception.Message);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_DirectoryWhoseParentsDoNotExist_CreatesThemAndStoresTheEntry()
+    {
+        var cache = new CacheDirectory(Path.Combine(_directory, "missing", "sub"));
+        var key = CacheKey.For("GET", new Uri("http://example.com/"));
+
+        await cache.WriteAsync(key, Sample(), TestContext.CancellationToken);
+
+        AssertSame(Sample(), await cache.ReadAsync(key, TestContext.CancellationToken));
+    }
 }
