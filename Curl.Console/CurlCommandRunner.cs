@@ -3764,17 +3764,24 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Parses <paramref name="url" /> with any <c>-G</c> / <c>--url-query</c> query appended, or says why curl refuses it:
-    /// a URL curl cannot parse before the query goes on fails to set the query (CGR-190, BL-3719).
+    /// Parses <paramref name="url" /> with any <c>-G</c> / <c>--url-query</c> query appended, or says why curl refuses the
+    /// transfer before it connects, in curl's order: a URL curl cannot parse before the query goes on fails to set the query
+    /// (CGR-190, BL-3719), then a malformed <c>--resolve</c> entry, then a URL curl cannot parse.
     /// </summary>
-    private bool TryParseQueriedUrl(string url, CommandLineOptions options, UrlTransfer transfer, [NotNullWhen(true)] out CurlUrl? transferUrl, [NotNullWhen(false)] out TransferResult? failure)
+    private bool TryCheckResolveEntriesAndParseUrl(string url, CommandLineOptions options, UrlTransfer transfer, [NotNullWhen(true)] out CurlUrl? transferUrl, [NotNullWhen(false)] out TransferResult? failure)
     {
         string queriedUrl = QueryUrl.Append(url, options);
-        failure = null;
         if (QueryRejected(url, queriedUrl))
         {
             transferUrl = null;
             failure = TransferResult.Failure(CurlExitCode.UrlMalformat, "Could not parse the URL, failed to set query");
+            return false;
+        }
+
+        failure = MalformedResolveFailure(options, EventsBeforeConnecting(transfer));
+        if (failure is not null)
+        {
+            transferUrl = null;
             return false;
         }
 
@@ -3783,13 +3790,14 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        failure = MalformedResolveFailure(options, EventsBeforeConnecting(transfer)) ?? TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
+        failure = TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
         return false;
     }
 
     /// <summary>
     /// The exit 49 failure for a malformed <c>--resolve</c> entry, or <see langword="null" /> when every entry parses: curl loads
-    /// <c>CURLOPT_RESOLVE</c> before it parses the URL, so the entry is reported ahead of a URL rejection (AF-0807), as an info line first (BL-5263). A <c>-G</c> query rejection comes before it: the tool fails that one itself (exit 3).
+    /// <c>CURLOPT_RESOLVE</c> as each transfer starts, so the entry fails the transfer before any connection is made or reused
+    /// (STD-225, BL-6022) and ahead of a URL rejection (AF-0807), as an info line first (BL-5263). A <c>-G</c> query rejection comes before it: the tool fails that one itself (exit 3).
     /// </summary>
     private static TransferResult? MalformedResolveFailure(CommandLineOptions options, ITransferEvents events)
     {
@@ -3878,7 +3886,8 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Tells whether a transfer got as far as a connection of its own: every transfer does
-    /// but one whose URL curl rejects before connecting, with exit 1 or 3. curl 8.21.0 printed
+    /// but one curl refuses before connecting, for a rejected URL (exit 1 or 3) or a malformed
+    /// <c>--resolve</c> entry (exit 49; <c>-1</c> measured on curl 8.22.0, BL-6022). curl 8.21.0 printed
     /// <c>conn_id</c> <c>0</c> for a refused connection (exit 7) and <c>-1</c> for a rejected
     /// URL (exit 3); no connection is reused, so each transfer that connects takes the next number
     /// (measured 2026-09-26, BL-284 Notes).
@@ -3888,7 +3897,14 @@ internal sealed class CurlCommandRunner(
     private static bool UsedAConnection(TransferResult result) =>
         result.ExitCode is not CurlExitCode.UrlMalformat
         && !IsUnsupportedProtocolRejection(result)
+        && !IsMalformedResolveRejection(result)
         && !IsIpfsGatewayFailure(result);
+
+    /// <summary>Tells whether a result is the exit 49 refusal of a malformed <c>--resolve</c> entry, which happens before any connection.</summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for that refusal; a <c>--connect-to</c> or <c>-t</c> exit 49 is not one.</returns>
+    private static bool IsMalformedResolveRejection(TransferResult result) =>
+        result.ErrorMessage?.StartsWith("Could not parse CURLOPT_RESOLVE entry ", StringComparison.Ordinal) == true;
 
     /// <summary>
     /// Tells whether a result is an exit 1 refusal of a URL's scheme, which happens before any connection;
@@ -4582,7 +4598,7 @@ internal sealed class CurlCommandRunner(
         EasyProxyOptions proxyOptions = EasyOptionsFromCommandLine.ProxyOf(options);
         EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
 
-        if (!TryParseQueriedUrl(url, options, transfer, out CurlUrl? transferUrl, out TransferResult? urlFailure))
+        if (!TryCheckResolveEntriesAndParseUrl(url, options, transfer, out CurlUrl? transferUrl, out TransferResult? urlFailure))
         {
             return urlFailure;
         }

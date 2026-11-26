@@ -9,8 +9,9 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins that a malformed <c>--resolve</c> entry exits 49 even when the URL is rejected, as curl 8.22.0 does
-/// (AF-0807): it loads the list before it parses the URL.
+/// Pins that a malformed <c>--resolve</c> entry exits 49 as each transfer starts, as curl 8.22.0 does: it loads the
+/// list before it parses the URL (AF-0807) and before it looks for a connection to reuse (STD-225, BL-6022,
+/// measured with <c>Record-CurlExchange.ps1</c> on 2026-11-26).
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerMalformedResolveTests
@@ -55,17 +56,44 @@ public sealed class CurlCommandRunnerMalformedResolveTests
         Assert.AreEqual(3, exitCode);
     }
 
-    private static async Task<(int ExitCode, string Error)> RunAsync(params string[] arguments)
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task RunAsync_MalformedResolveInALaterGroupOnAReusableConnection_Exits49WithoutSendingTheRequest(bool parallel)
+    {
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+        MemoryStream standardOutput = new();
+        string[] arguments =
+        [
+            .. parallel ? new[] { "-Z" } : [],
+            "-sS", "http://127.0.0.1:24000/hello",
+            "--next", "-sS", "--resolve", "bad", "http://127.0.0.1:24000/json", "-w", "[%{exitcode} %{num_connects} %{conn_id}]\n",
+        ];
+
+        (int exitCode, string error) = await RunAsync(server, standardOutput, arguments);
+
+        Assert.AreEqual(49, exitCode);
+        Assert.AreEqual("curl: (49) Could not parse CURLOPT_RESOLVE entry 'bad'", error.TrimEnd());
+        string output = Encoding.Latin1.GetString(standardOutput.ToArray());
+        // Under -Z the transfers report in completion order, so only the two outputs themselves are pinned.
+        Assert.AreEqual("hello", output.Replace("[49 0 -1]\n", string.Empty, StringComparison.Ordinal));
+        StringAssert.Contains(output, "[49 0 -1]\n");
+        Assert.HasCount(1, server.Targets);
+    }
+
+    private static Task<(int ExitCode, string Error)> RunAsync(params string[] arguments) =>
+        RunAsync(new ScriptedConnector([]), new MemoryStream(), arguments);
+
+    private static async Task<(int ExitCode, string Error)> RunAsync(ScriptedConnector server, MemoryStream standardOutput, string[] arguments)
     {
         MemoryStream standardError = new();
         InMemoryFileSystem files = new();
-        ScriptedConnector server = new([]);
         HttpProtocolHandler http = new(server, new Curl.Authentication.BasicAndBearerAuthenticator(Curl.Authentication.CredentialEncoding.ForPlatform(isWindows: false)));
         int exitCode = await new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([http]), [], loadResolveEntries: events => events.ReportInfo("[DNS] added good:80:127.0.0.1 to cache")),
                 files,
                 files,
-                new MemoryStream(),
+                standardOutput,
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: false)
