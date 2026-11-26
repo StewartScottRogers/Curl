@@ -1,4 +1,4 @@
-# ADR-1431: `--dpop` signs inside every hook that repeats or changes a request
+# ADR-1439: `--dpop` signs inside every hook that repeats or changes a request
 
 - Status: Accepted. Decided by Claude under Stewart's delegation.
 - Date: 2026-11-26

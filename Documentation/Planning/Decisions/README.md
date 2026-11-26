@@ -1480,4 +1480,4 @@ Each option and the specific reason it lost.
 | [1436](ADR-1436-a-response-body-throws-only-to-its-reader.md) | A response body throws only to its reader (BL-6054) | Accepted | 2026-11-26 |
 | [1437](ADR-1437-the-schannel-build-matches-empty-and-at-rfc822name-constraints-against-the-end-of-the-name.md) | The Schannel build matches empty and `@` rfc822Name constraints against the end of the name (BL-6046) | Accepted | 2026-11-26 |
 | [1438](ADR-1438-cert-status-refuses-a-not-yet-valid-delegated-ocsp-responder.md) | `--cert-status` refuses a not-yet-valid delegated OCSP responder; the Schannel revocation checks accept it (BL-6037) | Accepted | 2026-11-26 |
-| [1431](ADR-1431-dpop-signs-inside-every-request-changing-hook.md) | --dpop signs inside every hook that repeats or changes a request (BL-6042) | Accepted | 2026-11-26 |
+| [1439](ADR-1439-dpop-signs-inside-every-request-changing-hook.md) | --dpop signs inside every hook that repeats or changes a request (BL-6042) | Accepted | 2026-11-26 |

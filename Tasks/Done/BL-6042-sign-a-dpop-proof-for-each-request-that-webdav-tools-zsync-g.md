@@ -35,7 +35,7 @@ a request whose body is `Http.Body` (`-F`, a streamed `-d`) sends the whole body
 
 ## Notes
 
-- Plan: list the DPoP hook after `RecordReplay`'s and before `DnsQuery`'s (ADR-1431). The DNS query and gRPC hooks must
+- Plan: list the DPoP hook after `RecordReplay`'s and before `DnsQuery`'s (ADR-1439). The DNS query and gRPC hooks must
   stay after it, because their handlers recognise the context they wrap by its type; `--ohttp-relay` stays after it, so
   the proof names the target and travels inside the encapsulated request (a test shows the relay and key fetch carry none).
 - A `grpc`/`grpcs` proof says `POST` and `http`/`https`. A nonce retry rewinds a `StreamBody` as well as `-T`.

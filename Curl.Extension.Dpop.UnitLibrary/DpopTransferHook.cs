@@ -12,7 +12,7 @@ namespace Curl.Extension.Dpop;
 /// answer that brings a new one is retried once with it (§8, §9), its <c>-T</c> upload and its streamed request body
 /// (<see cref="StreamBody" />) rewound first, and not retried when either cannot be rewound; the response is held until
 /// then, so only the one kept is written. The hook runs inside every hook that sends several requests or changes a
-/// request's method or URL (ADR-1426, ADR-1431), so each request is signed on its own; a <c>grpc</c> or <c>grpcs</c>
+/// request's method or URL (ADR-1426, ADR-1439), so each request is signed on its own; a <c>grpc</c> or <c>grpcs</c>
 /// call's proof names the HTTP <c>POST</c> that carries it. A transfer that is not HTTP runs as it would without the
 /// hook.
 /// </summary>

@@ -13,7 +13,7 @@ namespace Curl.Extension.Composition;
 
 /// <summary>
 /// <c>--dpop</c> beside each hook that sends several requests or changes a request's method or URL (RFC 9449 §4.2,
-/// ADR-1431), run through the catalogue's own order against a stand-in for curl's handler.
+/// ADR-1439), run through the catalogue's own order against a stand-in for curl's handler.
 /// </summary>
 [TestClass]
 public sealed class DpopWithRequestChangingHooksTests

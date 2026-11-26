@@ -10,7 +10,7 @@ namespace Curl.Extension.Composition;
 /// <c>.gitattributes</c> and listed in <c>Tasks/SharedListFiles.txt</c>, so lanes adding different extensions
 /// do not overlap. A host passes them to <see cref="TransferHooks.ActivatedBy" /> for each option group. Plain
 /// method references, no reflection, so native AOT sees every type. A hook that sends several requests, or changes a
-/// request's method or URL, is listed before the <c>--dpop</c> hook, so each request is signed on its own (ADR-1431).
+/// request's method or URL, is listed before the <c>--dpop</c> hook, so each request is signed on its own (ADR-1439).
 /// </summary>
 public static class ExtensionTransferHookCatalogue
 {

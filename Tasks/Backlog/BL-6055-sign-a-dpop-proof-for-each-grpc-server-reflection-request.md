@@ -18,7 +18,7 @@ With `--dpop`, each gRPC server reflection request carries a DPoP proof naming i
 
 ## Context
 
-Found in BL-6042 (ADR-1431). Without `--grpc-proto`, `GrpcProtocolHandler` learns the method's types by server
+Found in BL-6042 (ADR-1439). Without `--grpc-proto`, `GrpcProtocolHandler` learns the method's types by server
 reflection on the same connection, sending the call's `-H` headers, and so the call's one DPoP proof, to
 `/grpc.reflection.v1.ServerReflection/ServerReflectionInfo` (and `v1alpha`). RFC 9449 §4.2 wants `htu` to match each
 request and `jti` to be unique. The handler needs a seam in `Curl.Extension.Abstractions` or its own context to ask for
