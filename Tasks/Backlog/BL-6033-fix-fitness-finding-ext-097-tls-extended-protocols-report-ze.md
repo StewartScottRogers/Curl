@@ -4,8 +4,8 @@ title: Fix fitness finding EXT-097: TLS extended protocols report zero %{time_to
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs]
+depends-on: [BL-6019]
+touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerTimingsTests.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerTests.cs, Curl.Engine.UnitTests/TransferPerformerTests.cs, Curl.Networking.UnitTests/TcpConnectorTests.FailureTimings.cs]
 requirement: none
 created: 2026-11-26
 completed:
@@ -43,7 +43,37 @@ The finding, verbatim:
 
 ## Notes
 
+First run, 2026-11-26 (no code changed). `touches` widened from the one engine file, and
+`depends-on` BL-6019 added because it was in Doing holding `TcpConnector.cs`.
+
+Measured on this branch (Windows Debug build, a `TcpListener` that never accepts, `-m 2`):
+- amqps, mqtt5s, grpcs, socketios: `[28 c=0.000000 t=1.97..2.00 ip=:-1 nc=0 pt=0 st=0]`.
+  `t` is no longer 0 here; `ip` and `nc` still fail.
+- https: `t=1.950096 ip=:-1 nc=0`, so the finding's "as https" does not hold for `ip` either.
+- redis (plain TCP): `ip=127.0.0.1:<port> nc=1`, `t=1.973`.
+
+Causes and plan:
+1. `ip`/`nc`: `TcpConnector.ConnectDirectlyAsync` / `SecureWhenAskedAsync` lose the dialled
+   connection when the TLS handshake is cancelled or fails: the `-m` cancellation leaves with
+   nothing, and the connect-limit failure (`ConnectWithinTimeoutAsync`) has no timings or end
+   points for a direct connect. Carry the dialled local and remote end points and the connect
+   timings on the failed `ConnectResult` (new init properties) and on the cancellation's `Data`
+   (as `ConnectTimings.CarriedOnCancellationKey` does for proxies). `EndPointRecordingConnector`
+   records them on both paths; the recorder then makes a report, which
+   `StampTimingsAndUploadSize` already times. `ConnectionEndPointRecorder.ReportOn` fills end
+   points for https too (its handler leaves `RemoteEndPoint` unset on a failed connect), so
+   measure real curl's https `%{remote_ip}` and `%{num_connects}` before pinning that.
+2. `t` >= 2: `EndPointReportingProtocolHandler` takes `started` about 50 ms after the `-m`
+   watchdog starts (`TransferPerformer.StartMaxTimeWatchdog`), so a watchdog-ended transfer
+   reports under 2 s. Take `Timings.Started` back to the watchdog's start in
+   `TransferPerformer.WithReportOf`. Windows timers can also fire a few ms early: check that.
+3. Receive (`pt`, `st`): `ReportsPhases` / `TimedReport` set `RequestReady` and
+   `FirstByteReceived` to the end. Use the first connection's `TlsHandshakeCompleted` or
+   `Connected` for `RequestReady`, and stamp `FirstByteReceived` at the first write to the
+   transfer's output (`TransferPerformer.WithFirstByte` only fills a null one, with the end).
+
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: be1c9677 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019 in Doing; plan and measurements are under Notes
