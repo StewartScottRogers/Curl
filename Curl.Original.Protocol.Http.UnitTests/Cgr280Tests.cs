@@ -1,7 +1,7 @@
 using System.Net;
 using Curl.Http2;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Http;
@@ -100,4 +100,5 @@ public sealed class Cgr280Tests
         public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }}
+    }
+}

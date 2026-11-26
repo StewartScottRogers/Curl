@@ -1,8 +1,8 @@
 using System.Text;
-using Curl.Protocol.Abstractions;
-using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 using Curl.Original.Protocol.Http.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Original.Protocol.Http;
 
