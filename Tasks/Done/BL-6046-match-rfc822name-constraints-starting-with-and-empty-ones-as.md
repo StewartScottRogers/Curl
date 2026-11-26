@@ -28,7 +28,7 @@ Found in BL-6011 (ADR-1430). CryptoAPI, measured with `X509Chain` on Windows: an
 
 ## Notes
 
-- Measured CryptoAPI with `X509Chain`, excluded and permitted subtrees (table in ADR-1431): empty and `@`-prefixed constraints match the end of the name, ignoring case; a leading-dot constraint holding `@` stays an equality, as before.
+- Measured CryptoAPI with `X509Chain`, excluded and permitted subtrees (table in ADR-1437): empty and `@`-prefixed constraints match the end of the name, ignoring case; a leading-dot constraint holding `@` stays an equality, as before.
 - `CertificateNameConstraints` now carries each build's rfc822Name comparison with the names it reads. The matchers are held in static fields, because passing the method groups added branches that failed the complexity gate.
 - Empty-constraint tests are excluded on macOS: its certificate parser was not measured with one. The rest are pure matching over a built chain, as the existing constraint tests are.
 - Fast tests: all 114 test projects passed; `Curl.Networking.UnitTests` 4813 passed, 33 skipped, rerun after the last edit. `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.

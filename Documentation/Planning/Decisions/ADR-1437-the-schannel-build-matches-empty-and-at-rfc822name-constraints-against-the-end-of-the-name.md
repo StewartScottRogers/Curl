@@ -1,4 +1,4 @@
-# ADR-1431: The Schannel build matches empty and `@` rfc822Name constraints against the end of the name (BL-6046)
+# ADR-1437: The Schannel build matches empty and `@` rfc822Name constraints against the end of the name (BL-6046)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1300.
 

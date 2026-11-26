@@ -18,7 +18,7 @@ Below a `--cacert` anchor, the OpenSSL build judges an rfc822Name constraint sta
 
 ## Context
 
-Found in BL-6046 (ADR-1431), which changed the Schannel build only. `CertificateNameConstraints.EmailMatches` compares a constraint holding `@` for equality ignoring case, and an empty one as a host. OpenSSL's `nc_email` (`crypto/x509/v3_ncons.c`) is expected to differ (an `@host` constraint matching every local part at that host, the local part compared with case), but none of this is measured. Measure with `openssl verify` (Git for Windows ships OpenSSL 3.5) or the OpenSSL build of curl, as excluded and as permitted subtrees.
+Found in BL-6046 (ADR-1437), which changed the Schannel build only. `CertificateNameConstraints.EmailMatches` compares a constraint holding `@` for equality ignoring case, and an empty one as a host. OpenSSL's `nc_email` (`crypto/x509/v3_ncons.c`) is expected to differ (an `@host` constraint matching every local part at that host, the local part compared with case), but none of this is measured. Measure with `openssl verify` (Git for Windows ships OpenSSL 3.5) or the OpenSSL build of curl, as excluded and as permitted subtrees.
 
 ## Acceptance criteria
 
