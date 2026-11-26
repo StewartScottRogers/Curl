@@ -18,13 +18,21 @@ public sealed class NegotiateLogonTokenSource(NetworkCredential? credential = nu
 
     /// <inheritdoc />
     public ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName, ProtectionLevel protection) =>
-        new NegotiateLogonAuthentication(new NegotiateAuthentication(new NegotiateAuthenticationClientOptions
+        new NegotiateLogonAuthentication(new NegotiateAuthentication(ClientOptions(package, targetName, protection)));
+
+    /// <summary>
+    /// The options <see cref="Start" /> authenticates with: the security package
+    /// <paramref name="package" /> names, and this source's credential, or the logged-on user's
+    /// when it has none.
+    /// </summary>
+    internal NegotiateAuthenticationClientOptions ClientOptions(LdapLogonPackage package, string targetName, ProtectionLevel protection) =>
+        new()
         {
             Package = package == LdapLogonPackage.Ntlm ? "NTLM" : "Negotiate",
             Credential = credential ?? CredentialCache.DefaultNetworkCredentials,
             TargetName = targetName,
             RequiredProtectionLevel = protection,
-        }));
+        };
 
     /// <summary>One <see cref="NegotiateAuthentication" />'s tokens.</summary>
     private sealed class NegotiateLogonAuthentication(NegotiateAuthentication authentication) : ILdapLogonAuthentication
