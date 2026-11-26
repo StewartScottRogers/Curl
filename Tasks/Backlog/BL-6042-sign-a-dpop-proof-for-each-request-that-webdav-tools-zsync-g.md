@@ -18,7 +18,7 @@ With `--dpop`, every request an inner transfer hook sends or rewrites carries a 
 
 ## Context
 
-Found in BL-6029 (ADR-1418), which moved the `--dpop` hook inside `--resumable-upload`'s. In
+Found in BL-6029 (ADR-1426), which moved the `--dpop` hook inside `--resumable-upload`'s. In
 `ExtensionTransferHookCatalogue` the hooks listed after the DPoP hook can still send several requests, or change the
 method or URL, under the one proof the DPoP hook made: start with `WebDavToolsExtension` (calls `next` with
 `WithRequest(url, "GET", null)`), `DeltaDownloadExtension`, `GrpcWebExtension`, `GrpcExtension`, `PrivacyPassOptions`

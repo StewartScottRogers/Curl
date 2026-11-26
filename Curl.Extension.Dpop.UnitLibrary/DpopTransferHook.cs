@@ -11,7 +11,7 @@ namespace Curl.Extension.Dpop;
 /// such a header already sends a token. The last <c>DPoP-Nonce</c> each origin sent goes into its proofs, and a 400 or 401
 /// answer that brings a new one is retried once with it (§8, §9), its <c>-T</c> upload rewound first, and not retried
 /// when the upload cannot be rewound; the response is held until then, so only the one kept is written. The hook runs
-/// inside <c>--resumable-upload</c>'s (ADR-1418), so each request of that upload is signed on its own. A transfer that
+/// inside <c>--resumable-upload</c>'s (ADR-1426), so each request of that upload is signed on its own. A transfer that
 /// is not HTTP runs as it would without the hook.
 /// </summary>
 /// <param name="keyFile">The PEM file of the private key.</param>

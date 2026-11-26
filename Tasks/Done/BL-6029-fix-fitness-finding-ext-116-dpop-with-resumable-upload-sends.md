@@ -44,7 +44,7 @@ The finding, verbatim:
 ## Notes
 
 - Cause: BL-5866 put the `--dpop` hook outside `--resumable-upload`'s; since ADR-1379 the upload sends each request
-  through `next`, so one outer proof reached all of them. Fix (ADR-1418): the catalogue lists ResumableUpload before
+  through `next`, so one outer proof reached all of them. Fix (ADR-1426): the catalogue lists ResumableUpload before
   DPoP. A `DPoP-Nonce` retry now repeats one upload request, so `DpopTransferHook` rewinds its upload first.
 - `touches` widened to the catalogue, its order test, the Dpop tests and the Dpop `CLAUDE.md`; no task in Doing on
   `origin/work/dark-factory` named them.

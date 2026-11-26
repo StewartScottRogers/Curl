@@ -1467,4 +1467,4 @@ Each option and the specific reason it lost.
 | [1423](ADR-1423-an-expired-delegated-ocsp-responder-is-not-authorised.md) | An expired delegated OCSP responder is not authorised (BL-6008) | Accepted | 2026-11-26 |
 | [1424](ADR-1424-doh-url-offers-h2-and-speaks-http-2-to-a-server-that-picks-it.md) | --doh-url offers h2 by ALPN and speaks HTTP/2 to a server that picks it (BL-6015) | Accepted | 2026-11-26 |
 | [1425](ADR-1425-the-trace-file-opens-at-the-first-trace-event.md) | The trace file opens at the first trace event (BL-6023) | Accepted | 2026-11-26 |
-| [1418](ADR-1418-dpop-signs-inside-the-resumable-upload.md) | --dpop signs inside --resumable-upload, one proof per request (BL-6029) | Accepted | 2026-11-26 |
+| [1426](ADR-1426-dpop-signs-inside-the-resumable-upload.md) | --dpop signs inside --resumable-upload, one proof per request (BL-6029) | Accepted | 2026-11-26 |

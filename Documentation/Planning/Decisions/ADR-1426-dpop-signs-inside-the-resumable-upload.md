@@ -1,4 +1,4 @@
-# ADR-1418: `--dpop` signs inside `--resumable-upload`, one proof per request
+# ADR-1426: `--dpop` signs inside `--resumable-upload`, one proof per request
 
 - Status: Accepted. Decided by Claude under Stewart's delegation.
 - Date: 2026-11-26
