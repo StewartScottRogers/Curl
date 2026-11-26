@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.ConnectionExchange.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.ResponseExchange.cs, Curl.Original.Protocol.Http.UnitTests/Http3FailedTransferStreamTests.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.ConnectionExchange.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.ResponseExchange.cs, Curl.Original.Protocol.Http.UnitTests/Http3FailedTransferStreamTests.cs, Curl.Original.Protocol.Http.UnitTests/Fakes/FakeMultiplexedStream.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5998 — Keep a failed HTTP/3 transfer's exit code when its token is cancelled while its stream is cancelled
 
@@ -30,13 +30,26 @@ Found by the shift-end review of 2026-11-25 (ADR-0710; `pr-review-toolkit:silent
 
 ## Acceptance criteria
 
-- [ ] The stream cleanup in the `HttpTransferException` path of `HttpProtocolHandler.ResponseExchange.cs` runs under `CancellationToken.None` (or catches the cleanup's `OperationCanceledException`), so the transfer's `HttpTransferException` outcome is what is returned.
-- [ ] A unit test in `Curl.Original.Protocol.Http.UnitTests` fails an HTTP/3 transfer with `-f` (exit 22) using a token cancelled before the stream cancel completes. It asserts exit 22 and that the transfer was marked done with the session.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes, with `Curl.Original.Protocol.Http.UnitLibrary` still at 100% line and branch coverage.
+- [x] The stream cleanup in the `HttpTransferException` path of `HttpProtocolHandler.ResponseExchange.cs` runs under `CancellationToken.None` (or catches the cleanup's `OperationCanceledException`), so the transfer's `HttpTransferException` outcome is what is returned.
+- [x] A unit test in `Curl.Original.Protocol.Http.UnitTests` fails an HTTP/3 transfer with `-f` (exit 22) using a token cancelled before the stream cancel completes. It asserts exit 22 and that the transfer was marked done with the session.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes, with `Curl.Original.Protocol.Http.UnitLibrary` still at 100% line and branch coverage.
 
 ## Notes
+
+- `ResetFailedStreamAsync` no longer takes a token: both of its cleanups (the stream cancel
+  and the HTTP/2 unsent-upload reset) run under `CancellationToken.None`, as the timeout path
+  already does. Passing `None` was chosen over catching the `OperationCanceledException`,
+  which would still skip `AddCancelledStream` and `ReportTransferDone`. No ADR: it changes no
+  behaviour curl shows beyond keeping what the earlier ADRs already decided.
+- `touches` widened to `Fakes/FakeMultiplexedStream.cs` for its new `Aborting` hook, which
+  lets the test cancel the token at the abort, just before the decoder stream write. No other
+  task in Doing named it.
+- The new test failed with `TaskCanceledException` before the fix and passes after it. Build:
+  0 warnings, 0 errors. Fast tests: all passed. `Measure-CodeQuality.ps1 -Library
+  Curl.Original.Protocol.Http.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: c5fd228d dd54244f 796c16d0.
+- 2026-11-25: Doing -> Done. A failed HTTP/3 transfer keeps its exit code and transfer-done bookkeeping when its token fires during the stream cancel; build clean, fast tests green, quality run 0 failing members

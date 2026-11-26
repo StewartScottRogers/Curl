@@ -105,7 +105,7 @@ public sealed partial class HttpProtocolHandler
         {
             HttpAttemptOutcome failedOutcome = OutcomeOfFailure(plan, exchange, body, exchangeLog, headReader, upload, !newConnection, failure);
             failedOutcome.UpgradedSession = UpgradedSessionOf(connection);
-            await ResetFailedStreamAsync(failure, requestStream, connect, connection, cancellationToken).ConfigureAwait(false);
+            await ResetFailedStreamAsync(failure, requestStream, connect, connection).ConfigureAwait(false);
             return failedOutcome;
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
