@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using Curl.Core;
 using Curl.Core.Multipart;
@@ -40,6 +41,7 @@ public sealed class FormFileSizedBeforeTraceTests
         List<long> lengths = [];
         RecordingProtocolHandler http = new("http", context =>
         {
+            context.Events.ReportInfo("Connected"); // the first trace event, which opens the trace file
             lengths.Add((context.Http?.Body as StreamBody)?.Length ?? -1);
             return ValueTask.FromResult(TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } });
         });
@@ -69,6 +71,7 @@ public sealed class FormFileSizedBeforeTraceTests
         files.ExistingContent["f.txt"] = "file body\n"u8.ToArray();
         RecordingProtocolHandler http = new("http", async context =>
         {
+            context.Events.ReportInfo("Connected"); // the first trace event, which opens the trace file
             if (context.Http?.Body is StreamBody body)
             {
                 using MemoryStream sent = new();
@@ -146,6 +149,7 @@ public sealed class FormFileSizedBeforeTraceTests
         long length = -2;
         RecordingProtocolHandler http = new("http", context =>
         {
+            context.Events.ReportInfo("Connected"); // the first trace event, which opens the trace file
             length = (context.Http?.Body as StreamBody)?.Length ?? -1;
             return ValueTask.FromResult(TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } });
         });
@@ -172,16 +176,41 @@ public sealed class FormFileSizedBeforeTraceTests
         return length;
     }
 
+    /// <summary>
+    /// An <see cref="InMemoryFileSystem" /> whose truncating open empties the file a later read open
+    /// sees, and the one an earlier read open still holds, as a real file system's does.
+    /// </summary>
     private sealed class TruncatingFileSystem(InMemoryFileSystem inner) : IFileSystem
     {
-        public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken) =>
-            inner.OpenForReadAsync(path, cancellationToken);
+        private readonly ConcurrentBag<(string Path, MemoryStream Content)> readers = [];
+
+        public async ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
+        {
+            FileOpenResult opened = await inner.OpenForReadAsync(path, cancellationToken);
+            if (opened.Content is not { } content)
+            {
+                return opened;
+            }
+
+            MemoryStream held = new();
+            await content.CopyToAsync(held, cancellationToken);
+            held.Position = 0;
+            readers.Add((path, held));
+            return FileOpenResult.Opened(held, opened.Length, null);
+        }
 
         public ValueTask<FileOpenResult> OpenForWriteAsync(string path, FileWriteMode mode, UnixFileMode createMode, CancellationToken cancellationToken)
         {
             if (mode == FileWriteMode.Truncate && inner.ExistingContent.ContainsKey(path))
             {
                 inner.ExistingContent[path] = [];
+                foreach ((string readerPath, MemoryStream held) in readers)
+                {
+                    if (readerPath == path && held.CanWrite)
+                    {
+                        held.SetLength(0);
+                    }
+                }
             }
 
             return inner.OpenForWriteAsync(path, mode, createMode, cancellationToken);

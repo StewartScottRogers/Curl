@@ -10,14 +10,15 @@ namespace Curl.Console;
 /// writes, which this owns and closes when disposed.
 /// </summary>
 /// <param name="events">The sink every transfer of the run reports to.</param>
-/// <param name="ownedTraceFile">The trace file opened for the run, or <see langword="null" /> when none was.</param>
+/// <param name="ownedTraceFile">The run's trace file stream, or <see langword="null" /> when the run names no trace file.</param>
 /// <param name="traceIds">The <c>--trace-ids</c> marker <paramref name="events" /> writes, or <see langword="null" /> without <c>--trace-ids</c>.</param>
 /// <remarks>
 /// As curl 8.21.0 does (measured 2026-09-27, BL-242 Notes): <c>-v</c> writes to standard error;
-/// a <c>--trace</c> or <c>--trace-ascii</c> file is opened once per run, truncated, and every
-/// transfer's dump goes into it; <c>-</c> names standard output and <c>%</c> standard error; a
-/// file that cannot be opened sends the dump to standard error, with no warning. Each is in text
-/// mode on Windows, so every line ends CR LF there, except standard output once a transfer has
+/// a <c>--trace</c> or <c>--trace-ascii</c> file is opened once per run, truncated, at the first
+/// trace event (<see cref="TraceFileOpenedOnFirstWriteStream" />; at once when it is also a <c>-T</c>
+/// file), and every transfer's dump goes into it; <c>-</c> names standard output and <c>%</c>
+/// standard error; a file that cannot be opened sends the dump to standard error, with no warning.
+/// Each is in text mode on Windows, so every line ends CR LF there, except standard output once a transfer has
 /// switched it to binary mode (BL-546).
 /// </remarks>
 internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedTraceFile, TraceIdsPrefix? traceIds) : IAsyncDisposable
@@ -55,7 +56,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// Opens the output <paramref name="options" /> ask for.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="fileSystem">Opens the trace file.</param>
+    /// <param name="fileSystem">Opens the trace file, at the first trace event.</param>
     /// <param name="standardOutput">Where a <c>--trace -</c> dump goes.</param>
     /// <param name="standardError">Where <c>-v</c> lines, a <c>--trace %</c> dump and a dump whose file cannot be opened go.</param>
     /// <param name="runsOnWindows">Whether each line feed is written as CR LF, as curl's text-mode streams do on Windows.</param>
@@ -69,7 +70,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// </param>
     /// <param name="standardErrorIsStandardOutput">Whether <c>--stderr -</c> makes <paramref name="standardError" /> standard output, so <c>-v</c> lines follow its text or binary mode (BL-5040).</param>
     /// <returns>The output, which also writes each reported warning to <paramref name="standardError" /> unless <c>-s</c> is given (BL-3986); <see cref="None" /> with <c>-s</c> and no trace option.</returns>
-    internal static async Task<TransferEventOutput> OpenAsync(
+    internal static Task<TransferEventOutput> OpenAsync(
         CommandLineOptions options,
         IFileSystem fileSystem,
         Stream standardOutput,
@@ -80,10 +81,9 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         Func<bool> standardOutputIsBinary,
         bool standardErrorIsStandardOutput = false)
     {
-        TransferEventOutput traceOutput = await OpenTraceOutputAsync(
-            options, fileSystem, standardOutput, standardError, runsOnWindows, standardOutputIsTerminal, timeProvider, standardOutputIsBinary, standardErrorIsStandardOutput)
-            .ConfigureAwait(false);
-        return options.Silent ? traceOutput : traceOutput.WritingWarningsTo(TextMode(standardError, runsOnWindows));
+        TransferEventOutput traceOutput = OpenTraceOutput(
+            options, fileSystem, standardOutput, standardError, runsOnWindows, standardOutputIsTerminal, timeProvider, standardOutputIsBinary, standardErrorIsStandardOutput);
+        return Task.FromResult(options.Silent ? traceOutput : traceOutput.WritingWarningsTo(TextMode(standardError, runsOnWindows)));
     }
 
     /// <summary>
@@ -99,7 +99,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// <param name="standardOutputIsBinary">Tells whether a transfer has switched standard output to binary mode.</param>
     /// <param name="standardErrorIsStandardOutput">Whether <c>--stderr -</c> makes standard error standard output.</param>
     /// <returns>The output; <see cref="None" /> when no trace option is in effect.</returns>
-    private static async Task<TransferEventOutput> OpenTraceOutputAsync(
+    private static TransferEventOutput OpenTraceOutput(
         CommandLineOptions options,
         IFileSystem fileSystem,
         Stream standardOutput,
@@ -132,8 +132,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
                 traceIds);
         }
 
-        return await OpenTraceDumpAsync(options, fileSystem, standardOutput, standardError, runsOnWindows, timeProvider, standardOutputIsBinary, traceIds)
-            .ConfigureAwait(false);
+        return OpenTraceDump(options, fileSystem, standardOutput, standardError, runsOnWindows, timeProvider, standardOutputIsBinary, traceIds);
     }
 
     /// <summary>
@@ -148,7 +147,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// <param name="standardOutputIsBinary">Tells whether a transfer has switched standard output to binary mode.</param>
     /// <param name="traceIds">The <c>--trace-ids</c> marker, or <see langword="null" /> for none.</param>
     /// <returns>The output.</returns>
-    private static async Task<TransferEventOutput> OpenTraceDumpAsync(
+    private static TransferEventOutput OpenTraceDump(
         CommandLineOptions options,
         IFileSystem fileSystem,
         Stream standardOutput,
@@ -158,8 +157,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         Func<bool> standardOutputIsBinary,
         TraceIdsPrefix? traceIds)
     {
-        (Stream target, Stream? ownedFile) = await OpenTraceTargetAsync(options.TraceFile!, fileSystem, standardOutput, standardError)
-            .ConfigureAwait(false);
+        (Stream target, Stream? ownedFile) = TraceTarget(options.TraceFile!, options.UploadFiles, fileSystem, standardOutput, standardError);
         TraceDumpFormat format = options.Trace == TraceKind.HexDump ? TraceDumpFormat.HexAndText : TraceDumpFormat.TextOnly;
 
         Stream textModeTarget = runsOnWindows && ReferenceEquals(target, standardOutput)
@@ -192,16 +190,20 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     }
 
     /// <summary>
-    /// Opens where a dump goes: standard output for <c>-</c>, standard error for <c>%</c>, else the
-    /// named file, truncated, or standard error when it cannot be opened.
+    /// Chooses where a dump goes: standard output for <c>-</c>, standard error for <c>%</c>, else the
+    /// named file, opened and truncated at the first write, or standard error when it cannot be opened.
+    /// A file that is also a <c>-T</c> file is opened at once, so the upload is opened already truncated
+    /// and expects the size the runner took before (AF-0513, ADR-1175).
     /// </summary>
     /// <param name="traceFile">The <c>--trace</c> or <c>--trace-ascii</c> file name.</param>
+    /// <param name="uploadFiles">The <c>-T</c> values.</param>
     /// <param name="fileSystem">Opens the file.</param>
     /// <param name="standardOutput">Standard output.</param>
     /// <param name="standardError">Standard error.</param>
-    /// <returns>The stream to write to, and the file to close afterwards when one was opened.</returns>
-    private static async Task<(Stream Target, Stream? OwnedFile)> OpenTraceTargetAsync(
+    /// <returns>The stream to write to, and the file stream to close afterwards when a file was named.</returns>
+    private static (Stream Target, Stream? OwnedFile) TraceTarget(
         string traceFile,
+        IReadOnlyList<string> uploadFiles,
         IFileSystem fileSystem,
         Stream standardOutput,
         Stream standardError)
@@ -214,18 +216,13 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
                 return (standardError, null);
         }
 
-        FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(traceFile, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, CancellationToken.None)
-            .ConfigureAwait(false);
-
-        if (opened.Content is not { } file)
+        TraceFileOpenedOnFirstWriteStream file = new(fileSystem, traceFile, standardError);
+        if (uploadFiles.Contains(traceFile, StringComparer.Ordinal))
         {
-            return (standardError, null);
+            file.OpenNow();
         }
 
-        // curl ignores a failed write or close of its trace stream (CGR-026, BL-3830).
-        WriteFailureIgnoringStream traceStream = new(file);
-        return (traceStream, traceStream);
+        return (file, file);
     }
 
     /// <summary>

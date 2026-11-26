@@ -1466,3 +1466,4 @@ Each option and the specific reason it lost.
 | [1422](ADR-1422-the-schannel-build-reads-multi-valued-relative-names-against-name-constraints.md) | The Schannel build reads multi-valued relative names against name constraints (BL-6007) | Accepted | 2026-11-26 |
 | [1423](ADR-1423-an-expired-delegated-ocsp-responder-is-not-authorised.md) | An expired delegated OCSP responder is not authorised (BL-6008) | Accepted | 2026-11-26 |
 | [1424](ADR-1424-doh-url-offers-h2-and-speaks-http-2-to-a-server-that-picks-it.md) | --doh-url offers h2 by ALPN and speaks HTTP/2 to a server that picks it (BL-6015) | Accepted | 2026-11-26 |
+| [1423](ADR-1423-the-trace-file-opens-at-the-first-trace-event.md) | The trace file opens at the first trace event (BL-6023) | Accepted | 2026-11-26 |
