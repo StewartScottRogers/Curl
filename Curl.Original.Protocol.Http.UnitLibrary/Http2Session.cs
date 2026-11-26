@@ -181,8 +181,9 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// Resets each unfinished stream (<see cref="ResetUnfinishedStreamsAsync" />), then sends
     /// GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
     /// curl 8.18.0 does when it closes an HTTP/2 connection (measured, BL-817 and BL-5906 Notes); nothing
-    /// when no preface went out, when a GOAWAY already has, after <see cref="SkipClosingGoAway" />, or when the peer closed the
-    /// connection. A connection that fails the write is closing anyway, so that is not an error.
+    /// when no preface went out, when a GOAWAY already has, after <see cref="SkipClosingGoAway" />, when the peer closed the
+    /// connection, or after a write was cancelled part way, since the peer was not taking it and
+    /// these writes could wait for ever (BL-6006). A connection that fails the write is closing anyway, so that is not an error.
     /// </summary>
     /// <param name="cancellationToken">Cancels the writes.</param>
     /// <returns>A task that completes when the frames are written, or at once when none is due.</returns>
@@ -191,7 +192,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (!isPrefaceSent || isClosingGoAwaySkipped || Frames.IsGoAwaySent || Frames.IsClosedByPeer)
+            if (!isPrefaceSent || isClosingGoAwaySkipped || Frames.IsGoAwaySent || Frames.IsClosedByPeer || incoming.IsWriteCancelled)
             {
                 return;
             }
