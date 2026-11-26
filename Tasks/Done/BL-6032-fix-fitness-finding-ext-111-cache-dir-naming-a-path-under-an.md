@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.HttpCache.UnitLibrary/CacheDirectory.cs]
+touches: [Curl.Extension.HttpCache.UnitLibrary/CacheDirectory.cs, Curl.Extension.HttpCache.UnitTests/CacheDirectoryTests.cs, Curl.Extension.HttpCache.UnitTests/HttpCacheTransferHookTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6032 — Fix fitness finding EXT-111: --cache-dir naming a path under an existing file silently caches nothing, exit 0 (PARTLY FIXED)
 
@@ -36,13 +36,24 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro prints a message naming `--cache-dir` and `recfile/sub` and exits 2 (or warns).
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro prints a message naming `--cache-dir` and `recfile/sub` and exits 2 (or warns).
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Refuse rather than warn, the same answer as a path that is itself a file (ADR-1425).
+- Added the two test files to `touches`; no other task in Doing names this library's tests.
+- `ExecuteAsync_ACacheDirectoryThatCannotBeWritten_LeavesTheTransferAsItWas` now makes the blocking
+  file after the hook has accepted the path, since the path under a file is refused at activation.
+- Repro run with the built `curl.exe`: `curl: --cache-dir cannot use 'recfile/sub'`, the try-help
+  line, exit 2 (no server needed: the refusal comes before the transfer).
+- Fast tests: the full run failed only on the test above; after its change its project passed
+  (106 of 106). Quality for the library: 100% line and branch, 0 failing members.
+- The tests join paths with `/` and name no OS text, so they hold on Linux and macOS too.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 93878311 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. path under an existing file is refused, exit 2
