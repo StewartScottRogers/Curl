@@ -31,3 +31,4 @@ Found in BL-6011 (ADR-1430). CryptoAPI, measured with `X509Chain` on Windows: an
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: a3ba62c7 3e79b7d6 3d836d5e.
