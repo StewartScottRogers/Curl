@@ -30,3 +30,4 @@ Found by the `verify` run of BL-5919 on 2026-11-24: `dotnet format --verify-no-c
 ## Log
 
 - 2026-11-24: Created.
+- 2026-11-26: Backlog -> Deferred. Split by project group into BL-6000..BL-6005, which lanes run in parallel; line endings left to git (ADR-1417).
