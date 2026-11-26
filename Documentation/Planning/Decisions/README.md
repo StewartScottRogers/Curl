@@ -1464,7 +1464,7 @@ Each option and the specific reason it lost.
 | [1420](ADR-1420-a-z-telnet-session-holds-back-later-transfers.md) | Under -Z a telnet session holds back later transfers, and telnet -t values are not judged at setup (BL-6017) | Accepted | 2026-11-26 |
 | [1421](ADR-1421-ending-a-failed-http-stream-waits-at-most-one-second.md) | Ending a failed HTTP stream waits at most one second (BL-6006) | Accepted | 2026-11-26 |
 | [1422](ADR-1422-the-schannel-build-reads-multi-valued-relative-names-against-name-constraints.md) | The Schannel build reads multi-valued relative names against name constraints (BL-6007) | Accepted | 2026-11-26 |
-| [1423](ADR-1423-an-expired-delegated-ocsp-responder-is-not-authorised.md) | An expired delegated OCSP responder is not authorised (BL-6008) | Accepted | 2026-11-26 |
+| [1423](ADR-1423-an-expired-delegated-ocsp-responder-is-not-authorised.md) | An expired delegated OCSP responder is not authorised (BL-6008) | Superseded in part by ADR-1432 | 2026-11-26 |
 | [1424](ADR-1424-doh-url-offers-h2-and-speaks-http-2-to-a-server-that-picks-it.md) | --doh-url offers h2 by ALPN and speaks HTTP/2 to a server that picks it (BL-6015) | Accepted | 2026-11-26 |
 | [1425](ADR-1425-the-trace-file-opens-at-the-first-trace-event.md) | The trace file opens at the first trace event (BL-6023) | Accepted | 2026-11-26 |
 | [1426](ADR-1426-dpop-signs-inside-the-resumable-upload.md) | --dpop signs inside --resumable-upload, one proof per request (BL-6029) | Accepted | 2026-11-26 |
@@ -1479,3 +1479,4 @@ Each option and the specific reason it lost.
 | [1435](ADR-1435-doh-url-sends-the-a-and-aaaa-queries-on-one-http-2-connection.md) | --doh-url sends the A and AAAA queries on one HTTP/2 connection (BL-6038) | Accepted | 2026-11-26 |
 | [1436](ADR-1436-a-response-body-throws-only-to-its-reader.md) | A response body throws only to its reader (BL-6054) | Accepted | 2026-11-26 |
 | [1437](ADR-1437-the-schannel-build-matches-empty-and-at-rfc822name-constraints-against-the-end-of-the-name.md) | The Schannel build matches empty and `@` rfc822Name constraints against the end of the name (BL-6046) | Accepted | 2026-11-26 |
+| [1432](ADR-1432-cert-status-refuses-a-not-yet-valid-delegated-ocsp-responder.md) | `--cert-status` refuses a not-yet-valid delegated OCSP responder; the Schannel revocation checks accept it (BL-6037) | Accepted | 2026-11-26 |

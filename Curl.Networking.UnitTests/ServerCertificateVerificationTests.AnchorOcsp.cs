@@ -138,6 +138,16 @@ public sealed class ServerCertificateVerificationAnchorOcspTests
     }
 
     [TestMethod]
+    public void VerifyPeer_OcspGoodFromANotYetValidDelegatedResponder_Accepts()
+    {
+        using var pki = new Pki(List.Revoking, Responder);
+
+        var failure = Verify(pki, _ => pki.DelegatedGoodResponse(TimeSpan.FromDays(5), TimeSpan.FromDays(2)));
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
     public void VerifyPeer_FirstResponderUnfetchableAndSecondRevokes_IsRevoked()
     {
         using var pki = new Pki(List.Clean, Responder, SecondResponder);
@@ -300,14 +310,18 @@ public sealed class ServerCertificateVerificationAnchorOcspTests
         public byte[] Response(OcspStapleStatus status) => ResponseBuilder(status).Build();
 
         // "good", signed by a responder the intermediate issued for OCSP signing, which the response carries.
-        public byte[] DelegatedGoodResponse(TimeSpan responderExpiresIn)
+        public byte[] DelegatedGoodResponse(TimeSpan responderExpiresIn, TimeSpan? responderStartsIn = null)
         {
             var now = DateTimeOffset.UtcNow;
             using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
             var request = new X509CertificateRequest("CN=Ocsp Delegate", key, HashAlgorithmName.SHA256);
             request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(OcspTestPki.OcspSigningOid)], false));
             using var responder = request.Create(
-                Intermediate.SubjectName, X509SignatureGenerator.CreateForECDsa(_intermediateKey), now.AddDays(-30), now + responderExpiresIn, [4]);
+                Intermediate.SubjectName,
+                X509SignatureGenerator.CreateForECDsa(_intermediateKey),
+                now + (responderStartsIn ?? TimeSpan.FromDays(-30)),
+                now + responderExpiresIn,
+                [4]);
             return (ResponseBuilder(OcspStapleStatus.Good) with
             {
                 Signer = OcspResponseBuilder.EcdsaSigner(key),

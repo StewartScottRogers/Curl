@@ -34,7 +34,7 @@ internal sealed partial class ServerCertificateVerification
     {
         var address = OcspGetAddress(responder, OcspRequestFor(certificate, issuer));
         var response = TryFetch(FetchOcspResponse, "OCSP response", address, budget);
-        return OcspStapleVerifier.Verify(response, [certificate.RawData, issuer.RawData], timeProvider.GetUtcNow()).Status switch
+        return OcspStapleVerifier.VerifyForSchannelRevocationCheck(response, [certificate.RawData, issuer.RawData], timeProvider.GetUtcNow()).Status switch
         {
             OcspStapleStatus.Good => BelowAnchorRevocation.Clean,
             OcspStapleStatus.Revoked => BelowAnchorRevocation.Revoked,

@@ -391,7 +391,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     private OcspStapleStatus? StapledRevocationStatus(byte[]? stapledResponse, X509Chain? chain, ReadOnlyMemory<byte>[] peerCertificates) =>
         !matchesSchannelBuild || options.Insecure || options.SkipRevocationCheck || stapledResponse is null || peerCertificates.Length == 0
             ? null
-            : OcspStapleVerifier.Verify(stapledResponse, IssuerCandidates(chain, peerCertificates), timeProvider.GetUtcNow()).Status;
+            : OcspStapleVerifier.VerifyForSchannelRevocationCheck(stapledResponse, IssuerCandidates(chain, peerCertificates), timeProvider.GetUtcNow()).Status;
 
     // What the server sent, its own certificate first, then the chain built, which holds the
     // --cacert root a server that sends only its own certificate leaves out: the staple's issuer.

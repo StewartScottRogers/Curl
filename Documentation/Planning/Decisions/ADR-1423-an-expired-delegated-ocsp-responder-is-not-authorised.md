@@ -1,6 +1,6 @@
 # ADR-1423: An expired delegated OCSP responder is not authorised
 
-- Status: Accepted
+- Status: Superseded in part by [ADR-1432](ADR-1432-cert-status-refuses-a-not-yet-valid-delegated-ocsp-responder.md) (a not-yet-valid responder under `--cert-status`)
 - Date: 2026-11-26
 - Decided by Claude under Stewart's delegation (BL-6008; fitness finding STD-215)
 

@@ -202,8 +202,10 @@ and Encrypted Client Hello (BL-706, ADR-0233).
 - OCSP stapling (ADR-0173): `OcspStapleVerifier.Verify(response, chain, now)` checks a
   stapled response (RFC 6960) in curl's OpenSSL order and returns an
   `OcspStapleOutcome` (`OcspStapleStatus` and the CRL reason or `responseStatus`). A
-  delegated responder past its `notAfter` at `now` is `ResponderNotAuthorised`; one not
-  yet valid is accepted, as curl's Schannel build accepts it. Only a SHA-1 `CertID`
+  delegated responder outside its validity at `now` is `ResponderNotAuthorised` (no
+  leeway); `VerifyForSchannelRevocationCheck`, the Windows stapled-status and
+  below-anchor checks' entry, accepts one not yet valid, as curl's Schannel build does
+  (ADR-1432). Only a SHA-1 `CertID`
   names the certificate (ADR-1431). It
   reads with the internal `OcspBasicResponse`, `OcspSingleResponse` and
   `OcspCertificateFields`, and maps signature and `CertID` hash OIDs with

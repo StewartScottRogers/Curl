@@ -5,7 +5,7 @@ namespace Curl.Tls;
 /// <summary>
 /// The parts of a DER X.509 certificate that checking an OCSP response needs (RFC 5280
 /// section 4.1): the signed body and its signature, the serial number, the issuer and
-/// subject names as DER, the public key, the end of its validity, and whether the extended
+/// subject names as DER, the public key, its validity period, and whether the extended
 /// key usage allows OCSP signing (RFC 6960 section 4.2.2.2).
 /// </summary>
 /// <param name="TbsCertificate">The DER <c>tbsCertificate</c>, the bytes the issuer signed.</param>
@@ -15,6 +15,7 @@ namespace Curl.Tls;
 /// <param name="Issuer">The DER issuer <c>Name</c>.</param>
 /// <param name="Subject">The DER subject <c>Name</c>.</param>
 /// <param name="PublicKey">The subject's public key.</param>
+/// <param name="NotBefore">The first moment the certificate is valid.</param>
 /// <param name="NotAfter">The last moment the certificate is valid.</param>
 /// <param name="CanSignOcspResponses">Whether the extended key usage names <c>id-kp-OCSPSigning</c>.</param>
 internal sealed record OcspCertificateFields(
@@ -25,6 +26,7 @@ internal sealed record OcspCertificateFields(
     byte[] Issuer,
     byte[] Subject,
     TlsCertificatePublicKey PublicKey,
+    DateTimeOffset NotBefore,
     DateTimeOffset NotAfter,
     bool CanSignOcspResponses)
 {
@@ -57,20 +59,19 @@ internal sealed record OcspCertificateFields(
         byte[] serialNumber = tbs.ReadIntegerBytes().ToArray();
         tbs.ReadEncodedValue();
         byte[] issuer = tbs.ReadEncodedValue().ToArray();
-        DateTimeOffset notAfter = ReadNotAfter(tbs.ReadSequence());
+        AsnReader validity = tbs.ReadSequence();
+        DateTimeOffset notBefore = ReadTime(validity);
+        DateTimeOffset notAfter = ReadTime(validity);
         byte[] subject = tbs.ReadEncodedValue().ToArray();
         TlsCertificatePublicKey publicKey = TlsCertificatePublicKey.ReadSubjectPublicKeyInfo(tbs.ReadEncodedValue().ToArray());
-        return new OcspCertificateFields(tbsCertificate, signatureAlgorithm, signature, serialNumber, issuer, subject, publicKey, notAfter, AllowsOcspSigning(tbs));
+        return new OcspCertificateFields(tbsCertificate, signatureAlgorithm, signature, serialNumber, issuer, subject, publicKey, notBefore, notAfter, AllowsOcspSigning(tbs));
     }
 
-    /// <summary>The <c>notAfter</c> of a <c>Validity</c>: a <c>UTCTime</c> through 2049, a <c>GeneralizedTime</c> after (RFC 5280 section 4.1.2.5).</summary>
-    private static DateTimeOffset ReadNotAfter(AsnReader validity)
-    {
-        validity.ReadEncodedValue();
-        return validity.PeekTag().HasSameClassAndValue(Asn1Tag.UtcTime)
+    /// <summary>The next <c>Time</c> of a <c>Validity</c>: a <c>UTCTime</c> through 2049, a <c>GeneralizedTime</c> after (RFC 5280 section 4.1.2.5).</summary>
+    private static DateTimeOffset ReadTime(AsnReader validity) =>
+        validity.PeekTag().HasSameClassAndValue(Asn1Tag.UtcTime)
             ? validity.ReadUtcTime()
             : validity.ReadGeneralizedTime();
-    }
 
     /// <summary>Reads the rest of a <c>tbsCertificate</c> after its key: the unique IDs, skipped, and the extensions.</summary>
     private static bool AllowsOcspSigning(AsnReader tbs)
