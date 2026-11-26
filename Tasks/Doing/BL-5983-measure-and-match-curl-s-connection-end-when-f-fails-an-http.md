@@ -31,3 +31,4 @@ BL-5978 (ADR-1410) matched `-m` over HTTP/3 and left `-f` as it was: Curl writes
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: fb48a309 9289376a 3d836d5e.
