@@ -30,3 +30,4 @@ ADR-1424 (BL-6015) gave `--doh-url` HTTP/2 with a connection for each query. cur
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: f797e6d2 3d836d5e.
