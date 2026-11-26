@@ -530,7 +530,7 @@ public sealed class TransferWriteOutVariablesTests
     public void TryGetVariableText_RefusedConnectHeaders_CountTowardsNumHeaders()
     {
         // STD-144: curl printed num_headers 2 after a proxy refused the CONNECT with two header lines.
-        TransferWriteOutVariables variables = WithReport(new TransferReport { RefusedConnectHeaderCount = 2 });
+        TransferWriteOutVariables variables = WithReport(new TransferReport { ConnectReplyHeaderCount = 2 });
 
         Assert.AreEqual("2", Get(variables, "num_headers"));
     }

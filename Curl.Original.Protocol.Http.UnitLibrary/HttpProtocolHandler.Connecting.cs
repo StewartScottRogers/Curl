@@ -245,7 +245,7 @@ public sealed partial class HttpProtocolHandler
             ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
             HeaderSize = connect.ProxyConnectHeaderBytes,
             ResponseHeadersStored = connect.ConnectReplyHeadersStored,
-            RefusedConnectHeaderCount = connect.ConnectReplyHeadersStored,
+            ConnectReplyHeaderCount = connect.ConnectReplyHeadersStored,
             Timings = new TransferTimings(plan.Started, connect.Timings, failed, failed, failed, failed),
             ConnectionCount = ReachedAPeer(connect) ? 1 : 0,
         };

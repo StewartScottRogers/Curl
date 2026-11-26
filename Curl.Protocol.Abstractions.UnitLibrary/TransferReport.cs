@@ -62,11 +62,18 @@ public sealed record TransferReport
     public IReadOnlyList<KeyValuePair<string, string>> PseudoHeaders { get; init; } = [];
 
     /// <summary>
-    /// Gets how many header lines the proxy's reply to a refused CONNECT held; they count towards
-    /// <c>%{num_headers}</c> as curl counts them (STD-144) but are never found by <c>%header{}</c>;
-    /// zero when no CONNECT was refused.
+    /// Gets how many header lines of the proxy's reply to a CONNECT count towards <c>%{num_headers}</c>,
+    /// as curl counts them for a refused CONNECT (STD-144) and for a tunnel under a protocol other than
+    /// HTTP (ADR-1418); they are never found by <c>%header{}</c>. Zero when none counts.
     /// </summary>
-    public int RefusedConnectHeaderCount { get; init; }
+    public int ConnectReplyHeaderCount { get; init; }
+
+    /// <summary>
+    /// The entry in <see cref="PseudoHeaders" /> that stands for the one header curl counts for a successful FTP
+    /// download that received no header line (BL-5403); it is not counted beside a CONNECT reply's header lines
+    /// (ADR-1418).
+    /// </summary>
+    public static KeyValuePair<string, string> TransferCompleteStandInHeader { get; } = new("226", "Transfer complete");
 
     /// <summary>
     /// Gets how many trailer fields an HTTP/2 response ended with, already in <see cref="ResponseHeaders" />;
