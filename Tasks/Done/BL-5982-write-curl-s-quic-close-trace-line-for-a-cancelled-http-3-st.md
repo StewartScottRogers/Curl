@@ -38,7 +38,7 @@ Measured with curl 8.18.0 (WinGet, ngtcp2 1.21.0), `Record-CurlExchange.ps1 -Htt
 
 Curl writes it at the next read of a response on the connection (ADR-1412). `touches` kept; the
 ADR is the only other file. `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary`:
-0 failing members. Fast tests: 58380 passed, 0 failed, 363 skipped. Filed BL-5994 (curl also writes
+0 failing members. Fast tests: 58380 passed, 0 failed, 363 skipped. Filed BL-5995 (curl also writes
 `peer idle timeout` for a reused connection's later streams).
 
 ## Log

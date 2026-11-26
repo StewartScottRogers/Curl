@@ -1,5 +1,5 @@
 ---
-id: BL-5994
+id: BL-5995
 title: Write curl's HTTP/3 peer idle timeout line for each stream opened on an idle connection
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-25
 completed:
 ---
-# BL-5994 — Write curl's HTTP/3 peer idle timeout line for each stream opened on an idle connection
+# BL-5995 — Write curl's HTTP/3 peer idle timeout line for each stream opened on an idle connection
 
 ## Goal
 
