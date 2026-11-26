@@ -57,7 +57,7 @@ enough, no mock server; `-m 1` and `--connect-timeout 1`):
   (a failure with no report), `t`=elapsed when the `-m` cancellation escapes. `ftps`, `imaps` `nc=0` too.
 - Controls where real curl keeps `nc=0`: TCP connect timeout (`10.255.255.1`), refused (`127.0.0.1:1`),
   unresolved name. So "a connect timed out" is not enough; the connector must say TCP was connected.
-  The missing `t` for those is BL-6038.
+  The missing `t` for those is BL-6041.
 
 Plan:
 

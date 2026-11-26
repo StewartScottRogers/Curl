@@ -1,5 +1,5 @@
 ---
-id: BL-6038
+id: BL-6041
 title: wss and ftp: a failed or timed-out TCP connect reports %{time_total} 0; curl reports the elapsed time
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6038 — wss and ftp: a failed or timed-out TCP connect reports %{time_total} 0; curl reports the elapsed time
+# BL-6041 — wss and ftp: a failed or timed-out TCP connect reports %{time_total} 0; curl reports the elapsed time
 
 ## Goal
 
