@@ -9,10 +9,12 @@ namespace Curl.Extension.Dpop;
 /// <c>Authorization: DPoP</c> header (<c>-H</c>'s, or an outer hook's for a token it fetched with this hook's key), is
 /// bound to the proof by <c>ath</c>, and <c>--oauth2-bearer</c>'s is sent as <c>Authorization: DPoP</c> (§7.1) unless
 /// such a header already sends a token. The last <c>DPoP-Nonce</c> each origin sent goes into its proofs, and a 400 or 401
-/// answer that brings a new one is retried once with it (§8, §9), its <c>-T</c> upload rewound first, and not retried
-/// when the upload cannot be rewound; the response is held until then, so only the one kept is written. The hook runs
-/// inside <c>--resumable-upload</c>'s (ADR-1426), so each request of that upload is signed on its own. A transfer that
-/// is not HTTP runs as it would without the hook.
+/// answer that brings a new one is retried once with it (§8, §9), its <c>-T</c> upload and its streamed request body
+/// (<see cref="StreamBody" />) rewound first, and not retried when either cannot be rewound; the response is held until
+/// then, so only the one kept is written. The hook runs inside every hook that sends several requests or changes a
+/// request's method or URL (ADR-1426, ADR-1431), so each request is signed on its own; a <c>grpc</c> or <c>grpcs</c>
+/// call's proof names the HTTP <c>POST</c> that carries it. A transfer that is not HTTP runs as it would without the
+/// hook.
 /// </summary>
 /// <param name="keyFile">The PEM file of the private key.</param>
 internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
@@ -37,9 +39,11 @@ internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
             return TransferResult.Failure(CurlExitCode.ReadError, $"Failed to read a DPoP private key from {keyFile}");
         }
 
-        var uploadStart = context.Upload is { CanSeek: true } upload ? upload.Position : 0;
+        var body = (context.Http.Body as StreamBody)?.Content;
+        var uploadStart = PositionOf(context.Upload);
+        var bodyStart = PositionOf(body);
         var attempt = await AttemptAsync(key, context, next);
-        if (attempt.AsksForNewNonce && TryRewind(context.Upload, uploadStart))
+        if (attempt.AsksForNewNonce && TryRewind(context.Upload, uploadStart) && TryRewind(body, bodyStart))
         {
             attempt = await AttemptAsync(key, context, next);
         }
@@ -48,16 +52,37 @@ internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
         return attempt.Result;
     }
 
-    /// <summary>Gives the <c>htu</c> of a URL: its scheme, host and port in lower case and its path, without query or fragment (RFC 9449 §4.2, §4.3).</summary>
+    /// <summary>
+    /// Gives the <c>htu</c> of a URL: the scheme of the HTTP request, its host and port in lower case and its path, without
+    /// query or fragment (RFC 9449 §4.2, §4.3). A <c>grpc</c> URL's request goes over <c>http</c>, a <c>grpcs</c> one's
+    /// over <c>https</c>.
+    /// </summary>
     internal static string TargetUriOf(CurlUrl url) =>
-        url.Scheme.ToLowerInvariant() + "://" + url.Host.ToLowerInvariant() + (url.IsDefaultPort ? string.Empty : ":" + url.Port) + url.AbsolutePath;
-    /// <summary>Gives the method of the request curl's options build, as <c>htm</c> names it.</summary>
+        HttpSchemeOf(url) + "://" + url.Host.ToLowerInvariant() + (url.IsDefaultPort ? string.Empty : ":" + url.Port) + url.AbsolutePath;
+
+    /// <summary>
+    /// Gives the method of the request, as <c>htm</c> names it: <c>POST</c> for a gRPC call, whatever the options say,
+    /// otherwise that of the request curl's options build.
+    /// </summary>
     internal static string MethodOf(ITransferContext context) =>
+        IsGrpc(context.Url) ? "POST" : OptionsMethodOf(context);
+
+    private static string OptionsMethodOf(ITransferContext context) =>
         context.Http!.CustomMethod
         ?? (context.NoBody ? "HEAD"
         : SendsBody(context) ? "POST"
         : context.Upload is not null ? "PUT"
         : "GET");
+
+    private static bool IsGrpc(CurlUrl url) => url.Scheme.ToLowerInvariant() is "grpc" or "grpcs";
+
+    private static string HttpSchemeOf(CurlUrl url) =>
+        url.Scheme.ToLowerInvariant() switch
+        {
+            "grpc" => "http",
+            "grpcs" => "https",
+            var scheme => scheme,
+        };
 
     /// <summary>
     /// Gives the access token the request sends: that of an <c>Authorization: DPoP ...</c> header, which curl sends in place
@@ -65,16 +90,18 @@ internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
     /// </summary>
     internal static string? AccessTokenOf(HttpRequestOptions http) => HeaderTokenOf(http) ?? http.BearerToken;
 
-    /// <summary>Takes the upload back to where the first try found it, so the retry sends it whole.</summary>
+    private static long PositionOf(Stream? sent) => sent is { CanSeek: true } ? sent.Position : 0;
+
+    /// <summary>Takes the upload or request body back to where the first try found it, so the retry sends it whole.</summary>
     /// <returns><see langword="false" /> when it cannot be taken back; the refusal then stands.</returns>
-    private static bool TryRewind(Stream? upload, long start)
+    private static bool TryRewind(Stream? sent, long start)
     {
-        switch (upload)
+        switch (sent)
         {
             case null:
                 return true;
             case { CanSeek: true }:
-                upload.Position = start;
+                sent.Position = start;
                 return true;
             case IUploadRewinder rewinder:
                 return !rewinder.HasBeenRead || rewinder.RewindToStart() is null;

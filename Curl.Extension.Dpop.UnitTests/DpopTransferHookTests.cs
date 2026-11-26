@@ -265,6 +265,57 @@ public sealed class DpopTransferHookTests
         return [.. sent];
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_AStreamedRequestBodyRefusedForANonce_IsSentWholeAgain_Rfc9449Section9()
+    {
+        using var body = new MemoryStream("--form body"u8.ToArray()) { Position = 2 };
+
+        var sent = await SendStreamBodyRefusedForANonceAsync(body);
+
+        CollectionAssert.AreEqual(new[] { "form body", "form body" }, sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AStreamedRequestBodyThatCannotBeRewoundRefusedForANonce_KeepsTheRefusal_Rfc9449Section9()
+    {
+        using var body = new UnseekableUpload();
+
+        var sent = await SendStreamBodyRefusedForANonceAsync(body);
+
+        Assert.HasCount(1, sent);
+    }
+
+    [TestMethod]
+    [DataRow("grpc://A.example:50051/pkg.Service/Call", "http://a.example:50051/pkg.Service/Call")]
+    [DataRow("GRPCS://a.example/pkg.Service/Call", "https://a.example/pkg.Service/Call")]
+    public async Task ExecuteAsync_AGrpcCall_ProvesTheHttpPostThatCarriesIt_Rfc9449Section4Point2(string url, string target)
+    {
+        var server = new FakeServer(Response(200));
+
+        await Hook().ExecuteAsync(Context(url), server.Invoke);
+
+        var claims = DpopProofTests.Decode(ProofOf(server.Requests[0]).Split('.')[1]);
+        Assert.AreEqual("POST", claims.GetProperty("htm").GetString());
+        Assert.AreEqual(target, claims.GetProperty("htu").GetString());
+    }
+
+    private async Task<string[]> SendStreamBodyRefusedForANonceAsync(Stream body)
+    {
+        var server = new FakeServer(Response(401, "n-1"), Response(200));
+        var sent = new List<string>();
+        var context = Context(http: new HttpRequestOptions { Body = new StreamBody(body, null, "multipart/form-data") });
+
+        await Hook().ExecuteAsync(context, async request =>
+        {
+            using var read = new MemoryStream();
+            await ((StreamBody)request.Http!.Body!).Content.CopyToAsync(read);
+            sent.Add(Text(read));
+            return await server.Invoke(request);
+        });
+
+        return [.. sent];
+    }
+
     private static string? NonceOf(ITransferContext request) =>
         DpopProofTests.Decode(ProofOf(request).Split('.')[1]).TryGetProperty("nonce", out var nonce) ? nonce.GetString() : null;
 
