@@ -30,3 +30,4 @@ Part of BL-5923, split by project group so lanes run the parts in parallel. On 2
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 03521b86 3d836d5e.
