@@ -262,6 +262,135 @@ public sealed class ResponseBodyStreamTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ReadAsync_CancelledMidStreamAndTheUnpauseThrows_ThrowsOnlyToTheReader(bool clientCloses)
+    {
+        InvalidOperationException fault = new("unpause fault");
+        List<Exception> unobserved = [];
+        EventHandler<UnobservedTaskExceptionEventArgs> watch = (_, raised) =>
+        {
+            if (raised.Exception.Flatten().InnerExceptions.Contains(fault))
+            {
+                unobserved.Add(raised.Exception);
+            }
+        };
+        TaskScheduler.UnobservedTaskException += watch;
+        try
+        {
+            await CancelAPendingReadAsync(new SteppedEasyTransfer { PauseThrows = fault }, clientCloses);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= watch;
+        }
+
+        Assert.IsEmpty(unobserved);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_TheUnpauseThrows_DisposesTheHandleWithoutThrowing()
+    {
+        SteppedEasyTransfer easy = new() { PauseThrows = new InvalidOperationException("unpause fault") };
+        ResponseBodyStream body = NewHeldBody(easy, CancellationToken.None, CancellationToken.None);
+        easy.Deliver(1);
+        await body.StartAsync();
+
+        ValueTask disposed = body.DisposeAsync();
+        await easy.PauseThrew;
+        easy.Finish(CurlCode.AbortedByCallback);
+        await disposed;
+
+        Assert.IsTrue(easy.Disposed);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_PerformThrowsAfterTheBodyStarted_ThrowsItAfterTheBytes()
+    {
+        SteppedEasyTransfer easy = new();
+        ResponseBodyStream body = NewBody(easy);
+        easy.Deliver(1);
+        await body.StartAsync();
+        byte[] destination = new byte[8];
+        Assert.AreEqual(1, await body.ReadAsync(destination));
+        Task<int> pending = body.ReadAsync(destination).AsTask();
+
+        easy.Fault(new InvalidOperationException("engine fault"));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => pending.WaitAsync(TimeSpan.FromSeconds(30)));
+        await body.DisposeAsync();
+        Assert.IsTrue(easy.Disposed);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_PerformThrowsAfterTheCallerCancelled_ThrowsOperationCanceled()
+    {
+        SteppedEasyTransfer easy = new();
+        using CancellationTokenSource source = new();
+        await using ResponseBodyStream body = new(easy, 64, FaultWhenCancelledAsync, source.Token, CancellationToken.None);
+        easy.Options = easy.Options with { Callbacks = easy.Options.Callbacks with { Write = body.TakeBody } };
+        easy.Deliver(1);
+        await body.StartAsync();
+        byte[] destination = new byte[8];
+        Assert.AreEqual(1, await body.ReadAsync(destination));
+        Task<int> pending = body.ReadAsync(destination).AsTask();
+
+        await source.CancelAsync();
+
+        OperationCanceledException exception = await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.AreEqual(source.Token, exception.CancellationToken);
+    }
+
+    /// <summary>A perform that throws once its token is cancelled, as a torn-down transfer may.</summary>
+    private static async Task<CurlCode> FaultWhenCancelledAsync(EngineContracts.IEasyTransfer easy, CancellationToken abort)
+    {
+        await easy.PerformAsync(abort);
+        throw new InvalidOperationException("torn down");
+    }
+
+    /// <summary>Cancels, mid-stream, the token a pending read waits on, from the caller or with the client closing too.</summary>
+    private static async Task CancelAPendingReadAsync(SteppedEasyTransfer easy, bool clientCloses)
+    {
+        using CancellationTokenSource caller = new();
+        using CancellationTokenSource client = new();
+        CancellationTokenSource stop = clientCloses ? client : caller;
+        await using ResponseBodyStream body = NewHeldBody(easy, caller.Token, client.Token);
+        easy.Deliver(1);
+        await body.StartAsync();
+        byte[] destination = new byte[8];
+        Assert.AreEqual(1, await body.ReadAsync(destination));
+        Task<int> pending = body.ReadAsync(destination, 0, 8, stop.Token);
+
+        try
+        {
+            // Throws here, on the canceller's thread, whatever the transfer's callbacks let out; a timer's thread would end the process.
+            stop.Cancel();
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => pending);
+            Assert.IsTrue(easy.PauseThrew.IsCompleted);
+        }
+        finally
+        {
+            // Ends the held transfer, which disposing the body waits for, even when an assertion failed.
+            easy.Finish(CurlCode.AbortedByCallback);
+        }
+    }
+
+    /// <summary>
+    /// A body whose transfer ignores its token and so is still writing when a token fires, until the test
+    /// finishes it: the cancellation callback is then sure to run against a running transfer.
+    /// </summary>
+    private static ResponseBodyStream NewHeldBody(SteppedEasyTransfer easy, CancellationToken caller, CancellationToken client)
+    {
+        ResponseBodyStream body = new(easy, 64, static (transfer, _) => transfer.PerformAsync(CancellationToken.None).AsTask(), caller, client);
+        easy.Options = easy.Options with { Callbacks = easy.Options.Callbacks with { Write = body.TakeBody } };
+        return body;
+    }
+
+    [TestMethod]
     public async Task Members_DescribeAReadOnlyForwardOnlyStream()
     {
         SteppedEasyTransfer easy = new();

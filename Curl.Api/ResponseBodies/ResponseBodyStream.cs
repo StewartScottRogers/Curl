@@ -19,7 +19,9 @@ internal sealed class ResponseBodyStream : Stream
     private readonly IEasyTransfer _easy;
     private readonly ResponseBodyBuffer _buffer;
     private readonly Func<IEasyTransfer, CancellationToken, Task<CurlCode>> _perform;
-    private readonly CancellationTokenSource _abort;
+    private readonly CancellationTokenSource _abort = new();
+    private readonly CancellationTokenRegistration _callerAborts;
+    private readonly CancellationTokenRegistration _clientAborts;
     private readonly List<IDisposable> _owned = [];
     private readonly TransferCancellation _cancellation;
     private readonly TransferProgressReporter? _progress;
@@ -54,7 +56,6 @@ internal sealed class ResponseBodyStream : Stream
         _easy = easy;
         _perform = perform;
 
-        _abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, clientClosing);
         _buffer = new ResponseBodyBuffer(capacity, () => easy.Pause(CurlPause.Continue), cancellationToken, clientClosing);
         _cancellation = new TransferCancellation(easy, _abort.Token, _buffer.Abort);
         easy.Options = _cancellation.ApplyTo(easy.Options);
@@ -63,6 +64,10 @@ internal sealed class ResponseBodyStream : Stream
             _progress = new TransferProgressReporter(easy, progress, _cancellation.Progress);
             easy.Options = easy.Options with { Callbacks = easy.Options.Callbacks with { TransferInfo = _progress.Report } };
         }
+
+        // Not a linked source: that one lets what a callback on the transfer's token raises reach the canceller (ADR-1432).
+        _callerAborts = cancellationToken.Register(AbortTransfer);
+        _clientAborts = clientClosing.Register(AbortTransfer);
     }
 
     /// <summary>The <c>CURLOPT_WRITEFUNCTION</c> that fills the stream.</summary>
@@ -128,7 +133,7 @@ internal sealed class ResponseBodyStream : Stream
         _cancellation.Dispose();
         await _easy.DisposeAsync().ConfigureAwait(false);
         _owned.ForEach(handle => handle.Dispose());
-        _abort.Dispose();
+        await DisposeAbortAsync().ConfigureAwait(false);
     }
 
     /// <summary>Reads the next bytes of the body, waiting for the transfer to deliver some.</summary>
@@ -183,8 +188,24 @@ internal sealed class ResponseBodyStream : Stream
         base.Dispose(disposing);
     }
 
-    /// <summary>Runs the transfer to its end, then completes the buffer with its result; always ends progress reports and disposes the owned handles, whatever the outcome.</summary>
+    /// <summary>
+    /// Runs the transfer to its end. It never faults: nobody may be awaiting it while the body streams, so
+    /// what running or disposing the transfer throws is given to the buffer, which throws it to the reader.
+    /// </summary>
     private async Task PerformAsync()
+    {
+        try
+        {
+            await PerformAndDisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _buffer.Fail(exception);
+        }
+    }
+
+    /// <summary>Runs the transfer to its end, then completes the buffer with its result; always ends progress reports and disposes the owned handles, whatever the outcome.</summary>
+    private async Task PerformAndDisposeAsync()
     {
         try
         {
@@ -203,12 +224,40 @@ internal sealed class ResponseBodyStream : Stream
         }
     }
 
-    /// <summary>Aborts the buffer and the perform token, then waits for the transfer to finish so the handle is never freed while the engine is still using it.</summary>
+    /// <summary>
+    /// Aborts the buffer and the perform token, then waits for the transfer to finish so the handle is never
+    /// freed while the engine is still using it. It never faults, as <see cref="Dispose(bool)"/> does not await it.
+    /// </summary>
     private async Task CloseAsync()
     {
         _buffer.Abort();
-        await _abort.CancelAsync().ConfigureAwait(false);
+        await _abort.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         await _transfer.ConfigureAwait(false);
+        await DisposeAbortAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Cancels the transfer's token for the caller's or the client's token. It runs on whichever thread cancels
+    /// that token, a timer's for <c>CancelAfter</c>, where an exception ends the process, so what a callback on the
+    /// transfer's token raises is caught here; the reader still gets the cancellation from its read.
+    /// </summary>
+    private void AbortTransfer()
+    {
+        try
+        {
+            _abort.Cancel();
+        }
+        catch (AggregateException)
+        {
+            // Nothing may be thrown on the canceller's thread; every other callback has already run.
+        }
+    }
+
+    /// <summary>Stops watching the caller's and the client's tokens, waiting for a running <see cref="AbortTransfer"/>, then disposes the transfer's token source.</summary>
+    private async ValueTask DisposeAbortAsync()
+    {
+        await _callerAborts.DisposeAsync().ConfigureAwait(false);
+        await _clientAborts.DisposeAsync().ConfigureAwait(false);
         _abort.Dispose();
     }
 }

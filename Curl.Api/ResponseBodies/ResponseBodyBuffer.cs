@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.Errors;
@@ -34,6 +35,8 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
     private CurlCode _code;
     private string _errorText = "";
     private CancellationToken _cancelledBy;
+    /// <summary>What running or disposing the transfer threw, if it threw.</summary>
+    private ExceptionDispatchInfo? _failure;
 
     /// <summary>Completes on the first delivery of body bytes or the end of the transfer, whichever comes first.</summary>
     public Task Started => _started.Task;
@@ -41,7 +44,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
     /// <summary>Completes when the transfer ends or the buffer first fills and pauses it, whichever comes first.</summary>
     public Task EndedOrPaused => _endedOrPaused.Task;
 
-    /// <summary>Whether <see cref="Complete"/> has been called: the transfer is over.</summary>
+    /// <summary>Whether <see cref="Complete"/> or <see cref="Fail"/> has been called: the transfer is over.</summary>
     public bool Ended
     {
         get
@@ -106,22 +109,14 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
     /// <summary>Records the end of the transfer; readers get the bytes still buffered, then its result.</summary>
     /// <param name="code">The transfer's result.</param>
     /// <param name="errorText">The handle's error text for <paramref name="code"/>.</param>
-    public void Complete(CurlCode code, string errorText)
-    {
-        TaskCompletionSource arrived;
-        lock (_gate)
-        {
-            _ended = true;
-            _code = code;
-            _errorText = errorText;
-            _cancelledBy = CancelledBy(cancellation, closing);
-            arrived = SwapArrived();
-        }
+    public void Complete(CurlCode code, string errorText) => End(code, errorText, failure: null);
 
-        _started.TrySetResult();
-        _endedOrPaused.TrySetResult();
-        arrived.TrySetResult();
-    }
+    /// <summary>
+    /// Records that the transfer ended by throwing; readers get the bytes still buffered, then
+    /// <paramref name="exception"/>, or <see cref="OperationCanceledException"/> when the transfer had been cancelled.
+    /// </summary>
+    /// <param name="exception">What running or disposing the transfer threw.</param>
+    public void Fail(Exception exception) => End(CurlCode.Ok, "", ExceptionDispatchInfo.Capture(exception));
 
     /// <summary>Makes every later <see cref="Write"/> fail the transfer with <c>CURLE_WRITE_ERROR</c>.</summary>
     public void Abort()
@@ -134,12 +129,13 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
 
     /// <summary>Throws the transfer's failure once it has ended with one; otherwise returns.</summary>
     /// <exception cref="CurlException">The transfer ended with an error code.</exception>
-    /// <exception cref="OperationCanceledException">The transfer ended with an error code after the caller cancelled it.</exception>
+    /// <exception cref="OperationCanceledException">The transfer failed after the caller cancelled it.</exception>
+    /// <remarks>What <see cref="Fail"/> was given is thrown as it is when the transfer had not been cancelled.</remarks>
     public void ThrowIfFailed()
     {
         lock (_gate)
         {
-            TransferCancellation.ThrowIfFailed(_code, _errorText, _cancelledBy);
+            ThrowIfFailedLocked();
         }
     }
 
@@ -173,7 +169,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
             read = 0;
             if (_buffered == 0)
             {
-                TransferCancellation.ThrowIfFailed(_code, _errorText, _cancelledBy);
+                ThrowIfFailedLocked();
                 return _ended ? null : _arrived.Task;
             }
 
@@ -211,6 +207,37 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
 
         _buffered -= copied;
         return copied;
+    }
+
+    /// <summary>Records how the transfer ended and wakes every waiter.</summary>
+    private void End(CurlCode code, string errorText, ExceptionDispatchInfo? failure)
+    {
+        TaskCompletionSource arrived;
+        lock (_gate)
+        {
+            _ended = true;
+            _code = code;
+            _errorText = errorText;
+            _failure = failure;
+            _cancelledBy = CancelledBy(cancellation, closing);
+            arrived = SwapArrived();
+        }
+
+        _started.TrySetResult();
+        _endedOrPaused.TrySetResult();
+        arrived.TrySetResult();
+    }
+
+    /// <summary><see cref="ThrowIfFailed"/> for a caller that holds the gate.</summary>
+    private void ThrowIfFailedLocked()
+    {
+        if (_failure is not null)
+        {
+            _cancelledBy.ThrowIfCancellationRequested();
+        }
+
+        _failure?.Throw();
+        TransferCancellation.ThrowIfFailed(_code, _errorText, _cancelledBy);
     }
 
     /// <summary>The token a failure is thrown as cancelled by: the caller's when cancelled, else the client's when it is closing, else none.</summary>
