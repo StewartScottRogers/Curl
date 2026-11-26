@@ -7,10 +7,11 @@ namespace Curl.Tls;
 /// Checks a stapled OCSP response for <c>--cert-status</c> (RFC 6960) the way curl's
 /// OpenSSL build does, in its order: the response parses and is <c>successful</c>; the
 /// leaf's issuer is in the server's chain; the responder's signature verifies, and the
-/// responder is the issuer or a certificate the issuer signed with <c>id-kp-OCSPSigning</c>;
-/// a <c>SingleResponse</c> names the leaf by <c>CertID</c>; its status is good; and
-/// <c>thisUpdate</c> and <c>nextUpdate</c> hold at the given time with OpenSSL's five
-/// minutes' leeway (<c>OCSP_check_validity</c>, no maximum age).
+/// responder is the issuer or an unexpired certificate the issuer signed with
+/// <c>id-kp-OCSPSigning</c>; a <c>SingleResponse</c> names the leaf by <c>CertID</c>; its
+/// status is good; and <c>thisUpdate</c> and <c>nextUpdate</c> hold at the given time with
+/// OpenSSL's five minutes' leeway (<c>OCSP_check_validity</c>, no maximum age). A delegated
+/// responder that is not yet valid is accepted, as curl's Schannel build accepts it.
 /// </summary>
 public static class OcspStapleVerifier
 {
@@ -19,7 +20,7 @@ public static class OcspStapleVerifier
     /// <summary>Checks <paramref name="ocspResponse" /> for the leaf of <paramref name="serverCertificates" /> at <paramref name="now" />.</summary>
     /// <param name="ocspResponse">The DER <c>OCSPResponse</c> the server stapled, or <see langword="null" /> when it stapled none.</param>
     /// <param name="serverCertificates">The server's DER certificates, leaf first.</param>
-    /// <param name="now">The time to judge <c>thisUpdate</c> and <c>nextUpdate</c> against.</param>
+    /// <param name="now">The time to judge a delegated responder's expiry, <c>thisUpdate</c> and <c>nextUpdate</c> against.</param>
     /// <returns>The outcome; only <see cref="OcspStapleStatus.Good" /> passes.</returns>
     /// <exception cref="ArgumentException"><paramref name="serverCertificates" /> is empty.</exception>
     public static OcspStapleOutcome Verify(byte[]? ocspResponse, IReadOnlyList<byte[]> serverCertificates, DateTimeOffset now)
@@ -60,7 +61,7 @@ public static class OcspStapleVerifier
             return new OcspStapleOutcome(OcspStapleStatus.IssuerNotFound);
         }
 
-        if (CheckResponder(basic, issuer) is { } responderProblem)
+        if (CheckResponder(basic, issuer, now) is { } responderProblem)
         {
             return new OcspStapleOutcome(responderProblem);
         }
@@ -133,7 +134,7 @@ public static class OcspStapleVerifier
     }
 
     /// <summary>Finds the responder, checks its signature over the response, then its authority to sign for the issuer.</summary>
-    private static OcspStapleStatus? CheckResponder(OcspBasicResponse basic, OcspCertificateFields issuer)
+    private static OcspStapleStatus? CheckResponder(OcspBasicResponse basic, OcspCertificateFields issuer, DateTimeOffset now)
     {
         OcspCertificateFields? responder = FindResponder(basic, issuer);
         if (responder is null)
@@ -146,19 +147,22 @@ public static class OcspStapleVerifier
             return OcspStapleStatus.SignatureInvalid;
         }
 
-        return IsAuthorised(responder, issuer) ? null : OcspStapleStatus.ResponderNotAuthorised;
+        return IsAuthorised(responder, issuer, now) ? null : OcspStapleStatus.ResponderNotAuthorised;
     }
 
     private static bool IsResponder(OcspBasicResponse basic, OcspCertificateFields candidate) => basic.ResponderName is { } name
         ? name.AsSpan().SequenceEqual(candidate.Subject)
         : basic.ResponderKeyHash.AsSpan().SequenceEqual(SHA1.HashData(candidate.PublicKey.KeyBits));
 
-    /// <summary>RFC 6960 section 4.2.2.2: the issuer itself, or a certificate it issued for OCSP signing.</summary>
-    private static bool IsAuthorised(OcspCertificateFields responder, OcspCertificateFields issuer) =>
-        ReferenceEquals(responder, issuer)
-        || (responder.CanSignOcspResponses
-            && responder.Issuer.AsSpan().SequenceEqual(issuer.Subject)
-            && Verifies(issuer.PublicKey, responder.SignatureAlgorithm, responder.TbsCertificate, responder.Signature));
+    /// <summary>RFC 6960 section 4.2.2.2: the issuer itself, or an unexpired certificate it issued for OCSP signing.</summary>
+    private static bool IsAuthorised(OcspCertificateFields responder, OcspCertificateFields issuer, DateTimeOffset now) =>
+        ReferenceEquals(responder, issuer) || IsDelegatedBy(responder, issuer, now);
+
+    private static bool IsDelegatedBy(OcspCertificateFields responder, OcspCertificateFields issuer, DateTimeOffset now) =>
+        responder.CanSignOcspResponses
+        && responder.NotAfter >= now
+        && responder.Issuer.AsSpan().SequenceEqual(issuer.Subject)
+        && Verifies(issuer.PublicKey, responder.SignatureAlgorithm, responder.TbsCertificate, responder.Signature);
 
     private static bool Verifies(TlsCertificatePublicKey signer, byte[] algorithm, byte[] content, byte[] signature) =>
         OcspSignatureAlgorithm.FindRule(algorithm, signer) is { } rule && signer.VerifySignature(rule, content, signature) is null;

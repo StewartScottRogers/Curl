@@ -377,6 +377,41 @@ public sealed class OcspStapleVerifierTests
     }
 
     [TestMethod]
+    [DataRow(-2880, OcspStapleStatus.ResponderNotAuthorised)]
+    [DataRow(-1, OcspStapleStatus.ResponderNotAuthorised)]
+    [DataRow(0, OcspStapleStatus.Good)]
+    public void ADelegatedResponderIsAuthorisedOnlyUntilItsNotAfter(int notAfterSecondsFromNow, OcspStapleStatus expected)
+    {
+        using OcspTestPki pki = new();
+        using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using X509Certificate2 responder = pki.IssueResponderValid(responderKey, Now.AddDays(-30), Now.AddSeconds(notAfterSecondsFromNow));
+        Diagnostics.Arrange("responder's notAfter", $"{notAfterSecondsFromNow} seconds from now");
+
+        OcspStapleStatus status = Verify(pki, Delegated(pki, responder, responderKey)).Status;
+
+        Diagnostics.Assert("status", expected, status);
+        Assert.AreEqual(expected, status);
+    }
+
+    [TestMethod]
+    public void ADelegatedResponderNotYetValidOrExpiringAfter2049IsAuthorised()
+    {
+        using OcspTestPki pki = new();
+        using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using X509Certificate2 notYetValid = pki.IssueResponderValid(responderKey, Now.AddDays(2), Now.AddDays(30));
+        using X509Certificate2 generalizedTime = pki.IssueResponderValid(responderKey, Now.AddDays(-1), new DateTimeOffset(2050, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        Diagnostics.Arrange("responders", "not yet valid, and notAfter written as GeneralizedTime");
+
+        OcspStapleStatus notYetValidStatus = Verify(pki, Delegated(pki, notYetValid, responderKey)).Status;
+        OcspStapleStatus generalizedTimeStatus = Verify(pki, Delegated(pki, generalizedTime, responderKey)).Status;
+
+        Diagnostics.Assert("not-yet-valid status", OcspStapleStatus.Good, notYetValidStatus);
+        Diagnostics.Assert("GeneralizedTime status", OcspStapleStatus.Good, generalizedTimeStatus);
+        Assert.AreEqual(OcspStapleStatus.Good, notYetValidStatus);
+        Assert.AreEqual(OcspStapleStatus.Good, generalizedTimeStatus);
+    }
+
+    [TestMethod]
     public void ADelegatedResponderWithoutOcspSigningIsNotAuthorised()
     {
         using OcspTestPki pki = new();

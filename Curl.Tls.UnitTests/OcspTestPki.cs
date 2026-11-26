@@ -60,6 +60,14 @@ internal sealed class OcspTestPki : IDisposable
         return Issue(request, [0x77]);
     }
 
+    /// <summary>A responder certificate the CA signs for OCSP signing, valid from <paramref name="notBefore" /> to <paramref name="notAfter" />.</summary>
+    public X509Certificate2 IssueResponderValid(ECDsa key, DateTimeOffset notBefore, DateTimeOffset notAfter)
+    {
+        X509CertificateRequest request = new("CN=Test OCSP Responder", key, HashAlgorithmName.SHA256);
+        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(OcspSigningOid)], false));
+        return request.Create(Ca.SubjectName, X509SignatureGenerator.CreateForECDsa(CaKey), notBefore, notAfter, [0x79]);
+    }
+
     /// <summary>A responder certificate with OCSP signing that names the CA as issuer but is signed by another key.</summary>
     public X509Certificate2 ForgeResponder(ECDsa key)
     {

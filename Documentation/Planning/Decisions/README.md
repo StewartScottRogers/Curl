@@ -1464,3 +1464,4 @@ Each option and the specific reason it lost.
 | [1420](ADR-1420-a-z-telnet-session-holds-back-later-transfers.md) | Under -Z a telnet session holds back later transfers, and telnet -t values are not judged at setup (BL-6017) | Accepted | 2026-11-26 |
 | [1421](ADR-1421-ending-a-failed-http-stream-waits-at-most-one-second.md) | Ending a failed HTTP stream waits at most one second (BL-6006) | Accepted | 2026-11-26 |
 | [1422](ADR-1422-the-schannel-build-reads-multi-valued-relative-names-against-name-constraints.md) | The Schannel build reads multi-valued relative names against name constraints (BL-6007) | Accepted | 2026-11-26 |
+| [1418](ADR-1418-an-expired-delegated-ocsp-responder-is-not-authorised.md) | An expired delegated OCSP responder is not authorised (BL-6008) | Accepted | 2026-11-26 |
