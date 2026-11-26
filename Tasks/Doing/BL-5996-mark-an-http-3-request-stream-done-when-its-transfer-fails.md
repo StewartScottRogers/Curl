@@ -36,3 +36,4 @@ status of 400 or above, for one) the session counts the stream as active: the ne
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: 9e1bad8b fe0e6ee6 3d836d5e.
