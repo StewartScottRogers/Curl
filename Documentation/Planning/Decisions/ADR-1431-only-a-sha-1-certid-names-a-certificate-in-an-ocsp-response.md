@@ -1,4 +1,4 @@
-# ADR-1424: Only a SHA-1 CertID names a certificate in an OCSP response
+# ADR-1431: Only a SHA-1 CertID names a certificate in an OCSP response
 
 - Status: Accepted
 - Date: 2026-11-26

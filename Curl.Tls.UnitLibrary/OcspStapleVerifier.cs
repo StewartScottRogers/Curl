@@ -167,7 +167,7 @@ public static class OcspStapleVerifier
     private static bool Verifies(TlsCertificatePublicKey signer, byte[] algorithm, byte[] content, byte[] signature) =>
         OcspSignatureAlgorithm.FindRule(algorithm, signer) is { } rule && signer.VerifySignature(rule, content, signature) is null;
 
-    /// <summary>Only a SHA-1 <c>CertID</c> names the leaf: curl asks by SHA-1 and takes no answer under another hash (ADR-1424).</summary>
+    /// <summary>Only a SHA-1 <c>CertID</c> names the leaf: curl asks by SHA-1 and takes no answer under another hash (ADR-1431).</summary>
     private static bool NamesCertificate(OcspSingleResponse response, OcspCertificateFields leaf, OcspCertificateFields issuer) =>
         OcspSignatureAlgorithm.FindHash(response.HashAlgorithmOid) == HashAlgorithmName.SHA1
         && response.SerialNumber.AsSpan().SequenceEqual(leaf.SerialNumber)
