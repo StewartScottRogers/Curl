@@ -1,5 +1,5 @@
 ---
-id: BL-6007
+id: BL-6036
 title: Bound the HTTP/2 closing GOAWAY when the peer has stopped reading
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6007 — Bound the HTTP/2 closing GOAWAY when the peer has stopped reading
+# BL-6036 — Bound the HTTP/2 closing GOAWAY when the peer has stopped reading
 
 ## Goal
 
