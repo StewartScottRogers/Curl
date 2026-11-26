@@ -7,12 +7,12 @@ namespace Curl.Tls;
 /// Turns the X.509 <c>AlgorithmIdentifier</c>s an OCSP response and a responder
 /// certificate are signed with into the <see cref="TlsSignatureRule" /> that checks them:
 /// RSA PKCS #1 v1.5 and ECDSA with SHA-1, SHA-256, SHA-384 and SHA-512 (RFC 4055, RFC
-/// 5758), RSASSA-PSS with its hash from the parameters (RFC 4055 section 3.1), and Ed25519
-/// (RFC 8410); and names the hashes an OCSP <c>CertID</c> may use.
+/// 5758), RSASSA-PSS with its hash, MGF1 hash and salt length from the parameters (RFC 4055
+/// section 3.1), and Ed25519 (RFC 8410); and names the hashes an OCSP <c>CertID</c> may use.
 /// </summary>
 internal static class OcspSignatureAlgorithm
 {
-    private static readonly Asn1Tag PssHashTag = new(TagClass.ContextSpecific, 0, true);
+    private const string Mgf1Oid = "1.2.840.113549.1.1.8";
 
     private static readonly Dictionary<string, HashAlgorithmName> Hashes = new()
     {
@@ -54,13 +54,50 @@ internal static class OcspSignatureAlgorithm
             : Rules.GetValueOrDefault(oid);
     }
 
-    /// <summary>RFC 4055's <c>RSASSA-PSS-params</c>: the hash is SHA-1 unless the parameters name another.</summary>
+    /// <summary>
+    /// RFC 4055's <c>RSASSA-PSS-params</c>: unless the parameters say otherwise the hash is
+    /// SHA-1, the mask is MGF1 over SHA-1, the salt is 20 bytes and the trailer field is 1.
+    /// </summary>
     private static TlsSignatureRule? FindRsaPssRule(AsnReader parameters, string keyOid)
     {
-        HashAlgorithmName? hash = parameters.HasData && parameters.PeekTag().HasSameClassAndValue(PssHashTag)
-            ? FindHash(parameters.ReadSequence(PssHashTag).ReadSequence().ReadObjectIdentifier())
-            : HashAlgorithmName.SHA1;
-        string ruleKeyOid = keyOid == TlsSignatureScheme.RsaSsaPssOid ? keyOid : TlsSignatureScheme.RsaEncryptionOid;
-        return hash is { } name ? new TlsSignatureRule(TlsSignatureKind.RsaPss, ruleKeyOid, null, name) : null;
+        AsnReader? hashField = ReadPssField(parameters, 0);
+        AsnReader? maskField = ReadPssField(parameters, 1);
+        AsnReader? saltField = ReadPssField(parameters, 2);
+        AsnReader? trailerField = ReadPssField(parameters, 3);
+        parameters.ThrowIfNotEmpty();
+        HashAlgorithmName? hash = FindPssHash(hashField);
+        (HashAlgorithmName MaskHash, int SaltLength)? encoding = FindPssEncoding(maskField, saltField);
+        return IsTrailerFieldOne(trailerField) && hash is { } name && encoding is not null
+            ? new TlsSignatureRule(TlsSignatureKind.RsaPss, FindRsaPssKeyOid(keyOid), null, name, encoding)
+            : null;
     }
+
+    private static HashAlgorithmName? FindPssHash(AsnReader? hashField) =>
+        hashField is null ? HashAlgorithmName.SHA1 : FindHash(hashField.ReadSequence().ReadObjectIdentifier());
+
+    private static bool IsTrailerFieldOne(AsnReader? trailerField) => trailerField is null || trailerField.ReadInteger().IsOne;
+
+    private static string FindRsaPssKeyOid(string signerKeyOid) =>
+        signerKeyOid == TlsSignatureScheme.RsaSsaPssOid ? signerKeyOid : TlsSignatureScheme.RsaEncryptionOid;
+
+    /// <summary>The content of the explicitly tagged field <c>[number]</c>, or <see langword="null" /> when the next field is not it.</summary>
+    private static AsnReader? ReadPssField(AsnReader parameters, int number)
+    {
+        Asn1Tag tag = new(TagClass.ContextSpecific, number, true);
+        return parameters.HasData && parameters.PeekTag() == tag ? parameters.ReadSequence(tag) : null;
+    }
+
+    /// <summary>The MGF1 hash and salt length, or <see langword="null" /> when the client knows no such mask or the length is negative or over <see cref="int.MaxValue" />.</summary>
+    private static (HashAlgorithmName MaskHash, int SaltLength)? FindPssEncoding(AsnReader? maskField, AsnReader? saltField)
+    {
+        HashAlgorithmName? maskHash = maskField is null ? HashAlgorithmName.SHA1 : FindMgf1Hash(maskField.ReadSequence());
+        int saltLength = 20;
+        bool saltFits = saltField is null || saltField.TryReadInt32(out saltLength);
+        return saltFits && saltLength >= 0 && maskHash is { } name ? (name, saltLength) : null;
+    }
+
+    private static HashAlgorithmName? FindMgf1Hash(AsnReader maskGeneration) =>
+        maskGeneration.ReadObjectIdentifier() == Mgf1Oid
+            ? FindHash(maskGeneration.ReadSequence().ReadObjectIdentifier())
+            : null;
 }

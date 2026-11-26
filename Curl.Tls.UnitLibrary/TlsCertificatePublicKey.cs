@@ -1,6 +1,7 @@
 using System.Formats.Asn1;
 using System.Numerics;
 using System.Security.Cryptography;
+using Curl.Cryptography;
 
 namespace Curl.Tls;
 
@@ -136,8 +137,17 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
     private bool VerifyRsa(TlsSignatureRule rule, byte[] content, byte[] signature) => rule.Kind switch
     {
         TlsSignatureKind.RsaMd5Sha1 or TlsSignatureKind.RsaPkcs1Sha224 => VerifyHandBuiltPkcs1(rule.Kind, content, signature),
+        TlsSignatureKind.RsaPss when rule.PssEncoding is { } encoding => VerifyStatedRsaPss(rule.Hash, encoding, content, signature),
         _ => VerifyRsa(rule.Hash, rule.Kind == TlsSignatureKind.RsaPss ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1, content, signature),
     };
+
+    /// <summary>The BCL's RSASSA-PSS takes only a salt as long as the hash and MGF1 over that hash, so a signature that states them is checked by <see cref="RsaPssVerification" />.</summary>
+    private bool VerifyStatedRsaPss(HashAlgorithmName hash, (HashAlgorithmName MaskHash, int SaltLength) encoding, byte[] content, byte[] signature)
+    {
+        using RSA rsa = RSA.Create();
+        rsa.ImportRSAPublicKey(KeyBits, out _);
+        return RsaPssVerification.Verify(rsa.ExportParameters(false), content, signature, hash, encoding.MaskHash, encoding.SaltLength);
+    }
 
     /// <summary>
     /// The BCL verifies PKCS #1 v1.5 only with a DigestInfo of a hash it computes, so TLS 1.0

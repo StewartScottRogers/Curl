@@ -7,4 +7,14 @@ namespace Curl.Tls;
 /// <param name="KeyOid">The <c>SubjectPublicKeyInfo</c> algorithm OID the key must carry.</param>
 /// <param name="CurveOid">The named curve OID the key must be on, or <see langword="null" /> for a key without one.</param>
 /// <param name="Hash">The hash the scheme signs with; unused by Ed25519.</param>
-internal sealed record TlsSignatureRule(TlsSignatureKind Kind, string KeyOid, string? CurveOid, HashAlgorithmName Hash);
+/// <param name="PssEncoding">
+/// The MGF1 hash and salt length a certificate-style RSASSA-PSS signature states, or
+/// <see langword="null" /> for a TLS scheme, whose mask hash is <paramref name="Hash" /> and
+/// whose salt is as long as that hash.
+/// </param>
+internal sealed record TlsSignatureRule(
+    TlsSignatureKind Kind,
+    string KeyOid,
+    string? CurveOid,
+    HashAlgorithmName Hash,
+    (HashAlgorithmName MaskHash, int SaltLength)? PssEncoding = null);

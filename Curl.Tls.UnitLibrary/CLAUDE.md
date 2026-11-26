@@ -207,7 +207,9 @@ and Encrypted Client Hello (BL-706, ADR-0233).
   names the certificate (ADR-1431). It
   reads with the internal `OcspBasicResponse`, `OcspSingleResponse` and
   `OcspCertificateFields`, and maps signature and `CertID` hash OIDs with
-  `OcspSignatureAlgorithm`. With `RequestOcspStatus` (and the settings' `TimeProvider`)
+  `OcspSignatureAlgorithm`, which verifies an RSASSA-PSS signature with the MGF1 hash and
+  salt length its parameters state, through `Curl.Cryptography`'s `RsaPssVerification`
+  (ADR-1424). With `RequestOcspStatus` (and the settings' `TimeProvider`)
   both handshakes run it once the verifier accepts the chain, expose `CertificateStatus`,
   and fail anything but good with `bad_certificate_status_response` and
   `TlsHandshakeFailure.CertificateStatusRejection`.
