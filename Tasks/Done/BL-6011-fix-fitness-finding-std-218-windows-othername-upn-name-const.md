@@ -53,7 +53,7 @@ The finding, verbatim:
 - `dotnet build` clean; full fast tests green (exit 0), `Curl.Networking.UnitTests` rerun after the last refactor: 4779 passed, 33 skipped.
 - `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: one failing member, `OtherNameMatches` (complexity 20, 100% covered). Split into three methods; a coverage run of the name-constraint tests then showed them at complexity 6 or less, 100% line and branch. The 40-minute whole-library script was not run again.
 - CI on Linux and macOS: the new tests build their own certificates and drive the library's own check, with no platform-specific output.
-- Follow-ups filed: BL-6037 (rfc822Name `@host` and empty constraints), BL-6038 (OpenSSL build's `otherName` constraints).
+- Follow-ups filed: BL-6046 (rfc822Name `@host` and empty constraints), BL-6047 (OpenSSL build's `otherName` constraints).
 
 ## Log
 

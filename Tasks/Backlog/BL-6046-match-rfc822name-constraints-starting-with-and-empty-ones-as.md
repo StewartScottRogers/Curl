@@ -1,5 +1,5 @@
 ---
-id: BL-6037
+id: BL-6046
 title: Match rfc822Name constraints starting with @, and empty ones, as CryptoAPI does in the Schannel build
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6037 — Match rfc822Name constraints starting with @, and empty ones, as CryptoAPI does in the Schannel build
+# BL-6046 — Match rfc822Name constraints starting with @, and empty ones, as CryptoAPI does in the Schannel build
 
 ## Goal
 

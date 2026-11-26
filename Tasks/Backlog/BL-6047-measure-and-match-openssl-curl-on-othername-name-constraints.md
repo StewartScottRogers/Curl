@@ -1,5 +1,5 @@
 ---
-id: BL-6038
+id: BL-6047
 title: Measure and match OpenSSL curl on otherName name constraints below an intermediate anchor
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6038 — Measure and match OpenSSL curl on otherName name constraints below an intermediate anchor
+# BL-6047 — Measure and match OpenSSL curl on otherName name constraints below an intermediate anchor
 
 ## Goal
 
