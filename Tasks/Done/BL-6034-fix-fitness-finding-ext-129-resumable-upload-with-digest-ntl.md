@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadFlow.cs]
+touches: [Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadFlow.cs, Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadSession.cs, Curl.Extension.ResumableUpload.UnitLibrary/CLAUDE.md, Curl.Extension.ResumableUpload.UnitTests/Transfer/ResumableUploadTransferHookTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6034 — Fix fitness finding EXT-129: --resumable-upload with --digest, --ntlm, --negotiate or --anyauth sends the creation POST twice, leaving an orphan upload on the server
 
@@ -36,13 +36,28 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] after the repro the upload count rises by exactly 1, and `-v` shows a single `> POST /files`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] after the repro the upload count rises by exactly 1, and `-v` shows a single `> POST /files`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: the creation request carried an empty upload stream, so curl's handler treated it as a request with a body,
+  sent it as the `--digest`/`--ntlm` probe, and after the 2xx sent it again. Fix (ADR-1426): creation has no body,
+  only `Content-Length: 0`; a request without a body also drops `-H "Transfer-Encoding: ..."`, which would give it one.
+- `touches` widened (no other task in Doing names these): `ResumableUploadSession.cs`, the library's `CLAUDE.md` and
+  the hook tests.
+- Pipeline run by the lane itself, without sub-agents: a two-file change.
+- Repro run against a loopback tus mock that asks for no authentication (not real tusd, no Docker), with the built
+  `curl.exe`: `--digest` and `--ntlm` gave `OPTIONS(0) POST(0) PATCH(0) PATCH(3)`, `--negotiate` and `--anyauth` gave
+  `OPTIONS(0) POST(0) PATCH(3)`; each had one `> POST` line in `-v` and exit 0, so one upload resource is created.
+- The empty probe `PATCH` is harmless under tus; under the IETF draft it carries `Upload-Complete: ?1`: BL-6042.
+- Checks: build with warnings as errors clean, all fast tests green, then after a complexity split in `IsSent` the build
+  again and the library's 116 tests; format check clean on the changed files; library at 100% line and branch coverage,
+  no failing member.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 9280cbb9 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. --resumable-upload sends one creation request with --digest, --ntlm, --negotiate or --anyauth, so no orphan upload is left
