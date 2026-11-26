@@ -65,7 +65,7 @@ internal sealed class ResponseBodyStream : Stream
             easy.Options = easy.Options with { Callbacks = easy.Options.Callbacks with { TransferInfo = _progress.Report } };
         }
 
-        // Not a linked source: that one lets what a callback on the transfer's token raises reach the canceller (ADR-1432).
+        // Not a linked source: that one lets what a callback on the transfer's token raises reach the canceller (ADR-1436).
         _callerAborts = cancellationToken.Register(AbortTransfer);
         _clientAborts = clientClosing.Register(AbortTransfer);
     }

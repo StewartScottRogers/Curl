@@ -47,7 +47,7 @@ Lanes test only on Windows, so make the race deterministic in a unit test: hold 
 
 ## Notes
 
-- Delivered directly in the lane session (no stage sub-agents), to stay inside the run's budget. Decision: ADR-1432.
+- Delivered directly in the lane session (no stage sub-agents), to stay inside the run's budget. Decision: ADR-1436.
 - Not reproduced: lanes run on Windows, and no callback of the managed engine is known to throw. What is fixed is
   every way found for `Curl.Api`'s body pipeline to throw where nobody observes it. A grep of the engine, networking
   and protocol libraries found no other token callback that looks able to throw on the cancel path; a native abort on

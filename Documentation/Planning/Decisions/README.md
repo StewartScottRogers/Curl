@@ -1477,4 +1477,4 @@ Each option and the specific reason it lost.
 | [1433](ADR-1433-closing-an-http-2-connection-waits-at-most-one-second.md) | Closing an HTTP/2 connection waits at most one second (BL-6036) | Accepted | 2026-11-26 |
 | [1434](ADR-1434-a-connect-reply-counts-in-size-header-and-num-headers-for-every-protocol.md) | A CONNECT reply counts in size_header and num_headers for every protocol (BL-6019) | Accepted | 2026-11-26 |
 | [1435](ADR-1435-doh-url-sends-the-a-and-aaaa-queries-on-one-http-2-connection.md) | --doh-url sends the A and AAAA queries on one HTTP/2 connection (BL-6038) | Accepted | 2026-11-26 |
-| [1432](ADR-1432-a-response-body-throws-only-to-its-reader.md) | A response body throws only to its reader (BL-6048) | Accepted | 2026-11-26 |
+| [1436](ADR-1436-a-response-body-throws-only-to-its-reader.md) | A response body throws only to its reader (BL-6048) | Accepted | 2026-11-26 |

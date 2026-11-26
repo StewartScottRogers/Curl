@@ -1,4 +1,4 @@
-# ADR-1432: A response body throws only to its reader
+# ADR-1436: A response body throws only to its reader
 
 - Status: Accepted
 - Date: 2026-11-26
