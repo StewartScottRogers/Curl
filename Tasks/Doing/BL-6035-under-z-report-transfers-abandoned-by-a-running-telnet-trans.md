@@ -40,3 +40,4 @@ command `-sS -m 5 -Z [--parallel-max 1] -w "[%{exitcode}]\n" telnet://... -t NEW
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: f02c2031 c561faef 48063094 3d836d5e.
