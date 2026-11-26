@@ -31,12 +31,40 @@ public sealed class FtpNumHeadersTests
         StringAssert.Contains(run.OutputText, "Content-Length: 10\r\n");
     }
 
+    /// <summary>
+    /// STD-223 (BL-6020): measured 2026-11-26 with <c>Record-CurlExchange.ps1 -Ftp</c>, curl 8.22.0
+    /// prints <c>0</c> for a download, an upload and a listing when no reply holds a colon.
+    /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_PlainDownload_CountsOneHeader()
+    public async Task ExecuteAsync_PlainDownloadWithNoColonInAnyReply_CountsNoHeaders()
     {
         FtpRun run = await FtpRun.ExecuteAsync(
             FileUrl,
             LoggedIn + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n213 7\r\n150 Opening\r\n226 Transfer complete\r\n221 Bye\r\n",
+            "hello\r\n");
+
+        Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Assert.AreEqual(0, NumHeaders(run.Report));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ListingWithNoColonInAnyReply_CountsNoHeaders()
+    {
+        FtpRun run = await FtpRun.ExecuteAsync(
+            "ftp://127.0.0.1:18321/",
+            LoggedIn + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n150 Opening\r\n226 Transfer complete\r\n221 Bye\r\n",
+            "hello\r\n");
+
+        Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Assert.AreEqual(0, NumHeaders(run.Report));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PlainDownloadWithOneReplyHoldingAColon_CountsOneHeader()
+    {
+        FtpRun run = await FtpRun.ExecuteAsync(
+            FileUrl,
+            LoggedIn + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n213 7\r\n150 Opening\r\n226 done: ok\r\n221 Bye\r\n",
             "hello\r\n");
 
         Assert.AreEqual(1, NumHeaders(run.Report));
@@ -81,14 +109,15 @@ public sealed class FtpNumHeadersTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_Upload_CountsOneHeader()
+    public async Task ExecuteAsync_UploadWithNoColonInAnyReply_CountsNoHeaders()
     {
         FtpRun run = await FtpRun.ExecuteAsync(
             FileUrl,
             LoggedIn + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n150 Opening\r\n226 Transfer complete\r\n221 Bye\r\n",
             adjust: c => new TransferContext { Url = c.Url, Output = c.Output, Upload = new MemoryStream([1, 2, 3]) });
 
-        Assert.AreEqual(1, NumHeaders(run.Report));
+        Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Assert.AreEqual(0, NumHeaders(run.Report));
     }
 
     [TestMethod]

@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs]
+touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Original.Protocol.Ftp.UnitLibrary/FtpHeadHeaderLines.cs, Curl.Original.Protocol.Ftp.UnitTests/FtpNumHeadersTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6020 — Fix fitness finding STD-223: FTP %{num_headers} is 1 when no server reply contains a colon; curl reports 0
 
@@ -36,13 +36,31 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro prints `0` against vsftpd, and a server whose replies contain a colon (pure-ftpd, pyftpdlib) still prints its count.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro prints `0` against vsftpd, and a server whose replies contain a colon (pure-ftpd, pyftpdlib) still prints its count.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced and measured 2026-11-26 with `Record-CurlExchange.ps1 -Ftp`, whose default replies
+  hold no colon (as vsftpd's): curl 8.22.0 prints `0` for a download, an `-T` upload and a
+  listing, `1` when only the final reply holds a colon (`226 done: ok`), and `3` for `-I` of a
+  file answering `SIZE` and `MDTM`. The `1` BL-5403 pinned came from a colon reply, not a rule.
+- Fix: `FtpSession.CountedPseudoHeaders` counts the colon reply lines and the `-I` lines only;
+  the stand-in `226 Transfer complete` fallback is gone. No ADR: curl's measured behaviour.
+- `touches` widened with `FtpHeadHeaderLines.cs` (its `TransferComplete` had no other user) and
+  `FtpNumHeadersTests.cs`; no task in Doing names either.
+- Checks: no Docker vsftpd in a lane, so the repro ran as `Record-CurlExchange.ps1 -Ftp` sessions
+  with colon-free replies (vsftpd's shape): the built `Curl.Console` printed `0`, `0`, `0`, and `1`
+  with one colon reply and `3` for `-I`, the same as real curl. Build clean (0 warnings); fast tests
+  green (one `FtpProtocolHandlerConnectOnlyTests` record comparison failed on the first run because
+  an empty count was a new array; fixed, FTP tests 1373 passed, 9 skipped; every other assembly had
+  passed). `Measure-CodeQuality.ps1` for the FTP library: 0 failing members. Platform-neutral.
+- `TransferReport.TransferCompleteStandInHeader` and the engine's removal of it are now unused;
+  `ConnectionEndPointRecorder.ProxyConnect.cs` is held by BL-6019 in Doing, so BL-6054 removes them.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: a0832679 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. FTP %{num_headers} counts only reply lines holding a colon and -I lines, so a colon-free server gives 0 as curl 8.22.0 does

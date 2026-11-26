@@ -30,10 +30,6 @@ internal static class FtpHeadHeaderLines
     internal static string? LastModified(DateTimeOffset? modifiedUtc) =>
         modifiedUtc?.ToString("'Last-Modified: 'ddd, dd MMM yyyy HH:mm:ss' GMT'\r\n", CultureInfo.InvariantCulture);
 
-
-    /// <inheritdoc cref="TransferReport.TransferCompleteStandInHeader" />
-    internal static KeyValuePair<string, string> TransferComplete => TransferReport.TransferCompleteStandInHeader;
-
     /// <summary>Splits a header <paramref name="line" /> written above into its name and value.</summary>
     /// <param name="line">The line, ending in CRLF.</param>
     /// <returns>The name and value.</returns>

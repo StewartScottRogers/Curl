@@ -371,7 +371,7 @@ internal sealed class FtpSession(
             {
                 ResponseCode = lastReplyCode,
                 FtpEntryPath = entryPath,
-                PseudoHeaders = PseudoHeadersOf(TransferResult.Failure(CurlExitCode.OperationTimedOut, cancelled.Message)),
+                PseudoHeaders = CountedPseudoHeaders(),
             };
             throw;
         }
@@ -385,7 +385,7 @@ internal sealed class FtpSession(
             {
                 ResponseCode = lastReplyCode,
                 FtpEntryPath = entryPath,
-                PseudoHeaders = PseudoHeadersOf(result),
+                PseudoHeaders = CountedPseudoHeaders(),
                 DownloadSize = uploaded ? 0 : result.BytesTransferred,
                 UploadSize = uploaded ? result.BytesTransferred : 0,
                 RequestSize = uploaded ? result.BytesTransferred : 0,
@@ -1565,16 +1565,14 @@ internal sealed class FtpSession(
     private readonly List<KeyValuePair<string, string>> writtenHeaders = [];
 
     /// <summary>
-    /// The lines counted by <c>%{num_headers}</c>: every server reply line holding a colon plus those
-    /// <c>-I</c> wrote (BL-5470), or, when no reply holds a colon, the one line curl 8.22.0 counts for a
-    /// successful download (BL-5403).
+    /// The lines counted by <c>%{num_headers}</c>, as curl 8.22.0 counts them: every server reply line
+    /// holding a colon plus those <c>-I</c> wrote (BL-5470), so none when there are neither (BL-6020). With
+    /// none it is the shared empty list, so two such reports compare equal.
     /// </summary>
-    private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result)
+    private IReadOnlyList<KeyValuePair<string, string>> CountedPseudoHeaders()
     {
         KeyValuePair<string, string>[] counted = [.. control.ColonReplyLines, .. writtenHeaders];
-        return counted.Length > 0 ? counted
-            : context.NoBody || !result.IsSuccess ? []
-            : [FtpHeadHeaderLines.TransferComplete];
+        return counted.Length > 0 ? counted : [];
     }
 
     /// <summary>
