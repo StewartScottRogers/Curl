@@ -1,5 +1,5 @@
 ---
-id: BL-6048
+id: BL-6054
 title: Measure and match the OpenSSL build's rfc822Name constraints starting with @, empty, and with a differently cased local part
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6048 — Measure and match the OpenSSL build's rfc822Name constraints starting with @, empty, and with a differently cased local part
+# BL-6054 — Measure and match the OpenSSL build's rfc822Name constraints starting with @, empty, and with a differently cased local part
 
 ## Goal
 

@@ -32,7 +32,7 @@ Found in BL-6011 (ADR-1430). CryptoAPI, measured with `X509Chain` on Windows: an
 - `CertificateNameConstraints` now carries each build's rfc822Name comparison with the names it reads. The matchers are held in static fields, because passing the method groups added branches that failed the complexity gate.
 - Empty-constraint tests are excluded on macOS: its certificate parser was not measured with one. The rest are pure matching over a built chain, as the existing constraint tests are.
 - Fast tests: all 114 test projects passed; `Curl.Networking.UnitTests` 4813 passed, 33 skipped, rerun after the last edit. `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
-- OpenSSL build left unchanged; BL-6048 filed to measure it.
+- OpenSSL build left unchanged; BL-6054 filed to measure it.
 
 ## Log
 
