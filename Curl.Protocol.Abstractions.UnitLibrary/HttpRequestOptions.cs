@@ -34,7 +34,7 @@ public sealed record HttpRequestOptions
     /// empty body in place of its own, carries instead of <see cref="Headers" />, in that form;
     /// <see langword="null" />, as for every command line, when the probe carries
     /// <see cref="Headers" />. <c>--resumable-upload</c> sets it so the probe of an upload
-    /// append does not say the upload is complete (ADR-1429).
+    /// append does not say the upload is complete (ADR-1440).
     /// </summary>
     public IReadOnlyList<string>? AuthProbeHeaders { get; init; }
 

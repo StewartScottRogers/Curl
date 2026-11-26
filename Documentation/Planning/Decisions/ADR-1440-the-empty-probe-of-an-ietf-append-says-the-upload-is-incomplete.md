@@ -1,4 +1,4 @@
-# ADR-1429: The empty probe of an IETF append says the upload is incomplete
+# ADR-1440: The empty probe of an IETF append says the upload is incomplete
 
 - Status: Accepted
 - Date: 2026-11-26

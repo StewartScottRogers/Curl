@@ -9,7 +9,7 @@ namespace Curl.Original.Protocol.Http;
 /// <content>
 /// Pins <see cref="HttpRequestOptions.AuthProbeHeaders" />: a <c>--digest</c> or NTLM probe carries them in place of
 /// <see cref="HttpRequestOptions.Headers" />, and the request that carries the body carries
-/// <see cref="HttpRequestOptions.Headers" /> (BL-6044, ADR-1429).
+/// <see cref="HttpRequestOptions.Headers" /> (BL-6044, ADR-1440).
 /// </content>
 public sealed partial class HttpProtocolHandlerTests
 {

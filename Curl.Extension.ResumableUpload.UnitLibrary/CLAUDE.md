@@ -14,7 +14,7 @@ another extension.
   creates the upload with a request that has no body, only `Content-Length: 0`, so that `--digest` and `--ntlm` never
   send it again after a 2xx (ADR-1428), appends, and after a broken connection retrieves the offset and appends from it. The
   empty probe curl's handler may send before an append for `--digest` or `--ntlm` carries the protocol's
-  `AppendProbeHeaders` (`HttpRequestOptions.AuthProbeHeaders`), for the IETF draft `Upload-Complete: ?0` (ADR-1429).
+  `AppendProbeHeaders` (`HttpRequestOptions.AuthProbeHeaders`), for the IETF draft `Upload-Complete: ?0` (ADR-1440).
   `ResumableUploadSession` sends each request through the rest of curl's transfer (`next`, with a
   `ResumableUploadRequestContext`), so `-v`, `--trace`, `--har` and `--record` see it (ADR-1379); a request's content is
   an `UploadRemainderStream`, a read-only window over the upload from its offset, so nothing of it is copied into memory.

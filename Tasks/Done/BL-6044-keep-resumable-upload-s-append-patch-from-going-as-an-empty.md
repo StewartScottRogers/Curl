@@ -36,7 +36,7 @@ non-2xx ends the transfer without the body). `--extended-help` and ADR-1103 are 
 
 ## Notes
 
-- Decision (ADR-1429): new `HttpRequestOptions.AuthProbeHeaders` gives the empty probe its own header fields; the
+- Decision (ADR-1440): new `HttpRequestOptions.AuthProbeHeaders` gives the empty probe its own header fields; the
   IETF append's probe says `Upload-Complete: ?0`. No command-line option sets it, so curl's transfers probe as before.
   No option changed, so `--ai-help` is unaffected.
 - A first design (content as `?0`, then an empty `?1` request) was built and dropped: it still sent an empty `?1`
@@ -58,4 +58,4 @@ non-2xx ends the transfer without the body). `--extended-help` and ADR-1103 are 
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 5a00fb8f 44796430 97f2967b 3d836d5e.
-- 2026-11-26: Doing -> Done. The IETF append's empty --digest or --ntlm probe now says Upload-Complete: ?0 (ADR-1429), so it completes nothing and the whole upload follows as ?1.
+- 2026-11-26: Doing -> Done. The IETF append's empty --digest or --ntlm probe now says Upload-Complete: ?0 (ADR-1440), so it completes nothing and the whole upload follows as ?1.

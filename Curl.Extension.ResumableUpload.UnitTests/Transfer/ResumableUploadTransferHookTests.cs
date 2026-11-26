@@ -139,7 +139,7 @@ public sealed class ResumableUploadTransferHookTests
     [TestMethod]
     public async Task ExecuteAsync_IetfAppend_GivesItsEmptyAuthenticationProbeUploadCompleteFalse()
     {
-        // ADR-1429: curl's handler may send an append's header fields first with no content for --digest or --ntlm, and a
+        // ADR-1440: curl's handler may send an append's header fields first with no content for --digest or --ntlm, and a
         // server that asks for no authentication would complete an upload whose probe said Upload-Complete: ?1.
         var next = new ScriptedNext(PlainOptions, IetfCreated, IetfAppended);
         var http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest, Headers = ["X-A: 1", "upload-complete: ?1"] };
