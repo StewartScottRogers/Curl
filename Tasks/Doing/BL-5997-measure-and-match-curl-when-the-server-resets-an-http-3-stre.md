@@ -37,3 +37,4 @@ ngtcp2 build with two URLs to the origin.
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: cfb57401 11f8926c 3d836d5e.
