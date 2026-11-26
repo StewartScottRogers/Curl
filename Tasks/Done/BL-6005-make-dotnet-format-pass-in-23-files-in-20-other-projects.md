@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api.UnitTests/EngineContracts/Multi/MultiValueTypeTests.cs, Curl.Api.UnitTests/Readme/ReadmeSamples.cs, Curl.Api/Client/CurlClient.cs, Curl.Cli.UnitLibrary/ConfigFileSyntax.cs, Curl.Cryptography.UnitLibrary/MontgomeryModulus.cs, Curl.Extended.Protocol.Amqp0.UnitTests/Client/Amqp0ClientFlowTests.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Requests/AzureStorageCredential.cs, Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapExtension.cs, Curl.Extended.Protocol.Coap.UnitLibrary/Observe/CoapObserveTransferHook.cs, Curl.Extended.Protocol.McpClient.UnitLibrary/Client/McpClientExtension.cs, Curl.Extended.Protocol.Plugin.UnitTests/BatchHelperArgumentTests.cs, Curl.Extended.Protocol.SignalR.UnitLibrary/SignalRExtension.cs, Curl.Extended.Protocol.Stomp.UnitTests/Wire/StompFrameReaderTests.cs, Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportConnectHeaderFieldsTests.cs, Curl.Extension.HttpCache.UnitTests/CacheDirectoryTests.cs, Curl.Extension.PrivacyPass.UnitTests/Tokens/TestIssuer.cs, Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardConnector.cs, Curl.Mcp.UnitLibrary/McpArgumentChecker.cs, Curl.Output.UnitTests/Cgr214Tests.cs, Curl.Protocol.Abstractions.UnitLibrary/TlsHandshakeEvent.cs, Libcurl.UnitTests/Cgr247Tests.cs, Libcurl.UnitTests/Misc/ErrorText/CurlErrorTextTests.cs, Libcurl/Multi/Settings/CurlMultiOption.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6005 — Make dotnet format pass in 23 files in 20 other projects
 
@@ -24,12 +24,20 @@ This part names the 23 files one by one, because they are spread over 20 project
 
 ## Acceptance criteria
 
-- [ ] `dotnet format Curl.slnx --verify-no-changes --include <each path in touches>` exits 0.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `dotnet format Curl.slnx --verify-no-changes --include <each path in touches>` exits 0.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- All 23 files changed: `using` order, whitespace and final newlines only.
+- `Curl.Output.UnitTests/Cgr214Tests.cs`: `dotnet format` left the `with` initializer badly indented, so it was
+  laid out by hand over four lines, with a trailing comma; `--verify-no-changes` accepts it.
+- `Measure-CodeQuality.ps1` for the 11 production libraries changed (one run, about 56 minutes): 0 failing members.
+- BL-6002 and BL-6004 were still in Doing on `origin/work/dark-factory` when this task finished, so this is not
+  the last of BL-6000 to BL-6005 and the whole-solution `--verify-no-changes` check falls to the last of them.
 
 ## Log
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 03521b86 3d836d5e.
+- 2026-11-26: Doing -> Done. dotnet format passes in the 23 files; build clean, fast tests green, 0 failing quality members in the 11 libraries changed.
