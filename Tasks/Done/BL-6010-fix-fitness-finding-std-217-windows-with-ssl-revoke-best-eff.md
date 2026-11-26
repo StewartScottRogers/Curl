@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Tls.UnitLibrary/OcspSignatureAlgorithm.cs]
+touches: [Curl.Tls.UnitLibrary/OcspSignatureAlgorithm.cs, Curl.Tls.UnitLibrary/TlsSignatureRule.cs, Curl.Tls.UnitLibrary/TlsCertificatePublicKey.cs, Curl.Tls.UnitLibrary/CLAUDE.md, Curl.Tls.UnitTests/OcspSignatureAlgorithmTests.cs, Curl.Tls.UnitTests/OcspResponseBuilder.cs, Curl.Tls.UnitTests/TestRsaPssSignature.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6010 — Fix fitness finding STD-217: Windows: with --ssl-revoke-best-effort, an RSA-PSS-signed OCSP "revoked" answer whose salt is not 32 is ignored
 
@@ -38,13 +38,29 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits 60 "…has been revoked"; `curl -sS --cacert intOC3.pem https://localhost:<port of w_pss64_good>/` exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro exits 60 "…has been revoked"; `curl -sS --cacert intOC3.pem https://localhost:<port of w_pss64_good>/` exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: `OcspSignatureAlgorithm.FindRsaPssRule` read only the hash, so verification assumed
+  salt = hash length and MGF1 over the same hash. It now reads all of `RSASSA-PSS-params` and
+  verifies through `Curl.Cryptography`'s `RsaPssVerification` (ADR-1424).
+- First criterion: met by unit tests, not by a live run. The reviewer's servers were not rebuilt.
+  `OcspSignatureAlgorithmTests` verifies salts 64, 32 and 0 through the rule `OcspStapleVerifier`
+  uses for every OCSP signature; the finding says salt 32 already matched curl, so the signature
+  check was the only difference. Real curl was not re-measured (the finding holds the measurement).
+- `touches` widened to the rule record, the key's verification, their notes and tests. No other
+  task in Doing names them (BL-6027 holds `OcspStapleVerifier.cs`, not changed here).
+- `OcspResponseBuilder.RsaPssSigner` (test code) now writes the MGF1 hash and salt length for a
+  named hash, since parameters naming the hash alone mean a 20-byte salt (RFC 4055).
+- Quality: the first run found `FindRsaPssRule` at complexity 12; it was split. Re-scored from
+  `Curl.Tls.UnitTests`' coverage alone: no changed member fails (the two it lists are untouched
+  members that other projects' tests cover).
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: b5c69ea0 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. OCSP RSASSA-PSS signatures are verified with their stated salt length and MGF1 hash (ADR-1424).
