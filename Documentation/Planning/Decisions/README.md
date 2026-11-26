@@ -1456,3 +1456,4 @@ Each option and the specific reason it lost.
 | [1412](ADR-1412-a-cancelled-http-3-streams-quic-close-line-is-written-by-the-next-read.md) | A cancelled HTTP/3 stream's quic close line is written by the next read (BL-5982) | Accepted | 2026-11-25 |
 | [1413](ADR-1413-the-http-3-peer-idle-timeout-line-is-written-for-each-stream-opened-on-an-idle-connection.md) | The HTTP/3 peer idle timeout line is written for each stream opened on an idle connection (BL-5995) | Accepted | 2026-11-25 |
 | [1414](ADR-1414-a-transfer-f-fails-over-http-3-keeps-its-connection.md) | A transfer -f fails over HTTP/3 keeps its connection (BL-5983) | Accepted | 2026-11-25 |
+| [1415](ADR-1415-a-max-filesize-or-write-failure-over-http-3-keeps-its-connection.md) | A --max-filesize or write failure over HTTP/3 keeps its connection (BL-5996) | Accepted | 2026-11-25 |

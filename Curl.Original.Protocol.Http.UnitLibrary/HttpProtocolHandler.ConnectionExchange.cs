@@ -40,6 +40,7 @@ public sealed partial class HttpProtocolHandler
         unheldSession ??= UnheldHttp2Session(upgradedSession, connection);
         IHttpStreamSession? used = streams ?? upgradedSession;
         outcome.RanOnMultiplexedStream = used is not null;
+        outcome.RanOnHttp3Stream = used is Http3Session;
         SkipClosingGoAwayWhenGivenUp(outcome, used);
         SettleConnection(plan, connection, used, outcome);
         await ShutDownAsync(unheldSession).ConfigureAwait(false);
@@ -96,11 +97,12 @@ public sealed partial class HttpProtocolHandler
             : outcome.ReportsLeftIntact && streams is not Http3Session { AcceptsNewStreams: false };
 
     /// <summary>
-    /// Ends the stream of an exchange that timed out or that <c>-f</c> failed: an HTTP/2 stream
-    /// is reset (<see cref="Http2StreamConnection.ResetUnlessEndedBothWaysAsync" />); an HTTP/3
+    /// Ends the stream of an exchange that timed out, that <c>-f</c> failed, or, over HTTP/3,
+    /// that <c>--max-filesize</c> or a failed write ended: an HTTP/2 stream is reset
+    /// (<see cref="Http2StreamConnection.ResetUnlessEndedBothWaysAsync" />); an HTTP/3
     /// stream is cancelled (<see cref="Http3StreamConnection.CancelUnlessEndedBothWaysAsync" />)
     /// and its transfer marked done, curl's <c>--trace-config http/3</c> lines included
-    /// (BL-5978, BL-5983); nothing on any other connection.
+    /// (BL-5978, BL-5983, BL-5996); nothing on any other connection.
     /// </summary>
     private static async ValueTask EndGivenUpStreamAsync(IHttpStreamConnection? stream, ConnectResult connect, CancellationToken cancellationToken)
     {
@@ -116,25 +118,35 @@ public sealed partial class HttpProtocolHandler
     }
 
     /// <summary>
-    /// Ends what a failed exchange leaves open of its stream: when <c>-f</c> failed it, the
-    /// stream unless it has ended both ways (<see cref="EndGivenUpStreamAsync" />), an HTTP/3
-    /// one after reading what has arrived of its response
-    /// (<see cref="Http3StreamConnection.ReadArrivedResponseAsync" />); and after any failure, an
-    /// HTTP/2 one whose response ended it with the upload unsent
+    /// Ends what a failed exchange leaves open of its stream: when the failure ends only the
+    /// stream (<see cref="FailsOnlyItsStream" />), the stream unless it has ended both ways
+    /// (<see cref="EndGivenUpStreamAsync" />), an HTTP/3 one after reading what has arrived of
+    /// its response (<see cref="Http3StreamConnection.ReadArrivedResponseAsync" />); and after
+    /// any failure, an HTTP/2 one whose response ended it with the upload unsent
     /// (<see cref="ResetFailedStreamUploadAsync" />), even on a connection that takes no new
     /// stream.
     /// </summary>
     private static async ValueTask ResetFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, ConnectResult connect, IConnection connection, CancellationToken cancellationToken)
     {
-        if (failure.ExitCode == CurlExitCode.HttpReturnedError)
+        IHttpStreamConnection? stream = TrailerStreamOf(requestStream, connection);
+        if (FailsOnlyItsStream(failure.ExitCode, stream is Http3StreamConnection))
         {
-            IHttpStreamConnection? stream = TrailerStreamOf(requestStream, connection);
             await ((stream as Http3StreamConnection)?.ReadArrivedResponseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
             await EndGivenUpStreamAsync(stream, connect, cancellationToken).ConfigureAwait(false);
         }
 
         await ResetFailedStreamUploadAsync(requestStream, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Tells whether a failure with <paramref name="exitCode" /> ends only its stream, so the
+    /// connection carries the next transfer: <c>-f</c>'s on HTTP/2 or HTTP/3, and over HTTP/3
+    /// also <c>--max-filesize</c>'s and a failed write's (measured, BL-5977, BL-5983,
+    /// BL-5996, ADR-1415).
+    /// </summary>
+    private static bool FailsOnlyItsStream(CurlExitCode exitCode, bool isHttp3) =>
+        exitCode == CurlExitCode.HttpReturnedError
+            || (isHttp3 && exitCode is CurlExitCode.FilesizeExceeded or CurlExitCode.WriteError);
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,
