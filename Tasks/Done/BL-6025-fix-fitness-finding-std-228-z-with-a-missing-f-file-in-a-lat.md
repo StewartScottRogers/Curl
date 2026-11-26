@@ -52,7 +52,7 @@ The finding, verbatim:
   groups apart by how many dispatches `CloseAtEnd` has received. The test went into
   `Curl.Console.UnitTests/Cgr175Tests.cs`, beside the existing `-Z -F` missing-file tests.
 - No ADR: this matches measured curl, with no behaviour choice to make.
-- Left for BL-6037: checking the form at the group's first URL (differs when that URL is in the batch and the group's
+- Left for BL-6043: checking the form at the group's first URL (differs when that URL is in the batch and the group's
   last is not), and `%{xfer_id}` (`0` in curl, `-1` here) for an earlier group's transfer.
 - Quality run for `Curl.Console`: 0 failing members. Platform-neutral change and test.
 

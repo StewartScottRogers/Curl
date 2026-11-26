@@ -1,5 +1,5 @@
 ---
-id: BL-6037
+id: BL-6043
 title: Match curl for -Z -F missing file: check the form at the group's first URL and report xfer_id 0 and up for earlier groups
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6037 — Match curl for -Z -F missing file: check the form at the group's first URL and report xfer_id 0 and up for earlier groups
+# BL-6043 — Match curl for -Z -F missing file: check the form at the group's first URL and report xfer_id 0 and up for earlier groups
 
 ## Goal
 
