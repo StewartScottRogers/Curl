@@ -194,8 +194,9 @@ public sealed partial class HttpProtocolHandler
     /// Finishes sending the body once the response is read: the rest of one kept sending past an
     /// error; a body still held, which goes out when its wait runs out on a connection that stays
     /// open, as an HTTP/2 or HTTP/3 stream's does, and is given up with curl 8.22.0's lines on one
-    /// that closes (measured, BL-5960 Notes); the reset of an HTTP/2 stream whose upload a status stopped (measured, BL-5972
-    /// Notes); and then any send failure kept for after the response.
+    /// that closes (measured, BL-5960 Notes); the reset of an HTTP/2 or HTTP/3 stream whose upload a
+    /// status stopped (measured over HTTP/2, BL-5972 Notes; ADR-1411); and then any send failure
+    /// kept for after the response.
     /// </summary>
     /// <exception cref="HttpTransferException">The send failed and the response does not close the connection (exit 55).</exception>
     private static async ValueTask FinishSendingBodyAsync(
@@ -218,10 +219,22 @@ public sealed partial class HttpProtocolHandler
     }
 
     /// <summary>
-    /// Resets the HTTP/2 stream whose upload a status stopped, during the wait for
+    /// Resets the HTTP/2 or HTTP/3 stream whose upload a status stopped, during the wait for
     /// <c>100 Continue</c> or part way through the body, once its response is read.
     /// </summary>
     private static ValueTask ResetStoppedStreamUploadAsync(HttpContinueWaitConnection waiting, CancellationToken cancellationToken) =>
+        waiting.Http3Stream is { } http3
+            ? CancelStoppedHttp3UploadAsync(waiting, http3, cancellationToken)
+            : ResetStoppedHttp2UploadAsync(waiting, cancellationToken);
+
+    /// <summary>Cancels the HTTP/3 stream of an upload a status stopped; nothing when none did.</summary>
+    private static ValueTask CancelStoppedHttp3UploadAsync(HttpContinueWaitConnection waiting, Http3StreamConnection stream, CancellationToken cancellationToken) =>
+        waiting.StoppedStreamUpload || stream.IsUploadStopped
+            ? stream.CancelUnlessEndedBothWaysAsync(cancellationToken)
+            : ValueTask.CompletedTask;
+
+    /// <summary>Resets the HTTP/2 stream of an upload a status stopped; nothing when none did, or on HTTP/1.x.</summary>
+    private static ValueTask ResetStoppedHttp2UploadAsync(HttpContinueWaitConnection waiting, CancellationToken cancellationToken) =>
         waiting.Http2Stream is { } stream && (waiting.StoppedStreamUpload || stream.IsUploadStopped)
             ? stream.ResetUnendedRequestAsync(cancellationToken)
             : ValueTask.CompletedTask;

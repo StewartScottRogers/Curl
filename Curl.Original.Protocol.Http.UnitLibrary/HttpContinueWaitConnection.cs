@@ -21,9 +21,9 @@ namespace Curl.Original.Protocol.Http;
 /// read waits for it. On a stream (<see cref="IsMultiplexedStream" />) the status is the response's
 /// own: a <c>100</c> sends the body at once, a status of 300 or above during the wait leaves it
 /// unsent (<see cref="StoppedStreamUpload" />) (curl 8.18.0's nghttp2 build, measured, BL-5970
-/// Notes), and one that arrives on an HTTP/2 stream after the wait ran out stops the body part
-/// way (measured, BL-5973 Notes); an HTTP/3 body being sent goes on. Disposing this only ends a wait still holding
-/// the body: the connection it wraps belongs to the handler.
+/// Notes), and one that arrives after the wait ran out stops the body part way (measured over
+/// HTTP/2, BL-5973 Notes; HTTP/3 does the same, ADR-1411). Disposing this only ends a wait still
+/// holding the body: the connection it wraps belongs to the handler.
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
 internal sealed class HttpContinueWaitConnection(IConnection connection) : IConnection, IDisposable
@@ -62,6 +62,9 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
 
     /// <summary>Gets the HTTP/2 stream this stands for, or <see langword="null" /> when it is none.</summary>
     internal Http2StreamConnection? Http2Stream { get; init; }
+
+    /// <summary>Gets the HTTP/3 stream this stands for, or <see langword="null" /> when it is none.</summary>
+    internal Http3StreamConnection? Http3Stream { get; init; }
 
     /// <summary>Gets or sets what sends a held body once the wait runs out; nothing by default.</summary>
     internal Func<CancellationToken, ValueTask> SendBody { get; set; } = _ => ValueTask.CompletedTask;
@@ -189,14 +192,20 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     }
 
     /// <summary>
-    /// Once the wait has run out, has the HTTP/2 stream stop its body at a status of 300 or above
-    /// (<see cref="Http2StreamConnection.StopsUploadAtErrorStatus" />).
+    /// Once the wait has run out, has the HTTP/2 or HTTP/3 stream stop its body at a status of 300
+    /// or above (<see cref="Http2StreamConnection.StopsUploadAtErrorStatus" />,
+    /// <see cref="Http3StreamConnection.StopsUploadAtErrorStatus" />).
     /// </summary>
     private void StopStreamUploadAtErrorStatusAfterTimeout()
     {
-        if (Http2Stream is { } stream)
+        if (Http2Stream is { } http2)
         {
-            stream.StopsUploadAtErrorStatus = WaitRanOut;
+            http2.StopsUploadAtErrorStatus = WaitRanOut;
+        }
+
+        if (Http3Stream is { } http3)
+        {
+            http3.StopsUploadAtErrorStatus = WaitRanOut;
         }
     }
 
@@ -230,11 +239,18 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// <c>417 Expectation Failed</c> (BL-319 Notes) or any other redirect or error
     /// (<c>HTTP error before end of send, stop sending</c>, BL-395 Notes). A 1xx or 2xx lets
     /// the body go on, and so does any status that held the body until the wait ran out
-    /// (<see cref="SendHeldBodyAsync" />). On an HTTP/2 stream the stream itself says so
-    /// (<see cref="Http2StreamConnection.IsUploadStopped" />); on an HTTP/3 one, never.
+    /// (<see cref="SendHeldBodyAsync" />). On an HTTP/2 or HTTP/3 stream the stream itself says so
+    /// (<see cref="Http2StreamConnection.IsUploadStopped" />,
+    /// <see cref="Http3StreamConnection.IsUploadStopped" />).
     /// </summary>
-    internal bool StopsSending => Http2Stream?.IsUploadStopped
-        ?? (!IsMultiplexedStream && !sendsHeldBody && statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300);
+    internal bool StopsSending => IsStreamUploadStopped ?? StopsHttp1Sending;
+
+    /// <summary>Whether the stream this stands for stopped its upload, or <see langword="null" /> when it stands for none.</summary>
+    private bool? IsStreamUploadStopped => Http2Stream?.IsUploadStopped ?? Http3Stream?.IsUploadStopped;
+
+    /// <summary><see cref="StopsSending" /> over HTTP/1.x.</summary>
+    private bool StopsHttp1Sending =>
+        !IsMultiplexedStream && !sendsHeldBody && statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300;
 
     /// <summary>
     /// Gets a value indicating whether a status of 300 or above arrived on a stream
@@ -260,7 +276,8 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// Writes one piece of the body, unless a status of 300 or above arrives first: a write
     /// still under way when it arrives is cancelled, as curl 8.21.0 stops sending there
     /// (measured, BL-319 and BL-395 Notes). On a stream a write under way is left to end by
-    /// itself, and counts as written (<see cref="Http2StreamConnection.IsUploadStopped" />).
+    /// itself, and counts as written (<see cref="Http2StreamConnection.IsUploadStopped" />,
+    /// <see cref="Http3StreamConnection.IsUploadStopped" />).
     /// </summary>
     /// <param name="bytes">The piece to send.</param>
     /// <param name="cancellationToken">Cancels the write.</param>

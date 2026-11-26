@@ -75,6 +75,20 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
     private bool isFinalHeadReceived;
 
+    private bool isErrorStatusReceived;
+
+    /// <summary>
+    /// Gets or sets whether a final status of 300 or above stops the request's body being sent, as
+    /// it does once the wait for <c>100 Continue</c> has run out.
+    /// </summary>
+    internal bool StopsUploadAtErrorStatus { get; set; }
+
+    /// <summary>
+    /// Gets whether such a status has arrived under <see cref="StopsUploadAtErrorStatus" />: the
+    /// body writer then sends no further piece, and the request is not ended.
+    /// </summary>
+    internal bool IsUploadStopped => StopsUploadAtErrorStatus && isErrorStatusReceived;
+
     /// <summary>Gets a value indicating that QUIC traffic is always encrypted.</summary>
     public bool IsSecure => true;
 
@@ -130,8 +144,9 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     /// <summary>
-    /// Ends the request stream with an empty write carrying FIN, unless it has ended already:
-    /// it had no body, or the last body write ended it. Over HTTP/3 nothing is read while the
+    /// Ends the request stream with an empty write carrying FIN, unless it has ended already
+    /// (it had no body, or the last body write ended it) or a status stopped the upload
+    /// (<see cref="IsUploadStopped" />). Over HTTP/3 only the response's head is read while the
     /// body is sent, so the response cannot have ended yet.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
@@ -139,7 +154,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// <exception cref="HttpTransferException">The connection was lost (the connection's own exit code).</exception>
     public async ValueTask EndRequestAsync(CancellationToken cancellationToken)
     {
-        if (isRequestEnded)
+        if (isRequestEnded || IsUploadStopped)
         {
             return;
         }
@@ -172,9 +187,9 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
     /// <summary>
     /// Gives up the stream of a transfer that timed out, as curl's HTTP/3 layer does
-    /// (<see cref="Http3ClientRequestStream.CancelAsync" />, measured, BL-5978), unless it was
-    /// never opened or has ended both ways. A connection too broken to send that takes no new
-    /// stream.
+    /// (<see cref="Http3ClientRequestStream.CancelAsync" />, measured, BL-5978), or of one whose
+    /// upload a status stopped, once its response is read (ADR-1411), unless it was never opened
+    /// or has ended both ways. A connection too broken to send that takes no new stream.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the cancellation is sent or the send has failed.</returns>
@@ -391,6 +406,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));
         trace.HeadReceived(request!.StreamId, statusCode);
         isFinalHeadReceived = statusCode >= 200;
+        isErrorStatusReceived = statusCode >= 300;
     }
 
     /// <summary>
