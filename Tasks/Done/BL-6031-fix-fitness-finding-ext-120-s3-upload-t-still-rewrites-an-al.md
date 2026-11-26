@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3ProtocolHandler.cs]
+touches: [Curl.Cli.UnitLibrary/UploadTransferUrl.cs, Curl.Cli.UnitLibrary/README.md, Curl.Cli.UnitTests/UploadTransferUrlTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6031 — Fix fitness finding EXT-120: s3:// upload (-T) still rewrites an all-digit or hex bucket name into a dotted quad (PARTLY FIXED)
 
@@ -37,13 +37,20 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the SeaweedFS upload returns 200 and `s3://12345678/k` then downloads `up.txt` byte-identical.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the SeaweedFS upload returns 200 and `s3://12345678/k` then downloads `up.txt` byte-identical.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: `UploadTransferUrl` (Curl.Cli) rewrote a `-T` URL with `CurlUrl.Host`, so the handler never saw the typed bucket. The fix is there, not in `S3ProtocolHandler.cs`; `touches` changed to match. No other task in Doing on origin/work/dark-factory named those files. `gs://` uploads had the same cause and are fixed too (ADR-1425).
+- Acceptance check run against chrislusf/seaweedfs:4.54: `-T` to `s3://12345678/k`, `s3://0x10/k`, `s3://127.1/k` and `s3://12345678/` each returned 200 and downloaded byte-identical.
+- `%{url_effective}` still prints the dotted quad: it is normalised separately, for downloads as for uploads, and does not affect where the request goes.
+- The pinning test is in `Curl.Cli.UnitTests`, the fixed library's tests (ADR-0482). Tests are pure string work, so platform-neutral.
+- Quality run on Curl.Cli.UnitLibrary: 100% line and branch; its one failing member (`HostToWrite`, complexity 12) was then split into two methods. Build, Curl.Cli.UnitTests and format are clean after the split; quality was not rerun.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: e3d9353f 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. -T keeps an s3 or gs bucket name as typed

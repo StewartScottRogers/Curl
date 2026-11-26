@@ -29,7 +29,8 @@ public static class UploadTransferUrl
     /// (<c>-</c> or <c>.</c>); otherwise the URL with the file name appended when its path names no
     /// file, normalised as curl writes it back: the scheme lower case and guessed (<c>http</c>) when
     /// absent, <c>http:/host</c> read as <c>http://host</c>, an absent path written as <c>/</c> and
-    /// dot segments removed. The empty string when the URL cannot be parsed, which is what curl's
+    /// dot segments removed. The bucket name of an <c>s3</c> or <c>gs</c> URL stays as typed.
+    /// The empty string when the URL cannot be parsed, which is what curl's
     /// <c>%{url_effective}</c> prints then.
     /// </param>
     /// <returns>
@@ -63,7 +64,8 @@ public static class UploadTransferUrl
     /// <summary>
     /// Writes <paramref name="url"/> back out from its parts, as curl's <c>curl_url_get</c> writes a
     /// whole URL. A port equal to the scheme's default is left out unless it was typed, which curl
-    /// keeps; the host is written as <see cref="CurlUrl.Host"/> holds it.
+    /// keeps; the host is written as <see cref="CurlUrl.Host"/> holds it, except that an <c>s3</c> or
+    /// <c>gs</c> URL's bucket name is written as typed.
     /// </summary>
     private static string Format(CurlUrl url)
     {
@@ -124,6 +126,27 @@ public static class UploadTransferUrl
             return;
         }
 
-        text.Append(url.Host);
+        text.Append(HostToWrite(url));
+    }
+
+    // The host of an s3 or gs URL is a bucket name, so it is written as typed: CurlUrl.Host would turn an
+    // all-digit or hex name into a dotted quad, and the upload would go to another bucket (ADR-1425).
+    private static string HostToWrite(CurlUrl url)
+    {
+        string name = BucketNameAsTyped(url);
+        return name.Length == 0 || name[0] == '[' ? url.Host : name;
+    }
+
+    // The host text of an "s3://" or "gs://" URL, without user information and port; empty for any other URL.
+    private static string BucketNameAsTyped(CurlUrl url)
+    {
+        string prefix = url.Scheme + "://";
+        if (url.Scheme is not ("s3" or "gs") || !url.OriginalString.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        string authority = url.OriginalString[prefix.Length..].Split('/', '?', '#')[0];
+        return authority[(authority.LastIndexOf('@') + 1)..].Split(':')[0];
     }
 }

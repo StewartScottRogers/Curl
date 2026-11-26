@@ -49,6 +49,33 @@ public sealed class UploadTransferUrlTests
     }
 
     [TestMethod]
+    [DataRow("s3://12345678/k", "s3://12345678/k")]
+    [DataRow("s3://0x10/k", "s3://0x10/k")]
+    [DataRow("s3://127.1/k", "s3://127.1/k")]
+    [DataRow("s3://12345678/", "s3://12345678/local.txt")]
+    [DataRow("S3://12345678", "s3://12345678/local.txt")]
+    [DataRow("s3://u:p@12345678:9000/d/", "s3://u:p@12345678:9000/d/local.txt")]
+    [DataRow("gs://0x10/", "gs://0x10/local.txt")]
+    // With no bucket in "scheme://authority", the host is written as curl normalises it.
+    [DataRow("s3:/12345678/k", "s3://0.188.97.78/k")]
+    [DataRow("s3:///12345678/k", "s3://0.188.97.78/k")]
+    [DataRow("s3://[0:0::1]/k", "s3://[::1]/k")]
+    // A server's host is still normalised.
+    [DataRow("http://127.1/k", "http://127.0.0.1/k")]
+    public void TryResolve_BucketUrl_KeepsTheBucketNameAsTyped(string url, string expected)
+    {
+        ArrangeUpload(url, "local.txt");
+
+        bool resolved = UploadTransferUrl.TryResolve(url, "local.txt", out string transferUrl);
+
+        ActResolve(resolved, transferUrl);
+        Diagnostics.Assert("resolved", true, resolved);
+        Diagnostics.Diff("transfer URL", expected, transferUrl);
+        Assert.IsTrue(resolved);
+        Assert.AreEqual(expected, transferUrl);
+    }
+
+    [TestMethod]
     public void TryResolve_FileUrl_WritesThePathAfterThreeSlashes()
     {
         ArrangeUpload("file:///tmp/", "local.txt");
