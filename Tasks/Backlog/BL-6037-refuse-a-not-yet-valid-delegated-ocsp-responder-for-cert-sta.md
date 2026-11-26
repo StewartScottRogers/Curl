@@ -19,7 +19,7 @@ refused as curl's OpenSSL build refuses it, while the Windows check below an anc
 
 ## Context
 
-BL-6008 (ADR-1418) made `OcspStapleVerifier` refuse a delegated responder past its `notAfter`.
+BL-6008 (ADR-1423) made `OcspStapleVerifier` refuse a delegated responder past its `notAfter`.
 A responder before its `notBefore` is still accepted everywhere, because curl 8.22.0 Schannel
 accepts it below an anchor (fitness finding STD-215). OpenSSL's `OCSP_basic_verify` builds the
 responder's chain with `X509_verify_cert`, which also refuses "certificate is not yet valid", so

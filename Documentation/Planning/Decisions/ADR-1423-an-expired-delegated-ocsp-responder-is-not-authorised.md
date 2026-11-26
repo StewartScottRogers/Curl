@@ -1,4 +1,4 @@
-# ADR-1418: An expired delegated OCSP responder is not authorised
+# ADR-1423: An expired delegated OCSP responder is not authorised
 
 - Status: Accepted
 - Date: 2026-11-26
