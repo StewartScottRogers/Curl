@@ -44,7 +44,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Fix: `ListRevocationOf` now keeps an expired base list in view; a certificate it names is revoked when no unexpired list is found (ADR-1418).
+- Fix: `ListRevocationOf` now keeps an expired base list in view; a certificate it names is revoked when no unexpired list is found (ADR-1419).
 - `touches` widened to `Curl.Networking.UnitTests/IntermediateOnlyProxyCacertTests.cs` for the unit tests; no task in Doing named it.
 - Verified end to end on Windows with a throwaway C# file-based app (loopback TLS and CRL servers, `--cacert` holding only the intermediate): `curl.exe` 8.21.0 Schannel and Curl gave the same exit code and error line in all 16 runs, the repro and the `k_expired_good` control included.
 - Gates: `dotnet build` clean (0 warnings), fast tests green (Curl.Networking.UnitTests 4739 passed, 33 skipped), `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 0 failing members, `dotnet format --verify-no-changes` clean on the changed files.

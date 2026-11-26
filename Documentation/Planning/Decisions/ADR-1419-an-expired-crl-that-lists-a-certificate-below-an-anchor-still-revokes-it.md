@@ -1,4 +1,4 @@
-# ADR-1418: An expired CRL that lists a certificate below an anchor still revokes it
+# ADR-1419: An expired CRL that lists a certificate below an anchor still revokes it
 
 - Status: Accepted
 - Date: 2026-11-26
