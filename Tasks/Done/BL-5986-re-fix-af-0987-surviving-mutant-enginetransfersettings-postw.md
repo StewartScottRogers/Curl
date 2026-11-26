@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/EngineTransferSettings.cs]
+touches: [Curl.Engine.UnitLibrary/EngineTransferSettings.cs, Curl.Engine.UnitTests/EngineTransferSettingsTests.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5986 — Re-fix AF-0987: Surviving mutant: EngineTransferSettings.PostWithoutData can default to true, turning every CLI CoAP GET into a POST and failing MQTT with exit 43
 
@@ -36,12 +36,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineTransferSettings.cs line 57`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineTransferSettings.cs line 57`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killing test: `Curl.Engine.UnitTests` `EngineTransferSettingsTests.Constructor_PostWithoutDataNotNamed_IsNotPostWithoutData`. With the default applied by hand as `true` it was the only failure (1 failed, 3210 passed, 7 skipped); reverted, `dotnet build` has 0 warnings and the fast tests pass (58369 passed, 363 skipped, 0 failed).
+- Why the finding came back: BL-5789's test is in `Curl.Console.UnitTests`, and the reproduction runs only the mutated library's `.UnitTests` project. That test stays: it checks the host's own mapping.
+- Added `Curl.Engine.UnitTests/EngineTransferSettingsTests.cs` to `touches` (no other task in Doing names it). No production code changed, so no quality run and no ADR.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 1bf9485c 9742157d.
+- 2026-11-25: Doing -> Done. A Curl.Engine unit test now fails when PostWithoutData defaults to true
