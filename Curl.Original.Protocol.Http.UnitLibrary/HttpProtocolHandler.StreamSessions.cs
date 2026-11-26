@@ -77,7 +77,7 @@ public sealed partial class HttpProtocolHandler
     /// </summary>
     private IConnection ExchangeConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection transport) =>
         (IConnection?)requestStream ?? (UpgradesToH2c(plan, transport)
-            ? new HttpH2cUpgradeConnection(transport, plan.Context.Events, plan.Context.Url.Scheme, TracesHttp2Frames ? plan.Context.Events : null)
+            ? new HttpH2cUpgradeConnection(transport, plan.Context.Events, plan.Context.Url.Scheme, TracesHttp2Frames ? plan.Context.Events : null, plan.Context.TimeProvider)
             : transport);
 
     private static void EchoResponseLineAfter(IHttpStreamConnection? requestStream, IConnection connection, byte[] line)

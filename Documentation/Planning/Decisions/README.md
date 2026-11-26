@@ -1474,3 +1474,4 @@ Each option and the specific reason it lost.
 | [1430](ADR-1430-the-schannel-build-matches-other-names-against-name-constraints-as-cryptoapi-does.md) | The Schannel build matches otherNames against name constraints as CryptoAPI does (BL-6011) | Accepted | 2026-11-26 |
 | [1431](ADR-1431-only-a-sha-1-certid-names-a-certificate-in-an-ocsp-response.md) | Only a SHA-1 CertID names a certificate in an OCSP response (BL-6027) | Accepted | 2026-11-26 |
 | [1432](ADR-1432-ocsp-rsassa-pss-signatures-are-verified-with-their-stated-salt-and-mask-hash.md) | OCSP RSASSA-PSS signatures are verified with their stated salt and mask hash (BL-6010) | Accepted | 2026-11-26 |
+| [1426](ADR-1426-closing-an-http-2-connection-waits-at-most-one-second.md) | Closing an HTTP/2 connection waits at most one second (BL-6036) | Accepted | 2026-11-26 |

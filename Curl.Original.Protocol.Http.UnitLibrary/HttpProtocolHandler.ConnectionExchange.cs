@@ -288,5 +288,5 @@ public sealed partial class HttpProtocolHandler
     private IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
         (IHttpStreamSession?)(connection as Http3Session)
             ?? (connection.Session as IHttpStreamSession)
-            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection, isPushEnabled: Http2PushSink is not null) : null);
+            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection, isPushEnabled: Http2PushSink is not null, plan.Context.TimeProvider) : null);
 }
