@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
+touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6011 — Fix fitness finding STD-218: Windows: otherName (UPN) name constraints are ignored below an intermediate anchor
 
@@ -40,13 +40,23 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] both repro commands exit 60 with the codes above; `o_x_ok` exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] both repro commands exit 60 with the codes above; `o_x_ok` exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Done directly (no sub-agents) to stay within the run's cost cap. Decision: ADR-1425 (match `otherName` constraints as CryptoAPI does, rather than refuse every chain carrying one).
+- Added `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs` to `touches` for the unit tests; no other task in Doing on `origin/work/dark-factory` named it.
+- Reproduced and verified with a PowerShell loopback TLS server (throwaway certificates, `--ssl-no-revoke`): System32 curl 8.23.0 Schannel and the built Curl both answer o_x_upn exit 60 `schannel: error 0x00008000`, o_p_bad exit 60 `schannel: error 0x00004000`, o_x_ok and o_p_ok exit 0.
+- CryptoAPI's matching rules were measured with `X509Chain` on Windows; the table is in ADR-1425.
+- `dotnet build` clean; full fast tests green (exit 0), `Curl.Networking.UnitTests` rerun after the last refactor: 4779 passed, 33 skipped.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: one failing member, `OtherNameMatches` (complexity 20, 100% covered). Split into three methods; a coverage run of the name-constraint tests then showed them at complexity 6 or less, 100% line and branch. The 40-minute whole-library script was not run again.
+- CI on Linux and macOS: the new tests build their own certificates and drive the library's own check, with no platform-specific output.
+- Follow-ups filed: BL-6037 (rfc822Name `@host` and empty constraints), BL-6038 (OpenSSL build's `otherName` constraints).
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: e4a423b6 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. The Schannel build refuses a UPN or other otherName that breaks an anchor's name constraints with 0x00008000 or 0x00004000, as curl does.
