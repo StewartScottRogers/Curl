@@ -47,10 +47,10 @@ The finding, verbatim:
 
 ## Notes
 
-- Measured Schannel curl 8.21.0 and the built Curl against a throwaway loopback TLS server (constrained intermediate as `--cacert`, `--ssl-no-revoke`): all seven direct cases answer the same (table in ADR-1418). The finding's `m_mvrdn`, `m_mvrdn_o` and `m_ok` shapes are among them.
+- Measured Schannel curl 8.21.0 and the built Curl against a throwaway loopback TLS server (constrained intermediate as `--cacert`, `--ssl-no-revoke`): all seven direct cases answer the same (table in ADR-1422). The finding's `m_mvrdn`, `m_mvrdn_o` and `m_ok` shapes are among them.
 - `--proxy-cacert`: the probe had no CRL, so both curls answered `the revocation status is unknown` through the proxy; the proxy handshake runs the same `CertificateNameConstraints` check as the direct one, which the unit tests pin.
 - The same measurement showed Schannel also reads a CN in a multi-valued relative name (`0x00008000`), which Curl ignored; fixed here, same method and file.
-- Touched beyond `touches`: the test file `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs` (its test must pin the change; no task in Doing on the shared branch names it) and ADR-1418 with its README row.
+- Touched beyond `touches`: the test file `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs` (its test must pin the change; no task in Doing on the shared branch names it) and ADR-1422 with its README row.
 - Quality run for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log

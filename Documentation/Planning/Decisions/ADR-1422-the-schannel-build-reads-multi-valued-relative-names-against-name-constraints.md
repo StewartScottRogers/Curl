@@ -1,4 +1,4 @@
-# ADR-1418: The Schannel build reads multi-valued relative names against name constraints (BL-6007)
+# ADR-1422: The Schannel build reads multi-valued relative names against name constraints (BL-6007)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1387.
 
