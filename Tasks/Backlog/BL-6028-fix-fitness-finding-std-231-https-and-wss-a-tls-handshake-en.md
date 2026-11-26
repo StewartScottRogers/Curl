@@ -4,8 +4,8 @@ title: Fix fitness finding STD-231: https and wss: a TLS handshake ended by -m r
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs]
+depends-on: [BL-6019]
+touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Engine.UnitTests/Std231Tests.cs, Curl.Networking.UnitTests/TcpConnectorStd231Tests.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultStd231Tests.cs]
 requirement: none
 created: 2026-11-26
 completed:
@@ -44,7 +44,37 @@ The finding, verbatim:
 
 ## Notes
 
+2026-11-26 (lane 13): reproduced and measured; no code written. Needs `TcpConnector.cs`, which BL-6019
+holds in Doing, so this waits on BL-6019.
+
+Measured (Windows, curl 8.21.0 Schannel; a `TcpListener` on loopback that is never accepted from is
+enough, no mock server; `-m 1` and `--connect-timeout 1`):
+
+- TLS handshake timed out (`https`, `wss`, `ftps`, `imaps`): real `nc=1`, `t`=elapsed, `time_connect` 0,
+  `time_appconnect` 0, pretransfer = starttransfer = total, empty `remote_ip`, `conn_id` 0.
+  So only the connection count is missing: do not record end points or `ConnectTimings.Connected`.
+- Curl now: `https` `nc=0`; `wss` `nc=0`, and `t=0.000000` when the connector's limit ends the connect
+  (a failure with no report), `t`=elapsed when the `-m` cancellation escapes. `ftps`, `imaps` `nc=0` too.
+- Controls where real curl keeps `nc=0`: TCP connect timeout (`10.255.255.1`), refused (`127.0.0.1:1`),
+  unresolved name. So "a connect timed out" is not enough; the connector must say TCP was connected.
+  The missing `t` for those is BL-6038.
+
+Plan:
+
+1. `TcpConnector.SecureWhenAskedAsync`: catch an `OperationCanceledException` from
+   `AuthenticateTracingRecordsAsync`, mark it in `Data` (a key constant on `ConnectResult`), rethrow.
+   The connect-limit catch copies the mark onto its `ConnectResult.Failed` (new `bool` property saying
+   TCP connected before the failure). The proxy path's `CanceledAfterResolveException` wraps the
+   cancellation in a new object, so carry the mark across it.
+2. `EndPointRecordingConnector`: count one connection for a marked failed result, and for a marked
+   cancellation (catch, record, rethrow). This covers the `-m` path.
+3. `ConnectionEndPointRecorder.ReportOn`: `WithConnectionCount` dereferences `result.Report!`, so give a
+   result with a count but no report one (that also stamps `wss`'s time_total). The count must apply
+   even when `handlerCountsConnections` (`http`/`https` report 0 after a timed-out connect, built by
+   `HttpTransferDeadline`).
+
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 45a3dc74 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019 in Doing; waits on BL-6019 (plan and measurements under Notes)
