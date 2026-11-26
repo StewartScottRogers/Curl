@@ -57,7 +57,7 @@ The finding, verbatim:
   an empty count was a new array; fixed, FTP tests 1373 passed, 9 skipped; every other assembly had
   passed). `Measure-CodeQuality.ps1` for the FTP library: 0 failing members. Platform-neutral.
 - `TransferReport.TransferCompleteStandInHeader` and the engine's removal of it are now unused;
-  `ConnectionEndPointRecorder.ProxyConnect.cs` is held by BL-6019 in Doing, so BL-6054 removes them.
+  `ConnectionEndPointRecorder.ProxyConnect.cs` is held by BL-6019 in Doing, so BL-6056 removes them.
 
 ## Log
 

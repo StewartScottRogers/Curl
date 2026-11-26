@@ -1,5 +1,5 @@
 ---
-id: BL-6054
+id: BL-6056
 title: Remove the unused FTP stand-in num_headers line from TransferReport and the engine
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6054 — Remove the unused FTP stand-in num_headers line from TransferReport and the engine
+# BL-6056 — Remove the unused FTP stand-in num_headers line from TransferReport and the engine
 
 ## Goal
 
