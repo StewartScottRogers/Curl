@@ -423,7 +423,7 @@ malformed one with a `ServiceBindingFailure`.
 `DohDnsResolver` (ADR-0152 and its BL-641 amendment) is the `IDnsResolver` behind `--doh-url`. It
 takes an `IConnector` for the DoH connections (a `TcpConnector` of its own, built with the system
 resolver and the DoH TLS options) and the DoH URL, and for each name POSTs the A query and the AAAA
-query in parallel, A first, on two connections unless the first picks `h2` (below), each request written byte for byte as curl 8.21.0
+query, A first (on two connections at once for a first name over plain HTTP; over TLS and for later names as below), each request written byte for byte as curl 8.21.0
 writes it (no `User-Agent`; `Host` with the port only when it is not the default). The target
 carries `PoolScheme` `https` and names `h2`, `http/1.1` as its `ApplicationProtocols` (ADR-1424), so
 the handshake offers both; a connection that picked `h2` carries the same POST on a stream of a
@@ -432,8 +432,13 @@ STD-221), with the `-v` lines `using HTTP/2` and `[HTTP/2] [1]`. Per ADR-1435 (B
 second address query waits for the first one's connection, as curl's `CURLOPT_PIPEWAIT` does: on `h2`
 it is stream 3 of that connection (A on 1, AAAA on 3, one connection number, outcomes in the order the
 streams end, `left intact` once), and traced, `DohPipeWaitTraceEvents` writes curl 8.18.0's waiting
-lines after the first `Trying` (not through a proxy); on HTTP/1.x it opens its own connection.
-The connection is closed once the name's queries are answered. `DohResponseReader` reads the
+lines after the first `Trying` (not through a proxy); on HTTP/1.x it runs after the first one's answer.
+Per ADR-1436 (BL-6051) the resolver keeps every connection a response leaves open (`DohConnection`,
+`DohDnsResolver.ConnectionReuse.cs`) until `DisposeAsync`: a later query takes the kept `h2` one
+(a name's two queries on its next two streams) or the lowest-numbered kept HTTP/1.x one, writing
+`Reusing existing https: connection with host H`, else opens one; a kept connection that answers
+nothing is replaced and the query asked again. One lookup holds a connection at a time, so a lookup
+beside another opens its own. `DohResponseReader` reads the
 HTTP/1.x response as curl does: `Content-Type` ignored, a `Content-Length`, chunked or close-delimited
 (CGR-160, BL-3689) body of at most 3000 bytes, anything else a failure; it hands on the status code, and a status outside 200-299
 fails the query undecoded with `[DoH] [DoH] [A] error: HTTP status N`, as curl 8.22.0's

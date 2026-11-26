@@ -719,8 +719,9 @@ public sealed class DohDnsResolverTests
     private static byte[] AnswerTo(DnsRecordType recordType, params IPAddress[] addresses) =>
         DnsTestReplies.Answer(QueryFor(recordType), addresses);
 
+    // Closes its connection, so each query these tests pin is on a connection of its own.
     private static byte[] Ok(byte[] answer) =>
-        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
+        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/dns-message\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
 
     private static byte[] Response(string text) => Encoding.Latin1.GetBytes(text);
 }

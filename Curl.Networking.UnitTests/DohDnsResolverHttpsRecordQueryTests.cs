@@ -184,8 +184,9 @@ public sealed class DohDnsResolverHttpsRecordQueryTests
         return connector;
     }
 
+    // Closes its connection, so each query these tests pin is on a connection of its own.
     private static byte[] Ok(byte[] answer) =>
-        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
+        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/dns-message\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
 
     // Records which of its two look-ups each resolve asked for, answering 127.0.0.1.
     private sealed class RecordingHttpsOriginResolver : IHttpsOriginDnsResolver

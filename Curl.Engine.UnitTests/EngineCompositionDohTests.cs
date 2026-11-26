@@ -79,6 +79,7 @@ public sealed class EngineCompositionDohTests
         // curl -sS -v --doh-url https://127.0.0.1:48711/dns-query --doh-insecure http://example.test:48712/
         // -> two POSTs to the DoH server, then "* Host example.test:48712 was resolved." / "* IPv6: (none)" /
         // "* IPv4: 127.0.0.1" / "*   Trying 127.0.0.1:48712...", the GET to the second server, exit 0.
+        // The DoH server leaves the connection open, so the second POST goes on it (ADR-1436).
         ScriptedConnector dohServer = new([AAnswer, AAnswer]);
         ScriptedConnector webServer = new([]);
         RecordingEvents events = new();
@@ -87,8 +88,8 @@ public sealed class EngineCompositionDohTests
 
         Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
-        Diagnostics.Assert("dohServer.Targets count", 2, dohServer.Targets.Count);
-        Assert.HasCount(2, dohServer.Targets);
+        Diagnostics.Assert("dohServer.Targets count", 1, dohServer.Targets.Count);
+        Assert.HasCount(1, dohServer.Targets);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 48711, true), dohServer.Targets[0] with { PoolScheme = null, ApplicationProtocols = null });
         CollectionAssert.AreEqual(HttpApplicationProtocols.H2ThenHttp11.ToArray(), dohServer.Targets[0].ApplicationProtocols!.ToArray());
         Diagnostics.Assert("dohServer.Targets[0].PoolScheme", "https", dohServer.Targets[0].PoolScheme);
@@ -134,9 +135,9 @@ public sealed class EngineCompositionDohTests
                 "[DoH] upload completely sent off: 30 bytes",
                 "[DoH] Connection #1 to host 127.0.0.1:48711 left intact",
                 "[DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE",
-                "[DoH] using HTTP/1.x",
+                "[DoH] Reusing existing https: connection with host 127.0.0.1",
                 "[DoH] upload completely sent off: 30 bytes",
-                "[DoH] Connection #2 to host 127.0.0.1:48711 left intact",
+                "[DoH] Connection #1 to host 127.0.0.1:48711 left intact",
                 "[DoH] DoH request complete, 0 to go",
                 "[DNS] resolve complete for example.test:48712",
                 "Host example.test:48712 was resolved.",

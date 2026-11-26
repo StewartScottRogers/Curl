@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 // The same POST over HTTP/2, for a DoH server whose TLS handshake picked h2 (ADR-1424), each query
-// the connection carries on a stream of its own (ADR-1435).
+// the connection carries on a stream of its own (ADR-1435), later ones included (ADR-1436).
 public sealed partial class DohDnsResolver
 {
     // One query of an HTTP/2 connection: its place among the queries, the stream carrying it (0 until
@@ -23,33 +23,25 @@ public sealed partial class DohDnsResolver
         public List<byte> Body { get; } = [];
     }
 
-    // Sends each query as a POST on a stream of its own (1, then 3) of one new HTTP/2 connection and
-    // hands answered each query's response as its stream ends: null when the stream, or the
-    // connection under it, fails or the response is not read whole, as ExchangeAsync returns it.
-    private async ValueTask ExchangeOverHttp2Async(IConnection connection, byte[][] queries, ITransferEvents events, Action<int, DohResponseReader.Response?> answered, CancellationToken cancellationToken)
+    // Sends each query as a POST on the connection's next stream and hands answered each query's
+    // response as its stream ends: null when the stream, or the connection under it, fails or the
+    // response is not read whole, as ExchangeAsync returns it. Under mayAskAgain, a connection that
+    // fails before any query is answered answers none, so the caller can ask them again.
+    private async ValueTask ExchangeOverHttp2Async(DohConnection connection, byte[][] queries, Action<int, DohResponseReader.Response?> answered, bool mayAskAgain, CancellationToken cancellationToken)
     {
         var unanswered = Enumerable.Range(0, queries.Length).Select(index => new Http2Query(index)).ToList();
         try
         {
-            var http2 = new Http2Connection(new ConnectionStream(connection));
-            await http2.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
-            var encoder = new HpackEncoder();
-            foreach (var query in unanswered)
-            {
-                if (query.Index > 0)
-                {
-                    ReportHttp2Reuse(events);
-                }
-
-                await SendHttp2RequestAsync(http2, encoder, query, queries[query.Index], events, cancellationToken).ConfigureAwait(false);
-                await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            await ReadHttp2ResponsesAsync(http2, unanswered, events, answered, cancellationToken).ConfigureAwait(false);
+            await SendAndReadHttp2Async(connection, queries, unanswered, answered, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (IsHttp2ExchangeFailure(exception))
         {
             // Every query still unanswered fails with the connection, below.
+        }
+
+        if (mayAskAgain && unanswered.Count == queries.Length)
+        {
+            return;
         }
 
         foreach (var query in unanswered.ToArray())
@@ -58,21 +50,37 @@ public sealed partial class DohDnsResolver
         }
     }
 
-    private async ValueTask SendHttp2RequestAsync(Http2Connection http2, HpackEncoder encoder, Http2Query query, byte[] body, ITransferEvents events, CancellationToken cancellationToken)
+    private async ValueTask SendAndReadHttp2Async(DohConnection connection, byte[][] queries, List<Http2Query> unanswered, Action<int, DohResponseReader.Response?> answered, CancellationToken cancellationToken)
     {
+        var session = await connection.StartHttp2Async(cancellationToken).ConfigureAwait(false);
+        await SendHttp2RequestsAsync(connection.Transport, session, queries, unanswered, cancellationToken).ConfigureAwait(false);
+        await ReadHttp2ResponsesAsync(session, unanswered, SubTransferEvents, answered, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask SendHttp2RequestsAsync(IConnection transport, DohConnection.Http2Session session, byte[][] queries, List<Http2Query> unanswered, CancellationToken cancellationToken)
+    {
+        foreach (var query in unanswered)
+        {
+            if (query.Index > 0)
+            {
+                SubTransferEvents.ReportInfo("Multiplexed connection found");
+                ReportReuse();
+            }
+
+            await SendHttp2RequestAsync(session, query, queries[query.Index], SubTransferEvents, cancellationToken).ConfigureAwait(false);
+            await transport.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask SendHttp2RequestAsync(DohConnection.Http2Session session, Http2Query query, byte[] body, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        var http2 = session.Connection;
         query.StreamId = http2.OpenStream();
         var fields = BuildRequestHeaderFields(body.Length);
-        await http2.WriteHeadersAsync(query.StreamId, encoder.Encode(fields), isEndStream: false, cancellationToken).ConfigureAwait(false);
+        await http2.WriteHeadersAsync(query.StreamId, session.Encoder.Encode(fields), isEndStream: false, cancellationToken).ConfigureAwait(false);
         // A query is at most 272 bytes, far inside the stream's initial send window, so one write sends it all.
         await http2.WriteDataAsync(query.StreamId, body, isEndStream: true, cancellationToken).ConfigureAwait(false);
         ReportHttp2Request(query.StreamId, fields, body, events);
-    }
-
-    // The -v lines curl writes as its second sub-transfer takes the first one's connection (ADR-1435).
-    private void ReportHttp2Reuse(ITransferEvents events)
-    {
-        events.ReportInfo("Multiplexed connection found");
-        events.ReportInfo($"Reusing existing {_dohUrl.Scheme}: connection with host {_dohServer.Host}");
     }
 
     private static void Answer(List<Http2Query> unanswered, Http2Query query, DohResponseReader.Response? response, Action<int, DohResponseReader.Response?> answered)
@@ -122,15 +130,14 @@ public sealed partial class DohDnsResolver
 
     // Reads frames until every query is answered or the peer closes. A query is answered when its
     // stream ends or is reset, or its body is longer than curl's buffer.
-    private static async ValueTask ReadHttp2ResponsesAsync(Http2Connection http2, List<Http2Query> unanswered, ITransferEvents events, Action<int, DohResponseReader.Response?> answered, CancellationToken cancellationToken)
+    private static async ValueTask ReadHttp2ResponsesAsync(DohConnection.Http2Session session, List<Http2Query> unanswered, ITransferEvents events, Action<int, DohResponseReader.Response?> answered, CancellationToken cancellationToken)
     {
-        var decoder = new HpackDecoder();
         while (unanswered.Count > 0)
         {
             Http2StreamFrame? frame;
             try
             {
-                frame = await http2.ReadStreamFrameAsync(cancellationToken).ConfigureAwait(false);
+                frame = await session.Connection.ReadStreamFrameAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Http2StreamResetException reset)
             {
@@ -148,7 +155,7 @@ public sealed partial class DohDnsResolver
                 return;
             }
 
-            TakeFrame(frame, decoder, unanswered, events, answered);
+            TakeFrame(frame, session.Decoder, unanswered, events, answered);
         }
     }
 
@@ -189,7 +196,7 @@ public sealed partial class DohDnsResolver
             events.ReportDataReceived(body);
         }
 
-        return new DohResponseReader.Response(statusCode, body);
+        return new DohResponseReader.Response(statusCode, body) { KeepsConnectionOpen = true };
     }
 
     // Reports one header block's lines as -v shows them, and returns the response's status so far:

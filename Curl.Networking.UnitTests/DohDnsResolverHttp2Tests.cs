@@ -200,6 +200,8 @@ public sealed class DohDnsResolverHttp2Tests
         CollectionAssert.AreEqual(new[] { Address6, Address }, addresses);
         Assert.HasCount(1, connector.Opened);
         Assert.AreEqual(1, connectionIdsTaken);
+        Assert.IsFalse(connector.Opened[0].IsDisposed);
+        await resolver.DisposeAsync();
         Assert.IsTrue(connector.Opened[0].IsDisposed);
         var frames = SentFrames(connector.Opened[0].Written.ToArray()[Http2Connection.ClientPreface.Length..]);
         var decoder = new HpackDecoder();

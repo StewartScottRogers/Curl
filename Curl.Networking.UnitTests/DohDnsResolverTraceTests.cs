@@ -155,8 +155,9 @@ public sealed partial class DohDnsResolverTraceTests
         return Convert.FromHexString(header + question + string.Concat(records));
     }
 
+    // Closes its connection, so each query these tests pin is on a connection of its own.
     private static byte[] Ok(byte[] answer) =>
-        [.. Response($"HTTP/1.1 200 OK\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
+        [.. Response($"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
 
     private static byte[] Response(string text) => Encoding.Latin1.GetBytes(text);
 }

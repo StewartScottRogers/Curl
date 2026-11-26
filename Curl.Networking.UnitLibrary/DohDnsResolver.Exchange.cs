@@ -5,11 +5,22 @@ namespace Curl.Networking;
 // Each query's connection, POST and response, and how each of them can fail.
 public sealed partial class DohDnsResolver
 {
-    private async Task<DohQueryResult> QueryAsync(byte[] query, DnsRecordType recordType, ITransferEvents events, CancellationToken cancellationToken)
+    // Sends one query on the kept connection it was given, else on a new one. A kept connection the
+    // server closed in the meantime answers nothing, so the query is then asked on a new one.
+    private async Task<DohQueryResult> QueryAsync(DohConnection? kept, byte[] query, DnsRecordType recordType, CancellationToken cancellationToken)
     {
-        var connectionNumber = Interlocked.Increment(ref _connectionCount);
-        var connected = await ConnectToDohServerAsync(events, cancellationToken).ConfigureAwait(false);
-        return await QueryOnAsync(connected, connectionNumber, query, recordType, events, cancellationToken).ConfigureAwait(false);
+        if (kept is not null)
+        {
+            ReportReuse();
+            if (await ExchangeOnAsync(kept, query, cancellationToken).ConfigureAwait(false) is { } response)
+            {
+                return ResultOf(response, recordType);
+            }
+        }
+
+        var connectionNumber = NextConnectionNumber();
+        var connected = await ConnectToDohServerAsync(SubTransferEvents, cancellationToken).ConfigureAwait(false);
+        return await QueryOnAsync(connected, connectionNumber, query, recordType, cancellationToken).ConfigureAwait(false);
     }
 
     private ValueTask<ConnectResult> ConnectToDohServerAsync(ITransferEvents events, CancellationToken cancellationToken) =>
@@ -17,110 +28,146 @@ public sealed partial class DohDnsResolver
 
     // curl sets CURLOPT_PIPEWAIT on its DoH sub-transfers, so over TLS the second query waits for the
     // first one's connection. A server that picked h2 gets both on it, A on stream 1 and AAAA on
-    // stream 3; any other gets a connection for each query, traced the AAAA query first (ADR-1435).
+    // stream 3 (ADR-1435); any other gets one query and, after its answer, the other, on the same
+    // connection when that answer leaves it open and else on a new one (ADR-1436): traced AAAA goes
+    // first (ADR-0380), untraced A.
     private async Task<DohQueryResult[]> RunQueriesAfterTheFirstConnectionAsync(List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
     {
-        TakeConnectionIdsFor(1);
-        var isTraced = !ReferenceEquals(SubTransferEvents, NoTransferEvents.Instance);
-        // curl's connect through a proxy was not measured, so it gets no waiting lines.
-        var connectionNumber = Interlocked.Increment(ref _connectionCount);
-        var connectEvents = isTraced && Proxy is null ? new DohPipeWaitTraceEvents(SubTransferEvents, connectionNumber) : SubTransferEvents;
-        var connected = await ConnectToDohServerAsync(connectEvents, cancellationToken).ConfigureAwait(false);
-        if (connected is { Connection: { } connection, ApplicationProtocol: "h2" })
-        {
-            return await QueryOnOneHttp2ConnectionAsync(connection, connectionNumber, queries, cancellationToken).ConfigureAwait(false);
-        }
-
-        TakeConnectionIdsFor(queries.Count);
-        return await QueryOnAConnectionEachAsync(connected, connectionNumber, queries, isTraced, cancellationToken).ConfigureAwait(false);
+        var connectionNumber = NextConnectionNumber();
+        var connected = await ConnectToDohServerAsync(FirstConnectEvents(connectionNumber), cancellationToken).ConfigureAwait(false);
+        var run = connected is { Connection: { } connection, ApplicationProtocol: "h2" }
+            ? QueryOnOneHttp2ConnectionAsync(new DohConnection(connection, connectionNumber, isHttp2: true), queries, isKept: false, cancellationToken)
+            : QueryOneAfterTheOtherAsync(connected, connectionNumber, queries, cancellationToken);
+        return await run.ConfigureAwait(false);
     }
 
-    // The first connection carries one query and a new one the other: traced, AAAA's whole before
-    // A's; untraced, both at once. AAAA's outcome is reported first (ADR-0380).
-    private async Task<DohQueryResult[]> QueryOnAConnectionEachAsync(ConnectResult connected, long connectionNumber, List<(byte[] Query, DnsRecordType Type)> queries, bool isTraced, CancellationToken cancellationToken)
+    // The first connect's events: traced and with no proxy, whose connect curl was not measured for,
+    // they carry the second sub-transfer's waiting lines.
+    private ITransferEvents FirstConnectEvents(long connectionNumber) =>
+        IsTraced && Proxy is null ? new DohPipeWaitTraceEvents(SubTransferEvents, connectionNumber) : SubTransferEvents;
+
+    // One query on the connection just made, then the other on it when it was kept, else on a new one.
+    // Traced, each outcome is reported after its query; untraced, both once both are in, AAAA's first.
+    private async Task<DohQueryResult[]> QueryOneAfterTheOtherAsync(ConnectResult connected, long connectionNumber, List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
     {
-        var first = isTraced ? 1 : 0;
+        var first = IsTraced ? 1 : 0;
         var second = 1 - first;
-        Task<DohQueryResult> OnFirstConnectionAsync() =>
-            QueryOnAsync(connected, connectionNumber, queries[first].Query, queries[first].Type, SubTransferEvents, cancellationToken);
-        Task<DohQueryResult> OnSecondConnectionAsync() =>
-            QueryAsync(queries[second].Query, queries[second].Type, SubTransferEvents, cancellationToken);
-
         var results = new DohQueryResult[queries.Count];
-        if (isTraced)
-        {
-            results[first] = await OnFirstConnectionAsync().ConfigureAwait(false);
-            ReportOutcome(results[first], 1);
-            results[second] = await OnSecondConnectionAsync().ConfigureAwait(false);
-            ReportOutcome(results[second], 0);
-            return results;
-        }
-
-        results = await Task.WhenAll(OnFirstConnectionAsync(), OnSecondConnectionAsync()).ConfigureAwait(false);
-        ReportOutcome(results[1], 1);
+        results[first] = await QueryOnAsync(connected, connectionNumber, queries[first].Query, queries[first].Type, cancellationToken).ConfigureAwait(false);
+        ReportOutcomeWhen(IsTraced, results[1], 1);
+        var kept = TakeKeptConnections(1).SingleOrDefault();
+        results[second] = await QueryAsync(kept, queries[second].Query, queries[second].Type, cancellationToken).ConfigureAwait(false);
+        ReportOutcomeWhen(!IsTraced, results[1], 1);
         ReportOutcome(results[0], 0);
         return results;
     }
 
-    // Sends every query on one HTTP/2 connection and reports each outcome as its stream ends.
-    private async Task<DohQueryResult[]> QueryOnOneHttp2ConnectionAsync(IConnection connection, long connectionNumber, List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
+    private void ReportOutcomeWhen(bool isDue, DohQueryResult result, int queriesToGo)
     {
-        await using (connection.ConfigureAwait(false))
+        if (isDue)
         {
-            SubTransferEvents.ReportInfo("using HTTP/2");
-            var results = new DohQueryResult[queries.Count];
-            var queriesToGo = queries.Count;
-            await ExchangeOverHttp2Async(connection, [.. queries.Select(query => query.Query)], SubTransferEvents, Answered, cancellationToken).ConfigureAwait(false);
-            return results;
-
-            void Answered(int index, DohResponseReader.Response? response)
-            {
-                queriesToGo--;
-                // curl says the connection is left intact once, as its last stream ends.
-                if (queriesToGo == 0 && response is not null)
-                {
-                    ReportLeftIntact(connectionNumber, SubTransferEvents);
-                }
-
-                results[index] = ResultOf(response, queries[index].Type);
-                ReportOutcome(results[index], queriesToGo);
-            }
+            ReportOutcome(result, queriesToGo);
         }
     }
 
-    // Sends one query on its own connection, over HTTP/2 when the server picked h2.
-    private async Task<DohQueryResult> QueryOnAsync(ConnectResult connected, long connectionNumber, byte[] query, DnsRecordType recordType, ITransferEvents events, CancellationToken cancellationToken)
+    // Sends every query on one HTTP/2 connection. A kept connection that answers none of them was
+    // closed in the meantime, so they are asked on a new one.
+    private async Task<DohQueryResult[]> QueryOnOneHttp2ConnectionAsync(DohConnection connection, List<(byte[] Query, DnsRecordType Type)> queries, bool isKept, CancellationToken cancellationToken)
     {
-        if (connected.Connection is not { } connection)
+        ReportConnectionTaken(isKept);
+        return await AskOnHttp2ConnectionAsync(connection, queries, isKept, cancellationToken).ConfigureAwait(false)
+            ?? await RunQueriesAfterTheFirstConnectionAsync(queries, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void ReportConnectionTaken(bool isKept)
+    {
+        if (isKept)
+        {
+            ReportReuse();
+        }
+        else
+        {
+            SubTransferEvents.ReportInfo("using HTTP/2");
+        }
+    }
+
+    // Asks every query on the connection and reports each outcome as its stream ends, then keeps the
+    // connection when every response was read; null when a kept connection answered none.
+    private async Task<DohQueryResult[]?> AskOnHttp2ConnectionAsync(DohConnection connection, List<(byte[] Query, DnsRecordType Type)> queries, bool isKept, CancellationToken cancellationToken)
+    {
+        var results = new DohQueryResult[queries.Count];
+        var queriesToGo = queries.Count;
+        var isEveryResponseRead = true;
+        var lease = new ConnectionLease(this, connection);
+        await using (lease.ConfigureAwait(false))
+        {
+            await ExchangeOverHttp2Async(connection, [.. queries.Select(query => query.Query)], Answered, mayAskAgain: isKept, cancellationToken).ConfigureAwait(false);
+            lease.IsUsable = queriesToGo == 0 && isEveryResponseRead;
+        }
+
+        return queriesToGo == queries.Count ? null : results;
+
+        void Answered(int index, DohResponseReader.Response? response)
+        {
+            queriesToGo--;
+            isEveryResponseRead &= response is not null;
+            // curl says the connection is left intact once, as its last stream ends.
+            if (queriesToGo == 0 && response is not null)
+            {
+                ReportLeftIntact(connection.Number);
+            }
+
+            results[index] = ResultOf(response, queries[index].Type);
+            ReportOutcome(results[index], queriesToGo);
+        }
+    }
+
+    // Sends one query on the connection just made for it; the connect's failure when there is none.
+    private async Task<DohQueryResult> QueryOnAsync(ConnectResult connected, long connectionNumber, byte[] query, DnsRecordType recordType, CancellationToken cancellationToken)
+    {
+        if (connected.Connection is not { } transport)
         {
             return new DohQueryResult(recordType, connected.ExitCode, null);
         }
 
-        await using (connection.ConfigureAwait(false))
-        {
-            var isHttp2 = connected.ApplicationProtocol == "h2";
-            events.ReportInfo(isHttp2 ? "using HTTP/2" : "using HTTP/1.x");
-            DohResponseReader.Response? response = null;
-            if (isHttp2)
-            {
-                await ExchangeOverHttp2Async(connection, [query], events, (_, answer) => response = answer, cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                response = await ExchangeAsync(connection, BuildRequestHead(query), query, events, cancellationToken).ConfigureAwait(false);
-            }
+        var connection = new DohConnection(transport, connectionNumber, connected.ApplicationProtocol == "h2");
+        SubTransferEvents.ReportInfo(connection.IsHttp2 ? "using HTTP/2" : "using HTTP/1.x");
+        return ResultOf(await ExchangeOnAsync(connection, query, cancellationToken).ConfigureAwait(false), recordType);
+    }
 
+    // Sends one query on the connection, then keeps the connection for later queries when the response
+    // leaves it open, else closes it.
+    private async ValueTask<DohResponseReader.Response?> ExchangeOnAsync(DohConnection connection, byte[] query, CancellationToken cancellationToken)
+    {
+        var lease = new ConnectionLease(this, connection);
+        await using (lease.ConfigureAwait(false))
+        {
+            var response = await SendQueryAsync(connection, query, cancellationToken).ConfigureAwait(false);
             if (response is not null)
             {
-                ReportLeftIntact(connectionNumber, events);
+                ReportLeftIntact(connection.Number);
             }
 
-            return ResultOf(response, recordType);
+            lease.IsUsable = response is { KeepsConnectionOpen: true };
+            return response;
         }
     }
 
-    private void ReportLeftIntact(long connectionNumber, ITransferEvents events) =>
-        events.ReportInfo(FormattableString.Invariant($"Connection #{connectionNumber} to host {_dohServer.Host}:{_dohServer.Port} left intact"));
+    // Sends one query on the connection, over HTTP/2 when the server picked h2.
+    private async ValueTask<DohResponseReader.Response?> SendQueryAsync(DohConnection connection, byte[] query, CancellationToken cancellationToken)
+    {
+        if (!connection.IsHttp2)
+        {
+            return await ExchangeAsync(connection.Transport, BuildRequestHead(query), query, SubTransferEvents, cancellationToken).ConfigureAwait(false);
+        }
+
+        DohResponseReader.Response? response = null;
+        await ExchangeOverHttp2Async(connection, [query], (_, answer) => response = answer, mayAskAgain: false, cancellationToken).ConfigureAwait(false);
+        return response;
+    }
+
+    private void ReportLeftIntact(long connectionNumber) =>
+        SubTransferEvents.ReportInfo(FormattableString.Invariant($"Connection #{connectionNumber} to host {_dohServer.Host}:{_dohServer.Port} left intact"));
 
     // The query's result: a receive error with no response, else its status and, for a success, its answer.
     private static DohQueryResult ResultOf(DohResponseReader.Response? response, DnsRecordType recordType)
