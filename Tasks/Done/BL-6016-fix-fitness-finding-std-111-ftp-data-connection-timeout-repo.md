@@ -58,7 +58,7 @@ The finding, verbatim:
   `[4|227]`, exit 28. With every reply holding a colon both print 6; the count is the colon reply lines read.
   `%{num_connects}` 1 and `%{ftp_entry_path}` `/` match too.
 - Quality: `Measure-CodeQuality.ps1` for the FTP and Engine libraries, 0 failing members. Fast tests green.
-- Left: `-v` closing lines and `%{size_header}` differ on this path (BL-6049).
+- Left: `-v` closing lines and `%{size_header}` differ on this path (BL-6053).
 
 ## Log
 

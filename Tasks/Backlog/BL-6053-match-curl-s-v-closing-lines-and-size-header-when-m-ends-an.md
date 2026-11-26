@@ -1,5 +1,5 @@
 ---
-id: BL-6049
+id: BL-6053
 title: Match curl's -v closing lines and size_header when -m ends an FTP data connect
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6049 — Match curl's -v closing lines and size_header when -m ends an FTP data connect
+# BL-6053 — Match curl's -v closing lines and size_header when -m ends an FTP data connect
 
 ## Goal
 
