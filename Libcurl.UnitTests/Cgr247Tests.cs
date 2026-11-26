@@ -1,7 +1,7 @@
 using Curl.Api.Codes;
-using Libcurl.Info;
 using Curl.Engine;
 using Libcurl.Easy;
+using Libcurl.Info;
 using Libcurl.Options;
 
 namespace Libcurl.UnitTests;

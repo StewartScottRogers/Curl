@@ -13,7 +13,10 @@ public sealed class Cgr214Tests
     public void TryGetVariableText_ResultWithWriteOutErrorMessage_PrintsIt()
     {
         TransferResult result = TransferResult.Failure(CurlExitCode.HttpReturnedError, "The requested URL returned error: 404")
-            with { WriteOutErrorMessage = "HTTP response code said error" };
+            with
+        {
+            WriteOutErrorMessage = "HTTP response code said error",
+        };
         TransferWriteOutVariables variables = new(result, "http://x/", 0, "http://x/", "http", TimeProvider.System);
 
         Assert.IsTrue(variables.TryGetVariableText("errormsg", out string? text));

@@ -1,6 +1,6 @@
 using Curl.Api.Codes;
-using Curl.Api.Errors;
 using Curl.Api.EngineContracts;
+using Curl.Api.Errors;
 using Curl.Api.Options;
 
 namespace Curl.Api;

@@ -238,7 +238,7 @@ internal sealed class WireGuardConnector(
         }
 
         await udp.DisposeAsync().ConfigureAwait(false);
-        return WireGuardConnector.IsTunnelFailure(failure) ?Unreachable(target, failure) : throw failure;
+        return WireGuardConnector.IsTunnelFailure(failure) ? Unreachable(target, failure) : throw failure;
     }
 
     private async ValueTask<ConnectResult> ConnectOverAsync(IWireGuardUdpChannel udp, WireGuardPeer peer, IPAddress source, IPEndPoint destination, ConnectTarget target, CancellationToken cancellationToken)

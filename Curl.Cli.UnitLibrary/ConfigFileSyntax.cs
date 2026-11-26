@@ -51,7 +51,7 @@ internal static class ConfigFileSyntax
     /// <returns><paramref name="contents"/>, or its bytes before the first Ctrl-Z.</returns>
     internal static byte[] TextModeContents(byte[] contents, bool readsInWindowsTextMode)
     {
-        int endOfFile = readsInWindowsTextMode ?Array.IndexOf(contents, TextModeEndOfFile) : -1;
+        int endOfFile = readsInWindowsTextMode ? Array.IndexOf(contents, TextModeEndOfFile) : -1;
         return endOfFile < 0 ? contents : contents[..endOfFile];
     }
 

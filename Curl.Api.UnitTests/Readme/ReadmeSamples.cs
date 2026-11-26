@@ -71,7 +71,7 @@ internal static class ReadmeSamples
         };
         CurlResponse first = await client.SendAsync(insecure, cancellationToken);
         await first.Body.DisposeAsync();
-        
+
         CurlRequest trusted = new(HttpMethod.Get, "https://localhost:8443/")
         {
             Tls = new CurlTlsOptions

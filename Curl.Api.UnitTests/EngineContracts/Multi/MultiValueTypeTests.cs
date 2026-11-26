@@ -3,8 +3,8 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.EngineContracts.Headers;
-using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.EngineContracts.Multi;
+using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
 

@@ -1,6 +1,6 @@
+using Curl.Extended.Protocol.Coap.Client;
 using Curl.Extension.Abstractions;
 using Curl.Extension.Abstractions.Transfer;
-using Curl.Extended.Protocol.Coap.Client;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Coap.Observe;

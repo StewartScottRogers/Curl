@@ -44,4 +44,5 @@ public sealed record AzureStorageCredential(AzureStorageCredentialKind Kind, str
     private static AzureStorageCredential? SharedKeyOf(System.Net.NetworkCredential? account) =>
         string.IsNullOrEmpty(account?.UserName) || string.IsNullOrEmpty(account.Password)
             ? null
-            : new AzureStorageCredential(AzureStorageCredentialKind.SharedKey, account.Password, account.UserName);}
+            : new AzureStorageCredential(AzureStorageCredentialKind.SharedKey, account.Password, account.UserName);
+}

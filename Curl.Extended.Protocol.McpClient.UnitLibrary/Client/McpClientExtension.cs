@@ -1,5 +1,5 @@
-using Curl.Extension.Abstractions.Description;
 using Curl.Extended.Protocol.McpClient.Stdio;
+using Curl.Extension.Abstractions.Description;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.McpClient.Client;

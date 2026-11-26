@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Extended.Protocol.Stomp.Client;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Stomp.Wire;
 
