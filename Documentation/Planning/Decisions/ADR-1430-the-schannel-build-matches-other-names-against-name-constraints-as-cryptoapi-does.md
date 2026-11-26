@@ -1,4 +1,4 @@
-# ADR-1425: The Schannel build matches otherNames against name constraints as CryptoAPI does (BL-6011)
+# ADR-1430: The Schannel build matches otherNames against name constraints as CryptoAPI does (BL-6011)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1300.
 

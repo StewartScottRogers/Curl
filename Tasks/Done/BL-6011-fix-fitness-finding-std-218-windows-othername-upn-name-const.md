@@ -46,10 +46,10 @@ The finding, verbatim:
 
 ## Notes
 
-- Done directly (no sub-agents) to stay within the run's cost cap. Decision: ADR-1425 (match `otherName` constraints as CryptoAPI does, rather than refuse every chain carrying one).
+- Done directly (no sub-agents) to stay within the run's cost cap. Decision: ADR-1430 (match `otherName` constraints as CryptoAPI does, rather than refuse every chain carrying one).
 - Added `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs` to `touches` for the unit tests; no other task in Doing on `origin/work/dark-factory` named it.
 - Reproduced and verified with a PowerShell loopback TLS server (throwaway certificates, `--ssl-no-revoke`): System32 curl 8.23.0 Schannel and the built Curl both answer o_x_upn exit 60 `schannel: error 0x00008000`, o_p_bad exit 60 `schannel: error 0x00004000`, o_x_ok and o_p_ok exit 0.
-- CryptoAPI's matching rules were measured with `X509Chain` on Windows; the table is in ADR-1425.
+- CryptoAPI's matching rules were measured with `X509Chain` on Windows; the table is in ADR-1430.
 - `dotnet build` clean; full fast tests green (exit 0), `Curl.Networking.UnitTests` rerun after the last refactor: 4779 passed, 33 skipped.
 - `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: one failing member, `OtherNameMatches` (complexity 20, 100% covered). Split into three methods; a coverage run of the name-constraint tests then showed them at complexity 6 or less, 100% line and branch. The 40-minute whole-library script was not run again.
 - CI on Linux and macOS: the new tests build their own certificates and drive the library's own check, with no platform-specific output.

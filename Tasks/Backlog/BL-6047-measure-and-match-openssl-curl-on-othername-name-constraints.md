@@ -18,7 +18,7 @@ The OpenSSL build answers an `otherName` name constraint below a non-self-signed
 
 ## Context
 
-Found in BL-6011 (ADR-1425), which changed the Schannel build only: `CertificateNameConstraints.ReadOpenSslNames` lists no `otherName`, so where the port's own check decides (a partial-chain anchor) an `otherName` constraint is not evaluated. Not measured against OpenSSL curl (WSL Ubuntu). OpenSSL's `nc_match_single` handles `GEN_OTHERNAME` for SmtpUTF8Mailbox and may report an unsupported constraint type for others. Measure a UPN and a SmtpUTF8Mailbox constraint, excluded and permitted.
+Found in BL-6011 (ADR-1430), which changed the Schannel build only: `CertificateNameConstraints.ReadOpenSslNames` lists no `otherName`, so where the port's own check decides (a partial-chain anchor) an `otherName` constraint is not evaluated. Not measured against OpenSSL curl (WSL Ubuntu). OpenSSL's `nc_match_single` handles `GEN_OTHERNAME` for SmtpUTF8Mailbox and may report an unsupported constraint type for others. Measure a UPN and a SmtpUTF8Mailbox constraint, excluded and permitted.
 
 ## Acceptance criteria
 

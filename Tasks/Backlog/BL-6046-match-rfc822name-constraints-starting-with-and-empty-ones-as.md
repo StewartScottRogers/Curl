@@ -18,7 +18,7 @@ Below a non-self-signed `--cacert` anchor, the Schannel build judges an rfc822Na
 
 ## Context
 
-Found in BL-6011 (ADR-1425). CryptoAPI, measured with `X509Chain` on Windows: an excluded rfc822Name `@evil.test` or empty one breaks on a leaf rfc822Name `u@evil.test` (`0x00008000`). `CertificateNameConstraints.EmailMatches` compares `@evil.test` for equality and an empty constraint as a host, so neither matches. The OpenSSL build shares `EmailMatches`; its behaviour must not change unless measured. Measure permitted subtrees too.
+Found in BL-6011 (ADR-1430). CryptoAPI, measured with `X509Chain` on Windows: an excluded rfc822Name `@evil.test` or empty one breaks on a leaf rfc822Name `u@evil.test` (`0x00008000`). `CertificateNameConstraints.EmailMatches` compares `@evil.test` for equality and an empty constraint as a host, so neither matches. The OpenSSL build shares `EmailMatches`; its behaviour must not change unless measured. Measure permitted subtrees too.
 
 ## Acceptance criteria
 
