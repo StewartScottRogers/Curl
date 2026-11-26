@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/ParallelRun.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6025 — Fix fitness finding STD-228: -Z with a missing -F file in a later --next group reports the failure once; curl reports it for every transfer in the batch
 
@@ -36,13 +36,28 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro's stdout and stderr equal REF's.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro's stdout and stderr equal REF's.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured curl 8.22.0 Schannel (2026-11-26, `Record-CurlExchange.ps1`): under `-Z` curl abandons the first batch while
+  setting up the failing `-F` group's first URL, so it reports every earlier group's transfer and that one, sends
+  nothing, and reports no later URL (variants: one or two URLs before, two URLs in the failing group, a group after
+  it, failing first group, `--parallel-max 1` and `2`, `--fail-early`). Curl's stdout, stderr and exit code are
+  byte-identical to curl's for the repro and seven variants; the repro reproduced before the change by
+  `ParallelRun`'s `reportsOnlyFirst` reporting one transfer for the whole batch.
+- Fix kept inside `ParallelRun.cs` because BL-6022 (Doing) holds `CurlCommandRunner.cs`: `ParallelRun` tells option
+  groups apart by how many dispatches `CloseAtEnd` has received. The test went into
+  `Curl.Console.UnitTests/Cgr175Tests.cs`, beside the existing `-Z -F` missing-file tests.
+- No ADR: this matches measured curl, with no behaviour choice to make.
+- Left for BL-6037: checking the form at the group's first URL (differs when that URL is in the batch and the group's
+  last is not), and `%{xfer_id}` (`0` in curl, `-1` here) for an earlier group's transfer.
+- Quality run for `Curl.Console`: 0 failing members. Platform-neutral change and test.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: a1654503 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. -Z with a missing -F file in a later --next group reports every earlier transfer and that group's first, as curl does
