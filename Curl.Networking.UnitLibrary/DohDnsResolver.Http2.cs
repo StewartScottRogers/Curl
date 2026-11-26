@@ -6,30 +6,79 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
 
-// The same POST over HTTP/2, for a DoH server whose TLS handshake picked h2 (ADR-1424).
+// The same POST over HTTP/2, for a DoH server whose TLS handshake picked h2 (ADR-1424), each query
+// the connection carries on a stream of its own (ADR-1428).
 public sealed partial class DohDnsResolver
 {
-    // Sends the query on stream 1 of a new HTTP/2 connection and reads the answer; null when the
-    // connection or the stream fails or the response is not read whole, as ExchangeAsync returns it.
-    private async ValueTask<DohResponseReader.Response?> ExchangeOverHttp2Async(IConnection connection, byte[] query, ITransferEvents events, CancellationToken cancellationToken)
+    // One query of an HTTP/2 connection: its place among the queries, the stream carrying it (0 until
+    // opened), and what has arrived of its response.
+    private sealed class Http2Query(int index)
     {
+        public int Index { get; } = index;
+
+        public int StreamId { get; set; }
+
+        public int StatusCode { get; set; }
+
+        public List<byte> Body { get; } = [];
+    }
+
+    // Sends each query as a POST on a stream of its own (1, then 3) of one new HTTP/2 connection and
+    // hands answered each query's response as its stream ends: null when the stream, or the
+    // connection under it, fails or the response is not read whole, as ExchangeAsync returns it.
+    private async ValueTask ExchangeOverHttp2Async(IConnection connection, byte[][] queries, ITransferEvents events, Action<int, DohResponseReader.Response?> answered, CancellationToken cancellationToken)
+    {
+        var unanswered = Enumerable.Range(0, queries.Length).Select(index => new Http2Query(index)).ToList();
         try
         {
             var http2 = new Http2Connection(new ConnectionStream(connection));
             await http2.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
-            var streamId = http2.OpenStream();
-            var fields = BuildRequestHeaderFields(query.Length);
-            await http2.WriteHeadersAsync(streamId, new HpackEncoder().Encode(fields), isEndStream: false, cancellationToken).ConfigureAwait(false);
-            // A query is at most 272 bytes, far inside the stream's initial send window, so one write sends it all.
-            await http2.WriteDataAsync(streamId, query, isEndStream: true, cancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            ReportHttp2Request(streamId, fields, query, events);
-            return await ReadHttp2ResponseAsync(http2, events, cancellationToken).ConfigureAwait(false);
+            var encoder = new HpackEncoder();
+            foreach (var query in unanswered)
+            {
+                if (query.Index > 0)
+                {
+                    ReportHttp2Reuse(events);
+                }
+
+                await SendHttp2RequestAsync(http2, encoder, query, queries[query.Index], events, cancellationToken).ConfigureAwait(false);
+                await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            await ReadHttp2ResponsesAsync(http2, unanswered, events, answered, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (IsHttp2ExchangeFailure(exception))
         {
-            return null;
+            // Every query still unanswered fails with the connection, below.
         }
+
+        foreach (var query in unanswered.ToArray())
+        {
+            Answer(unanswered, query, null, answered);
+        }
+    }
+
+    private async ValueTask SendHttp2RequestAsync(Http2Connection http2, HpackEncoder encoder, Http2Query query, byte[] body, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        query.StreamId = http2.OpenStream();
+        var fields = BuildRequestHeaderFields(body.Length);
+        await http2.WriteHeadersAsync(query.StreamId, encoder.Encode(fields), isEndStream: false, cancellationToken).ConfigureAwait(false);
+        // A query is at most 272 bytes, far inside the stream's initial send window, so one write sends it all.
+        await http2.WriteDataAsync(query.StreamId, body, isEndStream: true, cancellationToken).ConfigureAwait(false);
+        ReportHttp2Request(query.StreamId, fields, body, events);
+    }
+
+    // The -v lines curl writes as its second sub-transfer takes the first one's connection (ADR-1428).
+    private void ReportHttp2Reuse(ITransferEvents events)
+    {
+        events.ReportInfo("Multiplexed connection found");
+        events.ReportInfo($"Reusing existing {_dohUrl.Scheme}: connection with host {_dohServer.Host}");
+    }
+
+    private static void Answer(List<Http2Query> unanswered, Http2Query query, DohResponseReader.Response? response, Action<int, DohResponseReader.Response?> answered)
+    {
+        unanswered.Remove(query);
+        answered(query.Index, response);
     }
 
     private static bool IsHttp2ExchangeFailure(Exception exception) =>
@@ -71,34 +120,61 @@ public sealed partial class DohDnsResolver
         events.ReportInfo($"upload completely sent off: {query.Length} bytes");
     }
 
-    // Reads the stream to its end. Null when the peer closes first, ends the stream with no final
-    // status, or sends a body longer than curl's buffer.
-    private static async ValueTask<DohResponseReader.Response?> ReadHttp2ResponseAsync(Http2Connection http2, ITransferEvents events, CancellationToken cancellationToken)
+    // Reads frames until every query is answered or the peer closes. A query is answered when its
+    // stream ends or is reset, or its body is longer than curl's buffer.
+    private static async ValueTask ReadHttp2ResponsesAsync(Http2Connection http2, List<Http2Query> unanswered, ITransferEvents events, Action<int, DohResponseReader.Response?> answered, CancellationToken cancellationToken)
     {
         var decoder = new HpackDecoder();
-        var statusCode = 0;
-        var body = new List<byte>();
-        Http2StreamFrame? frame;
-        do
+        while (unanswered.Count > 0)
         {
-            frame = await http2.ReadStreamFrameAsync(cancellationToken).ConfigureAwait(false);
+            Http2StreamFrame? frame;
+            try
+            {
+                frame = await http2.ReadStreamFrameAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Http2StreamResetException reset)
+            {
+                // A stream given up on for its long body may be reset after it was answered.
+                if (unanswered.Find(query => query.StreamId == reset.StreamId) is { } resetQuery)
+                {
+                    Answer(unanswered, resetQuery, null, answered);
+                }
+
+                continue;
+            }
+
             if (frame is null)
             {
-                return null;
+                return;
             }
 
-            if (frame.Type == Http2FrameType.Headers)
-            {
-                statusCode = TakeHeaderBlock(decoder.Decode(frame.Content.Span), statusCode, events);
-            }
-            else
-            {
-                body.AddRange(frame.Content.Span);
-            }
+            TakeFrame(frame, decoder, unanswered, events, answered);
         }
-        while (!frame.IsEndStream && body.Count <= DohResponseReader.MaximumBodyLength);
+    }
 
-        return FinishedHttp2Response(statusCode, [.. body], events);
+    // A header block is decoded whichever stream it is on, since the HPACK decoder must see every one;
+    // a frame for a query already answered is otherwise dropped.
+    private static void TakeFrame(Http2StreamFrame frame, HpackDecoder decoder, List<Http2Query> unanswered, ITransferEvents events, Action<int, DohResponseReader.Response?> answered)
+    {
+        var fields = frame.Type == Http2FrameType.Headers ? decoder.Decode(frame.Content.Span) : null;
+        if (unanswered.Find(query => query.StreamId == frame.StreamId) is not { } query)
+        {
+            return;
+        }
+
+        if (fields is not null)
+        {
+            query.StatusCode = TakeHeaderBlock(fields, query.StatusCode, events);
+        }
+        else
+        {
+            query.Body.AddRange(frame.Content.Span);
+        }
+
+        if (frame.IsEndStream || query.Body.Count > DohResponseReader.MaximumBodyLength)
+        {
+            Answer(unanswered, query, FinishedHttp2Response(query.StatusCode, [.. query.Body], events), answered);
+        }
     }
 
     private static DohResponseReader.Response? FinishedHttp2Response(int statusCode, byte[] body, ITransferEvents events)

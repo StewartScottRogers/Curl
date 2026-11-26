@@ -7,13 +7,19 @@ namespace Curl.Networking;
 // How the A and AAAA queries are run, and the sub-transfer lines written between them.
 public sealed partial class DohDnsResolver
 {
-    // Untraced, the queries run in parallel as curl runs them, and their outcomes are reported
-    // once both are in; traced, one after another, each outcome after its own sub-transfer's
-    // lines, so each sub-transfer's lines come whole. Either way the last query's outcome, AAAA's, is
-    // reported first, as curl 8.22.0 reports it, and traced its sub-transfer runs first too; the results
-    // keep the queries' order (ADR-0380, BL-2973).
+    // Over TLS with both queries, the second waits for the first one's connection, which over HTTP/2
+    // carries both (ADR-1428). Else untraced, the queries run in parallel as curl runs them, and their
+    // outcomes are reported once both are in; traced, one after another, each outcome after its own
+    // sub-transfer's lines, so each sub-transfer's lines come whole. With a connection each, the last
+    // query's outcome, AAAA's, is reported first, as curl 8.22.0 reports it, and traced its
+    // sub-transfer runs first too; the results keep the queries' order (ADR-0380, BL-2973).
     private async Task<DohQueryResult[]> RunAddressQueriesAsync(List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
     {
+        if (queries.Count > 1 && _dohServer.UseTls)
+        {
+            return await RunQueriesAfterTheFirstConnectionAsync(queries, cancellationToken).ConfigureAwait(false);
+        }
+
         TakeConnectionIdsFor(queries.Count);
         DohQueryResult[] results;
         if (ReferenceEquals(SubTransferEvents, NoTransferEvents.Instance))

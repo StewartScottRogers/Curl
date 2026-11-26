@@ -423,12 +423,17 @@ malformed one with a `ServiceBindingFailure`.
 `DohDnsResolver` (ADR-0152 and its BL-641 amendment) is the `IDnsResolver` behind `--doh-url`. It
 takes an `IConnector` for the DoH connections (a `TcpConnector` of its own, built with the system
 resolver and the DoH TLS options) and the DoH URL, and for each name POSTs the A query and the AAAA
-query in parallel on two connections, A first, each request written byte for byte as curl 8.21.0
+query in parallel, A first, on two connections unless the first picks `h2` (below), each request written byte for byte as curl 8.21.0
 writes it (no `User-Agent`; `Host` with the port only when it is not the default). The target
 carries `PoolScheme` `https` and names `h2`, `http/1.1` as its `ApplicationProtocols` (ADR-1424), so
-the handshake offers both; a connection that picked `h2` carries the same POST on stream 1 of a
+the handshake offers both; a connection that picked `h2` carries the same POST on a stream of a
 `Curl.Http2` connection, its answer read from the HEADERS and DATA frames (`DohDnsResolver.Http2.cs`,
-STD-221), with the `-v` lines `using HTTP/2` and `[HTTP/2] [1]`. `DohResponseReader` reads the
+STD-221), with the `-v` lines `using HTTP/2` and `[HTTP/2] [1]`. Per ADR-1428 (BL-6038), over TLS the
+second address query waits for the first one's connection, as curl's `CURLOPT_PIPEWAIT` does: on `h2`
+it is stream 3 of that connection (A on 1, AAAA on 3, one connection number, outcomes in the order the
+streams end, `left intact` once), and traced, `DohPipeWaitTraceEvents` writes curl 8.18.0's waiting
+lines after the first `Trying` (not through a proxy); on HTTP/1.x it opens its own connection.
+The connection is closed once the name's queries are answered. `DohResponseReader` reads the
 HTTP/1.x response as curl does: `Content-Type` ignored, a `Content-Length`, chunked or close-delimited
 (CGR-160, BL-3689) body of at most 3000 bytes, anything else a failure; it hands on the status code, and a status outside 200-299
 fails the query undecoded with `[DoH] [DoH] [A] error: HTTP status N`, as curl 8.22.0's

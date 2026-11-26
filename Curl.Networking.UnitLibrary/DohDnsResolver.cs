@@ -7,8 +7,9 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Resolves a host name through an RFC 8484 DNS-over-HTTPS server, as curl 8.21.0 does for
-/// <c>--doh-url</c> (ADR-0152, BL-641): it POSTs an A query and an AAAA query in parallel, each on
-/// a connection of its own, and returns the AAAA answer's addresses and then the A answer's. Under
+/// <c>--doh-url</c> (ADR-0152, BL-641): it POSTs an A query and an AAAA query in parallel, as two
+/// streams of one connection to an HTTP/2 server (ADR-1428) and else each on a connection of its
+/// own, and returns the AAAA answer's addresses and then the A answer's. Under
 /// <c>-4</c> or <c>-6</c> (<see cref="AddressFamily" />) it sends only that family's query (BL-939).
 /// </summary>
 /// <remarks>
