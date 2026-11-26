@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6001 — Make dotnet format pass in Curl.Console and its tests
 
@@ -22,12 +22,16 @@ Part of BL-5923, split by project group so lanes run the parts in parallel. On 2
 
 ## Acceptance criteria
 
-- [ ] `dotnet format Curl.slnx --verify-no-changes --include <each path in touches>` exits 0.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `dotnet format Curl.slnx --verify-no-changes --include <each path in touches>` exits 0.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- `dotnet format` changed 138 files, only `using` order, blank lines and a final newline; no file had to be left alone.
+- Verified 2026-11-26: format check exits 0, build 0 warnings 0 errors, all 115 fast test assemblies pass, Measure-CodeQuality.ps1 -Library Curl.Console reports 0 failing members.
 
 ## Log
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 03521b86 3d836d5e.
+- 2026-11-26: Doing -> Done. dotnet format verifies clean for Curl.Console and Curl.Console.UnitTests
