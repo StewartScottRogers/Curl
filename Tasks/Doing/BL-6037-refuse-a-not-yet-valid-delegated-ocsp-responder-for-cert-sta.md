@@ -39,3 +39,4 @@ check), `HandBuiltCertificateVerifier` and both TLS handshakes.
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: bb26c3f6 7a5be3ea 20fe6bb3 3d836d5e.
