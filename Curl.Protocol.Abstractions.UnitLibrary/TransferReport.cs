@@ -64,14 +64,14 @@ public sealed record TransferReport
     /// <summary>
     /// Gets how many header lines of the proxy's reply to a CONNECT count towards <c>%{num_headers}</c>,
     /// as curl counts them for a refused CONNECT (STD-144) and for a tunnel under a protocol other than
-    /// HTTP (ADR-1418); they are never found by <c>%header{}</c>. Zero when none counts.
+    /// HTTP (ADR-1434); they are never found by <c>%header{}</c>. Zero when none counts.
     /// </summary>
     public int ConnectReplyHeaderCount { get; init; }
 
     /// <summary>
     /// The entry in <see cref="PseudoHeaders" /> that stands for the one header curl counts for a successful FTP
     /// download that received no header line (BL-5403); it is not counted beside a CONNECT reply's header lines
-    /// (ADR-1418).
+    /// (ADR-1434).
     /// </summary>
     public static KeyValuePair<string, string> TransferCompleteStandInHeader { get; } = new("226", "Transfer complete");
 

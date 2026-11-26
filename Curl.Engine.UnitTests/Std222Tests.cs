@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// Pins STD-222's fix (BL-6019, ADR-1418): the bytes and header lines of a proxy's CONNECT replies reach
+/// Pins STD-222's fix (BL-6019, ADR-1434): the bytes and header lines of a proxy's CONNECT replies reach
 /// <c>%{size_header}</c> and <c>%{num_headers}</c> for protocols other than HTTP. The expected values are the outside
 /// fitness review's, measured on curl 8.22.0 and 8.18.0 through a proxy whose reply is 62 bytes with one header line:
 /// <c>124</c> and <c>1</c> for FTP against vsftpd, <c>124</c> and <c>2</c> against pure-ftpd, and <c>62</c> and <c>1</c>

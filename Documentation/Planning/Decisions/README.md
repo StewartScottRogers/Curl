@@ -1475,4 +1475,4 @@ Each option and the specific reason it lost.
 | [1431](ADR-1431-only-a-sha-1-certid-names-a-certificate-in-an-ocsp-response.md) | Only a SHA-1 CertID names a certificate in an OCSP response (BL-6027) | Accepted | 2026-11-26 |
 | [1432](ADR-1432-ocsp-rsassa-pss-signatures-are-verified-with-their-stated-salt-and-mask-hash.md) | OCSP RSASSA-PSS signatures are verified with their stated salt and mask hash (BL-6010) | Accepted | 2026-11-26 |
 | [1433](ADR-1433-closing-an-http-2-connection-waits-at-most-one-second.md) | Closing an HTTP/2 connection waits at most one second (BL-6036) | Accepted | 2026-11-26 |
-| [1418](ADR-1418-a-connect-reply-counts-in-size-header-and-num-headers-for-every-protocol.md) | A CONNECT reply counts in size_header and num_headers for every protocol (BL-6019) | Accepted | 2026-11-26 |
+| [1434](ADR-1434-a-connect-reply-counts-in-size-header-and-num-headers-for-every-protocol.md) | A CONNECT reply counts in size_header and num_headers for every protocol (BL-6019) | Accepted | 2026-11-26 |

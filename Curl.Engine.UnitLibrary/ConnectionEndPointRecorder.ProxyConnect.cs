@@ -64,7 +64,7 @@ internal sealed partial class ConnectionEndPointRecorder
 
     /// <summary>
     /// <paramref name="report" /> with the last CONNECT reply's status, every reply's bytes added to its header size and
-    /// the last reply's header lines counted as <see cref="CountedConnectReplyHeaders" /> says (ADR-1418). A reply with
+    /// the last reply's header lines counted as <see cref="CountedConnectReplyHeaders" /> says (ADR-1434). A reply with
     /// header lines also removes <see cref="TransferReport.TransferCompleteStandInHeader" />, which curl does not count
     /// beside them.
     /// </summary>

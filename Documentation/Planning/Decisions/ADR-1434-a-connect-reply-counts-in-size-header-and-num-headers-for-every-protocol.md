@@ -1,4 +1,4 @@
-# ADR-1418: A CONNECT reply counts in size_header and num_headers for every protocol
+# ADR-1434: A CONNECT reply counts in size_header and num_headers for every protocol
 
 - Status: Accepted
 - Date: 2026-11-26
