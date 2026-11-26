@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs]
+touches: [Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs, Curl.Conformance.LibTest.UnitTests/Lib1560ChecksTests.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5992 — Fix AF-0998: Surviving mutant: the lib1560 port can report the zoneid part as UNKNOWN (> -> >=)
 
@@ -32,12 +32,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs line 134`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs line 134`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added Lib1560ChecksTests.cs to touches: the test that kills the mutant belongs there; no task in Doing on origin/work/dark-factory names it.
+- No production change: the code was right and only the test was missing, so the feature pipeline stages were not delegated and no quality run was needed.
+- Killing test: Lib1560ChecksTests.UpdateUrl_ZoneIdTheLastKnownPart_SetsItWithoutAnUnknownPartLine. With > changed to >= it was the one failure of 1244 in Curl.Conformance.LibTest.UnitTests; reverted, dotnet build had 0 warnings and 0 errors and the fast tests all passed.
+- The test runs against the fake engine and compares only managed strings, so it is platform-neutral.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: f59c9e85 9742157d.
+- 2026-11-25: Doing -> Done. A fast test now fails if the lib1560 port reports the zoneid part as UNKNOWN

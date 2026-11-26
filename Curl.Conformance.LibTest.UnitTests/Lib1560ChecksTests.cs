@@ -224,6 +224,20 @@ public sealed class Lib1560ChecksTests
     }
 
     [TestMethod]
+    public void UpdateUrl_ZoneIdTheLastKnownPart_SetsItWithoutAnUnknownPartLine()
+    {
+        var handle = new ScriptedUrlHandle();
+        var run = new Run(new FakeCurlEngine { CreatingUrl = () => handle });
+        using Libcurl.Url.CurlUrlHandle url = run.Library.UrlInit();
+
+        CurlUrlCode code = run.Checks.UpdateUrl(url, "zoneid=NULL,", CurlUrlFlags.None);
+
+        Assert.AreEqual(CurlUrlCode.Ok, code);
+        CollectionAssert.AreEqual(new[] { (CurlUrlPart.ZoneId, (string?)null) }, handle.Sets.ToArray());
+        Assert.AreEqual(string.Empty, run.Error.ToString());
+    }
+
+    [TestMethod]
     public void UpdateUrl_SetFails_StopsWithItsCode()
     {
         var handle = new ScriptedUrlHandle { Setting = (_, _) => CurlUrlCode.BadHostname };
