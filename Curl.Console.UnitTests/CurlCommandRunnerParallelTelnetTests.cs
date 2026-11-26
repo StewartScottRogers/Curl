@@ -56,4 +56,88 @@ public sealed class CurlCommandRunnerParallelTelnetTests
         Assert.HasCount(1, http.Contexts);
         Assert.AreEqual("[0]\nhello\n[0]\n", StandardOutputText);
     }
+
+    // Each expectation below was measured on curl 8.22.0 (Schannel, Windows) on 2026-11-26 (BL-6035, ADR-1428).
+    [TestMethod]
+    [DataRow("1", 1, "[43 000 0]\n[43 000 0]\n", "43 43", 0)]
+    [DataRow("1", 2, "[43 000 0]\n[43 000 0]\n", "43 43", 0)]
+    [DataRow("50", 1, "[43 000 0]\nhello\n[42 000 6]\n", "43 42", 1)]
+    [DataRow("2", 2, "[43 000 0]\nhello\n[42 000 6]\n[43 000 0]\n", "43 42 43", 1)]
+    [DataRow("50", 2, "[43 000 0]\n[42 000 0]\n[42 000 0]\n", "43 42 42", 0)]
+    public async Task RunAsync_TelnetFailsFatallyUnderParallel_ReportsTheTransfersBehindItAsCurlDoes(
+        string parallelMax, int httpTransfers, string expectedOutput, string expectedErrorCodes, int expectedHttpStarts)
+    {
+        RecordingProtocolHandler http = new("http", async context =>
+        {
+            await context.Output.WriteAsync("hello\n"u8.ToArray(), context.CancellationToken);
+            return TransferResult.Success(6);
+        });
+
+        int exitCode = await RunBehindFailingTelnetAsync(http, parallelMax, httpTransfers);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.HasCount(expectedHttpStarts, http.Contexts);
+        Assert.AreEqual(expectedOutput, StandardOutputText);
+        CollectionAssert.AreEqual(expectedErrorCodes.Split(' '), StandardErrorCodes);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TransferBehindAFatalTelnetFailureGetsNoResponse_IsAbortedAfterTheAbortDelay()
+    {
+        RecordingProtocolHandler http = new("http", async context =>
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, context.CancellationToken);
+            return TransferResult.Success(0);
+        });
+
+        int exitCode = await RunBehindFailingTelnetAsync(http, "50", 1);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual("[43 000 0]\n[42 000 0]\n", StandardOutputText);
+        CollectionAssert.AreEqual(new[] { "43", "42" }, StandardErrorCodes);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TransferBehindAFatalTelnetFailureFailsItself_KeepsItsOwnFailure()
+    {
+        RecordingProtocolHandler http = new(
+            "http",
+            _ => ValueTask.FromResult(TransferResult.Failure(CurlExitCode.CouldntConnect, "Could not connect")));
+
+        int exitCode = await RunBehindFailingTelnetAsync(http, "50", 1);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual("[43 000 0]\n[7 000 0]\n", StandardOutputText);
+        CollectionAssert.AreEqual(new[] { "43", "7" }, StandardErrorCodes);
+    }
+
+    private string[] StandardErrorCodes =>
+        Encoding.UTF8.GetString(standardError.ToArray())
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('(', ')')[1])
+            .ToArray();
+
+    private async Task<int> RunBehindFailingTelnetAsync(RecordingProtocolHandler http, string parallelMax, int httpTransfers)
+    {
+        RecordingProtocolHandler telnet = new(
+            "telnet",
+            _ => ValueTask.FromResult(TransferResult.Failure(CurlExitCode.BadFunctionArgument, "A libcurl function was given a bad argument")));
+        const string WriteOut = "[%{exitcode} %{http_code} %{size_download}]\n";
+        string[] arguments = ["-sS", "-Z", "--parallel-max", parallelMax, "-w", WriteOut, "telnet://h.test"];
+        for (int index = 0; index < httpTransfers; index++)
+        {
+            arguments = [.. arguments, "--next", "-sS", "-w", WriteOut, "http://h.test/hello"];
+        }
+
+        return await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([telnet, http])),
+                new InMemoryFileSystem(),
+                new InMemoryFileSystem(),
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: true)
+            .RunAsync(arguments)
+            .WaitAsync(TimeSpan.FromSeconds(30));
+    }
 }

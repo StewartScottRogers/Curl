@@ -165,12 +165,79 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
         (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held = [.. heldTransfers];
         heldTransfers.Clear();
         bool hasEnded = false;
-        foreach ((Func<Task<bool>> start, _) in held)
+        for (int index = 0; index < held.Length; index++)
         {
-            hasEnded = await start().ConfigureAwait(false);
+            hasEnded = await held[index].Start().ConfigureAwait(false);
+            if (FatalSessionFailure is { } fatalSession)
+            {
+                await EndFirstBatchBehindFatalSessionAsync(held[(index + 1)..], maxRunning - index - 1, fatalSession).ConfigureAwait(false);
+                return true;
+            }
         }
 
         return hasEnded;
+    }
+
+    /// <summary>
+    /// Gets the fatal failure a <c>telnet</c> session ended with, after which every other transfer is reported
+    /// as aborted (BL-6035, ADR-1428); <see langword="null" /> while none has.
+    /// </summary>
+    internal TransferResult? FatalSessionFailure { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the one transfer waiting behind a fatally failed <c>telnet</c> session is
+    /// being started although <see cref="HasFailedEarly" />.
+    /// </summary>
+    internal bool IsStartingBehindFatalSession { get; private set; }
+
+    /// <summary>Gets the token that ends a transfer's wait for its host: <see cref="StopStartsToken" />, or
+    /// <see cref="AbortToken" /> while <see cref="IsStartingBehindFatalSession" />.</summary>
+    internal CancellationToken HostWaitToken => IsStartingBehindFatalSession ? AbortToken : StopStartsToken;
+
+    /// <summary>Records that a <c>telnet</c> session ended with a fatal failure (<see cref="FatalSessionFailure" />).</summary>
+    /// <param name="failure">The session's failure.</param>
+    internal void NoteFatalSessionFailure(TransferResult failure) => FatalSessionFailure = failure;
+
+    /// <summary>
+    /// Ends the run at a <c>telnet</c> session of the first batch that failed fatally, as curl 8.22.0 does: a lone
+    /// transfer waiting within <c>--parallel-max</c> is started and reported as aborted once it ends, two or more
+    /// are reported as aborted without starting, and those past the limit are reported with the session's
+    /// failure (BL-6035, ADR-1428).
+    /// </summary>
+    /// <param name="waiting">The held transfers behind the session.</param>
+    /// <param name="placesWithinMax">How many of them curl would have had running beside the session; negative
+    /// when the session was itself past the limit.</param>
+    /// <param name="failure">The session's failure.</param>
+    /// <returns>A task that completes when they are reported.</returns>
+    private async Task EndFirstBatchBehindFatalSessionAsync(
+        (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] waiting,
+        int placesWithinMax,
+        TransferResult failure)
+    {
+        int withinMax = Math.Clamp(placesWithinMax, 0, waiting.Length);
+        if (withinMax == 1)
+        {
+            IsStartingBehindFatalSession = true;
+            await waiting[0].Start().ConfigureAwait(false);
+            await Queue.WhenAllEndedAsync().ConfigureAwait(false);
+        }
+        else
+        {
+            await AbandonEachAsync(waiting[..withinMax], AbortedResult).ConfigureAwait(false);
+        }
+
+        await AbandonEachAsync(waiting[withinMax..], failure).ConfigureAwait(false);
+        HasEnded = true;
+    }
+
+    private static async Task AbandonEachAsync(
+        (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held,
+        TransferResult result)
+    {
+        foreach ((_, Func<TransferResult, Task> abandon) in held)
+        {
+            await abandon(result).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

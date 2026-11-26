@@ -2415,7 +2415,8 @@ internal sealed class CurlCommandRunner(
     /// Starts one transfer of a <c>-Z</c> run in the slot it waited for, unless the run has ended or failed
     /// early. curl 8.22.0 runs a whole <c>telnet</c> session inside one call of its <c>-Z</c> loop, so for a
     /// <c>telnet</c> transfer this completes, and later transfers start, only once the session has ended
-    /// (STD-183, BL-6017, ADR-1420).
+    /// (STD-183, BL-6017, ADR-1420). A session that fails fatally is noted on the run
+    /// (<see cref="ParallelRun.NoteFatalSessionFailure" />, BL-6035).
     /// </summary>
     /// <param name="run">The run.</param>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
@@ -2435,7 +2436,7 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        if (run.HasFailedEarly)
+        if (run.HasFailedEarly && !run.IsStartingBehindFatalSession)
         {
             DeferReportOfEarlyFailure(run, dispatch, options, transfer, state);
             return false;
@@ -2444,12 +2445,14 @@ internal sealed class CurlCommandRunner(
         state.ParallelProgress = run.ProgressMeter?.AddTransfer();
 
         LogParallelScheduler("started", transfer);
-        Task running = TransferInParallelAsync(run, dispatch, options, transfer, state);
+        Task<TransferResult> running = TransferInParallelAsync(run, dispatch, options, transfer, state);
         run.Queue.Add(running);
 
-        if (UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol).StartsWith("telnet:", StringComparison.OrdinalIgnoreCase))
+        if (UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol).StartsWith("telnet:", StringComparison.OrdinalIgnoreCase)
+            && await running.ConfigureAwait(false) is var session
+            && IsFatalFailure(session))
         {
-            await running.ConfigureAwait(false);
+            run.NoteFatalSessionFailure(session);
         }
 
         return false;
@@ -2484,8 +2487,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
     /// <param name="state">The transfer's state.</param>
-    /// <returns>A task that completes when the transfer and its report, if not deferred, are done.</returns>
-    private async Task TransferInParallelAsync(
+    /// <returns>The transfer's result, once it and its report, if not deferred, are done.</returns>
+    private async Task<TransferResult> TransferInParallelAsync(
         ParallelRun run,
         TransferDispatch dispatch,
         CommandLineOptions options,
@@ -2497,7 +2500,7 @@ internal sealed class CurlCommandRunner(
         bool cancelledWhileWaiting = false;
         try
         {
-            ended = await TransferOnceHostIsFreeAsync(run, dispatch, options, transfer, run.StopStartsToken).ConfigureAwait(false);
+            ended = await TransferOnceHostIsFreeAsync(run, dispatch, options, transfer, run.HostWaitToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (run.HasFailedEarly)
         {
@@ -2510,6 +2513,7 @@ internal sealed class CurlCommandRunner(
         await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended, cancelledWhileWaiting))
             .ConfigureAwait(false);
         state.ParallelProgress?.End();
+        return ended.Result;
     }
 
     /// <summary>
@@ -2659,6 +2663,11 @@ internal sealed class CurlCommandRunner(
             return Task.CompletedTask;
         }
 
+        if (run.FatalSessionFailure is not null)
+        {
+            return ReportAsync(dispatch, options, transfer, state, ResultBehindFatalSessionOf(run, state, ended.Result), ended.GivenUrl, ended.TransferUrl);
+        }
+
         if (run.IsAborted || cancelledWhileWaiting)
         {
             run.DeferReport(
@@ -2667,12 +2676,7 @@ internal sealed class CurlCommandRunner(
             return Task.CompletedTask;
         }
 
-        if (ReferenceEquals(ended.Result, CannotOpenUploadFileFailure))
-        {
-            run.RecordSetupFailure(ended.Result, endsTheRun: true);
-        }
-
-        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly || IsFatalFailure(ended.Result));
+        RecordParallelTransferEnd(run, options, ended.Result);
 
         if (state.SkippedExistingOutputFile)
         {
@@ -2683,6 +2687,44 @@ internal sealed class CurlCommandRunner(
         }
 
         return ReportAsync(dispatch, options, transfer, state, ended.Result, ended.GivenUrl, ended.TransferUrl);
+    }
+
+    /// <summary>
+    /// Records on a <c>-Z</c> run how a transfer ended, a <c>-T</c> file that could not be opened as the run's
+    /// setup failure too.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="result">The transfer's result.</param>
+    private void RecordParallelTransferEnd(ParallelRun run, CommandLineOptions options, TransferResult result)
+    {
+        if (ReferenceEquals(result, CannotOpenUploadFileFailure))
+        {
+            run.RecordSetupFailure(result, endsTheRun: true);
+        }
+
+        run.RecordEnd(result, EndsTheRun(options, result), options.FailEarly || IsFatalFailure(result));
+    }
+
+    /// <summary>
+    /// Gives the result a <c>-Z</c> transfer ending after a <c>telnet</c> session failed fatally is reported with:
+    /// <see cref="AbortedResultOf" /> once the run has aborted it; a success that beat the abort keeps its
+    /// response and bytes but is aborted too, as curl 8.22.0 reports it; its own failure stands (BL-6035).
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <param name="ended">How the transfer ended.</param>
+    /// <returns>The result to report.</returns>
+    private static TransferResult ResultBehindFatalSessionOf(ParallelRun run, RunningTransferState state, TransferResult ended)
+    {
+        if (run.IsAborted)
+        {
+            return AbortedResultOf(state);
+        }
+
+        return ended.IsSuccess
+            ? ended with { ExitCode = CurlExitCode.AbortedByCallback, ErrorMessage = ParallelRun.AbortedMessage }
+            : ended;
     }
 
     /// <summary>
