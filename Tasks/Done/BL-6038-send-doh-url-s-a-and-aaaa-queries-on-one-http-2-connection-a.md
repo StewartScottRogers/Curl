@@ -31,7 +31,7 @@ ADR-1424 (BL-6015) gave `--doh-url` HTTP/2 with a connection for each query. cur
   decision are in ADR-1428.
 - Touches widened: the query runner (`SubTransferTrace.cs`), the new `DohPipeWaitTraceEvents.cs`,
   and the two documents saying each query has its own connection. No task in Doing named them.
-- Connection reuse for later names and HTTP/1.1 (also measured) is BL-6044.
+- Connection reuse for later names and HTTP/1.1 (also measured) is BL-6051.
 - Checks: `dotnet build` 0 warnings; whole fast suite 58490 passed, 0 failed; `Measure-CodeQuality.ps1 -Library
   Curl.Networking.UnitLibrary` 0 failing members. After those runs one line of defence was added (a reset
   of a stream already given up on is ignored, tested by a new data row) and Curl.Networking.UnitTests

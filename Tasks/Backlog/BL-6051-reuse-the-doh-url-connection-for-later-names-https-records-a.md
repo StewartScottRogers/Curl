@@ -1,5 +1,5 @@
 ---
-id: BL-6044
+id: BL-6051
 title: Reuse the --doh-url connection for later names, HTTPS records and an HTTP/1.1 second query, as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6044 — Reuse the --doh-url connection for later names, HTTPS records and an HTTP/1.1 second query, as curl does
+# BL-6051 — Reuse the --doh-url connection for later names, HTTPS records and an HTTP/1.1 second query, as curl does
 
 ## Goal
 
