@@ -50,3 +50,4 @@ Lanes test only on Windows, so make the race deterministic in a unit test: hold 
 ## Log
 
 - 2026-11-26: Created from Surly bug report 2026-11-26T2030, finding 1.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: fbaedeb8 a3922b49 469360ff.
