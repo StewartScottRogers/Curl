@@ -58,7 +58,8 @@ the server's control and QPACK streams in the background for the connection's li
 QPACK stream fails the transfer's next read with exit 56. A transfer `-m` ends, or that `-f`,
 `--max-filesize` or a failed write fails, cancels only its stream, sending nothing for one that
 has ended both ways, and its connection carries the next transfer (ADR-1410, ADR-1414,
-ADR-1415). Tests drive it with
+ADR-1415). A stream the server resets fails only itself too, and the connection is kept
+(BL-5997, ADR-1416). Tests drive it with
 `Fakes/FakeMultiplexedConnection` and `Fakes/FakeMultiplexedStream`.
 
 HTTP/2 server push (BL-2516, ADR-0638): an `HttpProtocolHandler` given an `IHttp2PushSink` creates

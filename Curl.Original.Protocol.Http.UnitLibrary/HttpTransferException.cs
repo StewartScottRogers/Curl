@@ -35,10 +35,11 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     internal bool RequiresHttp11 { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the failure ended only the request's HTTP/2 stream - the
-    /// server reset it - so its connection stays open for the next transfer, as curl 8.18.0 with
-    /// nghttp2 leaves a multiplexed connection intact after one stream fails (CGR-140), or a held
-    /// body sent after the response had ended the stream (BL-5972).
+    /// Gets a value indicating whether the failure ended only the request's HTTP/2 or HTTP/3
+    /// stream - the server reset it (CGR-140, BL-5997) - so its connection stays open for the
+    /// next transfer, as curl 8.18.0 with nghttp2 and ngtcp2 leaves a multiplexed connection
+    /// intact after one stream fails, or a held HTTP/2 body sent after the response had ended
+    /// the stream (BL-5972).
     /// </summary>
     internal bool LeavesConnectionIntact { get; init; }
 

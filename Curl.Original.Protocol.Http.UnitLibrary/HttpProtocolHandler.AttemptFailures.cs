@@ -10,7 +10,7 @@ public sealed partial class HttpProtocolHandler
     /// for it, such as <c>Recv failure: Connection was reset</c>, before the connection's end is
     /// reported (measured, BL-449 Notes), then the failure's own <see cref="HttpTransferException.InfoLines" />,
     /// such as the line curl 8.21.0's <c>cf-ngtcp2.c</c> prints for an HTTP/3 stream the server refused
-    /// (ADR-0187). Any other failure is left to the transfer's result.
+    /// (ADR-0187) or reset (BL-5997). Any other failure is left to the transfer's result.
     /// </summary>
     private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
     {
@@ -126,7 +126,7 @@ public sealed partial class HttpProtocolHandler
     /// again once on a fresh connection when a connection that already carried a request died
     /// before the response
     /// (<see cref="DiedBeforeResponse" />); and final otherwise, keeping the connection alive
-    /// when only the request's HTTP/2 stream was reset (CGR-140).
+    /// when only the request's HTTP/2 or HTTP/3 stream was reset (CGR-140, BL-5997).
     /// </summary>
     private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, bool reusedConnection, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
     {

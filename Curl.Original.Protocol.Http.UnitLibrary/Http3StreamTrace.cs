@@ -15,7 +15,7 @@ namespace Curl.Original.Protocol.Http;
 /// with curl 8.18.0's ngtcp2 build against cloudflare-quic.com; see BL-1168's Notes. It also
 /// writes, as they happen, the <c>status:</c> / <c>header:</c> echo of each response head line,
 /// the peer's idle timeout as a stream opens on an idle connection (BL-5995), and the lines that end a
-/// transfer (BL-1208, ADR-0388), and <c>quic close(app_error=268) -&gt; 0</c> for a stream an
+/// transfer (BL-1208, ADR-0388), the lines for a stream the server resets (BL-5997), and <c>quic close(app_error=268) -&gt; 0</c> for a stream an
 /// earlier transfer cancelled, as curl 8.18.0 writes it during the next one (BL-5982).
 /// </summary>
 /// <param name="events">The transfer's events, which the lines are reported through as info lines, or <see langword="null" /> to write none.</param>
@@ -53,6 +53,21 @@ internal sealed class Http3StreamTrace(ITransferEvents? events)
     {
         Hold(streamId, "CLOSED");
         Hold(streamId, QuicClose(NoErrorCode));
+    }
+
+    /// <summary>
+    /// Reports the lines held so far, then <c>[&lt;stream&gt;] reset -&gt; 0</c>,
+    /// <c>[&lt;stream&gt;] RESET: error &lt;code&gt;</c> and <c>[&lt;stream&gt;] quic close(app_error=&lt;code&gt;) -&gt; 0</c>
+    /// for a stream the server reset, the code in decimal (measured, BL-5997).
+    /// </summary>
+    /// <param name="streamId">The stream.</param>
+    /// <param name="errorCode">The application error code of the reset.</param>
+    internal void StreamReset(long streamId, long errorCode)
+    {
+        Flush();
+        Report(streamId, "reset -> 0");
+        Report(streamId, FormattableString.Invariant($"RESET: error {errorCode}"));
+        Report(streamId, QuicClose(errorCode));
     }
 
     /// <summary>

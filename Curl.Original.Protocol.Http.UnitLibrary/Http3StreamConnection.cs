@@ -20,8 +20,10 @@ namespace Curl.Original.Protocol.Http;
 /// Failures are the ones curl 8.21.0's <c>cf-ngtcp2.c</c> reports (ADR-0144 section 7,
 /// ADR-0172, ADR-0187): a stream the server resets is exit 95, or 18 once body bytes have
 /// arrived, with <c>HTTP/3 stream &lt;id&gt; reset by server (error 0x&lt;hex&gt;
-/// &lt;name&gt;)</c>; so is a response head with no valid <c>:status</c>, which this client
-/// resets with <c>H3_MESSAGE_ERROR</c> as nghttp3 does. A reset with
+/// &lt;name&gt;)</c>, and ends only its stream, marked
+/// <see cref="HttpTransferException.LeavesConnectionIntact" /> (BL-5997). A response head
+/// with no valid <c>:status</c>, which this client resets with <c>H3_MESSAGE_ERROR</c> as
+/// nghttp3 does, fails the same way but is not so marked. A reset with
 /// <c>H3_REQUEST_REJECTED</c> stops the session taking new streams and is exit 56 marked
 /// <see cref="HttpTransferException.IsStreamRefused" />, for the handler to send the request
 /// again; a reset with <c>H3_NO_ERROR</c>, or with any other code after the final head when
@@ -224,7 +226,8 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// (<see cref="Http3ClientRequestStream.CancelAsync" />, measured, BL-5978), of one <c>-f</c>
     /// (BL-5983), <c>--max-filesize</c> or a failed write (BL-5996) ended, or of one whose upload
     /// a status stopped, once its response is read
-    /// (ADR-1411), unless it was never opened
+    /// (ADR-1411), or of one the server reset while its request was still being sent (BL-5997),
+    /// unless it was never opened
     /// or has ended both ways. A connection too broken to send that takes no new stream. A stream
     /// cancelled before its response ended is kept for the next read on the connection to write
     /// curl's <c>quic close</c> trace line for it (BL-5982, ADR-1412).
@@ -404,8 +407,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         }
         catch (MultiplexedStreamResetException reset)
         {
-            frameLog.StreamResetReceived(request!.StreamId, reset.ApplicationErrorCode);
-            throw Reset(reset.ApplicationErrorCode);
+            throw ResetByServer(reset.ApplicationErrorCode);
         }
         catch (MultiplexedConnectionFailedException lost)
         {
@@ -418,12 +420,33 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     }
 
     /// <summary>
-    /// Gives the failure for a request stream reset with <paramref name="errorCode" />: exit
-    /// 95, or exit 18 once body bytes have arrived, as <c>cf-ngtcp2.c</c> counts them.
+    /// Takes the server's reset of the stream: logs and traces it, takes the response as ended,
+    /// so only a request not yet ended is left to cancel, and gives its failure, which <c>-v</c>
+    /// reports and which leaves the connection intact, as curl does (measured, BL-5997).
     /// </summary>
-    private HttpTransferException Reset(long errorCode) => new(
-        bodyBytesReceived > 0 ? CurlExitCode.PartialFile : CurlExitCode.Http3,
-        HttpTransferMessages.Http3StreamReset(request!.StreamId, errorCode));
+    private HttpTransferException ResetByServer(long errorCode)
+    {
+        frameLog.StreamResetReceived(request!.StreamId, errorCode);
+        trace.StreamReset(request.StreamId, errorCode);
+        isResponseEnded = true;
+        return Reset(errorCode, isByServer: true);
+    }
+
+    /// <summary>
+    /// Gives the failure for a request stream reset with <paramref name="errorCode" />: exit
+    /// 95, or exit 18 once body bytes have arrived, as <c>cf-ngtcp2.c</c> counts them. One
+    /// <paramref name="isByServer" /> also carries its <c>-v</c> line and leaves the connection
+    /// intact.
+    /// </summary>
+    private HttpTransferException Reset(long errorCode, bool isByServer)
+    {
+        string message = HttpTransferMessages.Http3StreamReset(request!.StreamId, errorCode);
+        return new HttpTransferException(bodyBytesReceived > 0 ? CurlExitCode.PartialFile : CurlExitCode.Http3, message)
+        {
+            LeavesConnectionIntact = isByServer,
+            InfoLines = isByServer ? [message] : [],
+        };
+    }
 
     private void ReceiveEnd()
     {
@@ -452,7 +475,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         if (Http2ResponseHead.StatusOf(fields) is not { } statusCode)
         {
             request!.Stream.Abort((long)Http3ErrorCode.MessageError);
-            throw Reset((long)Http3ErrorCode.MessageError);
+            throw Reset((long)Http3ErrorCode.MessageError, isByServer: false);
         }
 
         received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));

@@ -210,7 +210,7 @@ public sealed class Http3StreamAbortTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_FailRejectsAStreamThatFailsAfterItsHead_StillCancelsItAndExits22()
+    public async Task ExecuteAsync_FailRejectsAStreamTheServerThenResets_SendsNothingForItAndExits22()
     {
         FakeMultiplexedStream failed = new(0, ServerError(0, hasBody: false))
         {
@@ -225,7 +225,7 @@ public sealed class Http3StreamAbortTests
         Diagnostics.Act("exit code, abort code", $"{result.ExitCode}, {failed.AbortCode}");
         Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
-        Assert.AreEqual(RequestCancelled, failed.AbortCode);
+        Assert.IsNull(failed.AbortCode);
         Assert.AreEqual(1, connector.Pooled!.ReturnedReusableCount);
     }
 

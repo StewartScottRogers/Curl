@@ -119,7 +119,8 @@ public sealed partial class HttpProtocolHandler
 
     /// <summary>
     /// Ends what a failed exchange leaves open of its stream: when the failure ends only the
-    /// stream (<see cref="FailsOnlyItsStream" />), the stream unless it has ended both ways
+    /// stream (<see cref="FailsOnlyItsStream" />, or the server reset an HTTP/3 one,
+    /// BL-5997), the stream unless it has ended both ways
     /// (<see cref="EndGivenUpStreamAsync" />), an HTTP/3 one after reading what has arrived of
     /// its response (<see cref="Http3StreamConnection.ReadArrivedResponseAsync" />); and after
     /// any failure, an HTTP/2 one whose response ended it with the upload unsent
@@ -129,7 +130,7 @@ public sealed partial class HttpProtocolHandler
     private static async ValueTask ResetFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, ConnectResult connect, IConnection connection, CancellationToken cancellationToken)
     {
         IHttpStreamConnection? stream = TrailerStreamOf(requestStream, connection);
-        if (FailsOnlyItsStream(failure.ExitCode, stream is Http3StreamConnection))
+        if (FailsOnlyItsStream(failure.ExitCode, stream is Http3StreamConnection) || ResetsHttp3Stream(failure, stream))
         {
             await ((stream as Http3StreamConnection)?.ReadArrivedResponseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
             await EndGivenUpStreamAsync(stream, connect, cancellationToken).ConfigureAwait(false);
@@ -137,6 +138,14 @@ public sealed partial class HttpProtocolHandler
 
         await ResetFailedStreamUploadAsync(requestStream, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Tells whether <paramref name="failure" /> is the server's reset of the HTTP/3 stream
+    /// <paramref name="stream" />: curl marks the transfer done and keeps the connection
+    /// (measured, BL-5997).
+    /// </summary>
+    private static bool ResetsHttp3Stream(HttpTransferException failure, IHttpStreamConnection? stream) =>
+        failure.LeavesConnectionIntact && stream is Http3StreamConnection;
 
     /// <summary>
     /// Tells whether a failure with <paramref name="exitCode" /> ends only its stream, so the

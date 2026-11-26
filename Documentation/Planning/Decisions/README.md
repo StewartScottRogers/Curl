@@ -1457,3 +1457,4 @@ Each option and the specific reason it lost.
 | [1413](ADR-1413-the-http-3-peer-idle-timeout-line-is-written-for-each-stream-opened-on-an-idle-connection.md) | The HTTP/3 peer idle timeout line is written for each stream opened on an idle connection (BL-5995) | Accepted | 2026-11-25 |
 | [1414](ADR-1414-a-transfer-f-fails-over-http-3-keeps-its-connection.md) | A transfer -f fails over HTTP/3 keeps its connection (BL-5983) | Accepted | 2026-11-25 |
 | [1415](ADR-1415-a-max-filesize-or-write-failure-over-http-3-keeps-its-connection.md) | A --max-filesize or write failure over HTTP/3 keeps its connection (BL-5996) | Accepted | 2026-11-25 |
+| [1416](ADR-1416-a-stream-the-server-resets-over-http-3-keeps-its-connection.md) | A stream the server resets over HTTP/3 keeps its connection (BL-5997) | Accepted | 2026-11-25 |
