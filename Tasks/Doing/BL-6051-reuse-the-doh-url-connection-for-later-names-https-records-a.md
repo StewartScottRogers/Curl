@@ -31,3 +31,4 @@ ADR-1435 (BL-6038) records what curl 8.18.0 on Ubuntu does: a second name in the
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 79961f58 94cff58a 3d836d5e.
