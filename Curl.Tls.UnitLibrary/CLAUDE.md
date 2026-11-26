@@ -205,7 +205,7 @@ and Encrypted Client Hello (BL-706, ADR-0233).
   delegated responder outside its validity at `now` is `ResponderNotAuthorised` (no
   leeway); `VerifyForSchannelRevocationCheck`, the Windows stapled-status and
   below-anchor checks' entry, accepts one not yet valid, as curl's Schannel build does
-  (ADR-1432). Only a SHA-1 `CertID`
+  (ADR-1438). Only a SHA-1 `CertID`
   names the certificate (ADR-1431). It
   reads with the internal `OcspBasicResponse`, `OcspSingleResponse` and
   `OcspCertificateFields`, and maps signature and `CertID` hash OIDs with

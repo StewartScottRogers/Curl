@@ -45,7 +45,7 @@ check), `HandBuiltCertificateVerifier` and both TLS handshakes.
     `* SSL certificate status: good (0)`.
   - WSL `openssl s_server` was used because `Record-CurlExchange.ps1` runs the Windows curl,
     which has no `--cert-status`; the OpenSSL build is the one being measured.
-- Fix (ADR-1432): `OcspStapleVerifier.Verify` (what both handshakes run for `--cert-status`) now
+- Fix (ADR-1438): `OcspStapleVerifier.Verify` (what both handshakes run for `--cert-status`) now
   refuses a delegated responder before its `notBefore`, no leeway. The two Windows revocation
   checks (stapled status, below-anchor query) call the new
   `VerifyForSchannelRevocationCheck`, which still accepts one.

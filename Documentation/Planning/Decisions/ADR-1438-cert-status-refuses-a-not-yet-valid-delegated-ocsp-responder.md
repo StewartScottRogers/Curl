@@ -1,4 +1,4 @@
-# ADR-1432: `--cert-status` refuses a not-yet-valid delegated OCSP responder; the Schannel revocation checks accept it
+# ADR-1438: `--cert-status` refuses a not-yet-valid delegated OCSP responder; the Schannel revocation checks accept it
 
 - Status: Accepted
 - Date: 2026-11-26
