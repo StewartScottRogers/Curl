@@ -9,8 +9,10 @@ namespace Curl.Extension.Dpop;
 /// <c>Authorization: DPoP</c> header (<c>-H</c>'s, or an outer hook's for a token it fetched with this hook's key), is
 /// bound to the proof by <c>ath</c>, and <c>--oauth2-bearer</c>'s is sent as <c>Authorization: DPoP</c> (§7.1) unless
 /// such a header already sends a token. The last <c>DPoP-Nonce</c> each origin sent goes into its proofs, and a 400 or 401
-/// answer that brings a new one is retried once with it (§8, §9); the response is held until then, so only the one
-/// kept is written. A transfer that is not HTTP runs as it would without the hook.
+/// answer that brings a new one is retried once with it (§8, §9), its <c>-T</c> upload rewound first, and not retried
+/// when the upload cannot be rewound; the response is held until then, so only the one kept is written. The hook runs
+/// inside <c>--resumable-upload</c>'s (ADR-1418), so each request of that upload is signed on its own. A transfer that
+/// is not HTTP runs as it would without the hook.
 /// </summary>
 /// <param name="keyFile">The PEM file of the private key.</param>
 internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
@@ -35,8 +37,9 @@ internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
             return TransferResult.Failure(CurlExitCode.ReadError, $"Failed to read a DPoP private key from {keyFile}");
         }
 
+        var uploadStart = context.Upload is { CanSeek: true } upload ? upload.Position : 0;
         var attempt = await AttemptAsync(key, context, next);
-        if (attempt.AsksForNewNonce)
+        if (attempt.AsksForNewNonce && TryRewind(context.Upload, uploadStart))
         {
             attempt = await AttemptAsync(key, context, next);
         }
@@ -61,6 +64,24 @@ internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
     /// of its own, else <c>--oauth2-bearer</c>'s.
     /// </summary>
     internal static string? AccessTokenOf(HttpRequestOptions http) => HeaderTokenOf(http) ?? http.BearerToken;
+
+    /// <summary>Takes the upload back to where the first try found it, so the retry sends it whole.</summary>
+    /// <returns><see langword="false" /> when it cannot be taken back; the refusal then stands.</returns>
+    private static bool TryRewind(Stream? upload, long start)
+    {
+        switch (upload)
+        {
+            case null:
+                return true;
+            case { CanSeek: true }:
+                upload.Position = start;
+                return true;
+            case IUploadRewinder rewinder:
+                return !rewinder.HasBeenRead || rewinder.RewindToStart() is null;
+            default:
+                return false;
+        }
+    }
 
     private static string? HeaderTokenOf(HttpRequestOptions http) =>
         http.Headers.Where(header => header.StartsWith(AuthorizationPrefix, StringComparison.OrdinalIgnoreCase)).Select(header => header[AuthorizationPrefix.Length..].Trim()).FirstOrDefault();

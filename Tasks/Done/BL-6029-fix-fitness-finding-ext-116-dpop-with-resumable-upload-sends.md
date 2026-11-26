@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.Dpop.UnitLibrary/DpopTransferHook.cs]
+touches: [Curl.Extension.Dpop.UnitLibrary/DpopTransferHook.cs, Curl.Extension.Dpop.UnitLibrary/CLAUDE.md, Curl.Extension.Dpop.UnitTests/DpopTransferHookTests.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.Extension.Composition.UnitTests/DpopWithResumableUploadOrderTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6029 — Fix fitness finding EXT-116: --dpop with --resumable-upload sends the same DPoP proof, made for PUT to the original URL, on every request (PARTLY FIXED)
 
@@ -37,13 +37,28 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the three decoded proofs have `htm` OPTIONS, POST, PATCH; `htu` `…/tus`, `…/tus`, `…/files/1`; and three different `jti` values.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the three decoded proofs have `htm` OPTIONS, POST, PATCH; `htu` `…/tus`, `…/tus`, `…/files/1`; and three different `jti` values.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: BL-5866 put the `--dpop` hook outside `--resumable-upload`'s; since ADR-1379 the upload sends each request
+  through `next`, so one outer proof reached all of them. Fix (ADR-1418): the catalogue lists ResumableUpload before
+  DPoP. A `DPoP-Nonce` retry now repeats one upload request, so `DpopTransferHook` rewinds its upload first.
+- `touches` widened to the catalogue, its order test, the Dpop tests and the Dpop `CLAUDE.md`; no task in Doing on
+  `origin/work/dark-factory` named them.
+- Verified with `curl.exe` against `Record-CurlExchange.ps1` (OPTIONS, POST, PATCH 401 with a nonce, PATCH): `htm`
+  and `htu` matched each request, every `jti` differed, and the retried PATCH sent the whole body.
+- `dotnet build`: 0 warnings. Fast tests: 58413 passed, 0 failed.
+- Quality: `Measure-CodeQuality.ps1 -Library` for both libraries reaches too many test projects to finish before the
+  shift deadline under load, and was stopped after 43 projects. Read from its Cobertura output instead:
+  `Curl.Extension.Dpop.UnitLibrary` 100% line and branch from its own tests, no method over complexity 10;
+  `ExtensionTransferHookCatalogue` (one line moved, no code added) fully covered by `Curl.Extension.Composition.UnitTests`.
+- Follow-up: BL-6035 (other hooks that still run inside the DPoP hook's one proof).
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 58530a5d 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. --dpop with --resumable-upload now signs each upload request with its own DPoP proof

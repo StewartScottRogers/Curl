@@ -97,6 +97,57 @@ public sealed class DpopTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_EachRequestAnOuterHookSends_IsSignedForItsOwnMethodAndTarget_Rfc9449Section4Point2()
+    {
+        var server = new FakeServer(Response(200), Response(201), Response(204));
+        var hook = Hook();
+
+        foreach (var (method, url) in new[] { ("OPTIONS", "https://a.example/tus"), ("POST", "https://a.example/tus"), ("PATCH", "https://a.example/files/1") })
+        {
+            await hook.ExecuteAsync(Context(url, new HttpRequestOptions { CustomMethod = method }), server.Invoke);
+        }
+
+        var proofs = server.Requests.Select(request => DpopProofTests.Decode(ProofOf(request).Split('.')[1])).ToList();
+        CollectionAssert.AreEqual(new[] { "OPTIONS", "POST", "PATCH" }, proofs.Select(proof => proof.GetProperty("htm").GetString()).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "https://a.example/tus", "https://a.example/tus", "https://a.example/files/1" },
+            proofs.Select(proof => proof.GetProperty("htu").GetString()).ToArray());
+        Assert.AreEqual(3, proofs.Select(proof => proof.GetProperty("jti").GetString()).Distinct().Count());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ASeekableUploadRefusedForANonce_IsSentAgainFromWhereItStarted_Rfc9449Section9()
+    {
+        var upload = new MemoryStream("xxbody"u8.ToArray()) { Position = 2 };
+
+        var sent = await SendUploadRefusedForANonceAsync(upload);
+
+        CollectionAssert.AreEqual(new[] { "body", "body" }, sent);
+    }
+
+    [TestMethod]
+    [DataRow(false, null, 2, 0)]
+    [DataRow(true, null, 2, 1)]
+    [DataRow(true, "seek callback returned error 1", 1, 1)]
+    public async Task ExecuteAsync_ARewinderUploadRefusedForANonce_IsRetriedOnlyWhenItNeedsNoRewindOrRewinds_Rfc9449Section9(bool read, string? failure, int tries, int rewinds)
+    {
+        var upload = new RewinderUpload(read, failure);
+
+        var sent = await SendUploadRefusedForANonceAsync(upload);
+
+        Assert.HasCount(tries, sent);
+        Assert.AreEqual(rewinds, upload.Rewinds);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AnUploadThatCannotBeRewoundRefusedForANonce_KeepsTheRefusal_Rfc9449Section9()
+    {
+        var sent = await SendUploadRefusedForANonceAsync(new UnseekableUpload());
+
+        Assert.HasCount(1, sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AnAuthorizationServerDemandingANonce_IsRetriedAndTheNonceKeptForLaterRequests_Rfc9449Section8()
     {
         var server = new FakeServer(Response(400, "n-1"), Response(200), Response(200, "n-2"), Response(200));
@@ -196,6 +247,24 @@ public sealed class DpopTransferHookTests
         Assert.AreEqual("https://[::1]:8443/", DpopTransferHook.TargetUriOf(CurlUrl.Parse("https://[::1]:8443")));
     }
 
+    /// <summary>Sends <paramref name="upload" /> to a server that refuses the first try with a nonce, and gives what each try read of it.</summary>
+    private async Task<string[]> SendUploadRefusedForANonceAsync(Stream upload)
+    {
+        var server = new FakeServer(Response(401, "n-1"), Response(200));
+        var sent = new List<string>();
+        var context = new TransferContext { Url = CurlUrl.Parse("https://a.example/r"), Output = new MemoryStream(), HeaderOutput = new MemoryStream(), Upload = upload, Http = new HttpRequestOptions() };
+
+        await Hook().ExecuteAsync(context, async request =>
+        {
+            using var read = new MemoryStream();
+            await request.Upload!.CopyToAsync(read);
+            sent.Add(Text(read));
+            return await server.Invoke(request);
+        });
+
+        return [.. sent];
+    }
+
     private static string? NonceOf(ITransferContext request) =>
         DpopProofTests.Decode(ProofOf(request).Split('.')[1]).TryGetProperty("nonce", out var nonce) ? nonce.GetString() : null;
 
@@ -245,6 +314,26 @@ public sealed class DpopTransferHookTests
 
             await context.Output.WriteAsync(Encoding.Latin1.GetBytes(body));
             return result;
+        }
+    }
+
+    /// <summary>An upload that cannot seek, such as a pipe.</summary>
+    private class UnseekableUpload : MemoryStream
+    {
+        public override bool CanSeek => false;
+    }
+
+    /// <summary>An upload that cannot seek but rewinds through <see cref="IUploadRewinder" />, or fails to with a message.</summary>
+    private sealed class RewinderUpload(bool read, string? failure) : UnseekableUpload, IUploadRewinder
+    {
+        public int Rewinds { get; private set; }
+
+        public bool HasBeenRead => read;
+
+        public string? RewindToStart()
+        {
+            Rewinds++;
+            return failure;
         }
     }
 
