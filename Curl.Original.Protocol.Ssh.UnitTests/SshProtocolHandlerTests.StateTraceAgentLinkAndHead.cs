@@ -1,6 +1,6 @@
 using System.Net;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ssh.Fakes;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Ssh;
 

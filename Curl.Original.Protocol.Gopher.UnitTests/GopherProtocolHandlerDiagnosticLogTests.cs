@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Gopher.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Gopher;

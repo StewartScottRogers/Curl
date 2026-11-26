@@ -1,6 +1,6 @@
 using System.Globalization;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Mqtt.Fakes;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Mqtt;
 

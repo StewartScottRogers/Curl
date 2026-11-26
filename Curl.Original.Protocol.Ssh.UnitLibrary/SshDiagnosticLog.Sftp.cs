@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Globalization;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ssh.Sftp;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Ssh;
 

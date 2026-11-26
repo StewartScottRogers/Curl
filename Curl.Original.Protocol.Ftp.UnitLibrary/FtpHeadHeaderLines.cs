@@ -39,4 +39,5 @@ internal static class FtpHeadHeaderLines
     {
         int colon = line.IndexOf(": ", StringComparison.Ordinal);
         return new(line[..colon], line[(colon + 2)..].TrimEnd('\r', '\n'));
-    }}
+    }
+}
