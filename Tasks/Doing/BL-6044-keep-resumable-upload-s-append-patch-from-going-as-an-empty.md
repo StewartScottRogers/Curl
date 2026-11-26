@@ -39,3 +39,4 @@ non-2xx ends the transfer without the body). `--extended-help` and ADR-1103 are 
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 5a00fb8f 44796430 97f2967b 3d836d5e.
