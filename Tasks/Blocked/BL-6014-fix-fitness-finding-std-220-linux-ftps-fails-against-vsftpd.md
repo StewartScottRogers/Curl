@@ -51,3 +51,4 @@ The finding, verbatim:
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 3281bfb3 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 0; see Z:\repos\Curl.logs\BL-6014-20261126-083150-L7.jsonl
