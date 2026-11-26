@@ -39,7 +39,9 @@ read that fails depends on the platform. On Linux and macOS it ends the session 
 56 `Recv failure: <text>`, as curl 8.18.0 on Linux does (ADR-1382, BL-5918). On Windows
 it ends it with exit 0 (BL-077), except during the option negotiation (a reply the
 connection did not take, or replies sent and no data written yet), where it is that exit
-56 (ADR-1352, BL-5882). The handler's internal `RunsOnWindows` lets a test pick either
+56 (ADR-1352, BL-5882), and except when it strikes an unanswered upload (upload bytes sent
+in the session, and a reply or upload bytes sent since data was last written), where it is
+exit 56 too (ADR-1418, BL-6012). The handler's internal `RunsOnWindows` lets a test pick either
 rule. Each negotiation reply goes out as its own write
 through `TelnetOutbox`, which also queues the `-v` lines around it so they keep curl's
 order; a reply write failing with a `SocketException` inside its `IOException` is

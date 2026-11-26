@@ -2,7 +2,7 @@
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amended by ADR-1382: the
 rule below is Windows's alone (Linux and macOS exit 56 on every failed read), and
-`TelnetOutbox.ReadFailureLosesData` is now `TelnetOutbox.FailedReadIsReceiveError`.
+`TelnetOutbox.ReadFailureLosesData` is now `TelnetOutbox.FailedReadIsReceiveError`. Amended by ADR-1418: on Windows a read that strikes an unanswered upload exits 56 too.
 
 ## Context
 The handler took every failed connection read as the server closing, with exit 0 (BL-077,

@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Telnet.UnitLibrary/TelnetOutbox.cs, Curl.Original.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs]
+touches: [Curl.Original.Protocol.Telnet.UnitLibrary/TelnetOutbox.cs, Curl.Original.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs, Curl.Original.Protocol.Telnet.UnitLibrary/CLAUDE.md, Curl.Original.Protocol.Telnet.UnitTests/TelnetProtocolHandlerNegotiationResetTests.cs, Documentation/Planning/Decisions/ADR-1352-telnet-read-failing-during-option-negotiation-exits-56.md]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6012 — Fix fitness finding STD-201: Windows TELNET: a reset after data was written still sometimes ends with exit 0 and loses the server's last line (PARTLY FIXED)
 
@@ -37,13 +37,22 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the 20-run loop never prints `0/7`; every run is `0/22` or exits non-zero.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the 20-run loop never prints `0/7`; every run is `0/22` or exits non-zero.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Plan: Windows also exits 56 when a failed read strikes an unanswered upload (upload bytes sent in the session, and a reply or upload bytes sent since data was last written). Decided in ADR-1418; small enough that the feature stages ran in this session without subagents (cost cap).
+- touches widened to the test file the criterion needs, the library's CLAUDE.md and ADR-1352's status line; no other task in Doing names them.
+- Measured with a C# rebuild of the finding's mock (one program serving loopback and running the client 20 to 40 times). Server sends the last line then resets: curl 8.21.0 `0/21` x7, `55/0` x17, `56/7` x6; curl 8.22.0 `0/21` x3, `55/0` x12, `56/7` x10. Server resets 300 ms after `quit` sending nothing: both curls `0/7` every run.
+- `0/21` is the finding's `0/22`: the whole output, which in this mock has a one-digit counter.
+- Curl after the change (Debug build): sends-last-line `0/21` x6, `56/7` x34, never `0/7`; silent reset `56/7` x40, where curl gives `0/7`. A .NET read cannot tell the two apart, so ADR-1418 takes 56 over a success that may have lost data.
+- The loop was not run on the pre-change build; the old rule returned exit 0 for any failed read after data was written, by construction.
+- Gates: dotnet build 0 warnings; fast tests green; format clean for the two telnet projects; Measure-CodeQuality for the Telnet library: 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: eb271d27 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. Windows TELNET reset on an unanswered upload now exits 56; the mock loop no longer reports 0/7
