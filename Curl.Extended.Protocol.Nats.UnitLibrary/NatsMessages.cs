@@ -6,6 +6,9 @@ internal static class NatsMessages
     /// <summary>The URL has no subject.</summary>
     public const string NoSubject = "NATS URL has no subject";
 
+    /// <summary>The URL's subject decodes to bytes that are not valid UTF-8.</summary>
+    public const string SubjectNotUtf8 = "The NATS subject in the URL is not valid UTF-8";
+
     /// <summary>The server closed the connection inside a line or a payload.</summary>
     public const string ClosedMidMessage = "NATS server closed the connection mid-message";
 

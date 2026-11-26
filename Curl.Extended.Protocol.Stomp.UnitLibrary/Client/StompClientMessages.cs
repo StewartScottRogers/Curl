@@ -6,6 +6,9 @@ internal static class StompClientMessages
     /// <summary>The URL names no destination.</summary>
     internal const string NoDestination = "No STOMP destination found in the URL";
 
+    /// <summary>The URL's destination decodes to bytes that are not valid UTF-8.</summary>
+    internal const string DestinationNotUtf8 = "The STOMP destination in the URL is not valid UTF-8";
+
     /// <summary>The connection ended where a frame was due.</summary>
     internal const string Disconnected = "Connection disconnected";
 

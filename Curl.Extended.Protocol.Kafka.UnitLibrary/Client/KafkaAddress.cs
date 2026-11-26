@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Kafka.Client;
@@ -19,9 +20,12 @@ internal sealed record KafkaAddress(string Topic, int Partition, long Offset)
         {
             0 => throw Malformed(KafkaClientMessages.NoTopic),
             > 2 => throw Malformed(KafkaClientMessages.PathTooLong),
-            _ => new KafkaAddress(Uri.UnescapeDataString(segments[0]), PartitionOf(segments), OffsetOf(url.Query)),
+            _ => new KafkaAddress(TopicOf(segments[0]), PartitionOf(segments), OffsetOf(url.Query)),
         };
     }
+
+    private static string TopicOf(string segment) =>
+        UrlPercentDecoding.Utf8TextOf(segment) ?? throw Malformed(KafkaClientMessages.TopicNotUtf8);
 
     private static int PartitionOf(string[] segments) =>
         segments.Length == 1 ? 0

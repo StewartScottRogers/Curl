@@ -1,4 +1,5 @@
 using Curl.Extended.Protocol.Stomp.Wire;
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Stomp.Client;
@@ -42,7 +43,9 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
             return TransferResult.Failure(CurlExitCode.UrlMalformat, $"STOMP {field} holds a line break");
         }
 
-        return await TransferAsync(context, Uri.UnescapeDataString(path)).ConfigureAwait(false);
+        return UrlPercentDecoding.Utf8TextOf(path) is { } destination
+            ? await TransferAsync(context, destination).ConfigureAwait(false)
+            : TransferResult.Failure(CurlExitCode.UrlMalformat, StompClientMessages.DestinationNotUtf8);
     }
 
     /// <summary>

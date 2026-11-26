@@ -18,8 +18,14 @@ internal static class XmppClientMessages
     /// <summary>The message or query holds a character XML 1.0 forbids.</summary>
     internal const string ForbiddenCharacter = "XMPP stanza holds a character XML 1.0 forbids";
 
-    /// <summary>The message body from <c>-d</c> or <c>-T</c> is not valid UTF-8, so XML cannot carry its bytes unchanged.</summary>
+    /// <summary>The message body from <c>-d</c>, <c>-T</c> or the URL's query is not valid UTF-8, so XML cannot carry its bytes unchanged.</summary>
     internal const string BodyNotUtf8 = "XMPP message body is not valid UTF-8";
+
+    /// <summary>The URL's path decodes to bytes that are not valid UTF-8.</summary>
+    internal const string AddressNotUtf8 = "The XMPP address in the URL is not valid UTF-8";
+
+    /// <summary>A part of the URL's query other than a body decodes to bytes that are not valid UTF-8.</summary>
+    internal const string QueryNotUtf8 = "The XMPP query in the URL is not valid UTF-8";
 
     /// <summary>The URL's query names a query type the client does not provide.</summary>
     internal static string UnsupportedQuery(string queryType) => $"Unsupported XMPP query type: {queryType}";

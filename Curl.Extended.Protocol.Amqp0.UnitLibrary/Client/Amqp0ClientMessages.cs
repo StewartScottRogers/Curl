@@ -8,6 +8,12 @@ internal static class Amqp0ClientMessages
     /// <summary>The text for a URL whose path is not <c>/virtual-host/queue</c>.</summary>
     internal const string NoQueue = "No AMQP queue found: the URL path must be /<virtual host>/<queue>";
 
+    /// <summary>The URL's virtual host decodes to bytes that are not valid UTF-8.</summary>
+    internal const string VirtualHostNotUtf8 = "The AMQP virtual host in the URL is not valid UTF-8";
+
+    /// <summary>The URL's queue decodes to bytes that are not valid UTF-8.</summary>
+    internal const string QueueNotUtf8 = "The AMQP queue in the URL is not valid UTF-8";
+
     /// <summary>curl's text for the peer closing the connection while a frame is awaited.</summary>
     internal const string ConnectionDisconnected = "Connection disconnected";
 

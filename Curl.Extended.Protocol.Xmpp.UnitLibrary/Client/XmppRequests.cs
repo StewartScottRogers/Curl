@@ -1,6 +1,7 @@
 using System.Text;
 using System.Xml.Linq;
 using Curl.Extended.Protocol.Xmpp.Wire;
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Xmpp.Client;
@@ -20,13 +21,14 @@ internal static class XmppRequests
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     /// <summary>Gives the stanza for <paramref name="target"/>, the URL's query (without <c>?</c>) and the body.</summary>
-    /// <exception cref="XmppClientException">The query names a type or request the client does not provide (exit 3),
-    /// or a message's body is not valid UTF-8 (exit 43, ADR-1350).</exception>
+    /// <exception cref="XmppClientException">The query names a type or request the client does not provide, or a part of
+    /// it other than a body is not valid UTF-8 (exit 3); or a body, from <c>-d</c>, <c>-T</c> or the query, is not valid
+    /// UTF-8 (exit 43, ADR-1350, ADR-1418).</exception>
     internal static XElement For(string target, string? query, ReadOnlyMemory<byte>? body)
     {
         string[] parts = (query ?? string.Empty).Split(';');
         Dictionary<string, string> pairs = PairsOf(parts.AsSpan(1));
-        string queryType = parts[0].Length > 0 ? Uri.UnescapeDataString(parts[0]) : body is null ? "disco" : "message";
+        string queryType = parts[0].Length > 0 ? DecodedQueryPart(parts[0]) : body is null ? "disco" : "message";
         return queryType switch
         {
             "message" => Message(target, pairs, body),
@@ -41,11 +43,28 @@ internal static class XmppRequests
         foreach (string pair in pairs)
         {
             string[] keyAndValue = pair.Split('=', 2);
-            keys[Uri.UnescapeDataString(keyAndValue[0])] = keyAndValue.Length > 1 ? Uri.UnescapeDataString(keyAndValue[1]) : string.Empty;
+            string key = DecodedQueryPart(keyAndValue[0]);
+            keys[key] = keyAndValue.Length > 1 ? DecodedValue(key, keyAndValue[1]) : string.Empty;
         }
 
         return keys;
     }
+
+    /// <summary>Gives the JID the URL's path (without its leading slash) names.</summary>
+    /// <exception cref="XmppClientException">It is not valid UTF-8 (exit 3, ADR-1418).</exception>
+    internal static string DecodedAddress(string escapedPath) =>
+        DecodedText(escapedPath, CurlExitCode.UrlMalformat, XmppClientMessages.AddressNotUtf8);
+
+    private static string DecodedQueryPart(string escaped) =>
+        DecodedText(escaped, CurlExitCode.UrlMalformat, XmppClientMessages.QueryNotUtf8);
+
+    private static string DecodedValue(string key, string escaped) =>
+        key == "body"
+            ? DecodedText(escaped, CurlExitCode.BadFunctionArgument, XmppClientMessages.BodyNotUtf8)
+            : DecodedQueryPart(escaped);
+
+    private static string DecodedText(string escaped, CurlExitCode exitCode, string notUtf8Message) =>
+        UrlPercentDecoding.Utf8TextOf(escaped) ?? throw new XmppClientException(exitCode, notUtf8Message);
 
     private static XElement Message(string target, Dictionary<string, string> pairs, ReadOnlyMemory<byte>? body)
     {

@@ -28,4 +28,15 @@ public sealed class Amqp0UrlQueueTests
 
         Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
     }
+
+    [TestMethod]
+    [DataRow("amqp://broker/v%E9/q", "The AMQP virtual host in the URL is not valid UTF-8")]
+    [DataRow("amqp://broker/%2F/q%E9", "The AMQP queue in the URL is not valid UTF-8")]
+    public void Decode_EscapesThatAreNotUtf8_ThrowsUrlMalformat(string url, string message)
+    {
+        Amqp0ClientException failure = Assert.ThrowsExactly<Amqp0ClientException>(() => Amqp0UrlQueue.Decode(CurlUrl.Parse(url)));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
+        Assert.AreEqual(message, failure.Message);
+    }
 }

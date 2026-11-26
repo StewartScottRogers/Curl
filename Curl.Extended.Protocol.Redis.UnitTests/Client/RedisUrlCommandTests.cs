@@ -37,4 +37,13 @@ public sealed class RedisUrlCommandTests
         Assert.AreEqual(2, command.ArgumentsWith(null).Count);
         Assert.AreEqual("v", Encoding.UTF8.GetString(command.ArgumentsWith("v"u8.ToArray())[2]));
     }
+
+    [TestMethod]
+    public void Parse_EscapesThatAreNotUtf8_GivesTheirBytes()
+    {
+        RedisUrlCommand command = RedisUrlCommand.Parse("/SET/k%E9/%FF%00")!;
+
+        CollectionAssert.AreEqual(new byte[] { 0x6B, 0xE9 }, command.Arguments[1]);
+        CollectionAssert.AreEqual(new byte[] { 0xFF, 0x00 }, command.Arguments[2]);
+    }
 }

@@ -1,3 +1,4 @@
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Nats;
@@ -10,10 +11,12 @@ internal static class NatsSubject
     /// </summary>
     /// <param name="url">The URL.</param>
     /// <returns>The subject.</returns>
-    /// <exception cref="NatsException">The path is empty, or the subject holds whitespace or an empty token.</exception>
+    /// <exception cref="NatsException">The path is empty, or the subject is not valid UTF-8 (ADR-1418) or holds
+    /// whitespace or an empty token.</exception>
     public static string Of(CurlUrl url)
     {
-        string subject = Uri.UnescapeDataString(url.AbsolutePath.TrimStart('/'));
+        string subject = UrlPercentDecoding.Utf8TextOf(url.AbsolutePath.TrimStart('/'))
+            ?? throw new NatsException(CurlExitCode.UrlMalformat, NatsMessages.SubjectNotUtf8);
         if (subject.Length == 0)
         {
             throw new NatsException(CurlExitCode.UrlMalformat, NatsMessages.NoSubject);
