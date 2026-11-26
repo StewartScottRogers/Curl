@@ -48,7 +48,7 @@ internal sealed class ResumableUploadFlow(IResumableUploadProtocol protocol, Res
                 offset = OffsetIn(retrieval, body.Length);
             }
 
-            return await session.SendAsync("PATCH", upload, protocol.AppendHeaders(offset), body, offset);
+            return await session.SendAsync("PATCH", upload, protocol.AppendHeaders(offset), body, offset, protocol.AppendProbeHeaders(offset));
         });
     }
 

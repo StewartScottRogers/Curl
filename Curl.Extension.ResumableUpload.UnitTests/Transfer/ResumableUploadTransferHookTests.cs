@@ -137,6 +137,38 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_IetfAppend_GivesItsEmptyAuthenticationProbeUploadCompleteFalse()
+    {
+        // ADR-1429: curl's handler may send an append's header fields first with no content for --digest or --ntlm, and a
+        // server that asks for no authentication would complete an upload whose probe said Upload-Complete: ?1.
+        var next = new ScriptedNext(PlainOptions, IetfCreated, IetfAppended);
+        var http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest, Headers = ["X-A: 1", "upload-complete: ?1"] };
+
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", http: http), next.SendAsync);
+
+        var append = next.Sent[2];
+        Assert.AreEqual(
+            "Upload-Draft-Interop-Version: 6,Upload-Complete: ?1,Upload-Offset: 0,Content-Type: application/partial-upload,X-A: 1",
+            string.Join(',', append.Headers));
+        Assert.AreEqual(
+            "Upload-Draft-Interop-Version: 6,Upload-Complete: ?0,Upload-Offset: 0,Content-Type: application/partial-upload,X-A: 1",
+            string.Join(',', append.Context.Http!.AuthProbeHeaders!));
+        Assert.AreEqual("hello", append.Upload);
+        Assert.IsNull(next.Sent[0].Context.Http!.AuthProbeHeaders);
+        Assert.IsNull(next.Sent[1].Context.Http!.AuthProbeHeaders);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TusAppend_GivesItsEmptyAuthenticationProbeTheAppendsOwnFields()
+    {
+        var next = new ScriptedNext(TusOptions, TusCreated, TusPatched);
+
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), next.SendAsync);
+
+        CollectionAssert.AreEqual(next.Sent[2].Headers.ToArray(), next.Sent[2].Context.Http!.AuthProbeHeaders!.ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_OptionsWithoutTusCreation_UsesTheIetfDraftWithCurlsMethod()
     {
         var next = new ScriptedNext(Response(204, "", "Tus-Version: 1.0.0", "Tus-Extension: termination"), IetfCreated, IetfAppended);
