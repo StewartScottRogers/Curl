@@ -1,6 +1,6 @@
 using Curl.Api.Codes;
-using Curl.Api.Info;
 using Curl.Api.EngineContracts.Url;
+using Curl.Api.Info;
 using Curl.Api.Options;
 using Libcurl.Global;
 

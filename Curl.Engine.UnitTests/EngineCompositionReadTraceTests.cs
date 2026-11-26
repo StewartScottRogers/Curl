@@ -1,7 +1,7 @@
-using Curl.Console;
 using Curl.Cli;
-using Curl.Protocol.Abstractions;
+using Curl.Console;
 using Curl.Original.Protocol.Http;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Engine;

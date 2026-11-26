@@ -120,7 +120,8 @@ internal sealed partial class DifferentialProcessRunner(string rootDirectory, st
             await WriteStandardInputAsync(process, standardInput, timeout);
             await process.WaitForExitAsync(timeout);
             return process.ExitCode;
-        }        catch (OperationCanceledException)
+        }
+        catch (OperationCanceledException)
         {
             process.Kill(entireProcessTree: true);
             await process.WaitForExitAsync();

@@ -3,10 +3,10 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 using Curl.Api.Options.Http;
+using Curl.Api.Options.Network;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
-using Curl.Api.Options.Network;
 
 namespace Curl.Engine;
 

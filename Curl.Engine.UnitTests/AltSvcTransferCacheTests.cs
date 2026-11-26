@@ -1,6 +1,6 @@
 using Curl.Api.Options.Http;
-using Curl.Core.FileSystem;
 using Curl.Core.AltSvc;
+using Curl.Core.FileSystem;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;

@@ -9,8 +9,8 @@ using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Authentication;
 using Curl.Core;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ws;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 

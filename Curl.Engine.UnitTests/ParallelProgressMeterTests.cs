@@ -1,5 +1,5 @@
-using Curl.Console;
 using System.Text;
+using Curl.Console;
 using Curl.Testing;
 
 namespace Curl.Engine;

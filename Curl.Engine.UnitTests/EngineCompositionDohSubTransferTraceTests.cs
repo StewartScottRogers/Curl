@@ -1,7 +1,7 @@
-using Curl.Console;
 using System.Net.Sockets;
 using System.Text;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;

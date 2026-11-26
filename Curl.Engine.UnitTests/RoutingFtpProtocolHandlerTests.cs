@@ -1,10 +1,10 @@
 using System.Text;
+using Curl.Engine;
 using Curl.Networking;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ftp;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
-using Curl.Engine;
 
 namespace Curl.Engine;
 

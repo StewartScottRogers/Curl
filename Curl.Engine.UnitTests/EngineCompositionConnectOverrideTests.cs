@@ -1,7 +1,6 @@
-using Curl.Console;
 using System.Net;
-
 using Curl.Cli;
+using Curl.Console;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
