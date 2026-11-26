@@ -179,6 +179,10 @@ public sealed class Lib1551To1559Tests
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual("lib1553", new Lib1553(TimeProvider.System).ProgramName);
         Assert.AreEqual(Lib1553.WaitTurns, waits);
+        Assert.AreEqual("name", mime.Parts.Single().Name);
+        CollectionAssert.AreEqual("value"u8.ToArray(), mime.Parts.Single().Data);
+        Assert.AreEqual("name", seen.Http.MimePost?.Parts.Single().Name);
+        Assert.IsTrue(seen.Behaviour.Verbose);
         Assert.IsNotNull(seen.Callbacks.TransferInfo);
         Assert.IsNotNull(seen.Callbacks.Debug);
         Assert.AreEqual(1, seen.Callbacks.TransferInfo!(0, 0, 0, 0));

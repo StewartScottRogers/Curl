@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests/Lib1551To1559Tests.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5987 — Fix AF-0993: Lib1553_PostsTheMimeWithTracingAndWaitsOnce never checks that the MIME post is set
 
@@ -41,12 +41,22 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only change, made directly: the `feature` stages (plan, implement, review) have nothing
+  to plan or implement, and no production code changed, so no quality run.
+- `Lib1553_PostsTheMimeWithTracingAndWaitsOnce` now asserts the built part is `name`/`value`,
+  the transfer's `Http.MimePost` holds the `name` part (so dropping `CurlOption.Mimepost` fails
+  it) and `Behaviour.Verbose` is set. `FakeMimeBuilder.Build` carries only names, so the value is
+  checked on the builder. The trace text itself stays with
+  `Lib1553_TracesSentDataAsTextWithTheTimeAndNoHex`.
+- Reproduction count is now 3. `dotnet build`: 0 warnings, 0 errors. Fast tests: exit code 0.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-25: Doing -> Done. Lib1553 test now asserts the MIME part, that the MIME post is set and that verbose is on
