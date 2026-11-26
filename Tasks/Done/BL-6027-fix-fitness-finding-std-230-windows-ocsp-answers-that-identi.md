@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Tls.UnitLibrary/OcspStapleVerifier.cs]
+touches: [Curl.Tls.UnitLibrary/OcspStapleVerifier.cs, Curl.Tls.UnitLibrary/CLAUDE.md, Curl.Tls.UnitTests/OcspStapleVerifierTests.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.AnchorOcsp.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6027 — Fix fitness finding STD-230: Windows: OCSP answers that identify the certificate with a SHA-256 CertID are used, where Windows reports the status unknown
 
@@ -38,13 +38,19 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits 60 "the revocation status is unknown".
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro exits 60 "the revocation status is unknown".
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix (ADR-1424): `OcspStapleVerifier.NamesCertificate` takes only a SHA-1 `CertID`. It applies below the anchor, to the Schannel build's staple and to `--cert-status`; the OpenSSL side is read from `OCSP_resp_find_status`'s comparison, not measured.
+- Acceptance check: pinned by `VerifyPeer_OcspAnswerUnderASha256CertId_IsUnknownUnlessBestEffort` (exit 60 "revocation status is unknown"; best effort accepts), through the real verification with the fetch seam, not by rebuilding the reviewer's servers.
+- `touches` widened to the two test files and `Curl.Tls.UnitLibrary/CLAUDE.md`; no other task in Doing named them.
+- Verified: build clean, fast tests green, format clean on the changed files, Curl.Tls.UnitLibrary quality 0 failing members.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 2bf8e3cb 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. Only a SHA-1 CertID names a certificate in an OCSP response (ADR-1424).
