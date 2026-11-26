@@ -2314,26 +2314,11 @@ internal sealed class CurlCommandRunner(
             return TransferResult.Failure(CurlExitCode.UnknownOption, $"Unknown telnet option {option}");
         }
 
+        // A known option's value is not judged here: curl 8.22.0 connects with a NEW_ENV without a comma or an
+        // over-long TTYPE or XDISPLOC, and fails only if the server's subnegotiation asks for it (STD-183, BL-6017).
         return string.Equals(name, known, StringComparison.OrdinalIgnoreCase)
-            ? BadTelnetOptionValueFailure(known, option[(separator + 1)..])
+            ? null
             : TransferResult.Failure(CurlExitCode.UnknownOption, "An unknown option was passed in to libcurl");
-    }
-
-    /// <summary>
-    /// Finds the exit 43 curl's <c>check_telnet_options</c> gives a known option whose value cannot be held: a
-    /// <c>NEW_ENV</c> without a comma, a <c>TTYPE</c> of 32 or more characters or an <c>XDISPLOC</c> of 128 or more
-    /// (STD-074, BL-5811).
-    /// </summary>
-    private static TransferResult? BadTelnetOptionValueFailure(string known, string value)
-    {
-        bool bad = known switch
-        {
-            "NEW_ENV" => !value.Contains(',', StringComparison.Ordinal),
-            "TTYPE" => value.Length >= 32,
-            "XDISPLOC" => value.Length >= 128,
-            _ => false,
-        };
-        return bad ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, "A libcurl function was given a bad argument") : null;
     }
 
     private static bool ReadsStandardInput(EasyMimeBody mimePost) =>
@@ -2423,6 +2408,28 @@ internal sealed class CurlCommandRunner(
             run.Queue.BatchAddedTimestamp = timeProvider.GetTimestamp();
         }
 
+        return await StartInFreeSlotAsync(run, dispatch, options, transfer, state).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Starts one transfer of a <c>-Z</c> run in the slot it waited for, unless the run has ended or failed
+    /// early. curl 8.22.0 runs a whole <c>telnet</c> session inside one call of its <c>-Z</c> loop, so for a
+    /// <c>telnet</c> transfer this completes, and later transfers start, only once the session has ended
+    /// (STD-183, BL-6017, ADR-1418).
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <returns>As <see cref="StartInParallelAsync" />.</returns>
+    private async Task<bool> StartInFreeSlotAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        RunningTransferState state)
+    {
         if (run.HasEnded)
         {
             return true;
@@ -2437,7 +2444,14 @@ internal sealed class CurlCommandRunner(
         state.ParallelProgress = run.ProgressMeter?.AddTransfer();
 
         LogParallelScheduler("started", transfer);
-        run.Queue.Add(TransferInParallelAsync(run, dispatch, options, transfer, state));
+        Task running = TransferInParallelAsync(run, dispatch, options, transfer, state);
+        run.Queue.Add(running);
+
+        if (UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol).StartsWith("telnet:", StringComparison.OrdinalIgnoreCase))
+        {
+            await running.ConfigureAwait(false);
+        }
+
         return false;
     }
 

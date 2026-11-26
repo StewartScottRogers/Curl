@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console/CurlCommandRunner.cs]
+touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/CLAUDE.md, Curl.Console.UnitTests/CurlCommandRunnerFatalErrorTests.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelTelnetTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6017 — Fix fitness finding STD-183: under -Z, a TELNET -t TTYPE=<32+ chars> or -t NEW_ENV=<no comma> fails at setup and aborts the other transfers (PARTLY FIXED)
 
@@ -37,13 +37,28 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro prints `[0]`, `hello`, `[0]` and exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro prints `[0]`, `hello`, `[0]` and exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced on the branch. Measured curl 8.22.0 Schannel (ADR-1418): it judges no `-t` value at setup; 43 comes
+  only after a server `SB ... SEND`. Removed BL-5811's setup check (`BadTelnetOptionValueFailure`).
+- Under `-Z` curl's telnet session holds back later transfers, so the runner now awaits a telnet transfer before
+  starting the next one; without that the repro printed `hello` first.
+- Repro run against the built `curl.exe` with a PowerShell mock that closes its sending side after 500 ms:
+  `[0]`, `hello`, `[0]`, exit 0 for a long `TTYPE` and `NEW_ENV=nocomma`, with and without `--parallel-max 1`,
+  the same as curl. A mock that closes outright, with curl's bytes unread (a reset), gave Curl 56 where curl
+  gave 0; that is the telnet handler's, in BL-6012's files.
+- `touches` widened to the two test files and `Curl.Console/CLAUDE.md`; no task in Doing names them.
+- Fast tests passed solution-wide; after splitting `StartInFreeSlotAsync` out for the complexity gate, the build
+  and `Curl.Console.UnitTests` passed again (3302 passed, 38 skipped) and `Curl.Console` measured 100/100 with
+  no failing member. Tests are platform-neutral (fake handlers only).
+- Remaining difference when the server does ask for the value: BL-6035.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 289f15f7 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. Under -Z, telnet -t values are no longer rejected at setup and a telnet session holds later transfers, so the repro prints [0], hello, [0] and exits 0
