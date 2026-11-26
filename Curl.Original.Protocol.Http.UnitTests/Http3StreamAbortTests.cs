@@ -11,7 +11,9 @@ namespace Curl.Original.Protocol.Http;
 /// What <c>-m</c> does to an HTTP/3 transfer's stream and connection, as curl 8.18.0's ngtcp2
 /// build was measured to do (BL-5978): STOP_SENDING with <c>H3_REQUEST_CANCELLED</c>, a QPACK
 /// Stream Cancellation, <c>left intact</c>, and the next URL on a new stream of the connection,
-/// which writes the cancelled stream's <c>quic close</c> trace line (BL-5982).
+/// which writes the cancelled stream's <c>quic close</c> trace line (BL-5982). A transfer
+/// <c>-f</c> fails does the same, unless the response's end has arrived: then nothing is sent
+/// for the stream (measured, BL-5983).
 /// </summary>
 [TestClass]
 public sealed class Http3StreamAbortTests
@@ -139,6 +141,95 @@ public sealed class Http3StreamAbortTests
     }
 
     [TestMethod]
+    [DataRow(false, DisplayName = "head only, stream left open")]
+    [DataRow(true, DisplayName = "head and DATA, stream left open")]
+    public async Task ExecuteAsync_FailRejectsAStreamLeftOpen_CancelsItAndReportsTheConnectionLeftIntact(bool hasBody)
+    {
+        FakeMultiplexedStream failed = new(0, ServerError(0, hasBody)) { StaysOpen = true };
+        FakeMultiplexedStream second = new(4, Response(4));
+        FakeMultiplexedConnection quic = new(failed, second);
+        PoolingConnector connector = new(quic);
+        HttpProtocolHandler handler = new(connector, new SilentAuthenticator()) { TracesHttp3Streams = true };
+        RecordingTransferEvents events = new();
+        RecordingTransferEvents nextEvents = new();
+        MemoryStream output = new();
+        MemoryStream nextOutput = new();
+        Diagnostics.Arrange("server", $"HEADERS :status 500 on stream 0, DATA {hasBody}, never its end; answers stream 4 whole");
+
+        TransferResult result = await handler.ExecuteAsync(Context(events: events, output: output, fail: HttpFailMode.Fail));
+        TransferResult next = await handler.ExecuteAsync(Context(events: nextEvents, output: nextOutput));
+
+        string info = string.Join('|', events.Info);
+        string nextLines = string.Join('|', nextEvents.Events);
+        byte[] decoderStream = quic.UnidirectionalStreams[2].Written.ToArray();
+        Diagnostics.Act("exit codes, abort code, -v info lines", $"{result.ExitCode} then {next.ExitCode}, {failed.AbortCode}, {info}");
+        Diagnostics.Bytes("decoder stream", decoderStream);
+        Diagnostics.Assert("last info line", LeftIntact, events.Info[^1]);
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(RequestCancelled, failed.AbortCode);
+        CollectionAssert.AreEqual(DecoderStreamCancellingStreamZero, decoderStream);
+        Assert.AreEqual(LeftIntact, events.Info[^1], info);
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("closing", StringComparison.Ordinal)), info);
+        Assert.IsEmpty(output.ToArray());
+        Assert.Contains(CancelledStreamZeroClosed, nextEvents.Events, nextLines);
+        Assert.AreEqual(CurlExitCode.Ok, next.ExitCode);
+        CollectionAssert.AreEqual("hello\n"u8.ToArray(), nextOutput.ToArray());
+        Assert.IsNull(quic.CloseCode);
+        Assert.AreEqual(2, connector.Pooled!.ReturnedReusableCount);
+    }
+
+    [TestMethod]
+    [DataRow(false, DisplayName = "the head ends the stream")]
+    [DataRow(true, DisplayName = "DATA ends the stream")]
+    public async Task ExecuteAsync_FailRejectsAStreamWhoseEndHasArrived_ClosesItAndSendsNothing(bool hasBody)
+    {
+        FakeMultiplexedStream failed = new(0, ServerError(0, hasBody));
+        FakeMultiplexedConnection quic = new(failed);
+        PoolingConnector connector = new(quic);
+        HttpProtocolHandler handler = new(connector, new SilentAuthenticator()) { TracesHttp3Streams = true };
+        RecordingTransferEvents events = new();
+        MemoryStream output = new();
+        Diagnostics.Arrange("server", $"HEADERS :status 500 on stream 0, DATA {hasBody}, then its end");
+
+        TransferResult result = await handler.ExecuteAsync(Context(events: events, output: output, fail: HttpFailMode.Fail));
+
+        string lines = string.Join('|', events.Events);
+        byte[] decoderStream = quic.UnidirectionalStreams[2].Written.ToArray();
+        int closed = events.Events.IndexOf("* [HTTP/3] [0] quic close(app_error=256) -> 0");
+        Diagnostics.Act("exit code, abort code, events", $"{result.ExitCode}, {failed.AbortCode}, {lines}");
+        Diagnostics.Bytes("decoder stream", decoderStream);
+        Diagnostics.Assert("abort code", null, failed.AbortCode);
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.IsNull(failed.AbortCode);
+        CollectionAssert.AreEqual(DecoderStreamType, decoderStream);
+        Assert.IsEmpty(output.ToArray());
+        Assert.IsGreaterThanOrEqualTo(0, closed, lines);
+        Assert.IsGreaterThan(closed, events.Events.IndexOf("* [HTTP/3] [0] easy handle is done"), lines);
+        Assert.AreEqual(LeftIntact, events.Info[^1], lines);
+        Assert.AreEqual(1, connector.Pooled!.ReturnedReusableCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FailRejectsAStreamThatFailsAfterItsHead_StillCancelsItAndExits22()
+    {
+        FakeMultiplexedStream failed = new(0, ServerError(0, hasBody: false))
+        {
+            EndException = new MultiplexedStreamResetException((long)Http3ErrorCode.InternalError, "reset"),
+        };
+        FakeMultiplexedConnection quic = new(failed);
+        PoolingConnector connector = new(quic);
+        Diagnostics.Arrange("server", "HEADERS :status 500 on stream 0, then RESET_STREAM H3_INTERNAL_ERROR");
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context(fail: HttpFailMode.Fail));
+
+        Diagnostics.Act("exit code, abort code", $"{result.ExitCode}, {failed.AbortCode}");
+        Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(RequestCancelled, failed.AbortCode);
+        Assert.AreEqual(1, connector.Pooled!.ReturnedReusableCount);
+    }
+
+    [TestMethod]
     public async Task CancelUnlessEndedBothWaysAsync_TheStreamNeverOpened_SendsNothingAndReportsNothing()
     {
         FakeMultiplexedConnection quic = new();
@@ -219,12 +310,18 @@ public sealed class Http3StreamAbortTests
         .. new Http3DataFrame("hello\n"u8.ToArray()).ToBytes(),
     ];
 
+    private static byte[] ServerError(long streamId, bool hasBody) =>
+    [
+        .. new Http3HeadersFrame(new QpackEncoder(0, 0).EncodeFieldSection(streamId, [new HeaderField(":status", "500")])).ToBytes(),
+        .. hasBody ? new Http3DataFrame("hello\n"u8.ToArray()).ToBytes() : [],
+    ];
+
     private static Http3StreamConnection Stream(Http3Session session, long bodyLength) =>
         (Http3StreamConnection)session.CreateStream("https", bodyLength, ignoresBody: false);
 
     private static HttpProtocolHandler Handler(IConnector connector) => new(connector, new SilentAuthenticator());
 
-    private static TransferContext Context(TimeProvider? time = null, TimeSpan? maxTime = null, RecordingTransferEvents? events = null, Stream? output = null) => new()
+    private static TransferContext Context(TimeProvider? time = null, TimeSpan? maxTime = null, RecordingTransferEvents? events = null, Stream? output = null, HttpFailMode fail = HttpFailMode.None) => new()
     {
         Url = CurlUrl.Parse("https://example.com/"),
         Output = output ?? new MemoryStream(),
@@ -232,7 +329,7 @@ public sealed class Http3StreamAbortTests
         ConnectTimeout = TimeSpan.FromSeconds(1),
         MaxTime = maxTime,
         Events = events ?? new RecordingTransferEvents(),
-        Http = new HttpRequestOptions { Version = HttpVersionPreference.Http3Only },
+        Http = new HttpRequestOptions { Version = HttpVersionPreference.Http3Only, Fail = fail },
     };
 
     /// <summary>Opens one HTTP/3 session and gives every connect the same pooled connection holding it, as a pool does.</summary>

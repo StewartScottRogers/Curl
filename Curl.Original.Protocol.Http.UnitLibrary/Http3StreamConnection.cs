@@ -187,9 +187,42 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     internal void EchoResponseLineAfter(byte[] line) => trace.ResponseLineReported(request!.StreamId, line);
 
     /// <summary>
+    /// Reads what has already arrived of a response <c>-f</c> failed, without waiting for more,
+    /// and drops its body: curl takes those frames in with the head, so a stream whose end came
+    /// with them is closed and not cancelled (measured, BL-5983, ADR-1413). A read that fails
+    /// stops the reading, and the stream is left to be cancelled.
+    /// </summary>
+    /// <returns>A task that completes at the response's end or when nothing more has arrived.</returns>
+    internal async ValueTask ReadArrivedResponseAsync()
+    {
+        using CancellationTokenSource noWait = new();
+        try
+        {
+            while (!isResponseEnded)
+            {
+                ValueTask read = ReceiveFrameAsync(noWait.Token);
+                if (!read.IsCompleted)
+                {
+                    await noWait.CancelAsync().ConfigureAwait(false);
+                }
+
+                await read.ConfigureAwait(false);
+                received.Clear();
+            }
+        }
+        catch (Exception stopped) when (stopped is OperationCanceledException or HttpTransferException)
+        {
+            // Nothing more has arrived, or the stream or connection failed: -f's failure stands.
+        }
+
+        trace.Flush();
+    }
+
+    /// <summary>
     /// Gives up the stream of a transfer that timed out, as curl's HTTP/3 layer does
-    /// (<see cref="Http3ClientRequestStream.CancelAsync" />, measured, BL-5978), or of one whose
-    /// upload a status stopped, once its response is read (ADR-1411), unless it was never opened
+    /// (<see cref="Http3ClientRequestStream.CancelAsync" />, measured, BL-5978), of one <c>-f</c>
+    /// failed (BL-5983), or of one whose upload a status stopped, once its response is read
+    /// (ADR-1411), unless it was never opened
     /// or has ended both ways. A connection too broken to send that takes no new stream. A stream
     /// cancelled before its response ended is kept for the next read on the connection to write
     /// curl's <c>quic close</c> trace line for it (BL-5982, ADR-1412).
