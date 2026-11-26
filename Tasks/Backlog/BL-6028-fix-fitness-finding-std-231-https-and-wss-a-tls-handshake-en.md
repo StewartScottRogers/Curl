@@ -1,0 +1,49 @@
+---
+id: BL-6028
+title: Fix fitness finding STD-231: https and wss: a TLS handshake ended by -m reports %{num_connects} 0 (and wss %{time_total} 0); curl reports 1 and the elapsed time
+priority: Low
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs]
+requirement: none
+created: 2026-11-26
+completed:
+---
+# BL-6028 — Fix fitness finding STD-231: https and wss: a TLS handshake ended by -m reports %{num_connects} 0 (and wss %{time_total} 0); curl reports 1 and the elapsed time
+
+## Goal
+
+STD-231 from the outside fitness review of 2026-11-26 07:04 no longer reproduces: https and wss: a TLS handshake ended by -m reports %{num_connects} 0 (and wss %{time_total} 0); curl reports 1 and the elapsed time. Curl behaves as the finding's acceptance check states.
+
+## Context
+
+From the outside fitness review `Curl-Fitness-Review-2026-11-26T0704` (commit `23b62c2`, the `preview` release binaries).
+
+In the finding, .NET is this Curl, REF is curl 8.22.0 Schannel on Windows (Git for Windows `curl.exe`), REF2 is curl 8.18.0 OpenSSL on WSL Ubuntu. Measure real curl with `Record-CurlExchange.ps1` before pinning output text.
+
+The reviewer used Python mocks and real servers in Docker (pinned images listed in the review workspace's TestServers.md); rebuild any mock you need in PowerShell or C# (never Python). Mock servers bind 127.0.0.1 and port numbers are examples. Check that it still reproduces on the current branch first.
+
+The finding, verbatim:
+
+- **Severity:** Low · **Confidence:** Confirmed (2 runs each, by the orchestrator) · **Area:** HTTPS/WSS write-out, Windows build.
+- **Server:** a TCP listener on `127.0.0.1:29990` that accepts and never answers (a few lines of Python: `socket.bind/listen`, then `accept()` in a loop without reading or writing).
+- **Repro:**
+  - `curl -s -m 2 -o /dev/null -w "[%{exitcode} t=%{time_total} nc=%{num_connects}]\n" https://127.0.0.1:29990/`
+  - the same with `wss://127.0.0.1:29990/`
+- **Expected (REF 8.22.0):** `[28 t=2.0x nc=1]` for both.
+- **Actual (.NET):** https `[28 t=2.01 nc=0]`; wss `[28 t=0.000000 nc=0]`.
+- **Likely location:** the connect/TLS timeout path does not record the established TCP connection (and, for wss, the timings) before reporting; compare `Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs` (`StampTimingsAndUploadSize`).
+- **Acceptance check:** both commands print `nc=1` and `t` of at least 2.
+
+## Acceptance criteria
+
+- [ ] both commands print `nc=1` and `t` of at least 2.
+- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [ ] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+## Log
+
+- 2026-11-26: Created from fitness review 2026-11-26T0704.
