@@ -1,7 +1,7 @@
-using Curl.Engine;
 using System.Net;
 using System.Text;
 using Curl.Core;
+using Curl.Engine;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 

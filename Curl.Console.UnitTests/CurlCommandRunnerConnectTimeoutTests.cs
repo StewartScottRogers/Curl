@@ -1,8 +1,8 @@
-using Curl.Engine;
 using System.Net;
 using System.Text;
 using Curl.Cli;
 using Curl.Core;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;

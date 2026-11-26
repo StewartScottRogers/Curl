@@ -1,7 +1,7 @@
-using Curl.Engine;
 using System.Text;
 using System.Text.RegularExpressions;
 using Curl.Cli;
+using Curl.Engine;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 

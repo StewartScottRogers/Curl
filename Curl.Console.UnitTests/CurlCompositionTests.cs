@@ -1,11 +1,9 @@
 using System.Reflection;
 using System.Text;
-
 using Curl.Cli;
 using Curl.Core;
+using Curl.Engine;
 using Curl.Networking;
-using Curl.Output;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Dict;
 using Curl.Original.Protocol.File;
 using Curl.Original.Protocol.Ftp;
@@ -21,8 +19,9 @@ using Curl.Original.Protocol.Ssh;
 using Curl.Original.Protocol.Telnet;
 using Curl.Original.Protocol.Tftp;
 using Curl.Original.Protocol.Ws;
+using Curl.Output;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
-using Curl.Engine;
 
 namespace Curl.Console;
 

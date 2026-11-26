@@ -3,9 +3,9 @@ using System.Text;
 using Curl.Cookies;
 using Curl.Core;
 using Curl.Engine;
+using Curl.Original.Protocol.File;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
-using Curl.Original.Protocol.File;
 
 namespace Curl.Console;
 

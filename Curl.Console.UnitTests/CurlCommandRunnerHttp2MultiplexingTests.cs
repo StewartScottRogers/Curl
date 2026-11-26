@@ -1,9 +1,9 @@
-using Curl.Engine;
 using Curl.Authentication;
 using Curl.Core;
+using Curl.Engine;
 using Curl.Networking;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Console;

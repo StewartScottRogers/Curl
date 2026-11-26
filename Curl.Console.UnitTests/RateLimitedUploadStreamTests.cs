@@ -1,6 +1,6 @@
 using System.Text;
-using Curl.Engine;
 using Curl.Core;
+using Curl.Engine;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 

@@ -1,5 +1,5 @@
-using Curl.Api.EngineContracts.Multi;
 using Curl.Api.Codes;
+using Curl.Api.EngineContracts.Multi;
 using Libcurl.Easy;
 using Libcurl.Multi;
 

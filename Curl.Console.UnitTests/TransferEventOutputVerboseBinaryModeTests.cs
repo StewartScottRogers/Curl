@@ -1,7 +1,7 @@
+using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Testing;
-using System.Text;
 
 namespace Curl.Console;
 

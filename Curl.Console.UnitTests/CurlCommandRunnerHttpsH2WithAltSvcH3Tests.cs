@@ -1,6 +1,6 @@
-using Curl.Engine;
 using Curl.Authentication;
 using Curl.Core;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Original.Protocol.Http;
 using Curl.Testing;
