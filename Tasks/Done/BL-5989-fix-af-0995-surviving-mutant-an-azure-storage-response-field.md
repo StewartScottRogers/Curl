@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpResponseHead.cs]
+touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpResponseHead.cs, Curl.Extended.Protocol.AzureStorage.UnitTests/Http/AzureStorageHttpResponseHeadTests.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5989 — Fix AF-0995: Surviving mutant: an Azure Storage response field line starting with whitespace can be accepted as a field (>= -> >)
 
@@ -32,12 +32,23 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpResponseHead.cs line 31`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpResponseHead.cs line 31`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killing test: `AzureStorageHttpResponseHeadTests.ParseField_WhitespaceBeforeTheName_FailsMalformedHeaderField`
+  (rows ` X: y` and `\tX: y`). With `>= 0` changed to `> 0`, both rows fail (262 tests, 2 failed); reverted,
+  the build has no warnings and the fast tests of all 115 test projects pass.
+- The finding's stated effect does not happen through a transfer: `AzureStorageHttpClientConnection.ReadHeadLineAsync`
+  refuses a line starting with a space or tab before `ParseField` is called. Rows added to
+  `SendAsync_MalformedField_FailsMalformedHeaderField` therefore passed with the mutant applied, so the new test
+  calls `ParseField` directly. No production code changed.
+- `touches` widened to the new test file; no other task in Doing named it.
+- Plan: test only, written directly (no pipeline subagents), so no quality run was needed.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: 97c33b77 9742157d.
+- 2026-11-25: Doing -> Done. A direct ParseField test now kills the AF-0995 mutant: a field line starting with whitespace and holding a colon is refused.
