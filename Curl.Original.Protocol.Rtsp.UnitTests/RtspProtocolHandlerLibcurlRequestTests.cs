@@ -1,6 +1,6 @@
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Rtsp.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 

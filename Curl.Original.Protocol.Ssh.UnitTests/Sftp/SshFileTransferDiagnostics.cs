@@ -1,6 +1,6 @@
 using System.Globalization;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ssh.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Ssh.Sftp;

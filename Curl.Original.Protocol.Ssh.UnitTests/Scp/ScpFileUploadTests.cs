@@ -1,7 +1,7 @@
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ssh.Fakes;
 using Curl.Original.Protocol.Ssh.Sftp;
+using Curl.Protocol.Abstractions;
 using Curl.Ssh;
 using Curl.Ssh.Fakes;
 using Curl.Testing;

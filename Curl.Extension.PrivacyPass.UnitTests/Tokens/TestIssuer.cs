@@ -4,8 +4,8 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Extension.PrivacyPass.Http;
-using Curl.Protocol.Abstractions;
 using Curl.Extension.PrivacyPass.Wire;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.PrivacyPass.Tokens;
 

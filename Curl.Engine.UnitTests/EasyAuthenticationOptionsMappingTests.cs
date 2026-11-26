@@ -1,6 +1,4 @@
-using Curl.Console;
 using System.Net;
-
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
@@ -8,6 +6,7 @@ using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Api.Options.Proxy;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;

@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
-using Curl.Extension.Abstractions.Description;
 using Curl.Extended.Protocol.Coap.Observe;
+using Curl.Extension.Abstractions.Description;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Coap.Client;

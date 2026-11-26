@@ -22,6 +22,19 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    [DataRow(CurlUrlPart.User)]
+    [DataRow(CurlUrlPart.Fragment)]
+    public void Set_PartOfExactlyMaximumInputLength_IsAccepted(CurlUrlPart part)
+    {
+        using ManagedCurlUrlHandle url = Parsed(ImapUrl);
+        string longest = new('a', 8_000_000);
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(part, longest, CurlUrlFlags.None));
+
+        Assert.AreEqual(longest, GetOk(url, part));
+    }
+
+    [TestMethod]
     public void Set_NullUrl_ClearsEveryPart()
     {
         using ManagedCurlUrlHandle url = Parsed(FullUrl);

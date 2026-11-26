@@ -1,6 +1,6 @@
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Imap.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using Transport = Curl.Protocol.Abstractions.TransportSecurityLevel;
 

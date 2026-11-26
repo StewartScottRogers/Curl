@@ -1,5 +1,5 @@
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ftp.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Ftp;

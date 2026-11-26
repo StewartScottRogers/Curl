@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Telnet.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Telnet;

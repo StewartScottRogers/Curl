@@ -1,9 +1,8 @@
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
-
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;

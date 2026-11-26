@@ -1,7 +1,6 @@
-using Curl.Console;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Networking;
-
 using Curl.Testing;
 
 namespace Curl.Engine;

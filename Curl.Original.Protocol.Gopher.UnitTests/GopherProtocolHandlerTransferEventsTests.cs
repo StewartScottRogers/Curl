@@ -1,6 +1,6 @@
 using System.Net.Sockets;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Gopher.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Gopher;

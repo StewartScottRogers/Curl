@@ -1,6 +1,6 @@
 using System.Net;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Tftp.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Tftp;
@@ -81,7 +81,7 @@ public sealed class TftpTransferTimingsTests
         Assert.IsNull(timings.Connect.Connected);
         Assert.AreEqual(timings.Completed, timings.RequestReady);
         Assert.AreEqual(timings.Completed, timings.RequestSent);
-Assert.IsTrue(timings.RequestReady > timings.Started);
+        Assert.IsTrue(timings.RequestReady > timings.Started);
     }
 
     private static async Task<TransferResult> RunAsync(IDatagramChannel channel, TimeProvider clock, MemoryStream stream, bool upload) =>

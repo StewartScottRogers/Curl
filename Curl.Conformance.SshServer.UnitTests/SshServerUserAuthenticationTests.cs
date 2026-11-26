@@ -1,7 +1,7 @@
 using System.Text;
 using Curl.Original.Protocol.Ssh;
-using Curl.Ssh.Authentication;
 using Curl.Ssh;
+using Curl.Ssh.Authentication;
 using Curl.Ssh.Transport;
 
 namespace Curl.Conformance.SshServer;

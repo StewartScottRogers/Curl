@@ -1,8 +1,8 @@
-using Curl.Engine;
 using System.Globalization;
 using System.Text;
 using Curl.Core;
 using Curl.Core.FileSystem;
+using Curl.Engine;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 

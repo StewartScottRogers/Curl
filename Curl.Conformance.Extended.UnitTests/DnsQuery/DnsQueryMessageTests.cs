@@ -1,5 +1,5 @@
-using System.Net;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using Curl.Conformance.Extended.DnsQuery.Reference;
 using Curl.Conformance.Extended.Harness;

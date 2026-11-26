@@ -1,5 +1,5 @@
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Http.Fakes;
+using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Original.Protocol.Http;
@@ -41,4 +41,5 @@ public sealed partial class HttpProtocolHandlerTests
         await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
         CollectionAssert.AreEqual(expected.Split(", "), progress.Downloads.ToArray());
-    }}
+    }
+}

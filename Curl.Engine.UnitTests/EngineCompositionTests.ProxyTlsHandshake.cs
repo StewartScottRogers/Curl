@@ -1,9 +1,9 @@
-using Curl.Console;
-using Curl.Engine;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Curl.Cli;
+using Curl.Console;
+using Curl.Engine;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 

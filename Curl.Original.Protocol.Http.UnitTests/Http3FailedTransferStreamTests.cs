@@ -81,14 +81,46 @@ public sealed class Http3FailedTransferStreamTests
         Assert.IsNull(quic.CloseCode);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_TheTokenIsCancelledWhileAFailedStreamIsCancelled_KeepsExit22AndMarksTheTransferDone()
+    {
+        using CancellationTokenSource givingUp = new();
+        FakeMultiplexedStream failed = new(0, Response(0, "404")) { StaysOpen = true, Aborting = givingUp.Cancel };
+        FakeMultiplexedStream answered = new(4, Response(4, "200"));
+        FakeMultiplexedConnection quic = new(failed, answered) { BidirectionalStreamLimit = 100 };
+        PoolingConnector connector = new(quic);
+        HttpProtocolHandler handler = new(connector, new SilentAuthenticator()) { TracesHttp3Streams = true };
+        RecordingTransferEvents events = new();
+        RecordingTransferEvents nextEvents = new();
+        Diagnostics.Arrange("server", "HEADERS :status 404 on stream 0, left open; the token is cancelled as the client aborts it");
+
+        TransferResult result = await handler.ExecuteAsync(Context(events, CurlExitCode.HttpReturnedError, givingUp.Token));
+        TransferResult next = await handler.ExecuteAsync(Context(nextEvents, CurlExitCode.Ok));
+
+        string lines = string.Join('|', events.Events);
+        string nextLines = string.Join('|', nextEvents.Events);
+        Diagnostics.Act("exit codes, token cancelled", $"{result.ExitCode} then {next.ExitCode}, {givingUp.IsCancellationRequested}");
+        Diagnostics.Act("failed transfer's events", lines);
+        Diagnostics.Act("next transfer's events", nextLines);
+        Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.IsTrue(givingUp.IsCancellationRequested);
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(RequestCancelled, failed.AbortCode);
+        Assert.Contains("* [HTTP/3] [0] easy handle is done", events.Events, lines);
+        Assert.Contains("* [HTTP/3] query conn[0]: MAX_CONCURRENT -> 99 (0 in use)", events.Events, lines);
+        Assert.Contains($"* [HTTP/3] [0] quic close(app_error={RequestCancelled}) -> 0", nextEvents.Events, nextLines);
+        Assert.AreEqual(CurlExitCode.Ok, next.ExitCode);
+    }
+
     private static byte[] Response(long streamId, string status) =>
     [
         .. new Http3HeadersFrame(new QpackEncoder(0, 0).EncodeFieldSection(streamId, [new HeaderField(":status", status)])).ToBytes(),
         .. new Http3DataFrame("hello\n"u8.ToArray()).ToBytes(),
     ];
 
-    private static TransferContext Context(RecordingTransferEvents events, CurlExitCode failure) => new()
+    private static TransferContext Context(RecordingTransferEvents events, CurlExitCode failure, CancellationToken cancellationToken = default) => new()
     {
+        CancellationToken = cancellationToken,
         Url = CurlUrl.Parse("https://example.com/"),
         Output = failure == CurlExitCode.WriteError ? new FailingWriteStream(1, new IOException("disk full")) : new MemoryStream(),
         TimeProvider = TimeProvider.System,

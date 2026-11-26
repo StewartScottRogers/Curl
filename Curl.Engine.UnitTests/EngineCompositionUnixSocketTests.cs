@@ -1,6 +1,6 @@
 using Curl.Api.Options.Network;
-using Curl.Console;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;

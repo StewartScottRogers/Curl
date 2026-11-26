@@ -1,6 +1,6 @@
 using System.Net;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Smb.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Smb;

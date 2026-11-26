@@ -59,4 +59,5 @@ public sealed class BatchHelperArgumentTests
         var info = SystemHelperProcessStarter.BuildStartInfo("curl-proto-zzq", "zzq://h/x?a=b");
 
         CollectionAssert.AreEqual(new[] { "zzq://h/x?a=b" }, info.ArgumentList.ToArray());
-    }}
+    }
+}

@@ -1,8 +1,8 @@
-using Curl.Console;
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;

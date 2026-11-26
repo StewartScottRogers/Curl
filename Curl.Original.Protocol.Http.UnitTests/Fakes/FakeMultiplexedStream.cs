@@ -108,8 +108,15 @@ public sealed class FakeMultiplexedStream(long streamId, byte[] incoming, int ch
         return ValueTask.CompletedTask;
     }
 
+    /// <summary>Gets what runs when the client aborts the stream, or <see langword="null" /> for nothing.</summary>
+    public Action? Aborting { get; init; }
+
     /// <inheritdoc />
-    public void Abort(long applicationErrorCode) => AbortCode = applicationErrorCode;
+    public void Abort(long applicationErrorCode)
+    {
+        AbortCode = applicationErrorCode;
+        Aborting?.Invoke();
+    }
 
     private static async ValueTask<int> WaitUntilCancelledAsync(CancellationToken cancellationToken)
     {

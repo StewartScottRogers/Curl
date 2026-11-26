@@ -3,9 +3,9 @@ using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Core;
 using Curl.Core.Hsts;
-using Curl.Console;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;

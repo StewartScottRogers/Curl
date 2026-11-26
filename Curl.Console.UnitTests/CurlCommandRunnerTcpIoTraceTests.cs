@@ -1,9 +1,9 @@
-using Curl.Engine;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Curl.Cli;
 using Curl.Core;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;

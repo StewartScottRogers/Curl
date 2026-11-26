@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Smb;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
 

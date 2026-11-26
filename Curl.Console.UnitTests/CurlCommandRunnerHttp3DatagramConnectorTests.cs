@@ -1,6 +1,6 @@
-using Curl.Engine;
 using System.Net;
 using System.Net.Sockets;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 

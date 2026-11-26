@@ -1,8 +1,8 @@
-using Curl.Console;
 using System.Text;
 using Curl.Cli;
-using Curl.Protocol.Abstractions;
+using Curl.Console;
 using Curl.Original.Protocol.Ftp;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Engine;

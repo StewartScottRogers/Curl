@@ -676,6 +676,36 @@ function Invoke-CiCapacityRerun {
     Write-CiRunLine -RunId $Id -Line "failure on ${On}: reran its failed jobs for runner capacity ($($done + 1) of $Most)"
 }
 
+function Invoke-CiOnePlatformRerun {
+    # Reruns the failed jobs of the newest finished run, once, when every failure in it is a test
+    # that failed on one platform only and each is already filed or covered (-Settled), and no
+    # newer run is running or waiting on the branch. Such a failure is often a flake, and with
+    # only task-file pushes (skipped by CI) after it, nothing would start the run that proves it:
+    # on 2026-11-25 CI stayed red 37.8 minutes while BL-5994 waited, and the next run, at 19:17,
+    # passed before the fix landed (BL-5175). The rerun's result is read afresh when it finishes.
+    # -Rerun (a run id -> whether gh accepted it) stands in for gh in -TestCiWatch.
+    # Returns the rerun run's id, or ''.
+    param([object[]]$Runs, [object[]]$Listed, [hashtable]$Settled, [scriptblock]$Rerun)
+    $newest = @($Runs)[0]
+    if (-not $newest) { return '' }
+    $failures = @($newest.Failures | Where-Object { $_ })
+    if (-not $failures.Count) { return '' }
+    if (@($failures | Where-Object { $_.Kind -ne 'test' -or @($_.Platforms).Count -ne 1 }).Count) { return '' }
+    if (@($failures | Where-Object { -not $Settled.ContainsKey("$($_.Key)|$($newest.Id)") }).Count) { return '' }
+    $active = Get-CiActiveRuns $Listed
+    if ($active.Running -or $active.Waiting -or "$(@($Listed)[0].databaseId)" -ne "$($newest.Id)") { return '' }
+    if (-not $script:CiWatch.Reruns) { $script:CiWatch.Reruns = @{} }
+    $once = "one-platform $($newest.Id)"
+    if ($script:CiWatch.Reruns.ContainsKey($once)) { return '' }
+    $script:CiWatch.Reruns[$once] = 1
+    if (-not $Rerun) { $Rerun = { param([string]$Id) gh run rerun $Id --failed 2>$null | Out-Null; return ($LASTEXITCODE -eq 0) } }
+    $on = "$($newest.Sha)".Substring(0, [math]::Min(8, "$($newest.Sha)".Length))
+    if (-not (& $Rerun "$($newest.Id)")) { Write-CiRunLine -RunId "$($newest.Id)" -Line "failure on ${on}: gh run rerun --failed refused the one-platform rerun"; return '' }
+    $script:CiWatch.Failures.Remove("$($newest.Id)")
+    Write-Trace '-' 'ci' "reran the failed jobs of run $($newest.Id) on ${on}: every failure is on one platform only and filed" 'Yellow'
+    return "$($newest.Id)"
+}
+
 function ConvertTo-CiDateTime {
     # gh's timestamp as local time, whether ConvertFrom-Json made it a [datetime] (PowerShell 7)
     # or left it a string (Windows PowerShell).
@@ -982,6 +1012,8 @@ function Invoke-CiWatch {
     $all = @(Get-CiVerdicts -Runs $runs -ConfirmMinutes $confirm)
     $verdicts = @($all | Where-Object { -not $script:CiWatch.Settled.ContainsKey("$($_.Key)|$($_.RunId)") })
     if ($verdicts.Count) { New-CiFailureTasks -Branch $Branch -Runs $runs -Verdicts $verdicts }
+    # Once its failures are filed, a one-platform red gets its failed jobs rerun (BL-5175).
+    $null = Invoke-CiOnePlatformRerun -Runs $runs -Listed $listed -Settled $script:CiWatch.Settled
     Move-FixedCiTasksToDeferred -Branch $Branch -Runs $runs
     foreach ($run in $runs) {
         Write-CiRunLine -RunId $run.Id -Line (Get-CiRunOutcome -Run $run -Runs $runs -Verdicts $all -Settled $script:CiWatch.Settled -ConfirmMinutes $confirm)
@@ -1906,6 +1938,24 @@ if ($TestCiWatch) {
         & $check 'the watch looks every minute while CI is red, every heartbeat otherwise, and every 3 minutes with publishing off' '1 3 3 1' "$(Get-CiWatchEveryMinutes -HeartbeatMinutes 3 -Red $true) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 3 -Red $false) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 0 -Red $false) $(Get-CiWatchEveryMinutes -HeartbeatMinutes 0 -Red $true)"
         & $check 'gh cancelled only runs 78 and 86' '78,86' ($script:cancelledIds -join ',')
     } finally { Remove-Item -Recurse -Force -Path $fixTemp -ErrorAction SilentlyContinue }
+    # BL-5175: a red whose failures are each on one platform and filed gets its failed jobs rerun once.
+    $script:CiWatch.Reruns = @{}; $script:CiWatch.Failures['71'] = @('cached')
+    $script:rerunIds = @()
+    $rerunGh = { param([string]$Id) $script:rerunIds += $Id; return $true }
+    $oneRed = @([pscustomobject]@{ Id = '71'; Sha = 'abc1234567'; FinishedAt = $now; Failures = @(& $f A @('Windows')) })
+    $doneList = @([pscustomobject]@{ databaseId = 71; status = 'completed'; conclusion = 'failure'; headSha = 'abc1234567' })
+    $filedA = @{ 'A|71' = 'filed BL-1' }
+    & $check 'a one-platform test failure, filed, with nothing running: its failed jobs are rerun and its read forgotten' '71 False' "$(Invoke-CiOnePlatformRerun -Runs $oneRed -Listed $doneList -Settled $filedA -Rerun $rerunGh) $($script:CiWatch.Failures.ContainsKey('71'))"
+    & $check 'the same run is rerun once only' '' (Invoke-CiOnePlatformRerun -Runs $oneRed -Listed $doneList -Settled $filedA -Rerun $rerunGh)
+    $script:CiWatch.Reruns = @{}
+    & $check 'not before its failures are filed' '' (Invoke-CiOnePlatformRerun -Runs $oneRed -Listed $doneList -Settled @{} -Rerun $rerunGh)
+    $twoPlatforms = @([pscustomobject]@{ Id = '71'; Sha = 'abc1234567'; FinishedAt = $now; Failures = @(& $f A @('Windows', 'Linux')) })
+    $buildRed = @([pscustomobject]@{ Id = '71'; Sha = 'abc1234567'; FinishedAt = $now; Failures = @(& $f A @('Windows') 'build') })
+    & $check 'not for a failure on two platforms, nor a build error' ' ' "$(Invoke-CiOnePlatformRerun -Runs $twoPlatforms -Listed $doneList -Settled $filedA -Rerun $rerunGh) $(Invoke-CiOnePlatformRerun -Runs $buildRed -Listed $doneList -Settled $filedA -Rerun $rerunGh)"
+    $newerRunning = @([pscustomobject]@{ databaseId = 72; status = 'in_progress'; conclusion = ''; headSha = 'def' }) + $doneList
+    & $check 'not while a newer run is running' '' (Invoke-CiOnePlatformRerun -Runs $oneRed -Listed $newerRunning -Settled $filedA -Rerun $rerunGh)
+    & $check 'not for a green newest run' '' (Invoke-CiOnePlatformRerun -Runs @([pscustomobject]@{ Id = '71'; Sha = 'abc1234567'; FinishedAt = $now; Failures = @() }) -Listed $doneList -Settled $filedA -Rerun $rerunGh)
+    & $check 'gh was asked to rerun run 71 once' '71' ($script:rerunIds -join ',')
     # BL-5175: a red only an interactive session can fix gets a plan to revert the breaking commits.
     $revTemp = Join-Path ([IO.Path]::GetTempPath()) "df-ci-revert-$PID"
     try {

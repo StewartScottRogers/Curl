@@ -125,18 +125,20 @@ public sealed partial class HttpProtocolHandler
     /// its response (<see cref="Http3StreamConnection.ReadArrivedResponseAsync" />); and after
     /// any failure, an HTTP/2 one whose response ended it with the upload unsent
     /// (<see cref="ResetFailedStreamUploadAsync" />), even on a connection that takes no new
-    /// stream.
+    /// stream. The transfer has already failed, so none of this is cancelled with the
+    /// transfer's token: one that fires meanwhile would replace the failure with a
+    /// cancellation and leave the transfer not marked done (BL-5998).
     /// </summary>
-    private static async ValueTask ResetFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, ConnectResult connect, IConnection connection, CancellationToken cancellationToken)
+    private static async ValueTask ResetFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, ConnectResult connect, IConnection connection)
     {
         IHttpStreamConnection? stream = TrailerStreamOf(requestStream, connection);
         if (FailsOnlyItsStream(failure.ExitCode, stream is Http3StreamConnection) || ResetsHttp3Stream(failure, stream))
         {
             await ((stream as Http3StreamConnection)?.ReadArrivedResponseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
-            await EndGivenUpStreamAsync(stream, connect, cancellationToken).ConfigureAwait(false);
+            await EndGivenUpStreamAsync(stream, connect, CancellationToken.None).ConfigureAwait(false);
         }
 
-        await ResetFailedStreamUploadAsync(requestStream, cancellationToken).ConfigureAwait(false);
+        await ResetFailedStreamUploadAsync(requestStream, CancellationToken.None).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -1,5 +1,5 @@
-using Curl.Extension.Abstractions.Description;
 using Curl.Extended.Protocol.SignalR.Client;
+using Curl.Extension.Abstractions.Description;
 using Curl.Protocol.Abstractions;
 using Curl.WebSocket;
 

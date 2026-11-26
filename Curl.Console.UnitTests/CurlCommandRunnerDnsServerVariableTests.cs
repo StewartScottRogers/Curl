@@ -1,8 +1,8 @@
-using Curl.Engine;
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 

@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Pop3.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Pop3;

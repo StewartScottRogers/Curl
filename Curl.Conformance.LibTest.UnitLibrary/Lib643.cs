@@ -3,8 +3,8 @@ using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Libcurl.Easy;
 using Libcurl.Global;
-using Libcurl.Misc.ErrorText;
 using Libcurl.Mime;
+using Libcurl.Misc.ErrorText;
 using Libcurl.Options;
 
 namespace Curl.Conformance.LibTest;

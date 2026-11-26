@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.File.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using Microsoft.Win32.SafeHandles;
 

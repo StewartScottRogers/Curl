@@ -66,4 +66,5 @@ public sealed class Cgr186Tests
             addressFamily: AddressFamily.InterNetworkV6)
         {
             FiltersAddressLiterals = filtersAddressLiterals,
-        };}
+        };
+}
