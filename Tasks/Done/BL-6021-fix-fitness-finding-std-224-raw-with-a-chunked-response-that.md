@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.ResponseBody.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.ResponseBody.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpChunkedDecoder.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ChunkedTrailerNumHeaders.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6021 — Fix fitness finding STD-224: --raw with a chunked response that has trailers makes %{num_headers} 1
 
@@ -36,13 +36,20 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro prints `6`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro prints `6`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced and measured with Record-CurlExchange.ps1 against curl 8.21.0 Schannel (Git for Windows). Under `--raw`: a head of 3 headers and 1 trailer prints `num_headers` 3; 5001 trailers exit 0 (no 5000-header limit); a trailer with no colon still exits 8 `Header without colon`. Without `--raw`: num_headers 1, 5001 trailers exit 100.
+- Fix: `HttpChunkedDecoder.KeepsTrailers` is false for `--raw`, so trailers are still checked but neither stored, counted nor limited. Matching measured curl, so no ADR.
+- The built curl.exe on the finding-shaped response (6 head headers, 1 trailer) prints 6 with `--raw` and 1 without; 5001 trailers with `--raw` match real curl.
+- Added HttpChunkedDecoder.cs and the ChunkedTrailerNumHeaders test file to `touches`; no other task in Doing names the HTTP library.
+- Fast tests passed; Measure-CodeQuality for the HTTP library: 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: c0784398 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. --raw chunked responses with trailers report the head's header count in num_headers, as curl does
