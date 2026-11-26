@@ -1,4 +1,4 @@
-# ADR-1423: The trace file opens at the first trace event
+# ADR-1425: The trace file opens at the first trace event
 
 - Status: Accepted
 - Date: 2026-11-26

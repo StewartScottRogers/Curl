@@ -445,7 +445,7 @@ as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s
 output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `--trace-time`, into
 the named file (`TraceFileOpenedOnFirstWriteStream`: opened and truncated once per run, at the first
 trace event, so a run that fails before one leaves no file, except a trace file that is also a `-T`
-value, opened up front, ADR-1423), standard output for `-`, standard error for `%`,
+value, opened up front, ADR-1425), standard output for `-`, standard error for `%`,
 and standard error, with no warning, for a file that cannot be opened. On Windows each is text
 mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). A transfer URL curl's parser rejects is
 reported to the transfer's events before connecting as the info line `URL rejected: <reason>`,

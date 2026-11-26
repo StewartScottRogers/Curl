@@ -42,7 +42,7 @@ The finding, verbatim:
 
 - Reproduced before the fix: `-T nofile` left a 0-byte trace file. Cause: `TransferEventOutput`
   opened the file before the transfer's setup. It now opens it on the first trace write
-  (`TraceFileOpenedOnFirstWriteStream`), as curl does. Decision and why: ADR-1423.
+  (`TraceFileOpenedOnFirstWriteStream`), as curl does. Decision and why: ADR-1425.
 - Touches widened for the new stream, its tests, `FormFileSizedBeforeTraceTests` and
   `Curl.Console/CLAUDE.md`; no other task in Doing names them. `CurlCommandRunner.cs` (held by
   BL-6022) is not changed.
@@ -63,4 +63,4 @@ The finding, verbatim:
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 0bcc2c9c 69116afe 3d836d5e.
-- 2026-11-26: Doing -> Done. A run that fails before its first trace event now leaves no --trace file, and an existing one untouched (ADR-1423).
+- 2026-11-26: Doing -> Done. A run that fails before its first trace event now leaves no --trace file, and an existing one untouched (ADR-1425).
