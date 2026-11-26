@@ -37,3 +37,4 @@ Fix: run the cleanup under its own short bounded token, made from the injected `
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 4e4a3ac8 e961c316 b9a65a29 2ee197b9 bd0dde9c.
