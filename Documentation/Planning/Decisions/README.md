@@ -1460,3 +1460,4 @@ Each option and the specific reason it lost.
 | [1416](ADR-1416-a-stream-the-server-resets-over-http-3-keeps-its-connection.md) | A stream the server resets over HTTP/3 keeps its connection (BL-5997) | Accepted | 2026-11-25 |
 | [1417](ADR-1417-git-alone-owns-line-endings-not-editorconfig.md) | Git alone owns line endings; .editorconfig names none (BL-5923) | Accepted | 2026-11-26 |
 | [1418](ADR-1418-a-windows-telnet-read-that-fails-on-an-unanswered-upload-exits-56.md) | A Windows TELNET read that fails on an unanswered upload exits 56 (BL-6012) | Accepted | 2026-11-26 |
+| [1418](ADR-1418-an-expired-crl-that-lists-a-certificate-below-an-anchor-still-revokes-it.md) | An expired CRL that lists a certificate below an anchor still revokes it (BL-6009) | Accepted | 2026-11-26 |

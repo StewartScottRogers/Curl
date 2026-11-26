@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs, Curl.Networking.UnitTests/IntermediateOnlyProxyCacertTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6009 — Fix fitness finding STD-216: Windows: with --ssl-revoke-best-effort, a certificate listed on an expired CRL is accepted below an intermediate anchor
 
@@ -38,13 +38,19 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro exits 60 "…has been revoked"; `k_expired_good` with `--ssl-revoke-best-effort` still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro exits 60 "…has been revoked"; `k_expired_good` with `--ssl-revoke-best-effort` still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: `ListRevocationOf` now keeps an expired base list in view; a certificate it names is revoked when no unexpired list is found (ADR-1418).
+- `touches` widened to `Curl.Networking.UnitTests/IntermediateOnlyProxyCacertTests.cs` for the unit tests; no task in Doing named it.
+- Verified end to end on Windows with a throwaway C# file-based app (loopback TLS and CRL servers, `--cacert` holding only the intermediate): `curl.exe` 8.21.0 Schannel and Curl gave the same exit code and error line in all 16 runs, the repro and the `k_expired_good` control included.
+- Gates: `dotnet build` clean (0 warnings), fast tests green (Curl.Networking.UnitTests 4739 passed, 33 skipped), `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 0 failing members, `dotnet format --verify-no-changes` clean on the changed files.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: a477820c 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. A certificate listed on an expired CRL below an intermediate anchor is now reported revoked, --ssl-revoke-best-effort included, as curl does
