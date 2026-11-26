@@ -51,7 +51,7 @@ The finding, verbatim:
 - Repro run against a loopback tus mock that asks for no authentication (not real tusd, no Docker), with the built
   `curl.exe`: `--digest` and `--ntlm` gave `OPTIONS(0) POST(0) PATCH(0) PATCH(3)`, `--negotiate` and `--anyauth` gave
   `OPTIONS(0) POST(0) PATCH(3)`; each had one `> POST` line in `-v` and exit 0, so one upload resource is created.
-- The empty probe `PATCH` is harmless under tus; under the IETF draft it carries `Upload-Complete: ?1`: BL-6042.
+- The empty probe `PATCH` is harmless under tus; under the IETF draft it carries `Upload-Complete: ?1`: BL-6044.
 - Checks: build with warnings as errors clean, all fast tests green, then after a complexity split in `IsSent` the build
   again and the library's 116 tests; format check clean on the changed files; library at 100% line and branch coverage,
   no failing member.

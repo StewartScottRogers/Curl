@@ -27,4 +27,4 @@ handler stays as curl behaves. `Content-Length: 0` stays on the wire for servers
 require a length on `POST` or `PUT`.
 
 The append `PATCH` still has a body, so curl's probe applies to it; that is a separate
-matter from the creation (BL-6042).
+matter from the creation (BL-6044).

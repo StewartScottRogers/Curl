@@ -1,5 +1,5 @@
 ---
-id: BL-6042
+id: BL-6044
 title: Keep --resumable-upload's append PATCH from going as an empty --digest or --ntlm probe that completes an IETF draft upload early
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6042 — Keep --resumable-upload's append PATCH from going as an empty --digest or --ntlm probe that completes an IETF draft upload early
+# BL-6044 — Keep --resumable-upload's append PATCH from going as an empty --digest or --ntlm probe that completes an IETF draft upload early
 
 ## Goal
 
