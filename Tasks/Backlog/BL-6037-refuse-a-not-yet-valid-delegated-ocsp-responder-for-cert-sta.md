@@ -1,5 +1,5 @@
 ---
-id: BL-6035
+id: BL-6037
 title: Refuse a not-yet-valid delegated OCSP responder for --cert-status as curl's OpenSSL build does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6035 — Refuse a not-yet-valid delegated OCSP responder for --cert-status as curl's OpenSSL build does
+# BL-6037 — Refuse a not-yet-valid delegated OCSP responder for --cert-status as curl's OpenSSL build does
 
 ## Goal
 

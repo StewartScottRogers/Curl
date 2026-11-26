@@ -28,4 +28,4 @@ curl's "OCSP response verification failed".
 
 - Below the anchor, an expired responder's answer falls back to the CRL.
 - curl's OpenSSL build is expected to refuse a not-yet-valid responder under `--cert-status`
-  too. That is not yet measured, and BL-6035 covers it.
+  too. That is not yet measured, and BL-6037 covers it.

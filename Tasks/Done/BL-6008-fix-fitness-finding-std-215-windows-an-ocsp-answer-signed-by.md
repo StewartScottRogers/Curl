@@ -49,7 +49,7 @@ The finding, verbatim:
 
 - Fix: `OcspCertificateFields` now carries `NotAfter`, and `OcspStapleVerifier` refuses a delegated
   responder past it (ADR-1418). A not-yet-valid responder stays accepted, as REF accepts it; the
-  OpenSSL `--cert-status` side of that is BL-6035.
+  OpenSSL `--cert-status` side of that is BL-6037.
 - `touches` widened to the certificate reader, the library's CLAUDE.md and the tests. No task in
   Doing on `origin/work/dark-factory` named any of them.
 - End to end on Windows, 2026-11-26, with the built `curl.exe` and a throwaway C# file-based app
