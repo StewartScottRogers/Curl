@@ -53,6 +53,12 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     private HttpFrameLog? connectionLog;
 
     /// <summary>
+    /// How many request streams are being opened or carry a transfer not yet marked done
+    /// (<see cref="EndRequestStream" />); the connection is idle while it is 0.
+    /// </summary>
+    private int activeRequestStreams;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Http3Session" /> class and starts reading
     /// the server's unidirectional streams.
     /// </summary>
@@ -147,22 +153,40 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     /// logged to <paramref name="transferLog" /> from now on, those that arrived before it
     /// included (ADR-0345, BL-1155). A stream the connection cannot open, though it is up, is
     /// exit 55 and <c>cannot open bidi streams</c>, as curl 8.21.0 reports it (ADR-0245).
+    /// A stream opened while the connection is idle - its first, or one after every earlier
+    /// transfer is done - has <paramref name="trace" /> write curl's peer idle timeout line
+    /// before it opens (BL-1208, BL-5995).
     /// </summary>
     /// <param name="transferLog">The frame log of the transfer opening the stream.</param>
     /// <param name="cancellationToken">Cancels the opens and writes.</param>
-    /// <param name="trace">The transfer's <c>--trace-config http/3</c> lines, told of the peer's idle timeout when this is the connection's first request stream (BL-1208), or <see langword="null" />.</param>
+    /// <param name="trace">The transfer's <c>--trace-config http/3</c> lines, or <see langword="null" /> for none.</param>
     /// <returns>The request stream.</returns>
     /// <exception cref="HttpTransferException">The stream cannot be opened (exit 55).</exception>
     internal async ValueTask<Http3ClientRequestStream> OpenRequestStreamAsync(HttpFrameLog transferLog, CancellationToken cancellationToken, Http3StreamTrace? trace = null)
     {
         UseConnectionLog(transferLog);
+        if (Interlocked.Increment(ref activeRequestStreams) == 1)
+        {
+            trace?.OpeningStreamOnIdleConnection(Connection.PeerIdleTimeout);
+        }
+
+        bool isOpened = false;
         try
         {
-            return await Core.OpenRequestStreamAsync(() => trace?.ConnectionReady(Connection.PeerIdleTimeout), cancellationToken).ConfigureAwait(false);
+            Http3ClientRequestStream request = await Core.OpenRequestStreamAsync(null, cancellationToken).ConfigureAwait(false);
+            isOpened = true;
+            return request;
         }
         catch (IOException refused) when (refused is not MultiplexedConnectionFailedException)
         {
             throw new HttpTransferException(CurlExitCode.SendError, HttpTransferMessages.Http3CannotOpenBidiStreams);
+        }
+        finally
+        {
+            if (!isOpened)
+            {
+                Interlocked.Decrement(ref activeRequestStreams);
+            }
         }
     }
 
@@ -172,7 +196,11 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     /// when the connection does not know, and how many request streams are still in use.
     /// </summary>
     /// <returns>The streams left and the streams still in use.</returns>
-    internal (long? StreamsLeft, int StreamsInUse) EndRequestStream() => Core.EndRequestStream();
+    internal (long? StreamsLeft, int StreamsInUse) EndRequestStream()
+    {
+        Interlocked.Decrement(ref activeRequestStreams);
+        return Core.EndRequestStream();
+    }
 
     /// <summary>
     /// Stops the connection carrying another request, as curl marks a connection closed once

@@ -14,7 +14,7 @@ namespace Curl.Original.Protocol.Http;
 /// <c>[&lt;stream&gt;] quic close(app_error=256) -&gt; 0</c> once the response has ended. Measured
 /// with curl 8.18.0's ngtcp2 build against cloudflare-quic.com; see BL-1168's Notes. It also
 /// writes, as they happen, the <c>status:</c> / <c>header:</c> echo of each response head line,
-/// the peer's idle timeout as the connection's first stream opens, and the lines that end a
+/// the peer's idle timeout as a stream opens on an idle connection (BL-5995), and the lines that end a
 /// transfer (BL-1208, ADR-0388), and <c>quic close(app_error=268) -&gt; 0</c> for a stream an
 /// earlier transfer cancelled, as curl 8.18.0 writes it during the next one (BL-5982).
 /// </summary>
@@ -63,11 +63,12 @@ internal sealed class Http3StreamTrace(ITransferEvents? events)
     internal void CancelledStreamClosed(long streamId) => Report(streamId, QuicClose((long)Http3ErrorCode.RequestCancelled));
 
     /// <summary>
-    /// Reports <c>[HTTP/3] peer idle timeout is &lt;n&gt;ms, set keep-alive to &lt;n/2&gt; ms.</c> as the
-    /// connection's first request stream opens (BL-1208), or nothing when the peer declared no idle timeout.
+    /// Reports <c>[HTTP/3] peer idle timeout is &lt;n&gt;ms, set keep-alive to &lt;n/2&gt; ms.</c> as a
+    /// request stream opens on a connection with no active stream (BL-1208, BL-5995), or nothing
+    /// when the peer declared no idle timeout.
     /// </summary>
     /// <param name="peerIdleTimeout">The peer's <c>max_idle_timeout</c>, or <see langword="null" /> for none.</param>
-    internal void ConnectionReady(TimeSpan? peerIdleTimeout)
+    internal void OpeningStreamOnIdleConnection(TimeSpan? peerIdleTimeout)
     {
         if (peerIdleTimeout is { } idle)
         {
