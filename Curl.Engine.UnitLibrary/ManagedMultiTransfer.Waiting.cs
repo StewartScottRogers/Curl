@@ -168,7 +168,9 @@ internal sealed partial class ManagedMultiTransfer
     {
         using CancellationTokenSource stopDelay = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         TimeSpan delay = checkSockets && left > SocketPollInterval ? SocketPollInterval : left;
-        List<Task> events = [.. entries.Select(entry => entry.Perform).OfType<Task>().Where(perform => !perform.IsCompleted)];
+        // Every unreported perform, finished ones too: one that finished after CountReady looked ends this wait
+        // at once. Left out for being finished, nothing would end the wait before its timeout.
+        List<Task> events = [.. entries.Where(entry => !entry.Done).Select(entry => entry.Perform).OfType<Task>()];
         events.Add(Task.Delay(TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, int.MaxValue)), timeProvider, stopDelay.Token));
         events.Add(callbackQueue.Arrived);
         if (poll)
