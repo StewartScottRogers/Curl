@@ -60,7 +60,7 @@ The finding, verbatim:
 - `touches` widened: `Curl.Extension.Abstractions.UnitLibrary` (shared decoder), each library's message file and
   its `.UnitTests`. No other task in Doing named them.
 - The same `Uri.UnescapeDataString` defect is likely in other extensions the finding does not list (amqp1, s3,
-  gcs, az, dns, mcp stdio); filed as BL-6035.
+  gcs, az, dns, mcp stdio); filed as BL-6045.
 
 ## Log
 

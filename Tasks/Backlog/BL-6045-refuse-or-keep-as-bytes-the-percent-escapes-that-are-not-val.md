@@ -1,5 +1,5 @@
 ---
-id: BL-6035
+id: BL-6045
 title: Refuse or keep as bytes the percent-escapes that are not valid UTF-8 in the remaining extension URL decoders (amqp1, s3, gcs, az, dns, mcp stdio)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6035 — Refuse or keep as bytes the percent-escapes that are not valid UTF-8 in the remaining extension URL decoders (amqp1, s3, gcs, az, dns, mcp stdio)
+# BL-6045 — Refuse or keep as bytes the percent-escapes that are not valid UTF-8 in the remaining extension URL decoders (amqp1, s3, gcs, az, dns, mcp stdio)
 
 ## Goal
 
