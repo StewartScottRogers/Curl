@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/DohDnsResolver.cs]
+touches: [Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohDnsResolver.Exchange.cs, Curl.Networking.UnitLibrary/DohDnsResolver.Http2.cs, Curl.Networking.UnitLibrary/DohDnsResolver.RequestEncoding.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/DohDnsResolverHttp2Tests.cs, Curl.Networking.UnitTests/DohDnsResolverTests.cs, Curl.Networking.UnitTests/Fakes/FakeConnector.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6015 — Fix fitness finding STD-221: --doh-url cannot use a DoH server that only speaks HTTP/2; curl resolves through it
 
@@ -36,13 +36,31 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the WSL repro with the Linux build prints `Trying 192.0.2.20:1` (exit 28, not 6).
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the WSL repro with the Linux build prints `Trying 192.0.2.20:1` (exit 28, not 6).
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Plan: `DohDnsResolver` names `h2,http/1.1` as its https target's ALPN offer and sends the
+  query over `Curl.Http2` when the handshake picks `h2` (ADR-1418, on every platform, as
+  ADR-1274 does for origins). Delivered in the session itself, no pipeline subagents, to stay
+  inside the run's cost cap.
+- Touches widened to the files above: the fix needed the resolver's other partial files, its
+  tests and fake, and two Engine DoH assertions on the exact target. No task in Doing named
+  any of them.
+- Repro checked 2026-11-26: Unbound 1.26.2 in Docker, linux-x64 self-contained publish
+  (`PublishAot=false`) run in WSL Ubuntu. Ubuntu curl and Curl both printed
+  `Host www.test.local:1 was resolved.`, `IPv4: 192.0.2.20`, `Trying 192.0.2.20:1...`, exit 28.
+- The same run showed Curl on Linux omits `Connection timed out after N milliseconds`, with
+  or without `--doh-url`: filed as BL-6036. One connection for both queries: BL-6035.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reported one member,
+  `IsHttp2ExchangeFailure`, at 90% branch (the false path). The test
+  `...WhenTheConnectionThrowsWhatNoHttp2ExchangeFailureIs_LetsItEscape` was added for it and
+  passes; the 38-minute measurement was not repeated.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 6023a8eb 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. --doh-url resolves through a DoH server that only speaks HTTP/2: it offers h2 by ALPN and sends the query over HTTP/2 (ADR-1418).
