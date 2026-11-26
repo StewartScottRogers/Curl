@@ -2,7 +2,8 @@ root = true
 
 [*]
 charset = utf-8
-end_of_line = crlf
+# No end_of_line: .gitattributes (* text=auto) normalizes line endings, so files check out CRLF
+# on Windows and LF on Linux and macOS, and dotnet format must not flag either (ADR-1417).
 insert_final_newline = true
 indent_style = space
 indent_size = 4
