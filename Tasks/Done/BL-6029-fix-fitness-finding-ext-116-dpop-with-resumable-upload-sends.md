@@ -55,7 +55,7 @@ The finding, verbatim:
   shift deadline under load, and was stopped after 43 projects. Read from its Cobertura output instead:
   `Curl.Extension.Dpop.UnitLibrary` 100% line and branch from its own tests, no method over complexity 10;
   `ExtensionTransferHookCatalogue` (one line moved, no code added) fully covered by `Curl.Extension.Composition.UnitTests`.
-- Follow-up: BL-6035 (other hooks that still run inside the DPoP hook's one proof).
+- Follow-up: BL-6042 (other hooks that still run inside the DPoP hook's one proof).
 
 ## Log
 

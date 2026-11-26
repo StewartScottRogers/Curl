@@ -1,5 +1,5 @@
 ---
-id: BL-6035
+id: BL-6042
 title: Sign a DPoP proof for each request that --webdav tools, --zsync, --grpc-web and later transfer hooks send
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6035 — Sign a DPoP proof for each request that --webdav tools, --zsync, --grpc-web and later transfer hooks send
+# BL-6042 — Sign a DPoP proof for each request that --webdav tools, --zsync, --grpc-web and later transfer hooks send
 
 ## Goal
 
