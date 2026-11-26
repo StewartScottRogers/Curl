@@ -1107,6 +1107,178 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(expected, status & (X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint));
     }
 
+    private const string UserPrincipalName = "1.3.6.1.4.1.311.20.2.3";
+
+    private const string OtherTypeId = "1.2.3.4";
+
+    [TestMethod]
+    [DataRow("user@evil.test", 0x8000)]
+    [DataRow("user@good.test", 0)]
+    public void VerifyPeer_LeafUpnAgainstTheAnchorsExcludedUpn_IsSchannelError0x8000OnlyWhenWithin(string upn, int violation)
+    {
+        var failure = Verify(
+            Constraints(excludedName: OtherName(UserPrincipalName, Text("evil.test"))), Host, true,
+            alternativeNames: DnsAnd(OtherName(UserPrincipalName, Text(upn))));
+
+        Assert.AreEqual(violation == 0 ? null : "schannel: error 0x00008000", failure?.Message);
+    }
+
+    [TestMethod]
+    [DataRow("user@good.test", 0x4000)]
+    [DataRow("user@evil.test", 0)]
+    public void VerifyPeer_LeafUpnAgainstTheAnchorsPermittedUpn_IsSchannelError0x4000OnlyWhenOutside(string upn, int violation)
+    {
+        var failure = Verify(
+            Constraints(permittedName: OtherName(UserPrincipalName, Text("evil.test"))), Host, true,
+            alternativeNames: DnsAnd(OtherName(UserPrincipalName, Text(upn))));
+
+        Assert.AreEqual(violation == 0 ? null : "schannel: error 0x00004000", failure?.Message);
+    }
+
+    // Each row measured against CryptoAPI (BL-6011).
+    [TestMethod]
+    [DataRow(UserPrincipalName, "evil.test", "USER@EVIL.TEST", true)]
+    [DataRow(UserPrincipalName, "evil.test", "evil.test", true)]
+    [DataRow(UserPrincipalName, "evil.test", "a@b@evil.test", true)]
+    [DataRow(UserPrincipalName, "evil.test", "@evil.test", true)]
+    [DataRow(UserPrincipalName, "evil.test", "user@sub.evil.test", false)]
+    [DataRow(UserPrincipalName, "evil.test", "user@notevil.test", false)]
+    [DataRow(UserPrincipalName, "evil.test", "sub.evil.test", false)]
+    [DataRow(UserPrincipalName, "evil.test", "xevil.test", false)]
+    [DataRow(UserPrincipalName, "evil.test", "evil.test@good.test", false)]
+    [DataRow(UserPrincipalName, "evil.test", "", false)]
+    [DataRow(UserPrincipalName, ".evil.test", "user@a.sub.evil.test", true)]
+    [DataRow(UserPrincipalName, ".evil.test", "sub.evil.test", true)]
+    [DataRow(UserPrincipalName, ".evil.test", "user@evil.test", false)]
+    [DataRow(UserPrincipalName, "@EVIL.test", "a@b@evil.test", true)]
+    [DataRow(UserPrincipalName, "@evil.test", "user@sub.evil.test", false)]
+    [DataRow(UserPrincipalName, "user@evil.test", "USER@evil.TEST", true)]
+    [DataRow(UserPrincipalName, "user@evil.test", "xuser@evil.test", false)]
+    [DataRow(UserPrincipalName, "user@", "user@evil.test", false)]
+    [DataRow(UserPrincipalName, "", "user@evil.test", true)]
+    [DataRow(OtherTypeId, "evil.test", "xevil.test", true)]
+    [DataRow(OtherTypeId, "abc", "x@ABC", true)]
+    [DataRow(OtherTypeId, "abc", "a@xabc", false)]
+    [DataRow(OtherTypeId, "abc", "abcx", false)]
+    [DataRow(OtherTypeId, "evil.test", "u@sub.evil.test", false)]
+    [DataRow(OtherTypeId, "user@evil.test", "xuser@evil.test", false)]
+    public void FindViolation_SchannelBuildOtherName_MatchesAsCryptoApiDoes(string typeId, string constraint, string name, bool within)
+    {
+        var constraintName = OtherName(typeId, Text(constraint));
+        var alternativeNames = DnsAnd(OtherName(typeId, Text(name)));
+
+        var excluded = FindViolationOfOtherNames(Constraints(excludedName: constraintName), alternativeNames);
+        var permitted = FindViolationOfOtherNames(Constraints(permittedName: constraintName), alternativeNames);
+
+        Assert.AreEqual(within ? CertificateNameConstraints.Excluded : 0, excluded);
+        Assert.AreEqual(within ? 0 : CertificateNameConstraints.NotPermitted, permitted);
+    }
+
+    [TestMethod]
+    public void FindViolation_SchannelBuildOtherNameOfAnotherTypeId_IsNotConstrained()
+    {
+        var constraintName = OtherName(OtherTypeId, Text("evil.test"));
+        var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
+
+        Assert.AreEqual(0, FindViolationOfOtherNames(Constraints(excludedName: constraintName), alternativeNames));
+        Assert.AreEqual(0, FindViolationOfOtherNames(Constraints(permittedName: constraintName), alternativeNames));
+    }
+
+    [TestMethod]
+    public void FindViolation_SchannelBuildOtherNameWhoseValueIsNotAString_MatchesNoConstraint()
+    {
+        var constraintName = OtherName(UserPrincipalName, Text("evil.test"));
+        var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Integer()));
+
+        Assert.AreEqual(0, FindViolationOfOtherNames(Constraints(excludedName: constraintName), alternativeNames));
+        Assert.AreEqual(
+            CertificateNameConstraints.NotPermitted,
+            FindViolationOfOtherNames(Constraints(permittedName: constraintName), alternativeNames));
+    }
+
+    [TestMethod]
+    public void FindViolation_SchannelBuildPermittedOtherNameWhoseValueIsNotAString_IsNotSupported()
+    {
+        var constraints = Constraints(permittedName: OtherName(UserPrincipalName, Integer()));
+        var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
+
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedNameSyntax, FindViolationOfOtherNames(constraints, alternativeNames));
+    }
+
+    [TestMethod]
+    public void FindViolation_SchannelBuildExcludedOtherNameWhoseValueIsNotAString_Accepts()
+    {
+        var constraints = Constraints(excludedName: OtherName(UserPrincipalName, Integer()));
+        var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Integer()));
+
+        Assert.AreEqual(0, FindViolationOfOtherNames(constraints, alternativeNames));
+    }
+
+    [TestMethod]
+    public void FindViolation_SchannelBuildUnsupportedPermittedOtherNameAndAnExcludedName_IsExcluded()
+    {
+        var constraints = Constraints(permittedName: OtherName(UserPrincipalName, Integer()), excluded: Host);
+        var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
+
+        Assert.AreEqual(CertificateNameConstraints.Excluded, FindViolationOfOtherNames(constraints, alternativeNames));
+    }
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildExcludedOtherName_IsLeftToTheChainEngine()
+    {
+        var constraints = Constraints(excludedName: OtherName(UserPrincipalName, Text("evil.test")));
+        var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
+
+        Assert.AreEqual(0, FindViolationOfOtherNames(constraints, alternativeNames, matchesSchannelBuild: false));
+    }
+
+    private static int FindViolationOfOtherNames(byte[] constraints, byte[] alternativeNames, bool matchesSchannelBuild = true) =>
+        FindViolationOfSubject(new X500DistinguishedName($"CN={Host}"), constraints, matchesSchannelBuild, alternativeNames);
+
+    private static byte[] Text(string value)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        writer.WriteCharacterString(UniversalTagNumber.UTF8String, value);
+        return writer.Encode();
+    }
+
+    private static byte[] Integer()
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        writer.WriteInteger(5);
+        return writer.Encode();
+    }
+
+    // A GeneralName otherName: [0] { type-id, [0] value }.
+    private static byte[] OtherName(string typeId, byte[] value)
+    {
+        var tag = new Asn1Tag(TagClass.ContextSpecific, 0, true);
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence(tag))
+        {
+            writer.WriteObjectIdentifier(typeId);
+            using (writer.PushSequence(tag))
+            {
+                writer.WriteEncodedValue(value);
+            }
+        }
+
+        return writer.Encode();
+    }
+
+    // A subjectAltName holding DNS:localhost and then the general name given.
+    private static byte[] DnsAnd(byte[] generalName)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteCharacterString(UniversalTagNumber.IA5String, Host, new Asn1Tag(TagClass.ContextSpecific, 2));
+            writer.WriteEncodedValue(generalName);
+        }
+
+        return writer.Encode();
+    }
+
     private static int FindViolationOfCommonName(string commonName, byte[] constraints, bool matchesSchannelBuild = false)
     {
         var subject = new X500DistinguishedNameBuilder();
