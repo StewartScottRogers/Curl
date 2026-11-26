@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console/CurlCommandRunner.cs]
+touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/CurlCommandRunnerMalformedResolveTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6022 — Fix fitness finding STD-225: a malformed --resolve in a later --next group is ignored when that group reuses a kept-alive connection
 
@@ -36,13 +36,21 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the repro prints `[49]` with REF's stderr line and exits 49.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the repro prints `[49]` with REF's stderr line and exits 49.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: only the connectors checked `ResolveOverrides.ParseError`, so a transfer that reused a pooled connection never failed. The runner now checks the entries at each transfer's start (`TryCheckResolveEntriesAndParseUrl`, formerly `TryParseQueriedUrl`), after the `-G` query check and before the URL parse, proxy choice and connect. Direct pipeline: a two-method change, so the `/feature` stages' subagents were not worth their cost.
+- Measured curl 8.22.0 Schannel with `Record-CurlExchange.ps1` (serial, `-Z`, `file://`, single group, `-v -b nofile`): exit 49, `-w` `%{num_connects}` 0 and `%{conn_id}` -1, `-D` file created, no `-o` file, no progress meter, the cookie-file warning still before the entry line. `%{conn_id}` printed 0 or the next number in Curl, so `UsedAConnection` now excludes this refusal (`IsMalformedResolveRejection`).
+- No ADR: this matches curl, with no design choice.
+- Added `Curl.Console.UnitTests/CurlCommandRunnerMalformedResolveTests.cs` to `touches` for the test; no task in Doing names it.
+- Left to BL-6036: under `-Z` curl writes the failed transfer's `-w` before the running transfer's body; Curl writes it after.
+- Verified: `dotnet build` clean; fast tests 58420 passed, 0 failed; `Measure-CodeQuality.ps1 -Library Curl.Console` 0 failing members; repro run on the built `curl.exe` prints `hello[49 0 -1]`, curl's stderr line, exit 49.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 91d27397 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. A malformed --resolve now exits 49 at each transfer's start, a reused connection included, with conn_id -1
