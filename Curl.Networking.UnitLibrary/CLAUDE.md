@@ -425,7 +425,7 @@ takes an `IConnector` for the DoH connections (a `TcpConnector` of its own, buil
 resolver and the DoH TLS options) and the DoH URL, and for each name POSTs the A query and the AAAA
 query in parallel on two connections, A first, each request written byte for byte as curl 8.21.0
 writes it (no `User-Agent`; `Host` with the port only when it is not the default). The target
-carries `PoolScheme` `https` and names `h2`, `http/1.1` as its `ApplicationProtocols` (ADR-1418), so
+carries `PoolScheme` `https` and names `h2`, `http/1.1` as its `ApplicationProtocols` (ADR-1424), so
 the handshake offers both; a connection that picked `h2` carries the same POST on stream 1 of a
 `Curl.Http2` connection, its answer read from the HEADERS and DATA frames (`DohDnsResolver.Http2.cs`,
 STD-221), with the `-v` lines `using HTTP/2` and `[HTTP/2] [1]`. `DohResponseReader` reads the

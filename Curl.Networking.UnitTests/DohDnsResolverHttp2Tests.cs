@@ -9,7 +9,7 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins <see cref="DohDnsResolver" /> over HTTP/2 (ADR-1418, fitness finding STD-221): a DoH
+/// Pins <see cref="DohDnsResolver" /> over HTTP/2 (ADR-1424, fitness finding STD-221): a DoH
 /// server whose handshake picks <c>h2</c> gets the query as an HTTP/2 POST, and its answer is read
 /// from the stream's HEADERS and DATA frames. The server's frames are scripted, so no test touches
 /// the network.

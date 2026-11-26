@@ -18,7 +18,7 @@ Under `--doh-url` over HTTP/2, the A and AAAA queries share one connection as tw
 
 ## Context
 
-ADR-1418 (BL-6015) gave `--doh-url` HTTP/2 with a connection for each query. curl sets `CURLOPT_PIPEWAIT` on its DoH sub-transfers (`lib/doh.c`) and can multiplex them. Measure curl 8.18.0 on Ubuntu against an HTTP/2 DoH server (Unbound, `--trace-config doh`) first.
+ADR-1424 (BL-6015) gave `--doh-url` HTTP/2 with a connection for each query. curl sets `CURLOPT_PIPEWAIT` on its DoH sub-transfers (`lib/doh.c`) and can multiplex them. Measure curl 8.18.0 on Ubuntu against an HTTP/2 DoH server (Unbound, `--trace-config doh`) first.
 
 ## Acceptance criteria
 

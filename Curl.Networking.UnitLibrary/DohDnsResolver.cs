@@ -14,7 +14,7 @@ namespace Curl.Networking;
 /// <remarks>
 /// <para>
 /// An <c>https://</c> DoH URL's handshake offers <c>h2</c> and <c>http/1.1</c> through ALPN, and a
-/// server that picks <c>h2</c> gets the same POST over HTTP/2 (ADR-1418).
+/// server that picks <c>h2</c> gets the same POST over HTTP/2 (ADR-1424).
 /// </para>
 /// <para>
 /// Over HTTP/1.1 each POST is the one curl sends, byte for byte: <c>POST &lt;path&gt; HTTP/1.1</c>, <c>Host</c>
@@ -99,7 +99,7 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
         _dohTrace = dohTrace;
         _describeExitCode = describeExitCode;
         var isHttps = string.Equals(dohUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
-        // curl asks its DoH sub-transfers for HTTP/2 over TLS, so the handshake offers h2 first (ADR-1418).
+        // curl asks its DoH sub-transfers for HTTP/2 over TLS, so the handshake offers h2 first (ADR-1424).
         _dohServer = new ConnectTarget(dohUrl.IdnHost, dohUrl.Port, isHttps)
         {
             PoolScheme = dohUrl.Scheme,

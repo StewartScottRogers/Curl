@@ -43,7 +43,7 @@ The finding, verbatim:
 ## Notes
 
 - Plan: `DohDnsResolver` names `h2,http/1.1` as its https target's ALPN offer and sends the
-  query over `Curl.Http2` when the handshake picks `h2` (ADR-1418, on every platform, as
+  query over `Curl.Http2` when the handshake picks `h2` (ADR-1424, on every platform, as
   ADR-1274 does for origins). Delivered in the session itself, no pipeline subagents, to stay
   inside the run's cost cap.
 - Touches widened to the files above: the fix needed the resolver's other partial files, its
@@ -63,4 +63,4 @@ The finding, verbatim:
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 6023a8eb 69116afe 3d836d5e.
-- 2026-11-26: Doing -> Done. --doh-url resolves through a DoH server that only speaks HTTP/2: it offers h2 by ALPN and sends the query over HTTP/2 (ADR-1418).
+- 2026-11-26: Doing -> Done. --doh-url resolves through a DoH server that only speaks HTTP/2: it offers h2 by ALPN and sends the query over HTTP/2 (ADR-1424).

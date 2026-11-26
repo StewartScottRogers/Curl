@@ -1,4 +1,4 @@
-# ADR-1418 — `--doh-url` offers `h2` by ALPN and speaks HTTP/2 to a server that picks it
+# ADR-1424 — `--doh-url` offers `h2` by ALPN and speaks HTTP/2 to a server that picks it
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

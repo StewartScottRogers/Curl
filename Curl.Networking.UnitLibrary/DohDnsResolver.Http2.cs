@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
 
-// The same POST over HTTP/2, for a DoH server whose TLS handshake picked h2 (ADR-1418).
+// The same POST over HTTP/2, for a DoH server whose TLS handshake picked h2 (ADR-1424).
 public sealed partial class DohDnsResolver
 {
     // Sends the query on stream 1 of a new HTTP/2 connection and reads the answer; null when the
