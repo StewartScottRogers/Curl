@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Curl.Http3;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Http;
@@ -14,7 +15,8 @@ namespace Curl.Original.Protocol.Http;
 /// with curl 8.18.0's ngtcp2 build against cloudflare-quic.com; see BL-1168's Notes. It also
 /// writes, as they happen, the <c>status:</c> / <c>header:</c> echo of each response head line,
 /// the peer's idle timeout as the connection's first stream opens, and the lines that end a
-/// transfer (BL-1208, ADR-0388).
+/// transfer (BL-1208, ADR-0388), and <c>quic close(app_error=268) -&gt; 0</c> for a stream an
+/// earlier transfer cancelled, as curl 8.18.0 writes it during the next one (BL-5982).
 /// </summary>
 /// <param name="events">The transfer's events, which the lines are reported through as info lines, or <see langword="null" /> to write none.</param>
 /// <remarks>
@@ -50,8 +52,15 @@ internal sealed class Http3StreamTrace(ITransferEvents? events)
     internal void StreamClosed(long streamId)
     {
         Hold(streamId, "CLOSED");
-        Hold(streamId, FormattableString.Invariant($"quic close(app_error={NoErrorCode}) -> 0"));
+        Hold(streamId, QuicClose(NoErrorCode));
     }
+
+    /// <summary>
+    /// Reports <c>[&lt;stream&gt;] quic close(app_error=268) -&gt; 0</c>, H3_REQUEST_CANCELLED, for a
+    /// stream cancelled before its response ended (BL-5982).
+    /// </summary>
+    /// <param name="streamId">The cancelled stream, of an earlier transfer or one running beside this one.</param>
+    internal void CancelledStreamClosed(long streamId) => Report(streamId, QuicClose((long)Http3ErrorCode.RequestCancelled));
 
     /// <summary>
     /// Reports <c>[HTTP/3] peer idle timeout is &lt;n&gt;ms, set keep-alive to &lt;n/2&gt; ms.</c> as the
@@ -135,6 +144,8 @@ internal sealed class Http3StreamTrace(ITransferEvents? events)
     }
 
     private static bool IsStatusLine(string text) => text.StartsWith("HTTP/3 ", StringComparison.Ordinal);
+
+    private static string QuicClose(long applicationError) => FormattableString.Invariant($"quic close(app_error={applicationError}) -> 0");
 
     private void Report(long streamId, string text) => Report(string.Create(CultureInfo.InvariantCulture, $"[HTTP/3] [{streamId}] {text}"));
 

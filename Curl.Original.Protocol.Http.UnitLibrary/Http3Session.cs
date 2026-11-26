@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using Curl.Http3;
 using Curl.Protocol.Abstractions;
@@ -35,6 +36,9 @@ namespace Curl.Original.Protocol.Http;
 internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectionSession
 {
     private readonly Lock gate = new();
+
+    /// <summary>The cancelled request streams whose <c>quic close</c> trace line no transfer has written yet.</summary>
+    private readonly ConcurrentQueue<long> cancelledStreams = new();
 
     /// <summary>The server's SETTINGS and GOAWAY that arrived before any transfer opened a stream.</summary>
     private readonly List<Http3Frame> unloggedConnectionFrames = [];
@@ -175,6 +179,18 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     /// the server refuses a stream with <c>H3_REQUEST_REJECTED</c> (ADR-0187).
     /// </summary>
     internal void StopNewStreams() => Core.StopNewStreams();
+
+    /// <summary>
+    /// Keeps a request stream cancelled before its response ended, for the next transfer that
+    /// reads on the connection to write curl's <c>quic close</c> trace line for it (BL-5982).
+    /// </summary>
+    /// <param name="streamId">The cancelled stream.</param>
+    internal void AddCancelledStream(long streamId) => cancelledStreams.Enqueue(streamId);
+
+    /// <summary>Takes the earliest stream <see cref="AddCancelledStream" /> kept that has not been taken.</summary>
+    /// <param name="streamId">The stream taken.</param>
+    /// <returns><see langword="true" /> when there was one.</returns>
+    internal bool TryTakeCancelledStream(out long streamId) => cancelledStreams.TryDequeue(out streamId);
 
     /// <summary>Always throws: bytes travel only on the session's streams.</summary>
     /// <param name="buffer">Not used.</param>

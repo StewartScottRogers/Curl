@@ -10,7 +10,8 @@ namespace Curl.Original.Protocol.Http;
 /// <summary>
 /// What <c>-m</c> does to an HTTP/3 transfer's stream and connection, as curl 8.18.0's ngtcp2
 /// build was measured to do (BL-5978): STOP_SENDING with <c>H3_REQUEST_CANCELLED</c>, a QPACK
-/// Stream Cancellation, <c>left intact</c>, and the next URL on a new stream of the connection.
+/// Stream Cancellation, <c>left intact</c>, and the next URL on a new stream of the connection,
+/// which writes the cancelled stream's <c>quic close</c> trace line (BL-5982).
 /// </summary>
 [TestClass]
 public sealed class Http3StreamAbortTests
@@ -18,6 +19,8 @@ public sealed class Http3StreamAbortTests
     private const long RequestCancelled = 0x10c;
 
     private const string LeftIntact = "Connection #0 to host example.com:443 left intact";
+
+    private const string CancelledStreamZeroClosed = "* [HTTP/3] [0] quic close(app_error=268) -> 0";
 
     private static readonly byte[] DecoderStreamType = [0x03];
 
@@ -80,6 +83,38 @@ public sealed class Http3StreamAbortTests
         Assert.IsNull(answered.AbortCode);
         Assert.IsNull(quic.CloseCode);
         Assert.AreEqual(2, connector.Pooled.ReturnedReusableCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NextTransferAfterATimeout_WritesTheCancelledStreamsQuicCloseBeforeItsResponse()
+    {
+        FakeMultiplexedStream stalled = new(0, Response(0)) { StaysOpen = true };
+        FakeMultiplexedStream second = new(4, Response(4));
+        FakeMultiplexedStream third = new(8, Response(8));
+        PoolingConnector connector = new(new FakeMultiplexedConnection(stalled, second, third));
+        HttpProtocolHandler handler = new(connector, new SilentAuthenticator()) { TracesHttp3Streams = true };
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        RecordingTransferEvents firstEvents = new();
+        RecordingTransferEvents secondEvents = new();
+        RecordingTransferEvents thirdEvents = new();
+        Diagnostics.Arrange("server", "stalls on stream 0, answers streams 4 and 8 whole");
+
+        Task<TransferResult> timingOut = handler.ExecuteAsync(Context(time, TimeSpan.FromSeconds(1), firstEvents)).AsTask();
+        await stalled.Drained;
+        time.Advance(TimeSpan.FromSeconds(1));
+        await timingOut;
+        await handler.ExecuteAsync(Context(events: secondEvents));
+        await handler.ExecuteAsync(Context(events: thirdEvents));
+
+        string lines = string.Join('|', secondEvents.Events);
+        int close = secondEvents.Events.IndexOf(CancelledStreamZeroClosed);
+        Diagnostics.Act("second transfer's events", lines);
+        Diagnostics.Assert("line after the request is sent", CancelledStreamZeroClosed, secondEvents.Events.ElementAtOrDefault(close));
+        Assert.IsGreaterThan(secondEvents.Events.IndexOf("* Request completely sent off"), close, lines);
+        Assert.IsLessThan(secondEvents.Events.IndexOf("< HTTP/3 200 \r\n"), close, lines);
+        Assert.ContainsSingle(secondEvents.Events.Where(line => line.Contains("app_error=268", StringComparison.Ordinal)), lines);
+        Assert.DoesNotContain(CancelledStreamZeroClosed, firstEvents.Events);
+        Assert.IsFalse(thirdEvents.Events.Any(line => line.Contains("app_error=268", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -152,6 +187,30 @@ public sealed class Http3StreamAbortTests
         Diagnostics.Assert("abort code", RequestCancelled, request.AbortCode);
         Assert.AreEqual(RequestCancelled, request.AbortCode);
         CollectionAssert.AreEqual(DecoderStreamCancellingStreamZero, quic.UnidirectionalStreams[2].Written.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(false, true, DisplayName = "cancelled before the response ended")]
+    [DataRow(true, false, DisplayName = "cancelled after the response ended")]
+    public async Task CancelUnlessEndedBothWaysAsync_KeepsTheStreamForItsQuicCloseLine_OnlyWhenItsResponseHadNotEnded(bool readsResponse, bool isKept)
+    {
+        Http3Session session = new(new FakeMultiplexedConnection(new FakeMultiplexedStream(0, Response(0))));
+        Http3StreamConnection stream = Stream(session, bodyLength: 10);
+        await stream.WriteAsync("PUT / HTTP/1.1\r\nHost: a\r\n\r\n"u8.ToArray(), CancellationToken.None);
+        if (readsResponse)
+        {
+            await stream.ReadToEndAsync(CancellationToken.None);
+        }
+
+        Diagnostics.Arrange("response read to its end", readsResponse);
+
+        await stream.CancelUnlessEndedBothWaysAsync(CancellationToken.None);
+        bool taken = session.TryTakeCancelledStream(out long streamId);
+
+        Diagnostics.Act("kept, stream", $"{taken}, {streamId}");
+        Diagnostics.Assert("kept", isKept, taken);
+        Assert.AreEqual(isKept, taken);
+        Assert.AreEqual(0, streamId);
     }
 
     private static byte[] Response(long streamId) =>

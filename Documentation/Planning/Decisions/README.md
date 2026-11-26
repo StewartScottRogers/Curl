@@ -1453,3 +1453,4 @@ Each option and the specific reason it lost.
 | [1409](ADR-1409-a-status-of-300-or-above-stops-an-http-2-upload-part-way.md) | A status of 300 or above stops an HTTP/2 upload part way (BL-5973) | Accepted | 2026-11-25 |
 | [1410](ADR-1410-a-timed-out-http-3-transfer-cancels-its-stream-and-keeps-its-connection.md) | A timed-out HTTP/3 transfer cancels its stream and keeps its connection (BL-5978) | Accepted | 2026-11-25 |
 | [1411](ADR-1411-a-status-of-300-or-above-stops-an-http-3-upload-part-way.md) | A status of 300 or above stops an HTTP/3 upload part way (BL-5979) | Accepted | 2026-11-25 |
+| [1412](ADR-1412-a-cancelled-http-3-streams-quic-close-line-is-written-by-the-next-read.md) | A cancelled HTTP/3 stream's quic close line is written by the next read (BL-5982) | Accepted | 2026-11-25 |

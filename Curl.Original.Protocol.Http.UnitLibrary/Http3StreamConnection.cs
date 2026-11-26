@@ -103,6 +103,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         trace.Flush();
+        ReportCancelledStreamsClosed();
         while (unread.IsEmpty)
         {
             if (received.TryDequeue(out unread))
@@ -189,7 +190,9 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// Gives up the stream of a transfer that timed out, as curl's HTTP/3 layer does
     /// (<see cref="Http3ClientRequestStream.CancelAsync" />, measured, BL-5978), or of one whose
     /// upload a status stopped, once its response is read (ADR-1411), unless it was never opened
-    /// or has ended both ways. A connection too broken to send that takes no new stream.
+    /// or has ended both ways. A connection too broken to send that takes no new stream. A stream
+    /// cancelled before its response ended is kept for the next read on the connection to write
+    /// curl's <c>quic close</c> trace line for it (BL-5982, ADR-1412).
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the cancellation is sent or the send has failed.</returns>
@@ -207,6 +210,12 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         catch (IOException)
         {
             session.StopNewStreams();
+            return;
+        }
+
+        if (!isResponseEnded)
+        {
+            session.AddCancelledStream(request.StreamId);
         }
     }
 
@@ -234,6 +243,14 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static HttpTransferException Lost(MultiplexedConnectionFailedException lost) => new(lost.ExitCode, lost.Message);
+
+    private void ReportCancelledStreamsClosed()
+    {
+        while (session.TryTakeCancelledStream(out long streamId))
+        {
+            trace.CancelledStreamClosed(streamId);
+        }
+    }
 
     /// <summary>
     /// Gives nghttp3's name for an HTTP/3 error as <c>nghttp3_strerror</c> gives it, such as
