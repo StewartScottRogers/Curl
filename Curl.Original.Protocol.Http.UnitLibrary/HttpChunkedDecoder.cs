@@ -76,6 +76,14 @@ internal sealed class HttpChunkedDecoder
     internal int TrailerLimit { get; init; } = int.MaxValue;
 
     /// <summary>
+    /// Gets a value indicating whether trailer lines are kept in <see cref="TrailerBytes" />,
+    /// counted in <see cref="TrailerCount" /> and held to <see cref="TrailerLimit" />. It is
+    /// <see langword="false" /> for <c>--raw</c>, whose trailers curl neither stores nor counts
+    /// but still checks line by line (measured, curl 8.21.0, BL-6021 Notes). True by default.
+    /// </summary>
+    internal bool KeepsTrailers { get; init; } = true;
+
+    /// <summary>
     /// Gets how many trailer lines have been decoded and kept in <see cref="TrailerBytes" />.
     /// </summary>
     internal int TrailerCount { get; private set; }
@@ -227,9 +235,9 @@ internal sealed class HttpChunkedDecoder
     }
 
     /// <summary>
-    /// Ends a trailer line: the empty line ends the body, and any other line is kept for
-    /// header output. A line holding a NUL byte fails with exit 8, <c>Nul byte in header</c>, as
-    /// a head line does (upstream test2106, BL-1805).
+    /// Ends a trailer line: the empty line ends the body, and any other line is checked and,
+    /// under <see cref="KeepsTrailers" />, kept for header output. A line holding a NUL byte fails
+    /// with exit 8, <c>Nul byte in header</c>, as a head line does (upstream test2106, BL-1805).
     /// </summary>
     private void EndTrailerLine()
     {
@@ -254,6 +262,20 @@ internal sealed class HttpChunkedDecoder
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.HeaderWithoutColon);
         }
 
+        if (KeepsTrailers)
+        {
+            KeepTrailerLine();
+        }
+
+        trailerLine.SetLength(0);
+    }
+
+    /// <summary>
+    /// Adds the checked trailer line to <see cref="TrailerBytes" />, or fails with exit 100 when
+    /// <see cref="TrailerLimit" /> lines are already kept.
+    /// </summary>
+    private void KeepTrailerLine()
+    {
         if (TrailerCount == TrailerLimit)
         {
             throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders)
@@ -264,7 +286,6 @@ internal sealed class HttpChunkedDecoder
 
         trailerLine.WriteTo(trailers);
         trailers.Write(LineEnding);
-        trailerLine.SetLength(0);
         TrailerCount++;
     }
 }

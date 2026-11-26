@@ -33,4 +33,35 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(trailers, result.Report!.TrailerCount);
         Assert.AreEqual(3, result.Report.ResponseHeaders.Count);
     }
+
+    // BL-6021: curl 8.21.0 --raw neither stores nor counts chunked trailers, so %{num_headers} is the
+    // head's count and more than the 5000 header limit of them pass.
+    [TestMethod]
+    [DataRow(1)]
+    [DataRow(5001)]
+    public async Task ExecuteAsync_RawChunkedResponse_CountsOnlyTheHeadHeaders(int trailers)
+    {
+        string lastChunk = "0\r\n" + string.Concat(Enumerable.Repeat("X-T: 1\r\n", trailers)) + "\r\n";
+        const string head = "HTTP/1.1 200 OK\r\nX-A: 1\r\nX-B: 2\r\nTransfer-Encoding: chunked\r\n\r\n";
+        string body = "2\r\nhi\r\n" + lastChunk;
+        MemoryStream output = new();
+        MemoryStream headerOutput = new();
+        Diagnostics.Arrange("trailers", trailers);
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(head + body, 65536))).ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:41000/"),
+            Output = output,
+            HeaderOutput = headerOutput,
+            Http = new HttpRequestOptions { UserAgent = "curl/8.22.0", PassesContentCoding = true, PassesTransferCoding = true },
+        });
+
+        Diagnostics.Act("exit code, trailer count", $"{result.ExitCode}, {result.Report?.TrailerCount}");
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0, result.Report!.TrailerCount);
+        Assert.AreEqual(3, result.Report.ResponseHeaders.Count);
+        Assert.AreEqual(3, result.Report.ResponseHeadersStored);
+        Assert.AreEqual(head, System.Text.Encoding.Latin1.GetString(headerOutput.ToArray()));
+        Assert.AreEqual(body, System.Text.Encoding.Latin1.GetString(output.ToArray()));
+    }
 }
