@@ -120,8 +120,8 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building checks every CN, multi-valued or not, against the constraint itself (BL-5497).
-    public void VerifyPeer_LeafWithAMultiValuedRelativeName_IgnoresIt() =>
-        Assert.IsNull(Verify(Constraints(permitted: "example.com"), Host, true, withNames: false, subject: "CN=localhost+OU=Unit"));
+    public void VerifyPeer_CnInAMultiValuedRelativeNameOutsideThePermittedSubtree_IsSchannelError0x4000() =>
+        Assert.AreEqual(NotPermitted, Verify(Constraints(permitted: "example.com"), Host, true, withNames: false, subject: "CN=localhost+OU=Unit")?.Message);
 
     [TestMethod]
     public void VerifyPeer_EmptyPermittedDomain_Accepts() =>
@@ -303,8 +303,8 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building reads multi-valued names itself (BL-5497).
-    public void VerifyPeer_SubjectEmailAddressInAMultiValuedRelativeName_IsIgnored() =>
-        Assert.IsNull(Verify(Constraints(permittedName: GeneralName(1, "example.com")), Host, true, subject: "E=evil@other.org+OU=Unit, CN=localhost"));
+    public void VerifyPeer_SubjectEmailAddressInAMultiValuedRelativeNameInTheExcludedEmailDomain_IsSchannelError0x8000() =>
+        Assert.AreEqual(Excluded, Verify(Constraints(excludedName: GeneralName(1, "other.org")), Host, true, subject: "E=evil@other.org+OU=Unit, CN=localhost")?.Message);
 
     [TestMethod]
     public void VerifyPeer_SubjectEmailAddressInTheExcludedEmailDomain_IsSchannelError0x8000() =>
@@ -756,6 +756,26 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: excluded subtree violation (48)", failure?.Message);
     }
+
+    // curl 8.21.0's Schannel build (BL-6007): multi-valued relative names are read, emailAddresses and CNs alike.
+    [TestMethod]
+    [DataRow(true, "other.org", "evil@other.org", CertificateNameConstraints.Excluded)]
+    [DataRow(true, "other.org", "good@example.com", 0)]
+    [DataRow(false, "example.com", "evil@other.org", CertificateNameConstraints.NotPermitted)]
+    [DataRow(false, "example.com", "good@example.com", 0)]
+    public void FindViolation_SchannelBuildSubjectEmailAddressInAMultiValuedRelativeName_FollowsTheConstraint(bool excluded, string constraint, string address, int expected)
+    {
+        var email = GeneralName(1, constraint);
+        var constraints = excluded ? Constraints(excludedName: email) : Constraints(permittedName: email);
+
+        Assert.AreEqual(expected, FindViolationOfSubject(Subject([(OrganizationalUnit, "Unit"), (EmailAddress, address)], [(CommonName, Host)]), constraints, matchesSchannelBuild: true));
+    }
+
+    [TestMethod]
+    public void FindViolation_SchannelBuildCnInAMultiValuedRelativeNameInsideTheExcludedSubtree_IsExcluded() =>
+        Assert.AreEqual(
+            CertificateNameConstraints.Excluded,
+            FindViolationOfSubject(Subject([(OrganizationalUnit, "Unit"), (CommonName, Host)]), Constraints(excluded: Host), matchesSchannelBuild: true));
 
     // curl 8.18.0's OpenSSL build (BL-5940): every subject emailAddress is checked, multi-valued relative names included.
     [TestMethod]

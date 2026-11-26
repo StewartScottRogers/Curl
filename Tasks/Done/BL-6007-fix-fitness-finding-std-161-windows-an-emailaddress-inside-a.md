@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
+touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6007 — Fix fitness finding STD-161: Windows: an emailAddress inside a multi-valued subject RDN is not checked against rfc822Name name constraints (PARTLY FIXED)
 
@@ -41,13 +41,20 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] `curl -sS --cacert ncExclEmail5.pem https://localhost:<port of m_mvrdn>/` exits 60 with `schannel: error 0x00008000` (also via `--proxy-cacert`); `m_ok` still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -sS --cacert ncExclEmail5.pem https://localhost:<port of m_mvrdn>/` exits 60 with `schannel: error 0x00008000` (also via `--proxy-cacert`); `m_ok` still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured Schannel curl 8.21.0 and the built Curl against a throwaway loopback TLS server (constrained intermediate as `--cacert`, `--ssl-no-revoke`): all seven direct cases answer the same (table in ADR-1418). The finding's `m_mvrdn`, `m_mvrdn_o` and `m_ok` shapes are among them.
+- `--proxy-cacert`: the probe had no CRL, so both curls answered `the revocation status is unknown` through the proxy; the proxy handshake runs the same `CertificateNameConstraints` check as the direct one, which the unit tests pin.
+- The same measurement showed Schannel also reads a CN in a multi-valued relative name (`0x00008000`), which Curl ignored; fixed here, same method and file.
+- Touched beyond `touches`: the test file `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs` (its test must pin the change; no task in Doing on the shared branch names it) and ADR-1418 with its README row.
+- Quality run for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 28e1b4c4 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. Schannel build now reads multi-valued relative names against name constraints

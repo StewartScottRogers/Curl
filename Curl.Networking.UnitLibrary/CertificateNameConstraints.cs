@@ -69,7 +69,7 @@ internal static class CertificateNameConstraints
     /// <param name="matchesSchannelBuild">
     /// Whether every subject CN of a leaf with no dNSName is checked as a DNS name, as curl's Schannel
     /// build (CryptoAPI) does; otherwise only a CN that looks like a host name is, as in the OpenSSL build.
-    /// Subject CNs and emailAddresses in a multi-valued relative name are read in the OpenSSL build only.
+    /// Both builds read the subject CNs and emailAddresses of multi-valued relative names too.
     /// </param>
     /// <returns>
     /// <see cref="NotPermitted" />, <see cref="Excluded" />, <see cref="UnsupportedNameSyntax" /> (the
@@ -143,7 +143,7 @@ internal static class CertificateNameConstraints
     {
         var dnsNames = ListDnsNames(leaf);
         return new CheckedNames(
-            [ListSchannelNames(leaf, dnsNames.Count > 0 ? dnsNames : ListSingleValuedAttributes(leaf, CommonNameOid))], []);
+            [ListSchannelNames(leaf, dnsNames.Count > 0 ? dnsNames : ListEveryCommonName(leaf))], []);
     }
 
     private static List<string> ListDnsNames(X509Certificate2 certificate) =>
@@ -183,7 +183,7 @@ internal static class CertificateNameConstraints
 
         // directoryName, rfc822Name and URI names are constrained too; the subject counts as a directoryName (BL-5436)
         // and its emailAddress attributes as rfc822Names (RFC 5280 Â§4.2.1.10, BL-5804).
-        names.AddRange(ListSubjectNames(leaf, ListSingleValuedAttributes(leaf, EmailAddressOid)));
+        names.AddRange(ListSubjectNames(leaf, ListEveryAttribute(leaf, EmailAddressOid)));
         names.AddRange(ListAlternativeNames(leaf, SchannelOtherNameTags));
         return names;
     }
@@ -259,17 +259,10 @@ internal static class CertificateNameConstraints
         && label[^1] != '-'
         && label.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
 
-    private static List<string> ListSingleValuedAttributes(X509Certificate2 leaf, string oid) =>
-        leaf.SubjectName.EnumerateRelativeDistinguishedNames()
-            .Where(rdn => !rdn.HasMultipleElements && rdn.GetSingleElementType().Value == oid)
-            .Select(rdn => rdn.GetSingleElementValue())
-            .OfType<string>()
-            .ToList();
-
     /// <summary>
     /// The subject's CN values in the order they appear, those in a multi-valued relative name included,
-    /// as OpenSSL reads them. A NUL is kept, a character the string type does not allow does not throw,
-    /// and a value that is not a character string is left out.
+    /// as both OpenSSL and CryptoAPI read them. A NUL is kept, a character the string type does not allow
+    /// does not throw, and a value that is not a character string is left out.
     /// </summary>
     /// <param name="certificate">The certificate whose subject is read.</param>
     /// <returns>The CN values.</returns>
@@ -278,7 +271,8 @@ internal static class CertificateNameConstraints
     private static List<string> ListEveryAttribute(X509Certificate2 certificate, string oid) =>
         ListEveryEncodedAttribute(certificate, oid).SelectMany(value => DecodeCharacterString(value)).ToList();
 
-    // OpenSSL's NAME_CONSTRAINTS_check and its CN check read every attribute of a type, multi-valued relative names included (BL-5940).
+    // OpenSSL's NAME_CONSTRAINTS_check and its CN check (BL-5940), and CryptoAPI (BL-6007), read every attribute
+    // of a type, multi-valued relative names included.
     private static List<byte[]> ListEveryEncodedAttribute(X509Certificate2 certificate, string oid)
     {
         var values = new List<byte[]>();
