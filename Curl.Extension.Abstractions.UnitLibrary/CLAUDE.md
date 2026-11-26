@@ -63,7 +63,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   and strings). A positional argument it does not claim stays a URL, and one right after an option that may take it
   as its value (`-d a=1`) is never claimed.
 
-- `UrlPercentDecoding` decodes a part of an extension protocol's URL (ADR-1418): `BytesOf` gives every `%XX` its
+- `UrlPercentDecoding` decodes a part of an extension protocol's URL (ADR-1429): `BytesOf` gives every `%XX` its
   byte, for a field that carries bytes; `Utf8TextOf` gives the text, or `null` when those bytes are not valid UTF-8,
   for a field that can only hold text, which the extension then refuses.
 

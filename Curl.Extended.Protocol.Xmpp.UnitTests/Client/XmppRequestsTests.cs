@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Xmpp.Client;
 
-/// <summary>Checks that a URL's percent-escapes must name valid UTF-8 wherever XMPP carries text (ADR-1418).</summary>
+/// <summary>Checks that a URL's percent-escapes must name valid UTF-8 wherever XMPP carries text (ADR-1429).</summary>
 [TestClass]
 public sealed class XmppRequestsTests
 {

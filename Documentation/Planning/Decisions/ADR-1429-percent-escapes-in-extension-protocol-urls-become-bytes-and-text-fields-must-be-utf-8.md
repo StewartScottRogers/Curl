@@ -1,4 +1,4 @@
-# ADR-1418: Percent-escapes in extension protocol URLs become bytes, and text fields must be UTF-8
+# ADR-1429: Percent-escapes in extension protocol URLs become bytes, and text fields must be UTF-8
 
 - Status: Accepted
 - Date: 2026-11-26

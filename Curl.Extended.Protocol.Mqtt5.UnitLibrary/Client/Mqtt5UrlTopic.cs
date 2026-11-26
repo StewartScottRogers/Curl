@@ -9,7 +9,7 @@ internal static class Mqtt5UrlTopic
 {
     /// <summary>
     /// The URL's topic. A URL with no path after '/' ends the transfer with <see cref="CurlExitCode.UrlMalformat"/>, as
-    /// curl's <c>mqtt://</c> does; so does a topic that decodes to bytes that are not valid UTF-8 (ADR-1418).
+    /// curl's <c>mqtt://</c> does; so does a topic that decodes to bytes that are not valid UTF-8 (ADR-1429).
     /// </summary>
     internal static string Decode(CurlUrl url)
     {

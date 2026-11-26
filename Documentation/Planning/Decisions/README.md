@@ -1470,4 +1470,4 @@ Each option and the specific reason it lost.
 | [1426](ADR-1426-dpop-signs-inside-the-resumable-upload.md) | --dpop signs inside --resumable-upload, one proof per request (BL-6029) | Accepted | 2026-11-26 |
 | [1427](ADR-1427-cache-dir-refuses-a-path-under-an-existing-file.md) | --cache-dir refuses a path under an existing file (BL-6032) | Accepted | 2026-11-26 |
 | [1428](ADR-1428-the-resumable-upload-creation-request-has-no-body.md) | The resumable upload creation request has no body (BL-6034) | Accepted | 2026-11-26 |
-| [1418](ADR-1418-percent-escapes-in-extension-protocol-urls-become-bytes-and-text-fields-must-be-utf-8.md) | Percent-escapes in extension protocol URLs become bytes, and text fields must be UTF-8 (BL-6030) | Accepted | 2026-11-26 |
+| [1429](ADR-1429-percent-escapes-in-extension-protocol-urls-become-bytes-and-text-fields-must-be-utf-8.md) | Percent-escapes in extension protocol URLs become bytes, and text fields must be UTF-8 (BL-6030) | Accepted | 2026-11-26 |

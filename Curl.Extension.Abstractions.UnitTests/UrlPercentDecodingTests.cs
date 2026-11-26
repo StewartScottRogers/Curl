@@ -1,6 +1,6 @@
 namespace Curl.Extension.Abstractions;
 
-/// <summary>Checks percent-decoding a URL part to bytes and to text (ADR-1418).</summary>
+/// <summary>Checks percent-decoding a URL part to bytes and to text (ADR-1429).</summary>
 [TestClass]
 public sealed class UrlPercentDecodingTests
 {

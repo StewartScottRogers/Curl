@@ -11,7 +11,7 @@ internal static class NatsSubject
     /// </summary>
     /// <param name="url">The URL.</param>
     /// <returns>The subject.</returns>
-    /// <exception cref="NatsException">The path is empty, or the subject is not valid UTF-8 (ADR-1418) or holds
+    /// <exception cref="NatsException">The path is empty, or the subject is not valid UTF-8 (ADR-1429) or holds
     /// whitespace or an empty token.</exception>
     public static string Of(CurlUrl url)
     {

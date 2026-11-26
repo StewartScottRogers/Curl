@@ -5,7 +5,7 @@ using System.Text.Unicode;
 namespace Curl.Extension.Abstractions;
 
 /// <summary>
-/// Percent-decodes a part of an extension protocol's URL to the bytes it names (ADR-1418). Every <c>%XX</c> becomes its
+/// Percent-decodes a part of an extension protocol's URL to the bytes it names (ADR-1429). Every <c>%XX</c> becomes its
 /// byte, whether or not the bytes are valid UTF-8; a <c>%</c> not followed by two hex digits, and <c>+</c>, stay as they are.
 /// </summary>
 public static class UrlPercentDecoding

@@ -6,7 +6,7 @@ namespace Curl.Extended.Protocol.Redis.Client;
 /// <summary>
 /// The command a <c>redis://</c> URL's path names (ADR-1079): <c>/[db]/command/argument/...</c>, an all-digit first
 /// segment the database to <c>SELECT</c> (the redis URI scheme's <c>db-number</c>), every later segment, percent-decoded
-/// to bytes that need not be text (ADR-1418), one argument.
+/// to bytes that need not be text (ADR-1429), one argument.
 /// </summary>
 /// <param name="Database">The database number, or <see langword="null"/> when the path names none.</param>
 /// <param name="Arguments">The command name and its arguments, as the bytes the URL names.</param>

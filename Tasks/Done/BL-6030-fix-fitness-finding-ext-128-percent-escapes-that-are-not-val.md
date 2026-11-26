@@ -48,7 +48,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Fix: `UrlPercentDecoding` in `Curl.Extension.Abstractions.UnitLibrary` (ADR-1418). Redis arguments are the
+- Fix: `UrlPercentDecoding` in `Curl.Extension.Abstractions.UnitLibrary` (ADR-1429). Redis arguments are the
   decoded bytes; MQTT 5, NATS, STOMP, AMQP 0-9-1, Kafka and XMPP refuse non-UTF-8 text with exit 3, an XMPP
   query body with exit 43.
 - Checked with the built `curl.exe` on 2026-11-26: against a loopback stand-in (no Docker Redis) the `SET`

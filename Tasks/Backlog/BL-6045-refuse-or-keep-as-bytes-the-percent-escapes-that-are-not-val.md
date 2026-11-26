@@ -18,7 +18,7 @@ A URL whose percent-escapes are not valid UTF-8 never makes these extensions act
 
 ## Context
 
-Follow-up to BL-6030 (fitness finding EXT-128, ADR-1418). `Curl.Extended.Protocol.{Amqp1,S3,GoogleCloudStorage,
+Follow-up to BL-6030 (fitness finding EXT-128, ADR-1429). `Curl.Extended.Protocol.{Amqp1,S3,GoogleCloudStorage,
 AzureStorage,DnsQuery,McpClient}.UnitLibrary` still decode URL parts with `Uri.UnescapeDataString`, which leaves such
 escapes undecoded. Not reproduced yet: confirm each by a unit test first. Use `UrlPercentDecoding` in
 `Curl.Extension.Abstractions`.

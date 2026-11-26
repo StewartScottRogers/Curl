@@ -13,7 +13,7 @@ internal sealed record Amqp0UrlQueue(string VirtualHost, string Queue)
 
     /// <summary>
     /// The URL's virtual host and queue. A path that is not two segments, an empty queue, or either decoding to bytes
-    /// that are not valid UTF-8 (ADR-1418), ends the transfer with <see cref="CurlExitCode.UrlMalformat"/> before
+    /// that are not valid UTF-8 (ADR-1429), ends the transfer with <see cref="CurlExitCode.UrlMalformat"/> before
     /// anything is connected.
     /// </summary>
     internal static Amqp0UrlQueue Decode(CurlUrl url)

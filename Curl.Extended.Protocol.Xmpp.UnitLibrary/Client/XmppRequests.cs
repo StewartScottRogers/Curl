@@ -23,7 +23,7 @@ internal static class XmppRequests
     /// <summary>Gives the stanza for <paramref name="target"/>, the URL's query (without <c>?</c>) and the body.</summary>
     /// <exception cref="XmppClientException">The query names a type or request the client does not provide, or a part of
     /// it other than a body is not valid UTF-8 (exit 3); or a body, from <c>-d</c>, <c>-T</c> or the query, is not valid
-    /// UTF-8 (exit 43, ADR-1350, ADR-1418).</exception>
+    /// UTF-8 (exit 43, ADR-1350, ADR-1429).</exception>
     internal static XElement For(string target, string? query, ReadOnlyMemory<byte>? body)
     {
         string[] parts = (query ?? string.Empty).Split(';');
@@ -51,7 +51,7 @@ internal static class XmppRequests
     }
 
     /// <summary>Gives the JID the URL's path (without its leading slash) names.</summary>
-    /// <exception cref="XmppClientException">It is not valid UTF-8 (exit 3, ADR-1418).</exception>
+    /// <exception cref="XmppClientException">It is not valid UTF-8 (exit 3, ADR-1429).</exception>
     internal static string DecodedAddress(string escapedPath) =>
         DecodedText(escapedPath, CurlExitCode.UrlMalformat, XmppClientMessages.AddressNotUtf8);
 
