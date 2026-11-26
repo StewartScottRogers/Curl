@@ -1,4 +1,4 @@
-# ADR-1428 — `--doh-url` sends the A and AAAA queries on one HTTP/2 connection
+# ADR-1435 — `--doh-url` sends the A and AAAA queries on one HTTP/2 connection
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

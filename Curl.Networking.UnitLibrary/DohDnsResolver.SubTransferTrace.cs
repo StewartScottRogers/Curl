@@ -8,7 +8,7 @@ namespace Curl.Networking;
 public sealed partial class DohDnsResolver
 {
     // Over TLS with both queries, the second waits for the first one's connection, which over HTTP/2
-    // carries both (ADR-1428). Else untraced, the queries run in parallel as curl runs them, and their
+    // carries both (ADR-1435). Else untraced, the queries run in parallel as curl runs them, and their
     // outcomes are reported once both are in; traced, one after another, each outcome after its own
     // sub-transfer's lines, so each sub-transfer's lines come whole. With a connection each, the last
     // query's outcome, AAAA's, is reported first, as curl 8.22.0 reports it, and traced its

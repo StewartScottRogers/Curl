@@ -6,7 +6,7 @@ namespace Curl.Networking;
 /// Passes the first DoH sub-transfer's events on to <paramref name="inner" /> and, after its first
 /// <c>Trying</c> line, writes the lines the second sub-transfer writes while it waits under
 /// <c>CURLOPT_PIPEWAIT</c> for that connection to say whether it can carry both queries (measured,
-/// curl 8.18.0, ADR-1428).
+/// curl 8.18.0, ADR-1435).
 /// </summary>
 /// <param name="inner">Where every event goes.</param>
 /// <param name="connectionNumber">The number <c>-v</c> gives that first connection.</param>

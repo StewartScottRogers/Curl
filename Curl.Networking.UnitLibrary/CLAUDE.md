@@ -428,7 +428,7 @@ writes it (no `User-Agent`; `Host` with the port only when it is not the default
 carries `PoolScheme` `https` and names `h2`, `http/1.1` as its `ApplicationProtocols` (ADR-1424), so
 the handshake offers both; a connection that picked `h2` carries the same POST on a stream of a
 `Curl.Http2` connection, its answer read from the HEADERS and DATA frames (`DohDnsResolver.Http2.cs`,
-STD-221), with the `-v` lines `using HTTP/2` and `[HTTP/2] [1]`. Per ADR-1428 (BL-6038), over TLS the
+STD-221), with the `-v` lines `using HTTP/2` and `[HTTP/2] [1]`. Per ADR-1435 (BL-6038), over TLS the
 second address query waits for the first one's connection, as curl's `CURLOPT_PIPEWAIT` does: on `h2`
 it is stream 3 of that connection (A on 1, AAAA on 3, one connection number, outcomes in the order the
 streams end, `left intact` once), and traced, `DohPipeWaitTraceEvents` writes curl 8.18.0's waiting

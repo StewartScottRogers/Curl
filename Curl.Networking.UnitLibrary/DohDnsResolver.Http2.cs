@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 // The same POST over HTTP/2, for a DoH server whose TLS handshake picked h2 (ADR-1424), each query
-// the connection carries on a stream of its own (ADR-1428).
+// the connection carries on a stream of its own (ADR-1435).
 public sealed partial class DohDnsResolver
 {
     // One query of an HTTP/2 connection: its place among the queries, the stream carrying it (0 until
@@ -68,7 +68,7 @@ public sealed partial class DohDnsResolver
         ReportHttp2Request(query.StreamId, fields, body, events);
     }
 
-    // The -v lines curl writes as its second sub-transfer takes the first one's connection (ADR-1428).
+    // The -v lines curl writes as its second sub-transfer takes the first one's connection (ADR-1435).
     private void ReportHttp2Reuse(ITransferEvents events)
     {
         events.ReportInfo("Multiplexed connection found");

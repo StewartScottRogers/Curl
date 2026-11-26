@@ -28,7 +28,7 @@ ADR-1424 (BL-6015) gave `--doh-url` HTTP/2 with a connection for each query. cur
 ## Notes
 
 - Measured curl 8.18.0 on Ubuntu (WSL) against Unbound 1.26.2 DoH in Docker; the results and the
-  decision are in ADR-1428.
+  decision are in ADR-1435.
 - Touches widened: the query runner (`SubTransferTrace.cs`), the new `DohPipeWaitTraceEvents.cs`,
   and the two documents saying each query has its own connection. No task in Doing named them.
 - Connection reuse for later names and HTTP/1.1 (also measured) is BL-6051.
@@ -41,4 +41,4 @@ ADR-1424 (BL-6015) gave `--doh-url` HTTP/2 with a connection for each query. cur
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: f797e6d2 3d836d5e.
-- 2026-11-26: Doing -> Done. --doh-url over HTTP/2 sends the A and AAAA queries as streams 1 and 3 of one connection, with curl's -v lines (ADR-1428).
+- 2026-11-26: Doing -> Done. --doh-url over HTTP/2 sends the A and AAAA queries as streams 1 and 3 of one connection, with curl's -v lines (ADR-1435).

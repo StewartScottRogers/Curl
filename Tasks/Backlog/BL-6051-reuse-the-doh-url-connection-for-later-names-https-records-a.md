@@ -18,7 +18,7 @@ Under `--doh-url`, a later lookup and an HTTP/1.1 server's second query go on th
 
 ## Context
 
-ADR-1428 (BL-6038) records what curl 8.18.0 on Ubuntu does: a second name in the same run goes on streams 5 and 7 of the first name's HTTP/2 connection, and against an HTTP/1.1 server (nginx) the second query waits and then reuses the first connection (`Reusing existing https: connection with host ...`, both `Connection #1`). `DohDnsResolver` closes each connection once its queries are answered. Measure the HTTPS-record query and the Windows reference before pinning.
+ADR-1435 (BL-6038) records what curl 8.18.0 on Ubuntu does: a second name in the same run goes on streams 5 and 7 of the first name's HTTP/2 connection, and against an HTTP/1.1 server (nginx) the second query waits and then reuses the first connection (`Reusing existing https: connection with host ...`, both `Connection #1`). `DohDnsResolver` closes each connection once its queries are answered. Measure the HTTPS-record query and the Windows reference before pinning.
 
 ## Acceptance criteria
 
