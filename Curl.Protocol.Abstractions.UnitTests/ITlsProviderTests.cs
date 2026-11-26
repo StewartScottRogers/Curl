@@ -49,6 +49,23 @@ public sealed class ITlsProviderTests
     }
 
     [TestMethod]
+    public async Task AuthenticateAsClientResumingSessionOfAsync_NotOverridden_RunsTheHandshakeIgnoringTheSessionSource()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        var provider = new HostRecordingTlsProvider();
+        var plaintext = new UnusedConnection();
+        diagnostics.Arrange("target host", "ftp.example");
+
+        ConnectResult secured = await ((ITlsProvider)provider)
+            .AuthenticateAsClientResumingSessionOfAsync(plaintext, new UnusedConnection(), "ftp.example", new StubTransferEvents(), CancellationToken.None);
+
+        diagnostics.Act("provider target host", provider.TargetHost);
+        diagnostics.Assert("target host", "ftp.example", provider.TargetHost);
+        Assert.AreSame(plaintext, secured.Connection);
+        Assert.AreEqual("ftp.example", provider.TargetHost);
+    }
+
+    [TestMethod]
     public void VerifyServerCertificateChain_NotOverridden_RejectsTheChainWithExit60()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

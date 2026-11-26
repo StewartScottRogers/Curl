@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs]
+touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Protocol.Abstractions.UnitLibrary/ITlsProvider.cs, Curl.Extension.Abstractions.UnitLibrary/Certificates/CertificateCheckingTlsProvider.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.ResumingSessionOf.cs, Curl.Original.Protocol.Ftp.UnitTests/FtpTlsSessionResumptionTests.cs, Curl.Original.Protocol.Ftp.UnitTests/Fakes/QueuedTlsProvider.cs, Curl.Protocol.Abstractions.UnitTests/ITlsProviderTests.cs, Curl.Extension.Abstractions.UnitTests/Certificates/CertificateCheckHooksTests.cs]
 requirement: none
 created: 2026-11-26
 completed:
@@ -36,11 +36,16 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] in WSL, the Linux build's `curl -sS --ssl-reqd -k -u test:test ftp://127.0.0.1:25221/hello.txt` prints `hello from vsftpd` and exits 0, and the vsftpd log has no "No SSL session reuse" line.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] in WSL, the Linux build's `curl -sS --ssl-reqd -k -u test:test ftp://127.0.0.1:25221/hello.txt` prints `hello from vsftpd` and exits 0, and the vsftpd log has no "No SSL session reuse" line.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Root cause: on Linux without -v, FTPS ran on SslStreamTlsProvider, which cannot resume across ports (ADR-1418). touches widened to the files changed; no task in Doing named them.
+- WSL check (self-contained non-AOT linux-x64 publish, curlreview/vsftpd:1): download, upload (17 bytes) and listing resume, TLS 1.3 and --tls-max 1.2; no new "No SSL session reuse" lines.
+- About 1 run in 12 hung after "226 Transfer complete", before QUIT reached the server; the SslStream route hung the same way before this change. Filed as a follow-up, as is implicit FTPS resumption.
+- Quality: Measure-CodeQuality.ps1 did not finish before the run deadline (stopped at 45 min; Protocol.Abstractions reaches nearly every test project). Complexity is enforced by the clean build; new branches have tests; coverage score not read.
 
 ## Log
 

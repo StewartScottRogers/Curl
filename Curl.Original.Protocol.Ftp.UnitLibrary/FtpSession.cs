@@ -722,12 +722,14 @@ internal sealed class FtpSession(
     /// events, and carries on over the secured connection; a failed handshake ends the session
     /// with its exit code and no <c>QUIT</c>. A completed one reports the connect's
     /// <c>Established connection</c> line again, as curl 8.21.0 writes it a second time
-    /// between <c>234</c> and <c>USER</c> (measured, BL-1084).
+    /// between <c>234</c> and <c>USER</c> (measured, BL-1084). The control connection is named
+    /// as its own session source, so the provider runs it on a TLS client whose session the data
+    /// connections can resume (ADR-1418).
     /// </summary>
     private async ValueTask<TransferResult?> UpgradeControlAsync()
     {
         ConnectResult secured = await connections.TlsProvider
-            .AuthenticateAsClientAsync(control.Connection, context.Url.IdnHost, context.Events, control.CancellationToken)
+            .AuthenticateAsClientResumingSessionOfAsync(control.Connection, control.Connection, context.Url.IdnHost, context.Events, control.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
@@ -2237,7 +2239,7 @@ internal sealed class FtpSession(
 
     private Task<ConnectResult> StartDataHandshake(IConnection data) =>
         connections.TlsProvider
-            .AuthenticateAsClientAsync(data, context.Url.IdnHost, context.Events, context.CancellationToken)
+            .AuthenticateAsClientResumingSessionOfAsync(data, control.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
             .AsTask();
 
     /// <summary>Waits for a handshake that no transfer used, so its failure is never left unobserved.</summary>

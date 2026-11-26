@@ -20,6 +20,21 @@ public sealed class QueuedTlsProvider(params ConnectResult[] results) : ITlsProv
     /// <summary>Gets or sets what runs as each handshake starts, to see what came before it.</summary>
     public Action BeforeEachHandshake { get; set; } = () => { };
 
+    /// <summary>Gets the session source each session-resuming handshake named, in order.</summary>
+    public List<IConnection> SessionSources { get; } = [];
+
+    /// <inheritdoc />
+    public ValueTask<ConnectResult> AuthenticateAsClientResumingSessionOfAsync(
+        IConnection plaintext,
+        IConnection sessionSource,
+        string targetHost,
+        ITransferEvents events,
+        CancellationToken cancellationToken)
+    {
+        SessionSources.Add(sessionSource);
+        return AuthenticateAsClientAsync(plaintext, targetHost, events, cancellationToken);
+    }
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,

@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 using Curl.Protocol.Abstractions;
+using Curl.Tls;
 
 namespace Curl.Networking;
 
@@ -153,7 +154,34 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         _matchesSchannelBuild = matchesSchannelBuild;
         _verification = new ServerCertificateVerification(options, matchesSchannelBuild, timeProvider);
         Warnings = WarningsFor(options, matchesSchannelBuild);
+        _sessionResumingProvider = new(() => new HandBuiltTlsProvider(options, matchesSchannelBuild, timeProvider, certificateStore, SystemTlsRandomSource.Instance));
     }
+
+    // The hand-built client the OpenSSL build runs a session-resuming handshake on: SslStream
+    // offers no way to resume one connection's session on a connection to another port.
+    private readonly Lazy<HandBuiltTlsProvider> _sessionResumingProvider;
+
+    /// <summary>
+    /// Performs a handshake that resumes, or leaves a session for a later handshake to resume,
+    /// across connections, as FTP's control and data connections do. The Schannel build runs
+    /// the overload with events, Windows resuming the session itself; the OpenSSL build runs it
+    /// on a <see cref="HandBuiltTlsProvider" /> of this provider's options (ADR-1418).
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="sessionSource">The connection whose session to resume, <paramref name="plaintext" /> itself for the first one.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The same result the overload with events returns.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientResumingSessionOfAsync(
+        IConnection plaintext,
+        IConnection sessionSource,
+        string targetHost,
+        ITransferEvents events,
+        CancellationToken cancellationToken) =>
+        _matchesSchannelBuild
+            ? AuthenticateAsClientAsync(plaintext, targetHost, events, cancellationToken)
+            : _sessionResumingProvider.Value.AuthenticateAsClientResumingSessionOfAsync(plaintext, sessionSource, targetHost, events, cancellationToken);
 
     /// <summary>
     /// Returns the lines the build writes to standard error for options it ignores, as

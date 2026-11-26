@@ -182,6 +182,19 @@ public sealed class CertificateCheckHooksTests
     }
 
     [TestMethod]
+    public async Task TlsProviderOver_WithAHookRefusingASessionResumingUpgrade_FailsWithExit60()
+    {
+        TrackedConnection connection = new();
+        ITlsProvider checking = HooksOf(new ExampleHook(Dane, "refused")).TlsProviderOver(new FixedTlsProvider(ConnectResult.Connected(connection)));
+
+        ConnectResult result = await checking.AuthenticateAsClientResumingSessionOfAsync(
+            new TrackedConnection(), new TrackedConnection(), "ftp.example.com", NoTransferEvents.Instance, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
     public async Task TlsProviderOver_WithAHookRefusingAnUpgradeCurlAccepted_FailsWithExit60()
     {
         TrackedConnection connection = new();
