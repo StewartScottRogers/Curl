@@ -46,7 +46,7 @@ The finding, verbatim:
 - Measured curl 8.22.0 Schannel with `Record-CurlExchange.ps1` (serial, `-Z`, `file://`, single group, `-v -b nofile`): exit 49, `-w` `%{num_connects}` 0 and `%{conn_id}` -1, `-D` file created, no `-o` file, no progress meter, the cookie-file warning still before the entry line. `%{conn_id}` printed 0 or the next number in Curl, so `UsedAConnection` now excludes this refusal (`IsMalformedResolveRejection`).
 - No ADR: this matches curl, with no design choice.
 - Added `Curl.Console.UnitTests/CurlCommandRunnerMalformedResolveTests.cs` to `touches` for the test; no task in Doing names it.
-- Left to BL-6036: under `-Z` curl writes the failed transfer's `-w` before the running transfer's body; Curl writes it after.
+- Left to BL-6040: under `-Z` curl writes the failed transfer's `-w` before the running transfer's body; Curl writes it after.
 - Verified: `dotnet build` clean; fast tests 58420 passed, 0 failed; `Measure-CodeQuality.ps1 -Library Curl.Console` 0 failing members; repro run on the built `curl.exe` prints `hello[49 0 -1]`, curl's stderr line, exit 49.
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-6036
+id: BL-6040
 title: Under -Z report a later --next group's malformed --resolve failure before a running transfer's body, as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6036 — Under -Z report a later --next group's malformed --resolve failure before a running transfer's body, as curl does
+# BL-6040 — Under -Z report a later --next group's malformed --resolve failure before a running transfer's body, as curl does
 
 ## Goal
 
