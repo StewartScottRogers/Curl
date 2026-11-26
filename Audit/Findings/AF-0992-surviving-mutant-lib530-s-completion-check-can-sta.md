@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-25 | 2026-11-25_1306.md | not re-audited | Ran the -Site command: outcome site-missing. CheckForCompletion now starts with 'bool? success = null' (Lib530Run.cs:208); there is no 'success = false' site. Not re-audited.
+
 ## Log
 
 - 2026-11-22: filed proposed.

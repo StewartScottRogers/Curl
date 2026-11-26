@@ -3,8 +3,8 @@ id: AF-0976
 title: Surviving mutant: the --ciphers alias SHA256 can be made to also select GCM suites (&& -> ||)
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-25_1306.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/OpenSslCipherString.cs:readonly-and:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/OpenSslCipherString.cs:51:&&
 task: BL-5773
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-25
+closed-how: mechanical
+closed-by: 2026-11-25_1306.md
 ---
 # AF-0976 - Surviving mutant: the --ciphers alias SHA256 can be made to also select GCM suites (&& -> ||)
 
@@ -43,7 +43,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Re-audits
 
 - 2026-11-22 | 2026-11-22_1817.md | not re-audited | Not re-audited. The -Site command ended killed, but that mutant was at line 51 of OpenSslCipherString.cs. The SHA256 alias '!IsGcm(name) && name.EndsWith("SHA256", ...)' -> '||' is at line 66 now (resolvedLine was 51), and I never ran line 66.
+- 2026-11-25 | 2026-11-25_1306.md | reproduces: no | Ran the -Site command: line 51, '!IsGcm(name) && name.EndsWith("SHA256"...)' -> '||', outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-25: accepted -> closed. Re-audit 2026-11-25_1306.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
