@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.CaDirectoryRevocationList.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6013 — Fix fitness finding STD-219: Linux: --capath together with --crlfile always fails with "unable to get issuer certificate (2)", even when the --capath directory holds the self-signed root
 
@@ -39,13 +39,19 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the `allcrl_empty.pem` command prints `hello` and exits 0; the `allcrl.pem` command prints `certificate revoked (23)` and exits 60.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the `allcrl_empty.pem` command prints `hello` and exits 0; the `allcrl.pem` command prints `certificate revoked (23)` and exits 60.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added `Curl.Networking.UnitTests/ServerCertificateVerificationTests.CaDirectoryRevocationList.cs` to `touches` for the ADR-0482 unit test; no other task in Doing names it.
+- Cause: `RevocationListVerdict` checked the `--crlfile` lists on the system store's chain, which ends at the intermediate when only `--capath` holds the root. Fix: a chain not ending at a self-signed certificate is rebuilt against the `--capath` certificates (`RebuildAgainstAnchors`) before the lists are checked. A `--capath` holding only the intermediate still gives verify result 2 (STD-180).
+- Criteria checked on Windows through `VerifyChain` with the OpenSSL build pinned (empty lists accepted; revoking list `certificate revoked (23)`, exit 60; no root list `(3)`), in `ServerCertificateVerificationTests.CaDirectoryRevocationList.cs`. The Linux binary was not run against a server, and the new tests were not run against the old code.
+- `dotnet build` clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 433190ab 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. --capath with --crlfile checks the lists up to the --capath root

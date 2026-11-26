@@ -440,7 +440,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             return (WithRefusalVerifyResult(observed, refusal.Value.Message), refusal);
         }
 
-        return RevocationListVerdict(observed, chain, revocationLists);
+        return RevocationListVerdict(observed, chain, anchorsBesideSystemStore, revocationLists);
     }
 
     // curl checks the name before OpenSSL's verify result, so a refused name outranks a
@@ -448,13 +448,27 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     private (CurlExitCode ExitCode, string Message)? RejectedCaCertificateOrRevokedStapleRefusal(SslPolicyErrors anchoredErrors, X509Chain? chain, OcspStapleStatus? stapled, X509Certificate2Collection anchorsBesideSystemStore) =>
         (RefusesTheName(anchoredErrors) ? null : RejectedCaCertificateRefusal(chain, anchorsBesideSystemStore)) ?? RevokedStapleRefusal(stapled);
 
+    // The system store's chain stops short of a --capath root the server did not send, so a chain
+    // not ending at a self-signed certificate is checked against the lists as rebuilt against the
+    // --capath certificates, the chain OpenSSL builds (STD-219).
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) RevocationListVerdict(
         PeerVerification observed,
         X509Chain? chain,
-        CertificateRevocationListFile? revocationLists) =>
-        revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
+        X509Certificate2Collection anchorsBesideSystemStore,
+        CertificateRevocationListFile? revocationLists)
+    {
+        if (revocationLists is null)
+        {
+            return (observed, null);
+        }
+
+        using var anchored = IsSelfSigned(chain!.ChainElements[^1].Certificate)
+            ? null
+            : RebuildAgainstAnchors(chain, anchorsBesideSystemStore, requireServerAuthentication: true, out _);
+        return revocationLists.FirstRefusal(anchored ?? chain, timeProvider.GetUtcNow()) is { } verifyResult
             ? (observed with { VerifyResult = verifyResult }, (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslRevocationListRefusal(verifyResult)))
             : (observed, null);
+    }
 
     // A good staple answers the revocation status the online check could not fetch.
     private SslPolicyErrors WithoutUnavailableRevocationAGoodStapleAnswers(SslPolicyErrors errors, X509Chain? chain, OcspStapleStatus? stapled) =>
