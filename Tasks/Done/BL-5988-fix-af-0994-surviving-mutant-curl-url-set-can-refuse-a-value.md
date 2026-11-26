@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs]
 requirement: none
 created: 2026-11-25
-completed:
+completed: 2026-11-25
 ---
 # BL-5988 — Fix AF-0994: Surviving mutant: curl_url_set can refuse a value of exactly 8,000,000 characters with CURLUE_MALFORMED_INPUT (> -> >=)
 
@@ -32,12 +32,23 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs line 97`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs line 97`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killing test: `ManagedCurlUrlHandleTests.Set_PartOfExactlyMaximumInputLength_IsAccepted`
+  (data rows `User` and `Fragment`) in `Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs`.
+  With `>` changed to `>=` both rows failed (2 failed, 257 passed, 2 skipped among the class's
+  tests); with it reverted, `dotnet build` (0 warnings) and all fast tests passed.
+- Production code was already right (curl refuses only `strlen > CURL_MAX_INPUT_LENGTH`), so
+  only a test was added. No library production change, so no quality run was needed.
+- Added the test file to `touches`; no other task in Doing named it.
+- The test sets one part, not the whole URL: a whole URL of that length is refused by the URL
+  parser's own limit, which would not isolate this guard. A part value is platform-neutral.
 
 ## Log
 
 - 2026-11-25: Created.
 - 2026-11-25: Backlog -> Doing. Criteria at claim: afaf2634 9742157d.
+- 2026-11-25: Doing -> Done. Boundary test kills the AF-0994 mutant; build and fast tests pass
