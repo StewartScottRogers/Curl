@@ -141,18 +141,30 @@ internal static class CertificateNameConstraints
         return anchor == 0 ? elements.Count : anchor;
     }
 
+    // How a build compares an rfc822Name constraint with an rfc822Name.
+    private delegate bool EmailMatcher(string constraint, string name);
+
+    // Held in fields, so converting the methods adds no branch where they are passed.
+    private static readonly EmailMatcher SchannelEmailMatcher = SchannelEmailMatches;
+
+    private static readonly EmailMatcher OpenSslEmailMatcher = EmailMatches;
+
     // A certificate's names in the groups checked one after another (all of them at once in the Schannel build,
-    // one name each in the OpenSSL build), the subject CNs the OpenSSL build checks after them, one by one, and
-    // whether the names stop short at a subject emailAddress the OpenSSL build refuses to check.
+    // one name each in the OpenSSL build), the build's rfc822Name comparison, the subject CNs the OpenSSL build
+    // checks after the names, one by one, and whether the names stop short at a subject emailAddress the OpenSSL
+    // build refuses to check.
     private sealed record CheckedNames(
-        List<List<(Asn1Tag Tag, byte[] Value)>> CheckedTogether, List<string> OpenSslCommonNames, bool StopsAtUnsupportedEmailAddress = false);
+        List<List<(Asn1Tag Tag, byte[] Value)>> CheckedTogether,
+        EmailMatcher MatchesEmail,
+        List<string> OpenSslCommonNames,
+        bool StopsAtUnsupportedEmailAddress = false);
 
     // Both builds check the subject CN as a DNS name when the leaf has no dNSName SAN (BL-5432, BL-5829).
     private static CheckedNames ReadSchannelNames(X509Certificate2 leaf)
     {
         var dnsNames = ListDnsNames(leaf);
         return new CheckedNames(
-            [ListSchannelNames(leaf, dnsNames.Count > 0 ? dnsNames : ListEveryCommonName(leaf))], []);
+            [ListSchannelNames(leaf, dnsNames.Count > 0 ? dnsNames : ListEveryCommonName(leaf))], SchannelEmailMatcher, []);
     }
 
     private static List<string> ListDnsNames(X509Certificate2 certificate) =>
@@ -171,9 +183,10 @@ internal static class CertificateNameConstraints
         var emailAddresses = encodedEmailAddresses.TakeWhile(IsIa5String).SelectMany(value => DecodeCharacterString(value)).ToList();
         var subjectNames = ListSubjectNames(certificate, emailAddresses);
         return emailAddresses.Count < encodedEmailAddresses.Count
-            ? new CheckedNames(CheckOneByOne(subjectNames), [], StopsAtUnsupportedEmailAddress: true)
+            ? new CheckedNames(CheckOneByOne(subjectNames), OpenSslEmailMatcher, [], StopsAtUnsupportedEmailAddress: true)
             : new CheckedNames(
                 CheckOneByOne(subjectNames.Concat(ListAlternativeNames(certificate, OpenSslConstrainedNameTags))),
+                OpenSslEmailMatcher,
                 checksCommonNames ? ListEveryCommonName(certificate) : []);
     }
 
@@ -263,7 +276,7 @@ internal static class CertificateNameConstraints
             .Select(commonName => commonName.TrimEnd('\0'))
             .Select(commonName =>
                 commonName.Contains('\0') ? UnsupportedNameSyntax
-                : LooksLikeHostName(commonName) ? FindViolation(permitted, excluded, [DnsName(commonName)])
+                : LooksLikeHostName(commonName) ? FindViolation(permitted, excluded, [DnsName(commonName)], OpenSslEmailMatcher)
                 : 0)
             .FirstOrDefault(violation => violation != 0);
 
@@ -349,7 +362,7 @@ internal static class CertificateNameConstraints
         }
 
         var violation = names.CheckedTogether
-            .Select(together => FindViolation(permitted, excluded, together))
+            .Select(together => FindViolation(permitted, excluded, together, names.MatchesEmail))
             .FirstOrDefault(found => found != 0);
         return violation != 0 ? violation
             : names.StopsAtUnsupportedEmailAddress ? UnsupportedNameSyntax
@@ -358,10 +371,13 @@ internal static class CertificateNameConstraints
 
     // An excluded name outranks an otherName whose permitted subtree cannot be compared, as in CryptoAPI (BL-6011).
     private static int FindViolation(
-        List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names)
+        List<(Asn1Tag Tag, byte[] Value)> permitted,
+        List<(Asn1Tag Tag, byte[] Value)> excluded,
+        List<(Asn1Tag Tag, byte[] Value)> names,
+        EmailMatcher matchesEmail)
     {
-        var permittedViolation = FindPermittedViolation(permitted, names);
-        return permittedViolation != NotPermitted && BreaksExcluded(excluded, names) ? Excluded : permittedViolation;
+        var permittedViolation = FindPermittedViolation(permitted, names, matchesEmail);
+        return permittedViolation != NotPermitted && BreaksExcluded(excluded, names, matchesEmail) ? Excluded : permittedViolation;
     }
 
     private static List<(Asn1Tag Tag, byte[] Value)> ReadSubtrees(AsnReader subtrees)
@@ -380,12 +396,14 @@ internal static class CertificateNameConstraints
         return read;
     }
 
-    private static int FindPermittedViolation(List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> names) =>
-        names.Select(name => FindPermittedViolation(permitted, name)).FirstOrDefault(violation => violation != 0);
+    private static int FindPermittedViolation(
+        List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> names, EmailMatcher matchesEmail) =>
+        names.Select(name => FindPermittedViolation(permitted, name, matchesEmail)).FirstOrDefault(violation => violation != 0);
 
     // A name is permitted when no subtree is of its kind or one matches it. CryptoAPI takes an otherName's
     // subtrees in order and stops, unsupported, at one whose value is not a character string (BL-6011).
-    private static int FindPermittedViolation(List<(Asn1Tag Tag, byte[] Value)> permitted, (Asn1Tag Tag, byte[] Value) name)
+    private static int FindPermittedViolation(
+        List<(Asn1Tag Tag, byte[] Value)> permitted, (Asn1Tag Tag, byte[] Value) name, EmailMatcher matchesEmail)
     {
         // Permitted address subtrees of only the other family leave this name not permitted (BL-5433).
         var ofItsKind = permitted.Where(subtree => IsSameKind(subtree, name)).ToList();
@@ -394,7 +412,7 @@ internal static class CertificateNameConstraints
             return 0;
         }
 
-        var deciding = ofItsKind.FirstOrDefault(subtree => IsOtherNameWithoutText(subtree) || IsWithin(name, subtree));
+        var deciding = ofItsKind.FirstOrDefault(subtree => IsOtherNameWithoutText(subtree) || IsWithin(name, subtree, matchesEmail));
         return deciding.Value is null ? NotPermitted : IsOtherNameWithoutText(deciding) ? UnsupportedNameSyntax : 0;
     }
 
@@ -406,20 +424,21 @@ internal static class CertificateNameConstraints
         subtree.Tag == name.Tag && (subtree.Tag != OtherNameTag || ReadOtherName(subtree.Value).TypeId == ReadOtherName(name.Value).TypeId);
 
     // A constraint applies to a name of its kind, an address constraint only to its own family, and then must match.
-    private static bool IsWithin((Asn1Tag Tag, byte[] Value) name, (Asn1Tag Tag, byte[] Value) subtree) =>
+    private static bool IsWithin((Asn1Tag Tag, byte[] Value) name, (Asn1Tag Tag, byte[] Value) subtree, EmailMatcher matchesEmail) =>
         IsSameKind(subtree, name)
         && (subtree.Tag != IpAddressTag || subtree.Value.Length == name.Value.Length * 2)
-        && Matches(subtree.Tag, subtree.Value, name.Value);
+        && Matches(subtree.Tag, subtree.Value, name.Value, matchesEmail);
 
-    private static bool BreaksExcluded(List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names) =>
-        names.Any(name => excluded.Any(subtree => IsWithin(name, subtree)));
+    private static bool BreaksExcluded(
+        List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names, EmailMatcher matchesEmail) =>
+        names.Any(name => excluded.Any(subtree => IsWithin(name, subtree, matchesEmail)));
 
-    private static bool Matches(Asn1Tag tag, byte[] constraint, byte[] name) =>
+    private static bool Matches(Asn1Tag tag, byte[] constraint, byte[] name, EmailMatcher matchesEmail) =>
         tag == OtherNameTag ? OtherNameMatches(constraint, name)
         : tag == DnsNameTag ? DnsMatches(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name))
         : tag == IpAddressTag ? IpMatches(constraint, name)
         : tag == DirectoryNameTag ? DirectoryNameMatches(constraint, name)
-        : tag == EmailTag ? EmailMatches(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name))
+        : tag == EmailTag ? matchesEmail(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name))
         : UriMatches(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name));
 
     // The two have one type-id; a value that is not a character string matches nothing.
@@ -520,6 +539,12 @@ internal static class CertificateNameConstraints
         constraint.Contains('@')
             ? name.Equals(constraint, StringComparison.OrdinalIgnoreCase)
             : HostMatches(constraint, name[(name.LastIndexOf('@') + 1)..]);
+
+    // CryptoAPI, measured (BL-6046), compares an empty constraint, or one starting '@', with the end of the name.
+    private static bool SchannelEmailMatches(string constraint, string name) =>
+        constraint.Length == 0 || constraint[0] == '@'
+            ? name.EndsWith(constraint, StringComparison.OrdinalIgnoreCase)
+            : EmailMatches(constraint, name);
 
     private static bool UriMatches(string constraint, string name) =>
         Uri.TryCreate(name, UriKind.Absolute, out var uri) && HostMatches(constraint, uri.Host);

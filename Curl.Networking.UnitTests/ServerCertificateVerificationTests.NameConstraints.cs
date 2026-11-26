@@ -1167,8 +1167,8 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var constraintName = OtherName(typeId, Text(constraint));
         var alternativeNames = DnsAnd(OtherName(typeId, Text(name)));
 
-        var excluded = FindViolationOfOtherNames(Constraints(excludedName: constraintName), alternativeNames);
-        var permitted = FindViolationOfOtherNames(Constraints(permittedName: constraintName), alternativeNames);
+        var excluded = FindViolationOfAlternativeNames(Constraints(excludedName: constraintName), alternativeNames);
+        var permitted = FindViolationOfAlternativeNames(Constraints(permittedName: constraintName), alternativeNames);
 
         Assert.AreEqual(within ? CertificateNameConstraints.Excluded : 0, excluded);
         Assert.AreEqual(within ? 0 : CertificateNameConstraints.NotPermitted, permitted);
@@ -1180,8 +1180,8 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var constraintName = OtherName(OtherTypeId, Text("evil.test"));
         var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
 
-        Assert.AreEqual(0, FindViolationOfOtherNames(Constraints(excludedName: constraintName), alternativeNames));
-        Assert.AreEqual(0, FindViolationOfOtherNames(Constraints(permittedName: constraintName), alternativeNames));
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(Constraints(excludedName: constraintName), alternativeNames));
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(Constraints(permittedName: constraintName), alternativeNames));
     }
 
     [TestMethod]
@@ -1190,10 +1190,10 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var constraintName = OtherName(UserPrincipalName, Text("evil.test"));
         var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Integer()));
 
-        Assert.AreEqual(0, FindViolationOfOtherNames(Constraints(excludedName: constraintName), alternativeNames));
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(Constraints(excludedName: constraintName), alternativeNames));
         Assert.AreEqual(
             CertificateNameConstraints.NotPermitted,
-            FindViolationOfOtherNames(Constraints(permittedName: constraintName), alternativeNames));
+            FindViolationOfAlternativeNames(Constraints(permittedName: constraintName), alternativeNames));
     }
 
     [TestMethod]
@@ -1202,7 +1202,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var constraints = Constraints(permittedName: OtherName(UserPrincipalName, Integer()));
         var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
 
-        Assert.AreEqual(CertificateNameConstraints.UnsupportedNameSyntax, FindViolationOfOtherNames(constraints, alternativeNames));
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedNameSyntax, FindViolationOfAlternativeNames(constraints, alternativeNames));
     }
 
     [TestMethod]
@@ -1211,7 +1211,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var constraints = Constraints(excludedName: OtherName(UserPrincipalName, Integer()));
         var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Integer()));
 
-        Assert.AreEqual(0, FindViolationOfOtherNames(constraints, alternativeNames));
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(constraints, alternativeNames));
     }
 
     [TestMethod]
@@ -1220,7 +1220,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var constraints = Constraints(permittedName: OtherName(UserPrincipalName, Integer()), excluded: Host);
         var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
 
-        Assert.AreEqual(CertificateNameConstraints.Excluded, FindViolationOfOtherNames(constraints, alternativeNames));
+        Assert.AreEqual(CertificateNameConstraints.Excluded, FindViolationOfAlternativeNames(constraints, alternativeNames));
     }
 
     [TestMethod]
@@ -1229,10 +1229,58 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var constraints = Constraints(excludedName: OtherName(UserPrincipalName, Text("evil.test")));
         var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
 
-        Assert.AreEqual(0, FindViolationOfOtherNames(constraints, alternativeNames, matchesSchannelBuild: false));
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(constraints, alternativeNames, matchesSchannelBuild: false));
     }
 
-    private static int FindViolationOfOtherNames(byte[] constraints, byte[] alternativeNames, bool matchesSchannelBuild = true) =>
+    // CryptoAPI, measured with X509Chain (BL-6046): an rfc822Name constraint starting '@' matches the end of the name.
+    [TestMethod]
+    [DataRow("@evil.test", "u@evil.test", true)]
+    [DataRow("@evil.test", "A@B@EVIL.TEST", true)]
+    [DataRow("@evil.test", "u@sub.evil.test", false)]
+    [DataRow("@evil.test", "evil.test", false)]
+    [DataRow("@", "u@", true)]
+    [DataRow("@", "u@evil.test", false)]
+    [DataRow(".a@evil.test", "x.a@evil.test", false)]
+    public void FindViolation_SchannelBuildEmailConstraintStartingWithAt_MatchesTheEndOfTheName(string constraint, string email, bool within)
+    {
+        Assert.AreEqual(within ? CertificateNameConstraints.Excluded : 0, FindViolationOfExcludedEmail(constraint, email, matchesSchannelBuild: true));
+        Assert.AreEqual(within ? 0 : CertificateNameConstraints.NotPermitted, FindViolationOfPermittedEmail(constraint, email, matchesSchannelBuild: true));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // An empty constraint is not measured against macOS's certificate parser.
+    [DataRow("u@evil.test")]
+    [DataRow("evil.test")]
+    public void FindViolation_SchannelBuildEmptyEmailConstraint_MatchesEveryName(string email)
+    {
+        Assert.AreEqual(CertificateNameConstraints.Excluded, FindViolationOfExcludedEmail(string.Empty, email, matchesSchannelBuild: true));
+        Assert.AreEqual(0, FindViolationOfPermittedEmail(string.Empty, email, matchesSchannelBuild: true));
+    }
+
+    [TestMethod]
+    [DataRow("u@evil.test", false)]
+    [DataRow("@evil.test", true)]
+    public void FindViolation_OpenSslBuildEmailConstraintStartingWithAt_MatchesOnlyThatText(string email, bool within)
+    {
+        Assert.AreEqual(within ? CertificateNameConstraints.Excluded : 0, FindViolationOfExcludedEmail("@evil.test", email, matchesSchannelBuild: false));
+        Assert.AreEqual(within ? 0 : CertificateNameConstraints.NotPermitted, FindViolationOfPermittedEmail("@evil.test", email, matchesSchannelBuild: false));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // An empty constraint is not measured against macOS's certificate parser.
+    public void FindViolation_OpenSslBuildEmptyEmailConstraint_DoesNotMatchAMailbox()
+    {
+        Assert.AreEqual(0, FindViolationOfExcludedEmail(string.Empty, "u@evil.test", matchesSchannelBuild: false));
+        Assert.AreEqual(CertificateNameConstraints.NotPermitted, FindViolationOfPermittedEmail(string.Empty, "u@evil.test", matchesSchannelBuild: false));
+    }
+
+    private static int FindViolationOfExcludedEmail(string constraint, string email, bool matchesSchannelBuild) =>
+        FindViolationOfAlternativeNames(Constraints(excludedName: GeneralName(1, constraint)), DnsAnd(GeneralName(1, email)), matchesSchannelBuild);
+
+    private static int FindViolationOfPermittedEmail(string constraint, string email, bool matchesSchannelBuild) =>
+        FindViolationOfAlternativeNames(Constraints(permittedName: GeneralName(1, constraint)), DnsAnd(GeneralName(1, email)), matchesSchannelBuild);
+
+    private static int FindViolationOfAlternativeNames(byte[] constraints, byte[] alternativeNames, bool matchesSchannelBuild = true) =>
         FindViolationOfSubject(new X500DistinguishedName($"CN={Host}"), constraints, matchesSchannelBuild, alternativeNames);
 
     private static byte[] Text(string value)
