@@ -31,3 +31,4 @@ Measured during BL-5982 with curl 8.18.0 against `Record-CurlExchange.ps1 -Http3
 ## Log
 
 - 2026-11-25: Created.
+- 2026-11-25: Backlog -> Doing. Criteria at claim: cd3330ad 870d61b4 3d836d5e.
