@@ -89,7 +89,8 @@ public sealed class EngineCompositionDohTests
         Assert.IsNotNull(result.Connection);
         Diagnostics.Assert("dohServer.Targets count", 2, dohServer.Targets.Count);
         Assert.HasCount(2, dohServer.Targets);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 48711, true), dohServer.Targets[0] with { PoolScheme = null });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 48711, true), dohServer.Targets[0] with { PoolScheme = null, ApplicationProtocols = null });
+        CollectionAssert.AreEqual(HttpApplicationProtocols.H2ThenHttp11.ToArray(), dohServer.Targets[0].ApplicationProtocols!.ToArray());
         Diagnostics.Assert("dohServer.Targets[0].PoolScheme", "https", dohServer.Targets[0].PoolScheme);
         Assert.AreEqual("https", dohServer.Targets[0].PoolScheme);
         Diagnostics.Diff("DoH requests", MeasuredPost(0x01) + MeasuredPost(0x1C), Encoding.Latin1.GetString(dohServer.Written));
@@ -216,7 +217,7 @@ public sealed class EngineCompositionDohTests
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Diagnostics.Assert("result.ErrorMessage", "Could not resolve host: example.test", result.ErrorMessage);
         Assert.AreEqual("Could not resolve host: example.test", result.ErrorMessage);
-        Assert.AreEqual(new ConnectTarget("bogus", 443, true), dohServer.Targets[0] with { PoolScheme = null });
+        Assert.AreEqual(new ConnectTarget("bogus", 443, true), dohServer.Targets[0] with { PoolScheme = null, ApplicationProtocols = null });
         Diagnostics.Assert("webServer.Targets count", 0, webServer.Targets.Count);
         Assert.IsEmpty(webServer.Targets);
     }

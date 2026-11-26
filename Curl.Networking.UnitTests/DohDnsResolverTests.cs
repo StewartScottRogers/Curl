@@ -113,7 +113,7 @@ public sealed class DohDnsResolverTests
     }
 
     [TestMethod]
-    public async Task ResolveAsync_ConnectsToTheDohServerOverTlsOfferingHttp11()
+    public async Task ResolveAsync_ConnectsToTheDohServerOverTlsOfferingH2ThenHttp11()
     {
         var connector = new FakeConnector();
         var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
@@ -122,13 +122,13 @@ public sealed class DohDnsResolverTests
         await resolver.ResolveAsync("example.test", CancellationToken.None);
 
         WriteTargets(connector);
-        var target = new ConnectTarget("127.0.0.1", DohPort, UseTls: true) { PoolScheme = "https" };
+        var target = new ConnectTarget("127.0.0.1", DohPort, UseTls: true) { PoolScheme = "https", ApplicationProtocols = HttpApplicationProtocols.H2ThenHttp11 };
         var protocols = TcpConnector.ApplicationProtocolsFor(connector.Targets[0], ["http/1.1"]).ToArray();
         Diagnostics.Act("ALPN offered", string.Join(",", protocols));
         Diagnostics.Assert("targets", $"{target}, {target}", string.Join(", ", connector.Targets));
-        Diagnostics.Assert("ALPN offered", "http/1.1", string.Join(",", protocols));
+        Diagnostics.Assert("ALPN offered", "h2,http/1.1", string.Join(",", protocols));
         CollectionAssert.AreEqual(new[] { target, target }, connector.Targets);
-        CollectionAssert.AreEqual(new[] { "http/1.1" }, protocols);
+        CollectionAssert.AreEqual(new[] { "h2", "http/1.1" }, protocols);
     }
 
     [TestMethod]
@@ -144,7 +144,7 @@ public sealed class DohDnsResolverTests
         WriteSent(connector);
         WriteTargets(connector);
         var written = Encoding.Latin1.GetString(connector.Opened[0].Written.ToArray());
-        var expectedTarget = new ConnectTarget("dns.example", 443, UseTls: true) { PoolScheme = "https" };
+        var expectedTarget = new ConnectTarget("dns.example", 443, UseTls: true) { PoolScheme = "https", ApplicationProtocols = HttpApplicationProtocols.H2ThenHttp11 };
         Diagnostics.Assert("head starts with the query and a port-less Host", true, written.StartsWith("POST /dns-query?ct=1 HTTP/1.1\r\nHost: dns.example\r\nAccept: */*\r\n", StringComparison.Ordinal));
         Diagnostics.Assert("first target", expectedTarget, connector.Targets[0]);
         StringAssert.StartsWith(written, "POST /dns-query?ct=1 HTTP/1.1\r\nHost: dns.example\r\nAccept: */*\r\n");

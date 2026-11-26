@@ -13,7 +13,11 @@ namespace Curl.Networking;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Each POST is the one curl sends, byte for byte: <c>POST &lt;path&gt; HTTP/1.1</c>, <c>Host</c>
+/// An <c>https://</c> DoH URL's handshake offers <c>h2</c> and <c>http/1.1</c> through ALPN, and a
+/// server that picks <c>h2</c> gets the same POST over HTTP/2 (ADR-1418).
+/// </para>
+/// <para>
+/// Over HTTP/1.1 each POST is the one curl sends, byte for byte: <c>POST &lt;path&gt; HTTP/1.1</c>, <c>Host</c>
 /// (with the port only when it is not the scheme's default), <c>Accept: */*</c>,
 /// <c>Content-Type: application/dns-message</c>, <c>Content-Length</c>, and the query
 /// <see cref="DnsQueryEncoder" /> writes; there is no <c>User-Agent</c>. The response is read by
@@ -95,7 +99,12 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
         _dohTrace = dohTrace;
         _describeExitCode = describeExitCode;
         var isHttps = string.Equals(dohUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
-        _dohServer = new ConnectTarget(dohUrl.IdnHost, dohUrl.Port, isHttps) { PoolScheme = dohUrl.Scheme };
+        // curl asks its DoH sub-transfers for HTTP/2 over TLS, so the handshake offers h2 first (ADR-1418).
+        _dohServer = new ConnectTarget(dohUrl.IdnHost, dohUrl.Port, isHttps)
+        {
+            PoolScheme = dohUrl.Scheme,
+            ApplicationProtocols = isHttps ? HttpApplicationProtocols.H2ThenHttp11 : null,
+        };
     }
 
     /// <summary>
@@ -129,7 +138,8 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
     /// <summary>
     /// Gets the events each DoH sub-transfer reports its own <c>-v</c> lines on, as curl 8.21.0
     /// writes them under <c>--trace-config dns</c>, <c>doh</c> or <c>all</c> (BL-1180): the
-    /// connector's connect lines, <c>using HTTP/1.x</c>, the POST's head and body, <c>upload
+    /// connector's connect lines, <c>using HTTP/1.x</c> or <c>using HTTP/2</c> (then the
+    /// <c>[HTTP/2] [1]</c> stream lines), the POST's head and body, <c>upload
     /// completely sent off</c>, the answer's head and body, <c>Connection #N to host H:P left
     /// intact</c> and <c>DoH request complete, K to go</c>. The composition root wraps them so
     /// each line gets curl 8.22.0's <c>[DoH] </c> prefix. When given, the queries run one after

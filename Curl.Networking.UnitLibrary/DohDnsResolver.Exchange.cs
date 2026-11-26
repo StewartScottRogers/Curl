@@ -16,8 +16,11 @@ public sealed partial class DohDnsResolver
 
         await using (connection.ConfigureAwait(false))
         {
-            events.ReportInfo("using HTTP/1.x");
-            var response = await ExchangeAsync(connection, BuildRequestHead(query), query, events, cancellationToken).ConfigureAwait(false);
+            var isHttp2 = connected.ApplicationProtocol == "h2";
+            events.ReportInfo(isHttp2 ? "using HTTP/2" : "using HTTP/1.x");
+            var response = isHttp2
+                ? await ExchangeOverHttp2Async(connection, query, events, cancellationToken).ConfigureAwait(false)
+                : await ExchangeAsync(connection, BuildRequestHead(query), query, events, cancellationToken).ConfigureAwait(false);
             if (response is null)
             {
                 return new DohQueryResult(recordType, CurlExitCode.RecvError, null);
