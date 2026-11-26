@@ -1,4 +1,4 @@
-# ADR-1425: --cache-dir refuses a path under an existing file (BL-6032)
+# ADR-1427: --cache-dir refuses a path under an existing file (BL-6032)
 
 Decided by Claude under Stewart's delegation.
 

@@ -42,7 +42,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Refuse rather than warn, the same answer as a path that is itself a file (ADR-1425).
+- Refuse rather than warn, the same answer as a path that is itself a file (ADR-1427).
 - Added the two test files to `touches`; no other task in Doing names this library's tests.
 - `ExecuteAsync_ACacheDirectoryThatCannotBeWritten_LeavesTheTransferAsItWas` now makes the blocking
   file after the hook has accepted the path, since the path under a file is refused at activation.
