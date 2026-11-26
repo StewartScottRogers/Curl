@@ -31,3 +31,4 @@ Found in BL-6011 (ADR-1430), which changed the Schannel build only: `Certificate
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: f20e1cc9 ec79c5dc 3d836d5e.
