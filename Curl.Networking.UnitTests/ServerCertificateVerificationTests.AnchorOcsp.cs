@@ -111,6 +111,23 @@ public sealed class ServerCertificateVerificationAnchorOcspTests
     }
 
     [TestMethod]
+    [DataRow(OcspStapleStatus.Good, false)]
+    [DataRow(OcspStapleStatus.Revoked, false)]
+    [DataRow(OcspStapleStatus.Revoked, true)]
+    public void VerifyPeer_OcspAnswerUnderASha256CertId_IsUnknownUnlessBestEffort(OcspStapleStatus status, bool bestEffort)
+    {
+        using var pki = new Pki(List.None, Responder);
+
+        var failure = Verify(
+            pki,
+            _ => (pki.ResponseBuilder(status) with { CertIdHashOid = OcspResponseBuilder.Sha256Oid }).Build(),
+            bestEffort);
+
+        Assert.AreEqual(bestEffort ? null : TlsFailureMessages.SchannelRevocationStatusUnknown, failure?.Message);
+        Assert.AreEqual(bestEffort ? null : CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+    }
+
+    [TestMethod]
     public void VerifyPeer_OcspGoodFromAValidDelegatedResponder_Accepts()
     {
         using var pki = new Pki(List.Revoking, Responder);

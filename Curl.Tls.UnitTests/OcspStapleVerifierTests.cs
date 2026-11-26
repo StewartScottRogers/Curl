@@ -47,7 +47,7 @@ public sealed class OcspStapleVerifierTests
     }
 
     [TestMethod]
-    public void AResponseWithAVersionAndExtensionsAndAnSha256CertIdPasses()
+    public void AResponseWithAVersionAndExtensionsPasses()
     {
         using OcspTestPki pki = new();
         OcspResponseBuilder response = pki.Response(Now) with
@@ -56,14 +56,27 @@ public sealed class OcspStapleVerifierTests
             IncludeResponseExtensions = true,
             IncludeSingleExtensions = true,
             NextUpdateOffset = null,
-            CertIdHashOid = OcspResponseBuilder.Sha256Oid,
         };
-        Diagnostics.Arrange("response", "with a version, response and single extensions, no nextUpdate, a SHA-256 CertID");
+        Diagnostics.Arrange("response", "with a version, response and single extensions, no nextUpdate");
 
         OcspStapleStatus status = Verify(pki, response).Status;
 
         Diagnostics.Assert("status", OcspStapleStatus.Good, status);
         Assert.AreEqual(OcspStapleStatus.Good, status);
+    }
+
+    [TestMethod]
+    [DataRow(OcspStapleStatus.Good)]
+    [DataRow(OcspStapleStatus.Revoked)]
+    public void AnSha256CertIdDoesNotNameTheCertificate(OcspStapleStatus certStatus)
+    {
+        using OcspTestPki pki = new();
+        Diagnostics.Arrange("response", $"{certStatus}, identifying the certificate by a SHA-256 CertID");
+
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { CertStatus = certStatus, CertIdHashOid = OcspResponseBuilder.Sha256Oid }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.CertificateNotFound, status);
+        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, status);
     }
 
     [TestMethod]

@@ -8,7 +8,7 @@ namespace Curl.Tls;
 /// OpenSSL build does, in its order: the response parses and is <c>successful</c>; the
 /// leaf's issuer is in the server's chain; the responder's signature verifies, and the
 /// responder is the issuer or an unexpired certificate the issuer signed with
-/// <c>id-kp-OCSPSigning</c>; a <c>SingleResponse</c> names the leaf by <c>CertID</c>; its
+/// <c>id-kp-OCSPSigning</c>; a <c>SingleResponse</c> names the leaf by a SHA-1 <c>CertID</c>; its
 /// status is good; and <c>thisUpdate</c> and <c>nextUpdate</c> hold at the given time with
 /// OpenSSL's five minutes' leeway (<c>OCSP_check_validity</c>, no maximum age). A delegated
 /// responder that is not yet valid is accepted, as curl's Schannel build accepts it.
@@ -167,11 +167,12 @@ public static class OcspStapleVerifier
     private static bool Verifies(TlsCertificatePublicKey signer, byte[] algorithm, byte[] content, byte[] signature) =>
         OcspSignatureAlgorithm.FindRule(algorithm, signer) is { } rule && signer.VerifySignature(rule, content, signature) is null;
 
+    /// <summary>Only a SHA-1 <c>CertID</c> names the leaf: curl asks by SHA-1 and takes no answer under another hash (ADR-1424).</summary>
     private static bool NamesCertificate(OcspSingleResponse response, OcspCertificateFields leaf, OcspCertificateFields issuer) =>
-        OcspSignatureAlgorithm.FindHash(response.HashAlgorithmOid) is { } hash
+        OcspSignatureAlgorithm.FindHash(response.HashAlgorithmOid) == HashAlgorithmName.SHA1
         && response.SerialNumber.AsSpan().SequenceEqual(leaf.SerialNumber)
-        && response.IssuerNameHash.AsSpan().SequenceEqual(CryptographicOperations.HashData(hash, issuer.Subject))
-        && response.IssuerKeyHash.AsSpan().SequenceEqual(CryptographicOperations.HashData(hash, issuer.PublicKey.KeyBits));
+        && response.IssuerNameHash.AsSpan().SequenceEqual(SHA1.HashData(issuer.Subject))
+        && response.IssuerKeyHash.AsSpan().SequenceEqual(SHA1.HashData(issuer.PublicKey.KeyBits));
 
     private static bool IsCurrent(OcspSingleResponse response, DateTimeOffset now) =>
         response.ThisUpdate <= now + Leeway

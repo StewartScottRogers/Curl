@@ -203,7 +203,8 @@ and Encrypted Client Hello (BL-706, ADR-0233).
   stapled response (RFC 6960) in curl's OpenSSL order and returns an
   `OcspStapleOutcome` (`OcspStapleStatus` and the CRL reason or `responseStatus`). A
   delegated responder past its `notAfter` at `now` is `ResponderNotAuthorised`; one not
-  yet valid is accepted, as curl's Schannel build accepts it. It
+  yet valid is accepted, as curl's Schannel build accepts it. Only a SHA-1 `CertID`
+  names the certificate (ADR-1424). It
   reads with the internal `OcspBasicResponse`, `OcspSingleResponse` and
   `OcspCertificateFields`, and maps signature and `CertID` hash OIDs with
   `OcspSignatureAlgorithm`. With `RequestOcspStatus` (and the settings' `TimeProvider`)
