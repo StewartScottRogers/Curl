@@ -572,9 +572,10 @@
 .PARAMETER Http3StalledOrigin
     Serve HTTP/3 on UDP ListenAddress and Port over System.Net.Quic (msquic) with the
     throwaway certificate of -Tls, so curl needs -k and an HTTP/3 build (BL-5978). Every
-    request is answered with a 200 HEADERS frame and one DATA frame carrying the body of the
-    first Response (at most 16383 bytes), and its stream is never ended, so -m ends the
-    transfer. transcript.txt holds one line per QUIC event with the milliseconds since the
+    request is answered with a HEADERS frame holding the status of the first Response's
+    status line (200 when it has none) and, when that Response has a body (at most 16383
+    bytes), one DATA frame carrying it. Its stream is never ended, so -m ends the transfer,
+    unless -Http3EndStream is given. transcript.txt holds one line per QUIC event with the milliseconds since the
     server was made: connections accepted, streams opened, bytes received (their count and
     the first 64 in hex, so the client's QPACK decoder stream shows), FINs, the client's
     stop-sendings ("writes closed by the client"), its stream resets ("read ended") and the
@@ -582,6 +583,11 @@
     there is one, the application error code. request.bin holds the request streams' bytes.
     Needs pwsh; refused with every other server mode.
     Example: pwsh -File .\Record-CurlExchange.ps1 -Http3StalledOrigin -Port 18443 -Response 'HTTP/1.1 200 OK\r\n\r\nhello' -Curl <HTTP/3 curl> -CurlArgs '--http3-only','-k','-v','-m','2','https://127.0.0.1:18443/x' -OutDirectory fixtures\h3-stall
+
+.PARAMETER Http3EndStream
+    With -Http3StalledOrigin, end each answered stream (FIN) together with the answer, so
+    the origin does not stall, to measure how curl treats a response that is complete
+    (BL-5983: -f failing a 500).
 
 .PARAMETER ProxyAlpn
     With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
@@ -773,6 +779,7 @@ param(
     [ValidatePattern('^(|push|nostatus|status:.*)$')] [string] $Http2Answer = '',
     [switch] $Http2NoSettings,
     [switch] $Http3StalledOrigin,
+    [switch] $Http3EndStream,
     [string[]] $Http2HeaderField = @(),
     [string[]] $Http2Frames = @(),
     [string] $Curl,
@@ -812,6 +819,7 @@ if ($Http2 -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http2 needs Pow
 
 if ($Http3StalledOrigin -and ($Http2 -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $NoServer -or $UnixSocket -or $Tftp -or $UdpSink)) { throw '-Http3StalledOrigin serves HTTP/3 on UDP -Port, so it cannot be combined with -Http2, -Http2Origin, -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket, -Tftp or -UdpSink.' }
 if ($Http3StalledOrigin -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http3StalledOrigin needs PowerShell 7 (pwsh): Windows PowerShell 5.1''s .NET Framework has no System.Net.Quic.' }
+if ($Http3EndStream -and -not $Http3StalledOrigin) { throw '-Http3EndStream ends the streams of -Http3StalledOrigin, so it needs that switch.' }
 
 function Get-ReferenceCurlPath {
     # Git for Windows ships its curl in <Git>\ucrt64\bin from 2.56.0 (curl 8.22.0) and in
@@ -3454,7 +3462,8 @@ public sealed class RecorderTftpResponder
 $http3Origin = $null
 if ($Http3StalledOrigin) {
     # System.Net.Quic (msquic) is the server; the HTTP/3 frames are the few bytes written here.
-    # The QPACK field section is two zero prefix bytes and static index 25, ':status: 200'.
+    # The QPACK field section is two zero prefix bytes, then static index 25 (':status: 200')
+    # or, for another status, a literal value with that entry's name.
     Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -3478,15 +3487,19 @@ public sealed class RecorderHttp3StalledOrigin
     private readonly IPEndPoint _endPoint;
     private readonly X509Certificate2 _certificate;
     private readonly byte[] _body;
+    private readonly string _status;
+    private readonly bool _endsStream;
     private QuicListener _listener;
     private int _connections;
 
-    public RecorderHttp3StalledOrigin(IPAddress address, int port, X509Certificate2 certificate, byte[] body)
+    public RecorderHttp3StalledOrigin(IPAddress address, int port, X509Certificate2 certificate, string status, byte[] body, bool endsStream)
     {
         if (body.Length > 16383) { throw new ArgumentException("The HTTP/3 body must be at most 16383 bytes."); }
         _endPoint = new IPEndPoint(address, port);
         _certificate = certificate;
+        _status = status;
         _body = body;
+        _endsStream = endsStream;
     }
 
     public string Log { get { lock (_log) { return _log.ToString(); } } }
@@ -3584,7 +3597,7 @@ public sealed class RecorderHttp3StalledOrigin
                 if (isAnswered) { continue; }
                 isAnswered = true;
                 await AnswerAsync(stream);
-                Record(name + " sent HEADERS :status 200 and DATA of " + _body.Length + " bytes, stream left open");
+                Record(name + " sent HEADERS :status " + _status + " and DATA of " + _body.Length + " bytes, stream " + (_endsStream ? "ended" : "left open"));
             }
         }
         catch (QuicException error) { Record(name + " read ended: " + Describe(error)); }
@@ -3594,14 +3607,24 @@ public sealed class RecorderHttp3StalledOrigin
     private async Task AnswerAsync(QuicStream stream)
     {
         var answer = new MemoryStream();
-        answer.Write(new byte[] { 0x01, 0x03, 0x00, 0x00, 0xd9 }, 0, 5);
+        if (_status == "200")
+        {
+            answer.Write(new byte[] { 0x01, 0x03, 0x00, 0x00, 0xd9 }, 0, 5);
+        }
+        else
+        {
+            // HEADERS of 8 bytes: the prefix, a literal naming static index 25, a 3-byte value.
+            answer.Write(new byte[] { 0x01, 0x08, 0x00, 0x00, 0x5f, 0x0a, 0x03 }, 0, 7);
+            answer.Write(Encoding.ASCII.GetBytes(_status), 0, 3);
+        }
+
         if (_body.Length > 0)
         {
             // DATA, its length as a two-byte variable-length integer.
             answer.Write(new byte[] { 0x00, (byte)(0x40 | (_body.Length >> 8)), (byte)_body.Length }, 0, 3);
             answer.Write(_body, 0, _body.Length);
         }
-        await stream.WriteAsync(answer.ToArray(), _stop.Token);
+        await stream.WriteAsync(answer.ToArray(), _endsStream, _stop.Token);
     }
 
     private async Task WatchWritesAsync(QuicStream stream, string name)
@@ -3623,9 +3646,10 @@ public sealed class RecorderHttp3StalledOrigin
 }
 '@
     $body = [System.Text.Encoding]::GetEncoding(28591).GetString($responseBytes[0])
+    $status = if ($body -match '^HTTP/\S+ (\d{3})') { $Matches[1] } else { '200' }
     $bodyStart = $body.IndexOf("`r`n`r`n")
     $body = if ($bodyStart -ge 0) { $body.Substring($bodyStart + 4) } else { '' }
-    $http3Origin = New-Object RecorderHttp3StalledOrigin($ListenAddress, $Port, $tlsCertificate, [System.Text.Encoding]::GetEncoding(28591).GetBytes($body))
+    $http3Origin = New-Object RecorderHttp3StalledOrigin($ListenAddress, $Port, $tlsCertificate, $status, [System.Text.Encoding]::GetEncoding(28591).GetBytes($body), [bool] $Http3EndStream)
 }
 # The sink never answers; the datagrams wait in its receive buffer until curl exits.
 $udpSinkClient = $null
