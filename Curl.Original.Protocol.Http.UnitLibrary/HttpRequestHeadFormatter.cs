@@ -136,7 +136,7 @@ internal static class HttpRequestHeadFormatter
         bool rereadsUrl = false)
     {
         options ??= new HttpRequestOptions();
-        HttpCustomHeader[] customHeaders = CustomHeadersOf(options.Headers, options);
+        HttpCustomHeader[] customHeaders = CustomHeadersOf(HeaderValuesSentWith(options, framing), options);
         HttpCustomHeader[] proxyHeaders = forwardProxy ? CustomHeadersOf(options.ProxyHeaders, options) : [];
         framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
@@ -162,6 +162,14 @@ internal static class HttpRequestHeadFormatter
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
     }
+
+    /// <summary>
+    /// Gives the <c>-H</c> values a request sent with <paramref name="framing" /> carries:
+    /// <see cref="HttpRequestOptions.AuthProbeHeaders" />, when given, for an authentication probe
+    /// (<see cref="HttpRequestFraming.IsAuthProbe" />), otherwise <see cref="HttpRequestOptions.Headers" />.
+    /// </summary>
+    private static IReadOnlyList<string> HeaderValuesSentWith(HttpRequestOptions options, HttpRequestFraming? framing) =>
+        framing is { IsAuthProbe: true } ? options.AuthProbeHeaders ?? options.Headers : options.Headers;
 
     /// <summary>
     /// The length, in bytes, at which curl 8.22.0 refuses a request head: its request buffer
