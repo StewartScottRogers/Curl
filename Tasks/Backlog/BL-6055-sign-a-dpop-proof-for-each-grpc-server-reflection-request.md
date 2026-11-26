@@ -1,5 +1,5 @@
 ---
-id: BL-6043
+id: BL-6055
 title: Sign a DPoP proof for each gRPC server reflection request
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6043 — Sign a DPoP proof for each gRPC server reflection request
+# BL-6055 — Sign a DPoP proof for each gRPC server reflection request
 
 ## Goal
 

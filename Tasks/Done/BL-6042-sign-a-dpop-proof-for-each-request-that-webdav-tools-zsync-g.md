@@ -46,7 +46,7 @@ a request whose body is `Http.Body` (`-F`, a streamed `-d`) sends the whole body
   45 minute command limit, so it was stopped after both libraries' own test projects had reported and scored with
   `-SkipTestRun`: Composition and Dpop 100% line, 100% branch, complexity at most 10, 0 failing members.
 - `dotnet build` clean (0 warnings); fast tests 58485 passed, 0 failed, 363 skipped.
-- Follow-up filed: BL-6043 (gRPC server reflection requests share the call's proof).
+- Follow-up filed: BL-6055 (gRPC server reflection requests share the call's proof).
 
 ## Log
 
