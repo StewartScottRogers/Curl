@@ -30,3 +30,4 @@ Found in BL-6006 (ADR-1421). `Http2Session.ShutDownAsync` is run with `Cancellat
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: b0c04a34 bd0dde9c.
