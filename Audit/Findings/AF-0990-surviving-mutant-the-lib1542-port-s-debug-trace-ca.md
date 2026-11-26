@@ -3,8 +3,8 @@ id: AF-0990
 title: Surviving mutant: the lib1542 port's debug trace can stamp each line with the time (traceTime false -> true)
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-25_1306.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1542.cs:TestAsync-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1542.cs:49:false
 task: BL-5792
@@ -13,9 +13,9 @@ found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-25
+closed-how: mechanical
+closed-by: 2026-11-25_1306.md
 ---
 # AF-0990 - Surviving mutant: the lib1542 port's debug trace can stamp each line with the time (traceTime false -> true)
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-25 | 2026-11-25_1306.md | reproduces: no | Ran the -Site command: Lib1542.cs line 49, 'traceTime: false' -> 'true', outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-22: filed proposed.
+- 2026-11-25: accepted -> closed. Re-audit 2026-11-25_1306.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

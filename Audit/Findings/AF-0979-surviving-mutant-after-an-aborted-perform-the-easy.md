@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Re-audits
 
 - 2026-11-22 | 2026-11-22_1817.md | not re-audited | Not re-audited. The -Site command found no ?? false left at line 134: the code was refactored, and KeepHandleStateOf now calls DigestStaysAvailableAfter(result). The nearest ?? false it found (resolved line 152, in another member) was killed, which says nothing about this mutant.
+- 2026-11-25 | 2026-11-25_1306.md | not re-audited | Ran the -Site command: outcome site-missing. ManagedEasyTransfer.Parsed.cs:134 now lies in FollowFinishingMeterAsync; no '?? false' site in KeepHandleStateOf near it. Not re-audited.
 
 ## Log
 
