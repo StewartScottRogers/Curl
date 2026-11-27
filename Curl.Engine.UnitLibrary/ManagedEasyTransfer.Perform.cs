@@ -45,11 +45,29 @@ internal sealed partial class ManagedEasyTransfer
         ConnectOnly.PerformRunning = true;
         try
         {
-            return await PerformRunningAsync(cancellationToken).ConfigureAwait(false);
+            return await PerformDisposingTransportsAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             ConnectOnly.PerformRunning = false;
+        }
+    }
+
+    // However the perform ends, its transfers are then over, so each of the transports it built closes what its
+    // --doh-url resolver kept before the perform's outcome, a cancellation included, reaches the caller.
+    private async ValueTask<CurlCode> PerformDisposingTransportsAsync(CancellationToken cancellationToken)
+    {
+        Task<CurlCode> performed = PerformRunningAsync(cancellationToken).AsTask();
+        await ((Task)performed).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await DisposeTransportsBuiltAsync().ConfigureAwait(false);
+        return await performed.ConfigureAwait(false);
+    }
+
+    private async ValueTask DisposeTransportsBuiltAsync()
+    {
+        while (transportsBuilt.TryTake(out CurlTransports? built))
+        {
+            await built.DisposeAsync().ConfigureAwait(false);
         }
     }
 

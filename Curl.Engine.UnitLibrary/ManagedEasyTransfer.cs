@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
@@ -192,9 +193,13 @@ internal sealed partial class ManagedEasyTransfer(
     /// <summary>
     /// Gets the caches the running perform uses: those its share handle gives, else the engine's for the curl tool's
     /// transfers (<see cref="ToolSettings" />, ADR-0542), else the multi's connections, TLS sessions and resolved names with
-    /// the handle's own cookies and HSTS while it performs in a multi handle, else the handle's own (BL-3204).
+    /// the handle's own cookies and HSTS while it performs in a multi handle, else the handle's own (BL-3204). The
+    /// transports built over it are kept in <see cref="transportsBuilt" />.
     /// </summary>
-    private ManagedEngineSharedState PerformShared => (attachedShared ?? (ToolSettings is not null ? shared.EngineWide : MultiCachesOf() ?? shared)).WithSocketWait(SocketWait);
+    private ManagedEngineSharedState PerformShared => (attachedShared ?? (ToolSettings is not null ? shared.EngineWide : MultiCachesOf() ?? shared)).WithSocketWait(SocketWait).KeepingTransportsBuiltIn(transportsBuilt);
+
+    /// <summary>The transports the running perform built, which it disposes when it ends, so their <c>--doh-url</c> resolver's kept connections close (ADR-1441).</summary>
+    private readonly ConcurrentBag<CurlTransports> transportsBuilt = [];
 
     /// <summary>
     /// Gets or sets what the handle's transfers wait for on their socket while a multi handle drives them by

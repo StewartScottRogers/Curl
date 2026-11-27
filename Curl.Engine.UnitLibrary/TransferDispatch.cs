@@ -95,9 +95,21 @@ internal sealed class TransferDispatch(
     internal void LoadResolveEntries(ITransferEvents events) => loadResolveEntries?.Invoke(events);
 
     /// <summary>
-    /// Closes the run's <see cref="ConnectionPool" />, writing nothing, as curl closes its
-    /// connection cache after the last transfer; does nothing without one.
+    /// Gets what closes the connections the group's <c>--doh-url</c> resolver keeps (ADR-1441): the group's
+    /// <see cref="CurlTransports" />, or the DoH resolver the dialing runner built; <see langword="null" />, the
+    /// default, when there is nothing to close.
     /// </summary>
-    /// <returns>A task that completes when every idle connection is closed.</returns>
-    public ValueTask DisposeAsync() => ConnectionPool?.DisposeAsync() ?? ValueTask.CompletedTask;
+    internal IAsyncDisposable? KeptDohConnections { get; init; }
+
+    /// <summary>
+    /// Closes the run's <see cref="ConnectionPool" />, writing nothing, as curl closes its
+    /// connection cache after the last transfer, and then the <see cref="KeptDohConnections" />; does
+    /// nothing for whichever it has none of.
+    /// </summary>
+    /// <returns>A task that completes when both are closed.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        await (ConnectionPool?.DisposeAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
+        await (KeptDohConnections?.DisposeAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
+    }
 }

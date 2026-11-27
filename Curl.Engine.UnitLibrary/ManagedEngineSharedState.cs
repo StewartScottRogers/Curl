@@ -252,5 +252,17 @@ internal sealed class ManagedEngineSharedState
     /// </summary>
     /// <returns>The state, sharing every cache with this one.</returns>
     internal ManagedEngineSharedState WithoutFtpPwdStop() =>
-        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts, keepsFtpPwdStop: false) { SocketWait = SocketWait };
+        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts, keepsFtpPwdStop: false) { SocketWait = SocketWait, TransportsBuilt = TransportsBuilt };
+
+    /// <summary>
+    /// Gets where <see cref="ManagedCurlEngine.CreateTransports" /> keeps the transports it builds over this state,
+    /// for the perform running over it to dispose; <see langword="null" /> outside a perform.
+    /// </summary>
+    internal ConcurrentBag<CurlTransports>? TransportsBuilt { get; private init; }
+
+    /// <summary>Gives this state with <paramref name="transportsBuilt" /> as its <see cref="TransportsBuilt" />.</summary>
+    /// <param name="transportsBuilt">Where the transports built over the state are kept.</param>
+    /// <returns>The state, sharing every cache with this one.</returns>
+    internal ManagedEngineSharedState KeepingTransportsBuiltIn(ConcurrentBag<CurlTransports> transportsBuilt) =>
+        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts) { SocketWait = SocketWait, TransportsBuilt = transportsBuilt };
 }

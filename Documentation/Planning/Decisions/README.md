@@ -1489,3 +1489,4 @@ Each option and the specific reason it lost.
 | [1445](ADR-1445-an-upload-keeps-an-s3-or-gs-bucket-name-as-typed.md) | An upload keeps an s3 or gs bucket name as typed (BL-6031) | Accepted | 2026-11-26 |
 | [1446](ADR-1446-a-chain-build-that-throws-for-openssl-error-1-is-verify-result-1.md) | A chain build that .NET ends with an exception for OpenSSL error 1 is a refused chain with verify result 1 (BL-6061) | Accepted | 2026-11-26 |
 | [1447](ADR-1447-the-remaining-extension-protocols-refuse-url-escapes-that-are-not-utf-8.md) | The remaining extension protocols refuse URL escapes that are not valid UTF-8 (BL-6045) | Accepted | 2026-11-26 |
+| [1446](ADR-1446-whoever-builds-the-transports-disposes-the-doh-url-resolver.md) | Whoever builds the transports disposes the --doh-url resolver (BL-6057) | Accepted | 2026-11-26 |

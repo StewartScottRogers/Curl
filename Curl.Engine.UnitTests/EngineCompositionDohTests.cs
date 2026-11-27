@@ -1,8 +1,14 @@
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Curl.Api.Codes;
+using Curl.Api.EngineContracts;
+using Curl.Api.Options;
+using Curl.Api.Options.Network;
 using Curl.Api.Options.Tls;
 using Curl.Cli;
 using Curl.Console;
+using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
@@ -406,6 +412,154 @@ public sealed class EngineCompositionDohTests
         Diagnostics.Bytes("DoH requests", dohServer.Written);
         Diagnostics.Act("web targets", string.Join(", ", webServer.Targets.Select(target => $"{target.Host}:{target.Port}")));
         return result;
+    }
+
+    private const string PlainDohUrl = "http://127.0.0.1:48711/dns-query";
+
+    [TestMethod]
+    public async Task DisposeAsync_OfTransports_ClosesTheConnectionsTheDohResolverKept()
+    {
+        DohRecordingDialer dialer = new(AAnswer);
+        CurlTransports transports = DialingTransports(PlainDohUrl, dialer, new LoopbackDnsResolver());
+        await transports.DnsResolver.ResolveAsync("example.test", CancellationToken.None);
+        int closedBefore = dialer.Dialled.Count(connection => connection.IsDisposed);
+
+        await transports.DisposeAsync();
+
+        Diagnostics.Assert("closed before the dispose", 0, closedBefore);
+        Assert.AreEqual(0, closedBefore);
+        Diagnostics.Assert("DoH connections opened", 2, dialer.Dialled.Count);
+        Assert.HasCount(2, dialer.Dialled);
+        Assert.IsTrue(dialer.Dialled.All(connection => connection.IsDisposed));
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfTransportsWithoutADohUrl_LeavesTheCallersResolverAlone()
+    {
+        DisposalRecordingResolver resolver = new();
+        CurlTransports transports = DialingTransports(string.Empty, new DohRecordingDialer(AAnswer), resolver);
+
+        await transports.DisposeAsync();
+
+        Diagnostics.Assert("caller's resolver disposed", false, resolver.IsDisposed);
+        Assert.AreSame(resolver, transports.DnsResolver);
+        Assert.IsFalse(resolver.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfADispatchHoldingTheTransports_ClosesTheConnectionsTheDohResolverKept()
+    {
+        DohRecordingDialer dialer = new(AAnswer);
+        CurlTransports transports = DialingTransports(PlainDohUrl, dialer, new LoopbackDnsResolver());
+        await transports.DnsResolver.ResolveAsync("example.test", CancellationToken.None);
+        TransferDispatch dispatch = new(new ProtocolDispatcher([]), [], connectionPool: transports.PoolingConnector)
+        {
+            KeptDohConnections = transports,
+        };
+
+        await dispatch.DisposeAsync();
+
+        Diagnostics.Assert("DoH connections opened", 2, dialer.Dialled.Count);
+        Assert.HasCount(2, dialer.Dialled);
+        Assert.IsTrue(dialer.Dialled.All(connection => connection.IsDisposed));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_WithADohUrl_ClosesTheConnectionsTheDohResolverKept()
+    {
+        byte[] webResponse = Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = webResponse };
+        ManagedCurlEngine engine = new(TimeProvider.System, null, readEnvironmentVariable: _ => null, dialing: new EngineDialing(dialer, new LoopbackDnsResolver(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no udp")));
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://example.test:48712/", DohUrl = PlainDohUrl } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Diagnostics.Assert("code", CurlCode.Ok, code);
+        Assert.AreEqual(CurlCode.Ok, code);
+        List<DisposalRecordingConnection> dohConnections = [.. dialer.Dialled.Where(connection => connection.Port == 48711)];
+        Diagnostics.Assert("DoH connections opened", 2, dohConnections.Count);
+        Assert.HasCount(2, dohConnections);
+        Assert.IsTrue(dohConnections.All(connection => connection.IsDisposed));
+        // The web server's connection stays in the handle's pool.
+        Assert.IsFalse(dialer.Dialled.Single(connection => connection.Port == 48712).IsDisposed);
+    }
+
+    // The transports a run dialing in memory builds for --doh-url, or for no DoH URL when it is empty.
+    private CurlTransports DialingTransports(string dohUrl, ITcpDialer dialer, IDnsResolver resolver)
+    {
+        CommandLineOptions options = Parse("--doh-url", dohUrl);
+        return EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections: null, tlsSessions: null, diagnosticLog: null, runDnsCache: null, easyErrorText: null, traces: null, static lookUps => lookUps, new EngineDialing(dialer, resolver, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no udp")), socketWait: null);
+    }
+
+    // Answers each dialled connection with one reply: the DoH answer on the DoH server's port, else OtherPortReply.
+    private sealed class DohRecordingDialer(byte[] dohReply) : ITcpDialer
+    {
+        public byte[] OtherPortReply { get; init; } = [];
+
+        public List<DisposalRecordingConnection> Dialled { get; } = [];
+
+        public ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
+        {
+            DisposalRecordingConnection connection = new(endPoint.Port, endPoint.Port == 48711 ? dohReply : OtherPortReply);
+            lock (Dialled)
+            {
+                Dialled.Add(connection);
+            }
+
+            return ValueTask.FromResult(new DialedTcpConnection(connection, new IPEndPoint(IPAddress.Loopback, 50000)));
+        }
+
+        public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+            DialAsync(endPoint, cancellationToken);
+
+        public ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("No Unix socket is dialled.");
+    }
+
+    private sealed class DisposalRecordingConnection(int port, byte[] reply) : IConnection
+    {
+        private ReadOnlyMemory<byte> unread = reply;
+
+        public int Port => port;
+
+        public bool IsDisposed { get; private set; }
+
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            int count = Math.Min(unread.Length, buffer.Length);
+            unread[..count].CopyTo(buffer);
+            unread = unread[count..];
+            return ValueTask.FromResult(count);
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync()
+        {
+            IsDisposed = true;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class DisposalRecordingResolver : IDnsResolver, IAsyncDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Loopback]);
+
+        public ValueTask DisposeAsync()
+        {
+            IsDisposed = true;
+            return ValueTask.CompletedTask;
+        }
     }
 
     // The TLS record the command line maps to, as Curl.Console hands it to the engine.

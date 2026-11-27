@@ -387,6 +387,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Creates a library handle's transports over the engine's caches. <c>CURLOPT_PIPEWAIT</c> stands where the
     /// curl tool's <c>-Z</c> without <c>--parallel-immediate</c> does, so the pool waits for a connection being
     /// opened to the same origin to show it multiplexes rather than opening another, as libcurl's does (BL-3351).
+    /// The transports are kept in <see cref="ManagedEngineSharedState.TransportsBuilt" />, which the perform running
+    /// over the state disposes when it ends.
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="shared">The engine's shared state.</param>
@@ -394,6 +396,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
     internal static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
         EngineToolOptions tool = new(Parallel: options.Http.PipeWait, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null, TracesTransfer: options.Behaviour.Verbose);
-        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing, shared.SocketWait);
+        CurlTransports transports = EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing, shared.SocketWait);
+        shared.TransportsBuilt?.Add(transports);
+        return transports;
     }
 }
