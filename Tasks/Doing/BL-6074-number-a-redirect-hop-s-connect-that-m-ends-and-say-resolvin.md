@@ -31,3 +31,4 @@ Found in BL-6071 (ADR-1460). `curl -svSL -m 3` following a 302, answered after 1
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: bff96a23 c6835b0c 3d836d5e.
