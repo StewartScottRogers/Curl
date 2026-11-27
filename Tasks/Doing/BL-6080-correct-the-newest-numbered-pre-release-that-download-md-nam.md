@@ -29,3 +29,4 @@ What `DOWNLOAD.md` says about the newest numbered pre-release is true and does n
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: d48cb4d3.
