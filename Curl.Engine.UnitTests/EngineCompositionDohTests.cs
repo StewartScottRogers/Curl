@@ -79,7 +79,7 @@ public sealed class EngineCompositionDohTests
         // curl -sS -v --doh-url https://127.0.0.1:48711/dns-query --doh-insecure http://example.test:48712/
         // -> two POSTs to the DoH server, then "* Host example.test:48712 was resolved." / "* IPv6: (none)" /
         // "* IPv4: 127.0.0.1" / "*   Trying 127.0.0.1:48712...", the GET to the second server, exit 0.
-        // The DoH server leaves the connection open, so the second POST goes on it (ADR-1436).
+        // The DoH server leaves the connection open, so the second POST goes on it (ADR-1441).
         ScriptedConnector dohServer = new([AAnswer, AAnswer]);
         ScriptedConnector webServer = new([]);
         RecordingEvents events = new();

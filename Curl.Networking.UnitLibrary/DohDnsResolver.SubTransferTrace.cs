@@ -17,7 +17,7 @@ public sealed partial class DohDnsResolver
             : QueryOnAConnectionEachAsync(queries, kept, cancellationToken);
     }
 
-    // Both queries go on a kept HTTP/2 connection (ADR-1436). Over TLS with no kept connection, the
+    // Both queries go on a kept HTTP/2 connection (ADR-1441). Over TLS with no kept connection, the
     // second waits for the first one's (ADR-1435). Else each query goes on a kept HTTP/1.x connection
     // or a new one.
     private Task<DohQueryResult[]> RunBothQueriesAsync(List<(byte[] Query, DnsRecordType Type)> queries, List<DohConnection> kept, CancellationToken cancellationToken)
@@ -36,7 +36,7 @@ public sealed partial class DohDnsResolver
     // all are in; traced, one after another, each outcome after its own sub-transfer's lines, so each
     // sub-transfer's lines come whole. The last query's outcome, AAAA's, is reported first, as curl
     // 8.22.0 reports it, and traced its sub-transfer runs first too (ADR-0380, BL-2973), so it takes
-    // the first kept connection (ADR-1436). The results keep the queries' order.
+    // the first kept connection (ADR-1441). The results keep the queries' order.
     private async Task<DohQueryResult[]> QueryOnAConnectionEachAsync(List<(byte[] Query, DnsRecordType Type)> queries, List<DohConnection> kept, CancellationToken cancellationToken)
     {
         Task<DohQueryResult> RunAsync(int index) =>

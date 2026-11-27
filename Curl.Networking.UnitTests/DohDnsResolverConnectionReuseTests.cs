@@ -10,7 +10,7 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins how <see cref="DohDnsResolver" /> reuses its DoH connections (ADR-1436), with the connection
+/// Pins how <see cref="DohDnsResolver" /> reuses its DoH connections (ADR-1441), with the connection
 /// numbers, stream numbers and <c>-v</c> lines curl 8.18.0 (nghttp2, on Windows and on Ubuntu) was
 /// measured to use against nginx. The connection is scripted, so no test touches the network.
 /// </summary>

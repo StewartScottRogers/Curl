@@ -1482,4 +1482,4 @@ Each option and the specific reason it lost.
 | [1438](ADR-1438-cert-status-refuses-a-not-yet-valid-delegated-ocsp-responder.md) | `--cert-status` refuses a not-yet-valid delegated OCSP responder; the Schannel revocation checks accept it (BL-6037) | Accepted | 2026-11-26 |
 | [1439](ADR-1439-dpop-signs-inside-every-request-changing-hook.md) | --dpop signs inside every hook that repeats or changes a request (BL-6042) | Accepted | 2026-11-26 |
 | [1440](ADR-1440-the-empty-probe-of-an-ietf-append-says-the-upload-is-incomplete.md) | The empty probe of an IETF append says the upload is incomplete (BL-6044) | Accepted | 2026-11-26 |
-| [1436](ADR-1436-doh-url-keeps-its-connections-for-later-queries.md) | --doh-url keeps its connections for later queries (BL-6051) | Accepted | 2026-11-26 |
+| [1441](ADR-1441-doh-url-keeps-its-connections-for-later-queries.md) | --doh-url keeps its connections for later queries (BL-6051) | Accepted | 2026-11-26 |

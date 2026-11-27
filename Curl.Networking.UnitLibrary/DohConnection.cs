@@ -5,7 +5,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// One open DNS-over-HTTPS connection, which <see cref="DohDnsResolver" /> keeps for later queries
-/// (ADR-1436). One query or pair of queries holds it at a time.
+/// (ADR-1441). One query or pair of queries holds it at a time.
 /// </summary>
 /// <param name="transport">The connection to the DoH server.</param>
 /// <param name="number">The number <c>-v</c> gives the connection.</param>

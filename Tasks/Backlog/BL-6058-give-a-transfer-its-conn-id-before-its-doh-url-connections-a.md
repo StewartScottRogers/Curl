@@ -18,7 +18,7 @@ Under `--doh-url`, `%{conn_id}`, `-v`'s `closing connection #N` and the DoH conn
 
 ## Context
 
-Measured 2026-11-26 with curl 8.18.0 (Windows nghttp2 build and Ubuntu) over three URLs against an HTTP/1.1 DoH server: the transfers are `#0`, `#2`, `#4` and the DoH connections `#1` and `#3`. Curl prints `conn_id` 1, 3, 4 and `closing connection #0`, `#1`, `#2`, with DoH connections `#1`, `#2`: the console takes a transfer's `conn_id` after its DoH look-up. `DohDnsResolver` already uses the number `TakeConnectionId` returns when it is past the next DoH number (ADR-1436).
+Measured 2026-11-26 with curl 8.18.0 (Windows nghttp2 build and Ubuntu) over three URLs against an HTTP/1.1 DoH server: the transfers are `#0`, `#2`, `#4` and the DoH connections `#1` and `#3`. Curl prints `conn_id` 1, 3, 4 and `closing connection #0`, `#1`, `#2`, with DoH connections `#1`, `#2`: the console takes a transfer's `conn_id` after its DoH look-up. `DohDnsResolver` already uses the number `TakeConnectionId` returns when it is past the next DoH number (ADR-1441).
 
 ## Acceptance criteria
 

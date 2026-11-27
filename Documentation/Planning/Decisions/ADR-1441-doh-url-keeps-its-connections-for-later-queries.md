@@ -1,4 +1,4 @@
-# ADR-1436 — `--doh-url` keeps its connections for later queries
+# ADR-1441 — `--doh-url` keeps its connections for later queries
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

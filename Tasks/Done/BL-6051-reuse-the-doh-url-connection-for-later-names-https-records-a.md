@@ -29,9 +29,9 @@ ADR-1435 (BL-6038) records what curl 8.18.0 on Ubuntu does: a second name in the
 ## Notes
 
 - Measured curl 8.18.0 on Ubuntu (WSL) and on Windows (the WinGet curl.se build, nghttp2) against
-  nginx 1.30.8 in Docker; results and decisions are in ADR-1436. The Windows reference behaves as
+  nginx 1.30.8 in Docker; results and decisions are in ADR-1441. The Windows reference behaves as
   Linux does. The HTTPS-record query could not be measured (no curl here lists `HTTPSRR` or `ECH`),
-  so it follows the same reuse rules (ADR-1436).
+  so it follows the same reuse rules (ADR-1441).
 - Choices: one lookup holds a connection at a time; a kept connection that answers nothing is
   replaced without a `-v` line (curl's were not measured); query order stays ADR-0380's.
 - Checked `Curl.exe` end to end against the same nginx over three names: HTTP/2 streams 1 to 11 on
@@ -49,4 +49,4 @@ ADR-1435 (BL-6038) records what curl 8.18.0 on Ubuntu does: a second name in the
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 79961f58 94cff58a 3d836d5e.
-- 2026-11-26: Doing -> Done. Later names, HTTPS records and an HTTP/1.1 second query reuse the DoH connection (ADR-1436); build clean, fast tests green.
+- 2026-11-26: Doing -> Done. Later names, HTTPS records and an HTTP/1.1 second query reuse the DoH connection (ADR-1441); build clean, fast tests green.

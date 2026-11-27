@@ -1,6 +1,6 @@
 namespace Curl.Networking;
 
-// The DoH connections kept for later queries, and the numbers -v gives each one opened (ADR-1436).
+// The DoH connections kept for later queries, and the numbers -v gives each one opened (ADR-1441).
 public sealed partial class DohDnsResolver : IAsyncDisposable
 {
     private readonly object _connectionsLock = new();

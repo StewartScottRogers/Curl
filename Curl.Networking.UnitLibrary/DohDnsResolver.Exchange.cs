@@ -29,7 +29,7 @@ public sealed partial class DohDnsResolver
     // curl sets CURLOPT_PIPEWAIT on its DoH sub-transfers, so over TLS the second query waits for the
     // first one's connection. A server that picked h2 gets both on it, A on stream 1 and AAAA on
     // stream 3 (ADR-1435); any other gets one query and, after its answer, the other, on the same
-    // connection when that answer leaves it open and else on a new one (ADR-1436): traced AAAA goes
+    // connection when that answer leaves it open and else on a new one (ADR-1441): traced AAAA goes
     // first (ADR-0380), untraced A.
     private async Task<DohQueryResult[]> RunQueriesAfterTheFirstConnectionAsync(List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
     {

@@ -11,7 +11,7 @@ namespace Curl.Networking;
 /// connection to an HTTP/2 server (ADR-1435), and returns the AAAA answer's addresses and then the A
 /// answer's. Under <c>-4</c> or <c>-6</c> (<see cref="AddressFamily" />) it sends only that family's
 /// query (BL-939). It keeps each connection its response leaves open for later queries until it is
-/// disposed (ADR-1436): a later name's queries both go on the kept HTTP/2 connection, or each on a
+/// disposed (ADR-1441): a later name's queries both go on the kept HTTP/2 connection, or each on a
 /// kept HTTP/1.x one or a new one, and over TLS an HTTP/1.x server's second query of the first name
 /// waits for the first one's answer and goes on its connection.
 /// </summary>
@@ -114,7 +114,7 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
     /// Gets the function that takes the run's next <c>%{conn_id}</c>, called once for each DoH connection
     /// opened so the connection numbers <c>-v</c> prints for the transfer's own connections count them
     /// (CGR-286); the DoH connection's own <c>-v</c> number is the one taken when that is past the next
-    /// DoH number (ADR-1436). <see langword="null" /> takes none.
+    /// DoH number (ADR-1441). <see langword="null" /> takes none.
     /// </summary>
     public Func<long>? TakeConnectionId { get; init; }
 
@@ -129,7 +129,7 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
     /// another, AAAA's whole before A's as curl 8.22.0 runs them, so the lines come in a fixed order (ADR-0380); the default,
     /// <see cref="NoTransferEvents.Instance" />, reports nothing. Two streams of one HTTP/2 connection
     /// run together either way, A's first (ADR-1435); an untraced first name over TLS to an HTTP/1.x
-    /// server runs A's query and then AAAA's (ADR-1436), and other untraced queries run in parallel.
+    /// server runs A's query and then AAAA's (ADR-1441), and other untraced queries run in parallel.
     /// </summary>
     public ITransferEvents SubTransferEvents { get; init; } = NoTransferEvents.Instance;
 

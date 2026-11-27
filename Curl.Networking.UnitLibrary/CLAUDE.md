@@ -433,7 +433,7 @@ second address query waits for the first one's connection, as curl's `CURLOPT_PI
 it is stream 3 of that connection (A on 1, AAAA on 3, one connection number, outcomes in the order the
 streams end, `left intact` once), and traced, `DohPipeWaitTraceEvents` writes curl 8.18.0's waiting
 lines after the first `Trying` (not through a proxy); on HTTP/1.x it runs after the first one's answer.
-Per ADR-1436 (BL-6051) the resolver keeps every connection a response leaves open (`DohConnection`,
+Per ADR-1441 (BL-6051) the resolver keeps every connection a response leaves open (`DohConnection`,
 `DohDnsResolver.ConnectionReuse.cs`) until `DisposeAsync`: a later query takes the kept `h2` one
 (a name's two queries on its next two streams) or the lowest-numbered kept HTTP/1.x one, writing
 `Reusing existing https: connection with host H`, else opens one; a kept connection that answers

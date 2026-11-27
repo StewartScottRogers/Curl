@@ -18,7 +18,7 @@ Whoever builds the transports disposes the `--doh-url` resolver when their trans
 
 ## Context
 
-ADR-1436 (BL-6051): `DohDnsResolver` keeps its DoH connections for later queries and closes them in `DisposeAsync`, which nothing calls, so they stay open until the process ends. That matters most to a long-lived `Curl.Api` or engine host. Start at `EngineComposition.CreateDnsResolver` and `CurlTransports`; follow who owns and disposes the transports.
+ADR-1441 (BL-6051): `DohDnsResolver` keeps its DoH connections for later queries and closes them in `DisposeAsync`, which nothing calls, so they stay open until the process ends. That matters most to a long-lived `Curl.Api` or engine host. Start at `EngineComposition.CreateDnsResolver` and `CurlTransports`; follow who owns and disposes the transports.
 
 ## Acceptance criteria
 
