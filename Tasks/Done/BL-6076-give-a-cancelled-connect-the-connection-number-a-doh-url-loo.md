@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/PoolingConnector.cs, Curl.Networking.UnitTests/ConnectionCacheSubTransferNumberingTests.cs]
 requirement: none
 created: 2026-11-27
-completed:
+completed: 2026-11-27
 ---
 # BL-6076 — Give a cancelled connect the connection number a --doh-url look-up reserved for it
 
@@ -31,14 +31,19 @@ where curl, which numbers a connection before it resolves its host (ADR-1463), p
 
 ## Acceptance criteria
 
-- [ ] `OfferNumberToCanceledConnect` (or its caller) gives a cancelled non-QUIC connect a taker that returns `_cache.NumberOpened(numbering)`, so a reserved number is used and an unreserved one still takes the next number.
-- [ ] A unit test in `Curl.Networking.UnitTests/ConnectionCacheSubTransferNumberingTests.cs` has an inner connector call `NumberSubTransferConnection` and then throw `OperationCanceledException`; the exception's `ConnectionNumberTaker` gives `0` and the sub-transfer connection got `1`.
-- [ ] The existing cancelled-connect numbering tests still pass unchanged.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `OfferNumberToCanceledConnect` (or its caller) gives a cancelled non-QUIC connect a taker that returns `_cache.NumberOpened(numbering)`, so a reserved number is used and an unreserved one still takes the next number.
+- [x] A unit test in `Curl.Networking.UnitTests/ConnectionCacheSubTransferNumberingTests.cs` has an inner connector call `NumberSubTransferConnection` and then throw `OperationCanceledException`; the exception's `ConnectionNumberTaker` gives `0` and the sub-transfer connection got `1`.
+- [x] The existing cancelled-connect numbering tests still pass unchanged.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- The taker OfferNumberToCanceledConnect hands over now calls NumberOpened with the open's reservation. The new test failed before the fix and passes after it.
+- No new ADR: this applies ADR-1463 (a connection is numbered before its host is resolved) to the cancelled connect.
+- 2026-11-27: build clean, fast tests green, Measure-CodeQuality for Curl.Networking.UnitLibrary reports 0 failing members.
 
 ## Log
 
 - 2026-11-27: Created.
 - 2026-11-27: Backlog -> Doing. Criteria at claim: 5803d7d8 68c9dd61 21d6d7bb 3d836d5e.
+- 2026-11-27: Doing -> Done. A cancelled connect now takes the connection number a --doh-url look-up reserved for it
