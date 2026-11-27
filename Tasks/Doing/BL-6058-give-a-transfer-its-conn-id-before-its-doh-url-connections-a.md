@@ -30,3 +30,4 @@ Measured 2026-11-26 with curl 8.18.0 (Windows nghttp2 build and Ubuntu) over thr
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 6d06fcd3 3d836d5e.
