@@ -602,6 +602,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         CancellationToken cancellationToken)
     {
         var negotiation = StartNegotiation(key);
+        var numbering = _cache.ReserveForOpening();
         ConnectResult connect;
         try
         {
@@ -616,13 +617,13 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         if (connect.Connection is null)
         {
             Decide(negotiation);
-            return isQuic ? connect : NumberedConnectFailure.Of(connect, _cache.NumberNextConnection());
+            return isQuic ? connect : NumberedConnectFailure.Of(connect, _cache.NumberOpened(numbering));
         }
 
         var entry = Lease(new PoolEntry(
             key,
             connect.Connection,
-            _cache.NumberNextConnection(),
+            _cache.NumberOpened(numbering),
             connect.LocalEndPoint,
             connect.PeerCertificates,
             connect.UnixSocketPath,

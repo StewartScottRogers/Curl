@@ -11,6 +11,7 @@ namespace Curl.Networking;
 /// <param name="timeProvider">Measures how long each connection has been idle.</param>
 public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposable, IConnectionNumbers
 {
+    private readonly AsyncLocal<ConnectionNumberReservation?> _openingNumber = new();
     private long _nextConnectionNumber;
 
     /// <summary>Gets the lock every change to the cache is made under.</summary>
@@ -170,6 +171,32 @@ public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposabl
     /// </summary>
     /// <returns>The number.</returns>
     public long NumberNextConnection() => Interlocked.Increment(ref _nextConnectionNumber) - 1;
+
+    /// <summary>
+    /// Takes the next connection number for a connection opened on behalf of one still being opened,
+    /// a <c>--doh-url</c> connection, once that one, which a <see cref="PoolingConnector" /> is opening
+    /// in this flow, holds its own, which it takes first when it has none: curl numbers a connection
+    /// before it resolves its host (ADR-1455).
+    /// </summary>
+    /// <returns>The sub-transfer connection's number.</returns>
+    public long NumberSubTransferConnection()
+    {
+        if (_openingNumber.Value is { } opening)
+        {
+            opening.Number ??= NumberNextConnection();
+        }
+
+        return NumberNextConnection();
+    }
+
+    /// <summary>Starts the numbering of a connection about to be opened in this flow, holding no number yet.</summary>
+    /// <returns>The reservation <see cref="NumberOpened" /> reads once the open has ended.</returns>
+    internal ConnectionNumberReservation ReserveForOpening() => _openingNumber.Value = new ConnectionNumberReservation();
+
+    /// <summary>Gives a connection whose open has ended its number: the one it took early, else the next.</summary>
+    /// <param name="opening">The connection's reservation.</param>
+    /// <returns>The number.</returns>
+    internal long NumberOpened(ConnectionNumberReservation opening) => opening.Number ?? NumberNextConnection();
 
     /// <summary>Closes each of <paramref name="entries" /> in turn.</summary>
     /// <param name="entries">The connections to close.</param>

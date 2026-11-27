@@ -1499,3 +1499,4 @@ Each option and the specific reason it lost.
 | [1455](ADR-1455-the-schannel-build-checks-only-the-first-subject-email-address-and-none-beside-an-rfc822name.md) | The Schannel build checks only the first subject emailAddress, and none beside an rfc822Name (BL-6026) | Accepted | 2026-11-26 |
 | [1456](ADR-1456-a-grpc-reflection-refusal-reports-its-status-and-headers-so-dpop-retries-it.md) | A refused gRPC server reflection request reports its status and headers, so `--dpop` retries it (BL-6068) | Accepted | 2026-11-26 |
 | [1457](ADR-1457-a-cancellation-just-before-the-connect-limit-is-the-limit-passing.md) | A cancellation just before the connect limit is the limit passing (BL-6039) | Accepted | 2026-11-26 |
+| [1455](ADR-1455-a-transfer-is-numbered-before-its-doh-url-connections.md) | A transfer is numbered before its `--doh-url` connections (BL-6058) | Accepted | 2026-11-26 |
