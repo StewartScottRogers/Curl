@@ -1,4 +1,4 @@
-# ADR-1452: The Schannel build checks only the first subject emailAddress, and none beside an rfc822Name (BL-6026)
+# ADR-1455: The Schannel build checks only the first subject emailAddress, and none beside an rfc822Name (BL-6026)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1422.
 

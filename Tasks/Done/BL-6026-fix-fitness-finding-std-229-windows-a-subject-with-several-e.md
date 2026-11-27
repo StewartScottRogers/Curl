@@ -44,9 +44,9 @@ The finding, verbatim:
 
 ## Notes
 
-- Measured curl 8.21.0 Schannel against a throwaway C# loopback TLS server (intermediate as `--cacert`, `--ssl-no-revoke`), 28 cases; table in ADR-1452. After the fix Curl gave the same exit code and message line in all 28.
+- Measured curl 8.21.0 Schannel against a throwaway C# loopback TLS server (intermediate as `--cacert`, `--ssl-no-revoke`), 28 cases; table in ADR-1455. After the fix Curl gave the same exit code and message line in all 28.
 - Schannel checks only the first subject emailAddress in encoding order (the finding), and none when the subjectAltName holds an rfc822Name (found by the same measurement; same lines of `ListSchannelNames`, so fixed here). A single `evil@other.org` is still exit 60. Subject CNs are all still checked.
-- Touches gained the test file for the ADR-0482 test; no task in Doing named it. ADR-1422 gained an "Amended by ADR-1452" line.
+- Touches gained the test file for the ADR-0482 test; no task in Doing named it. ADR-1422 gained an "Amended by ADR-1455" line.
 - Build clean, fast tests green, Measure-CodeQuality for Curl.Networking.UnitLibrary: 100% line and branch, 0 failing members.
 - Linux and macOS: only the Schannel path changed and the new tests call it by flag with no platform-dependent output.
 
