@@ -32,3 +32,4 @@ Measured 2026-11-26 with curl 8.18.0 (Windows nghttp2 build and Ubuntu) over thr
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 6d06fcd3 3d836d5e.
 - 2026-11-26: Doing -> Backlog. Lane 1 could not integrate: rebase failed. The work is on branch factory/BL-6058-lane-1-20261126-174800; start with git cherry-pick --no-commit factory/BL-6058-lane-1-20261126-174800 and fix it.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 6d06fcd3 3d836d5e.
