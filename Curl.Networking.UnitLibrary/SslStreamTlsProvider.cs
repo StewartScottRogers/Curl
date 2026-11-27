@@ -1,11 +1,14 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Security;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 using Curl.Protocol.Abstractions;
+using Curl.Tls;
 
 namespace Curl.Networking;
 
@@ -25,7 +28,7 @@ namespace Curl.Networking;
 /// <see cref="TlsClientOptions.CaCertificateDirectory" />, which the OpenSSL build honours
 /// and the Schannel build ignores with <see cref="Warnings" />.
 /// </remarks>
-public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings, ISystemStoreTrustTlsProvider
+public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings, ISystemStoreTrustTlsProvider, ITlsProviderWithHandBuiltRedial
 {
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.SslStream;
@@ -207,6 +210,20 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// </summary>
     internal TlsClientOptions Options => _options;
 
+    /// <summary>
+    /// Gets the provider that runs a redialled handshake in place of the
+    /// <see cref="HandBuiltTlsProvider" /> built from the same settings (ADR-1459), or
+    /// <see langword="null" />, the default, for that one; tests replace it.
+    /// </summary>
+    internal ITlsProvider? HandBuiltRedialProvider { get; init; }
+
+    // The hosts whose handshakes ask TcpConnector for the hand-built client from now on, shared
+    // with every copy WithSystemStoreOnlyTrust makes.
+    private ConcurrentDictionary<string, bool> HostsRunByHand { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    // The failed results that asked for a redial; an entry lives no longer than its result.
+    private readonly ConditionalWeakTable<ConnectResult, string> _redialRequests = [];
+
     /// <inheritdoc />
     public ServerCertificateChainVerdict VerifyServerCertificateChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost) =>
         _verification.VerifyChain(certificates, targetHost);
@@ -218,6 +235,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             SessionPartitions = SessionPartitions,
             CipherSuitesPolicyFactory = CipherSuitesPolicyFactory,
             AuthenticateSslStreamAsClientAsync = AuthenticateSslStreamAsClientAsync,
+            HandBuiltRedialProvider = HandBuiltRedialProvider,
+            HostsRunByHand = HostsRunByHand,
         };
 
     /// <inheritdoc />
@@ -544,6 +563,23 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         RethrowIfCancellation(failure);
         (peerVerification, verificationFailure) = JudgeFailedHandshake(failure, peerVerification, verificationFailure);
         peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
+        return IsRunAgainByHand(failure)
+            ? AskForRedial(targetHost, failure)
+            : FailHandshake(events, failure, verificationFailure, judgedHandshake, peerVerification, peerCertificates, isProxy, targetHost);
+    }
+
+    // Reports a handshake that failed for good and gives its result: the certificate's refusal
+    // when there is one, otherwise the connect error.
+    private ConnectResult FailHandshake(
+        ITransferEvents events,
+        Exception failure,
+        (CurlExitCode ExitCode, string Message)? verificationFailure,
+        TlsHandshakeEvent judgedHandshake,
+        PeerVerification peerVerification,
+        ReadOnlyMemory<byte>[] peerCertificates,
+        bool isProxy,
+        string targetHost)
+    {
         ReportFailedHandshake(
             events, judgedHandshake, verificationFailure.HasValue, peerVerification, peerCertificates, isProxy, targetHost);
         peerVerification.ReportPinnedPublicKeyRefusal(events, _matchesSchannelBuild);
@@ -553,17 +589,44 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure)));
     }
 
+    /// <inheritdoc />
+    ITlsProvider ITlsProviderWithHandBuiltRedial.ProviderFor(string targetHost) =>
+        HostsRunByHand.ContainsKey(targetHost)
+            ? HandBuiltRedialProvider ?? new HandBuiltTlsProvider(_options, _matchesSchannelBuild, _timeProvider, _certificateStore, SystemTlsRandomSource.Instance)
+            : this;
+
+    /// <inheritdoc />
+    bool ITlsProviderWithHandBuiltRedial.AsksForRedial(ConnectResult handshake) =>
+        _redialRequests.TryGetValue(handshake, out _);
+
+    // Under -k the OpenSSL build goes on past a chain that ends with error 1, which this provider
+    // cannot: SslStream's handshake is already over when .NET throws (ADR-1459).
+    private bool IsRunAgainByHand(Exception failure) =>
+        _options.Insecure && EndedAsOpenSslError1(failure);
+
+    private bool EndedAsOpenSslError1(Exception failure) =>
+        !_matchesSchannelBuild && CertificateChainBuild.EndedHandshakeAsUnspecified(failure);
+
+    // The connect error, for a caller with no way to dial again, marked as one TcpConnector
+    // redials, the host's later handshakes running on the hand-built client.
+    private ConnectResult AskForRedial(string targetHost, Exception failure)
+    {
+        var result = ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure));
+        HostsRunByHand[targetHost] = true;
+        _redialRequests.Add(result, targetHost);
+        return result;
+    }
+
     // What a failed handshake says about the certificate: what the callbacks observed, except
     // when .NET on Linux threw from its own chain build for OpenSSL's error 1, before the
     // validation callback (ADR-1452). The OpenSSL build refuses that as verify result 1. Under -k
-    // SslStream has no handshake left to go on with, so only the verify result is added and the
-    // connect error stands.
+    // only the verify result is added: the connect error stands until the redial (ADR-1459).
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Refusal) JudgeFailedHandshake(
         Exception failure,
         PeerVerification observed,
         (CurlExitCode ExitCode, string Message)? refusal)
     {
-        if (_matchesSchannelBuild || !CertificateChainBuild.EndedHandshakeAsUnspecified(failure))
+        if (!EndedAsOpenSslError1(failure))
         {
             return (observed, refusal);
         }

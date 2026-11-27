@@ -117,6 +117,71 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_PooledAndCancelledByTheCallerBeforeTheLimit_OffersTheNextConnectionNumber()
+    {
+        // The handler numbers a connect -m ended on a redirect hop with this (BL-6074).
+        using var caller = new CancellationTokenSource();
+        var dialer = new StallingTcpDialer { OnStalled = caller.Cancel };
+        await using var pool = new PoolingConnector(
+            new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider(), connectTimeout: OneSecond),
+            new ManualTimeProvider());
+        var earlier = pool.ConnectionNumbers.NumberNextConnection();
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await pool.ConnectAsync(new ConnectTarget("127.0.0.1", 80, UseTls: false), caller.Token));
+        var take = (Func<long>)exception.Data[ConnectCancellationKeys.ConnectionNumberTaker]!;
+
+        Diagnostics.Assert("earlier number", 0L, earlier);
+        Assert.AreEqual(1L, take());
+        Assert.AreEqual(2L, pool.ConnectionNumbers.NumberNextConnection());
+        Assert.IsNull(exception.Data[ConnectCancellationKeys.ArrivedWhileResolving]);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_CancelledByTheCallerWhileResolving_SaysSoOnTheCancellation()
+    {
+        var resolver = new FakeDnsResolver(Loopback) { ExceptionToThrow = new OperationCanceledException() };
+        await using var pool = new PoolingConnector(
+            new TcpConnector(resolver, new StallingTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider(), connectTimeout: OneSecond),
+            new ManualTimeProvider());
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await pool.ConnectAsync(new ConnectTarget("slow.example.test", 1, UseTls: false), CancellationToken.None));
+
+        Diagnostics.Assert("arrived while resolving", true, exception.Data[ConnectCancellationKeys.ArrivedWhileResolving]);
+        Assert.AreEqual(true, exception.Data[ConnectCancellationKeys.ArrivedWhileResolving]);
+        Assert.IsNotNull(exception.Data[ConnectCancellationKeys.ConnectionNumberTaker]);
+    }
+
+    [TestMethod]
+    [DataRow(true, true, DisplayName = "a cancelled QUIC session connect")]
+    [DataRow(false, false, DisplayName = "a TCP connect that threw something else")]
+    public async Task ConnectAsync_PooledFailureThatCurlDoesNotNumber_OffersNoConnectionNumber(bool isQuic, bool isCancellation)
+    {
+        Exception failure = isCancellation ? new OperationCanceledException() : new InvalidOperationException();
+        await using var pool = new PoolingConnector(new ThrowingConnector(failure), new ManualTimeProvider());
+        var target = new ConnectTarget("127.0.0.1", 443, UseTls: true);
+
+        var exception = await Assert.ThrowsAsync<Exception>(async () => _ = isQuic
+            ? await pool.ConnectMultiplexedSessionAsync(target, _ => throw new NotSupportedException(), CancellationToken.None)
+            : await pool.ConnectAsync(target, CancellationToken.None));
+
+        Diagnostics.Assert("data entries", 0, exception.Data.Count);
+        Assert.AreSame(failure, exception);
+        Assert.IsEmpty(exception.Data);
+    }
+
+    private sealed class ThrowingConnector(Exception failure) : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            throw failure;
+
+        public ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(
+            ConnectTarget target, Func<IMultiplexedConnection, IConnection> openSession, CancellationToken cancellationToken) =>
+            throw failure;
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheCallerCancelsWithTheConnectTimeoutPassed_ReportsTheTimeout()
     {
         // A simultaneous -m cannot turn the connect timeout into an exception (ADR-0117).

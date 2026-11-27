@@ -109,20 +109,9 @@ public sealed partial class UpstreamConformanceTests
         UpstreamCaseOutcome outcome;
         using (diagnostics.Phase("run case through curl"))
         {
-            outcome = await RunCaseOnceAsync(testNumber, testFile);
-        }
-
-        // A stall of the whole CI runner can hold a listed case past a time limit that it
-        // finishes in milliseconds elsewhere - the harness's own (test1484, BL-1859) or the case's,
-        // as test303's -m 8 expired before its reply arrived on Linux (BL-2093) - so a listed case
-        // that fails gets one more attempt; a case that really broke fails again.
-        if (isListed && outcome.Kind == UpstreamCaseOutcomeKind.Failed)
-        {
-            diagnostics.Act("first attempt failed", outcome.Detail);
-            using (diagnostics.Phase("run case through curl again"))
-            {
-                outcome = await RunCaseOnceAsync(testNumber, testFile);
-            }
+            outcome = isListed
+                ? await RunAgainIfFailedAsync(() => RunCaseOnceAsync(testNumber, testFile), detail => diagnostics.Act("first attempt failed", detail))
+                : await RunCaseOnceAsync(testNumber, testFile);
         }
 
         UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(testNumber, outcome, isListed);
@@ -158,6 +147,22 @@ public sealed partial class UpstreamConformanceTests
             SigningKey = new EcdsaTlsSigningKey(certificate.GetECDsaPrivateKey()!),
             QuicTransportParameters = Http3ServerConnection.DefaultTransportParameters.Encode(),
         }));
+
+    // For a case that must pass. A stall of the whole CI runner can hold such a case past a time
+    // limit that it finishes in milliseconds elsewhere - the harness's own (test1484, BL-1859;
+    // ext4005, BL-6069) or the case's, as test303's -m 8 expired before its reply arrived on Linux
+    // (BL-2093) - so a failed first attempt gets one more; a case that really broke fails again.
+    internal static async Task<UpstreamCaseOutcome> RunAgainIfFailedAsync(Func<Task<UpstreamCaseOutcome>> runCase, Action<string> noteFirstFailure)
+    {
+        UpstreamCaseOutcome outcome = await runCase();
+        if (outcome.Kind != UpstreamCaseOutcomeKind.Failed)
+        {
+            return outcome;
+        }
+
+        noteFirstFailure(outcome.Detail);
+        return await runCase();
+    }
 
     private static async Task<UpstreamCaseOutcome> RunCaseOnceAsync(int testNumber, byte[] testFile)
     {

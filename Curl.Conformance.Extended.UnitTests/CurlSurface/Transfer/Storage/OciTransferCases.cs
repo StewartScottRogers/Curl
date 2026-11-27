@@ -5,6 +5,7 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Storage;
 
 /// <summary>curl's generic transfer options (BL-4615) for <c>oci://</c> against the reference registry, pulling a manifest by tag; each check is <see cref="StorageTransferChecks" />'s.</summary>
 [TestClass]
+[DoNotParallelize]
 public sealed class OciTransferCases
 {
     private static readonly StorageTransferTarget Target = new(

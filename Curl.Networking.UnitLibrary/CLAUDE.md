@@ -55,7 +55,9 @@ constraint that does not decode), which it answers as a refused, empty chain who
 1 (ADR-1446, BL-6061); `SslStream`'s own build inside a handshake does not go through it, so when that
 build throws, the OpenSSL build's `SslStreamTlsProvider` recognises it through
 `CertificateChainBuild.EndedHandshakeAsUnspecified` and answers exit 60 with verify result 1, or under
-`-k` keeps the exit 35 connect error and reports the verify result alone (ADR-1452, BL-6063). Both load `--cert` through
+`-k` marks its exit 35 result as asking for a redial (`ITlsProviderWithHandBuiltRedial`), which
+`TcpConnector` answers by dialling again and handshaking with that host on a `HandBuiltTlsProvider`,
+as it does for the rest of the run (ADR-1452, ADR-1459, BL-6063, BL-6066). Both load `--cert` through
 `ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
 `--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included,
 except in the Schannel build with `--cacert`, which judges the pin first (ADR-0504, BL-2270):
@@ -215,8 +217,11 @@ Per ADR-0117 (BL-510) each `ConnectAsync` runs its resolve, dials, tunnel and TL
 one limit, the constructor's `connectTimeout` (`CurlComposition.ConnectTimeoutOf`: `--connect-timeout`,
 or a smaller `-m`), else `DefaultConnectTimeout` (300 s), on its `TimeProvider`; when it passes the
 connect fails with exit 28 and `Connection timed out after N milliseconds`, N from the connect's
-start, also reported as a `-v` line. A cancellation arriving once the limit has passed is that
-failure; an earlier one escapes. Per ADR-0286 (BL-797) `ForFtpDataConnections()` gives a view of
+start and never below the limit, also reported as a `-v` line. It is that failure too when a
+cancellation arrives with at most a quarter of the limit, 500 ms at most, still to run, as a
+smaller `-m`'s does, its clock having started earlier, or when the limit's own timer fired before
+the clock read the limit (ADR-1457, BL-6039); an earlier cancellation escapes. A CONNECT-UDP proxy tunnel and a
+QUIC handshake (`QuicDialer`, under its connect timeout) end by the same rule (BL-6072). Per ADR-0286 (BL-797) `ForFtpDataConnections()` gives a view of
 the same connector (DNS cache, numbering, every setting) whose connects run under the longest
 timer delay instead and that takes a `--connect-to` mapping's host but keeps the target's port (BL-1976, BL-2042), FTP's passive data connector; `PoolingConnector.Over(inner)` gives a pooling
 connector over the same cache, configuration and numbering that opens through `inner`. A dial whose

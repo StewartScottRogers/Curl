@@ -33,7 +33,7 @@ internal sealed class ServerReflectionStream
     /// <summary>Opens the stream on the call's connection.</summary>
     /// <param name="session">The connection.</param>
     /// <param name="callTarget">The call the reflection is for: its scheme and authority are the stream's.</param>
-    /// <param name="headerValues">The deadline, <c>user-agent</c> and <c>-H</c> values the call sends, which the stream sends too.</param>
+    /// <param name="headerValues">The deadline, <c>user-agent</c> and <c>-H</c> values the stream sends: the call's, signed for the stream's own request.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>The open stream.</returns>
     public static async Task<ServerReflectionStream> OpenAsync(GrpcHttp2Session session, GrpcRequestTarget callTarget, GrpcRequestHeaderValues headerValues, CancellationToken cancellationToken)
@@ -47,8 +47,8 @@ internal sealed class ServerReflectionStream
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The response.</returns>
     /// <exception cref="GrpcClientException">
-    /// The server ended the stream with a status instead of answering (exit 22), its flow-control window did not take the
-    /// request, or it closed the connection (exit 16).
+    /// The server ended the stream with a status instead of answering (exit 22, carrying the report of the response's status
+    /// and headers), its flow-control window did not take the request, or it closed the connection (exit 16).
     /// </exception>
     /// <exception cref="GrpcWireException">The response breaks PROTOCOL-HTTP2.md or does not decode.</exception>
     public async Task<ServerReflectionResponse> ExchangeAsync(byte[] request, CancellationToken cancellationToken)
@@ -66,7 +66,10 @@ internal sealed class ServerReflectionStream
             {
                 throw new GrpcClientException(
                     CurlExitCode.HttpReturnedError,
-                    $"The server did not answer gRPC server reflection (grpc-status {(int)status.Code} ({status.CodeName}): {status.Message}); give the method's .proto file with --grpc-proto");
+                    $"The server did not answer gRPC server reflection (grpc-status {(int)status.Code} ({status.CodeName}): {status.Message}); give the method's .proto file with --grpc-proto")
+                {
+                    Report = response.Report,
+                };
             }
         }
 

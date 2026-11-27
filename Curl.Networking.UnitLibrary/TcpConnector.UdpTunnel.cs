@@ -76,9 +76,9 @@ public sealed partial class TcpConnector
 
             tunnel = opened;
         }
-        catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
+        catch (OperationCanceledException) when (IsEndedByConnectLimit(timeout, started, connectLimit))
         {
-            var message = $"Connection timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
+            var message = $"Connection timed out after {TimedOutMilliseconds(started, connectLimit)} milliseconds";
             target.Events.ReportInfo(message);
             return MultiplexedConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
         }

@@ -118,14 +118,10 @@ internal static class GrpcHttp2Call
         // Sized as curl counts an HTTP/2 head: the status line "HTTP/2 200 ", each field as "name: value", then an empty line, all CRLF-ended (ADR-1260).
         private static TransferReport ReportOf(int httpStatus, IReadOnlyList<KeyValuePair<string, string>> fields)
         {
-            long size = $"HTTP/2 {httpStatus} \r\n".Length + 2;
-            foreach (KeyValuePair<string, string> field in fields.Where(static field => !field.Key.StartsWith(':')))
-            {
-                size += field.Key.Length + field.Value.Length + 4;
-            }
-
+            KeyValuePair<string, string>[] headers = [.. fields.Where(static field => !field.Key.StartsWith(':'))];
+            long size = $"HTTP/2 {httpStatus} \r\n".Length + 2 + headers.Sum(static field => field.Key.Length + field.Value.Length + 4);
             string? contentType = fields.FirstOrDefault(static field => field.Key == "content-type").Value;
-            return new TransferReport { ResponseCode = httpStatus, HttpVersion = new Version(2, 0), ContentType = contentType, HeaderSize = size };
+            return new TransferReport { ResponseCode = httpStatus, HttpVersion = new Version(2, 0), ContentType = contentType, HeaderSize = size, ResponseHeaders = headers };
         }
 
         private GrpcStatus? ReadMessages(Http2StreamFrame frame)

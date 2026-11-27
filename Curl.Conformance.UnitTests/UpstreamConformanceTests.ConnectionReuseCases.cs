@@ -31,7 +31,29 @@ public sealed partial class UpstreamConformanceTests
     [DataRow(1479, true)]
     public async Task InProcessCurl_ConnectionReuseCase_Passes(int testNumber, bool dialsThroughTheTcpConnector)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
+        diagnostics.Arrange("upstream case number", testNumber);
+        diagnostics.Arrange("dials through the TcpConnector", dialsThroughTheTcpConnector);
+
+        // A case that must pass gets a second attempt, as a listed one does on the ratchet: on a loaded
+        // machine a stalled test process held cases that pass in a second past TimeLimit (BL-6075).
+        UpstreamCaseOutcome outcome = await RunAgainIfFailedAsync(
+            () => RunReuseCaseOnceAsync(testNumber, testFile, dialsThroughTheTcpConnector),
+            detail => diagnostics.Act("first attempt failed", detail));
+
+        // A case may still need a feature only another platform has (ADR-0488); http/2 runs on every platform since BL-3268.
+        if (outcome.RunsOnlyOnAnotherPlatform)
+        {
+            Assert.Inconclusive(outcome.Detail);
+        }
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    private static async Task<UpstreamCaseOutcome> RunReuseCaseOnceAsync(int testNumber, byte[] testFile, bool dialsThroughTheTcpConnector)
+    {
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
@@ -44,15 +66,7 @@ public sealed partial class UpstreamConformanceTests
                 TimeLimit,
                 SshServer,
                 Http2Server);
-            UpstreamCaseOutcome outcome = await runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value);
-
-            // A case may still need a feature only another platform has (ADR-0488); http/2 runs on every platform since BL-3268.
-            if (outcome.RunsOnlyOnAnotherPlatform)
-            {
-                Assert.Inconclusive(outcome.Detail);
-            }
-
-            Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+            return await runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value);
         }
         finally
         {

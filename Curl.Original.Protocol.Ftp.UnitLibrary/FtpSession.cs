@@ -368,8 +368,10 @@ internal sealed class FtpSession(
         }
         catch (OperationCanceledException cancelled)
         {
-            // A cancellation that leaves the session, -m passing during the data connect for one, still
-            // reports what was read: the engine takes this report off the exception (STD-111, BL-6016).
+            // A cancellation that leaves the session, -m passing during a reply wait for one, closes the control
+            // connection: the engine writes this -v line after the timeout's (BL-6053, BL-6064). It also takes
+            // this report of what was read off the exception (STD-111, BL-6016).
+            cancelled.Data[CancelledClosingLineDataKey] = FtpTransferMessages.ClosingConnection(controlName.Number);
             cancelled.Data[CancelledReportDataKey] = new TransferReport
             {
                 ResponseCode = lastReplyCode,
@@ -2233,18 +2235,7 @@ internal sealed class FtpSession(
             DiagnosticLog = context.DiagnosticLog,
             TcpIoTrace = protectData ? null : FtpTcpIoTraces.Data,
         };
-        ConnectResult connected;
-        try
-        {
-            connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException cancelled)
-        {
-            // -m passing here closes the control connection: the engine writes this -v line after the timeout's (BL-6053).
-            cancelled.Data[CancelledClosingLineDataKey] = FtpTransferMessages.ClosingConnection(controlName.Number);
-            throw;
-        }
-
+        ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         dataConnection = connected.Connection;
         if (dataConnection is null)
         {
@@ -2709,7 +2700,7 @@ internal sealed class FtpSession(
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
             // The overall time limit ran out while the end-of-transfer reply was awaited; curl 8.22.0 names the reply (CGR-231).
-            return TransferResult.Failure(CurlExitCode.OperationTimedOut, FtpTransferMessages.FtpResponseTimeout, bytesTransferred);
+            return TimedOutAwaitingTransferReply();
         }
 
         trace.TransferReplyRead(complete);
@@ -2720,6 +2711,20 @@ internal sealed class FtpSession(
         }
 
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Fails a transfer whose time limit ran out while the end-of-transfer reply was awaited, with no <c>QUIT</c>,
+    /// after curl 8.22.0's three <c>-v</c> lines, and with no <c>%{response_code}</c>, as it was measured to report
+    /// none (BL-6064).
+    /// </summary>
+    private TransferResult TimedOutAwaitingTransferReply()
+    {
+        lastReplyCode = 0;
+        context.Events.ReportInfo(FtpTransferMessages.FtpResponseTimeout);
+        context.Events.ReportInfo(FtpTransferMessages.ControlConnectionLooksDead);
+        context.Events.ReportInfo(FtpTransferMessages.ShuttingDownConnection(controlName.Number));
+        return TransferResult.Failure(CurlExitCode.OperationTimedOut, FtpTransferMessages.FtpResponseTimeout, bytesTransferred);
     }
 
     /// <summary>Ends a plain data connection: its send side shut down, then disposed.</summary>

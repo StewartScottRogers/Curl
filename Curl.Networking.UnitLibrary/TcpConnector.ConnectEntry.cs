@@ -196,7 +196,7 @@ public sealed partial class TcpConnector
             return ConnectResult.Failed(_resolveOverrides.ParseFailureCodeWith(destination), parseError);
         }
 
-        var result = await ConnectWithinTimeoutAsync(target, destination, started, connectLimit, cancellationToken).ConfigureAwait(false);
+        var result = await ConnectRedialingByHandAsync(target, destination, started, connectLimit, cancellationToken).ConfigureAwait(false);
 
         return result.Connection is null
             ? NumberedConnectFailure.Of(result, TakeConnectionNumber())

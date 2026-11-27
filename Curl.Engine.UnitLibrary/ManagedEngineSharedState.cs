@@ -51,7 +51,8 @@ internal sealed class ManagedEngineSharedState
         Hsts = new HstsTransferPolicy(timeProvider, learnsOverHttp: learnsHstsOverHttp);
         EngineWide = this;
         MultiCaches = new ConditionalWeakTable<ManagedMultiTransfer, ManagedEngineSharedState>();
-        OwnConnectionCaches = new ConditionalWeakTable<ConnectionCache, ConnectionCache>();
+        OwnConnectionCaches = new ConditionalWeakTable<ConnectionCache, KeptDohResolver>();
+        DohResolver = new KeptDohResolver();
         ConnectionIdsByPoolNumber = new ConcurrentDictionary<long, long>();
         MultiOwners = new ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance);
         SocketHandles = new CurlSocketHandles();
@@ -70,7 +71,10 @@ internal sealed class ManagedEngineSharedState
     /// <param name="hsts">The HSTS cache.</param>
     /// <param name="performer">The numbering of the new state's transfers, or <see langword="null" /> for <paramref name="engine" />'s.</param>
     /// <param name="keepsFtpPwdStop">Whether the new state keeps <paramref name="engine" />'s one-shot FTP PWD stop; <see langword="false" /> leaves it none.</param>
-    /// <remarks>It dials as <paramref name="engine" /> dials (<see cref="Dialing" />).</remarks>
+    /// <remarks>
+    /// It dials as <paramref name="engine" /> dials (<see cref="Dialing" />), and keeps <paramref name="engine" />'s
+    /// <see cref="DohResolver" />, so a caller giving another connection cache sets that cache's.
+    /// </remarks>
     internal ManagedEngineSharedState(
         ManagedEngineSharedState engine,
         ConnectionCache connections,
@@ -91,6 +95,7 @@ internal sealed class ManagedEngineSharedState
         EngineWide = engine.EngineWide;
         MultiCaches = engine.MultiCaches;
         OwnConnectionCaches = engine.OwnConnectionCaches;
+        DohResolver = engine.DohResolver;
         ConnectionIdsByPoolNumber = engine.ConnectionIdsByPoolNumber;
         MultiOwners = engine.MultiOwners;
         SocketHandles = engine.SocketHandles;
@@ -113,14 +118,15 @@ internal sealed class ManagedEngineSharedState
     /// gives each its own connection pool, TLS sessions, resolved names, cookies and HSTS (BL-3204). The resolved names are
     /// the handle's own, as libcurl 8.22.0's <c>dnscache_get</c> takes the share's or the handle's multi's, so a new handle
     /// looks a name up again and calls its <c>CURLOPT_RESOLVER_START_FUNCTION</c> (CGR-151, ADR-0851). The engine keeps the
-    /// new pool, which its <c>DisposeAsync</c> closes (<see cref="OwnConnectionCaches" />).
+    /// new pool and its <see cref="DohResolver" />, which its <c>DisposeAsync</c> closes (<see cref="OwnConnectionCaches" />).
     /// </summary>
     /// <returns>The new state.</returns>
     internal ManagedEngineSharedState WithOwnCaches()
     {
         ConnectionCache connections = new(TimeProvider);
-        OwnConnectionCaches.Add(connections, connections);
-        return new(this, connections, new TlsSessionCache(TimeProvider), new DnsCache(), new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp), Performer.StartingAtZero());
+        KeptDohResolver dohResolver = new();
+        OwnConnectionCaches.Add(connections, dohResolver);
+        return new(this, connections, new TlsSessionCache(TimeProvider), new DnsCache(), new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp), Performer.StartingAtZero()) { DohResolver = dohResolver };
     }
 
     /// <summary>
@@ -136,17 +142,21 @@ internal sealed class ManagedEngineSharedState
         return duplicate;
     }
 
-    /// <summary>Gets the pools of the engine's library easy handles and multi handles, which the engine closes when it is disposed (ADR-0789).</summary>
-    internal ConditionalWeakTable<ConnectionCache, ConnectionCache> OwnConnectionCaches { get; }
+    /// <summary>
+    /// Gets the pools of the engine's library easy handles and multi handles, each with its kept <c>--doh-url</c>
+    /// resolver, which the engine closes when it is disposed (ADR-0789, ADR-1458).
+    /// </summary>
+    internal ConditionalWeakTable<ConnectionCache, KeptDohResolver> OwnConnectionCaches { get; }
 
     /// <summary>
-    /// Creates the state a handle performing in a multi handle runs over: the multi's connections, TLS sessions and resolved
-    /// names, as upstream's multi handle pools them, with this state's cookies and HSTS (BL-3204).
+    /// Creates the state a handle performing in a multi handle runs over: the multi's connections (the
+    /// <c>--doh-url</c> ones too), TLS sessions and resolved names, as upstream's multi handle pools them, with this
+    /// state's cookies and HSTS (BL-3204).
     /// </summary>
     /// <param name="multi">The multi handle's caches (<see cref="MultiCaches" />).</param>
     /// <returns>The new state.</returns>
     internal ManagedEngineSharedState InMulti(ManagedEngineSharedState multi) =>
-        new(this, multi.Connections, multi.TlsSessions, multi.DnsCache, Cookies, Hsts);
+        new(this, multi.Connections, multi.TlsSessions, multi.DnsCache, Cookies, Hsts) { DohResolver = multi.DohResolver };
 
     /// <summary>Gets the engine's own state, whose caches the curl tool's transfers share across one run (ADR-0542).</summary>
     internal ManagedEngineSharedState EngineWide { get; }
@@ -252,17 +262,23 @@ internal sealed class ManagedEngineSharedState
     /// </summary>
     /// <returns>The state, sharing every cache with this one.</returns>
     internal ManagedEngineSharedState WithoutFtpPwdStop() =>
-        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts, keepsFtpPwdStop: false) { SocketWait = SocketWait, TransportsBuilt = TransportsBuilt };
+        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts, keepsFtpPwdStop: false) { SocketWait = SocketWait };
 
     /// <summary>
-    /// Gets where <see cref="ManagedCurlEngine.CreateTransports" /> keeps the transports it builds over this state,
-    /// for the perform running over it to dispose; <see langword="null" /> outside a perform.
+    /// Gets the <c>--doh-url</c> resolvers kept beside <see cref="Connections" />, which
+    /// <see cref="ManagedCurlEngine.CreateTransports" /> builds its transports with, so every transfer over that cache
+    /// reuses its DoH connections (ADR-1458).
     /// </summary>
-    internal ConcurrentBag<CurlTransports>? TransportsBuilt { get; private init; }
+    internal KeptDohResolver DohResolver { get; init; }
 
-    /// <summary>Gives this state with <paramref name="transportsBuilt" /> as its <see cref="TransportsBuilt" />.</summary>
-    /// <param name="transportsBuilt">Where the transports built over the state are kept.</param>
-    /// <returns>The state, sharing every cache with this one.</returns>
-    internal ManagedEngineSharedState KeepingTransportsBuiltIn(ConcurrentBag<CurlTransports> transportsBuilt) =>
-        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts) { SocketWait = SocketWait, TransportsBuilt = transportsBuilt };
+    /// <summary>
+    /// Closes the idle pooled connections and the kept <c>--doh-url</c> connections, as libcurl closes both when it
+    /// clears or destroys a connection cache.
+    /// </summary>
+    /// <returns>A task that completes once they are closed.</returns>
+    internal async ValueTask CloseIdleConnectionsAsync()
+    {
+        await Connections.CloseIdleAsync().ConfigureAwait(false);
+        await DohResolver.DisposeAsync().ConfigureAwait(false);
+    }
 }

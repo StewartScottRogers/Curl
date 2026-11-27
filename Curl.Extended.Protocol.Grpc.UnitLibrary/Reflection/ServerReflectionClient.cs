@@ -16,7 +16,7 @@ internal static class ServerReflectionClient
     /// <summary>Describes the method the call invokes.</summary>
     /// <param name="session">The call's connection.</param>
     /// <param name="callTarget">The call: its scheme, authority, service and method.</param>
-    /// <param name="headerValues">The deadline, <c>user-agent</c> and <c>-H</c> values the call sends, which the reflection stream sends too.</param>
+    /// <param name="headerValues">The deadline, <c>user-agent</c> and <c>-H</c> values the reflection stream sends: the call's, signed for the stream's own request.</param>
     /// <param name="cancellationToken">Cancels the reflection.</param>
     /// <returns>The method's message types.</returns>
     /// <exception cref="GrpcClientException">

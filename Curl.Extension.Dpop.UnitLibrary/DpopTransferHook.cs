@@ -13,8 +13,9 @@ namespace Curl.Extension.Dpop;
 /// (<see cref="StreamBody" />) rewound first, and not retried when either cannot be rewound; the response is held until
 /// then, so only the one kept is written. The hook runs inside every hook that sends several requests or changes a
 /// request's method or URL (ADR-1426, ADR-1439), so each request is signed on its own; a <c>grpc</c> or <c>grpcs</c>
-/// call's proof names the HTTP <c>POST</c> that carries it. A transfer that is not HTTP runs as it would without the
-/// hook.
+/// call's proof names the HTTP <c>POST</c> that carries it. A handler that makes further requests of its own, as the gRPC
+/// one does for server reflection, signs each through the signer the hook puts on the transfer (ADR-1454): a proof naming
+/// that request replaces the transfer's. A transfer that is not HTTP runs as it would without the hook.
 /// </summary>
 /// <param name="keyFile">The PEM file of the private key.</param>
 internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
@@ -121,11 +122,12 @@ internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
 
     private async Task<DpopAttempt> AttemptAsync(DpopKey key, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
-        var origin = context.Url.Scheme.ToLowerInvariant() + "://" + context.Url.Host.ToLowerInvariant() + ":" + context.Url.Port;
+        var origin = OriginOf(context.Url);
         var nonce = _noncesByOrigin.GetValueOrDefault(origin);
-        var proof = DpopProof.Create(key, new DpopRequest(DpopProof.NewId(), MethodOf(context), TargetUriOf(context.Url), context.TimeProvider.GetUtcNow(), AccessTokenOf(context.Http!), nonce));
+        var proofHeader = ProofHeaderFor(key, context, MethodOf(context), context.Url, nonce);
         var attempt = new DpopAttempt(context.DumpHeaderOutput is not null);
-        attempt.Result = await next(context.WithRequestHeaders(HeadersFor(proof, context.Http!)).WithOutputs(attempt.Body, attempt.Head, attempt.DumpedHead));
+        var signed = context.WithRequestHeaders(HeadersFor(proofHeader, context.Http!)).WithOutputs(attempt.Body, attempt.Head, attempt.DumpedHead);
+        attempt.Result = await next(signed.WithRequestSigner(SignerReplacing(proofHeader, key, context)));
         if (NonceGivenBy(attempt.Result) is { } given)
         {
             _noncesByOrigin[origin] = given;
@@ -135,9 +137,23 @@ internal sealed class DpopTransferHook(string keyFile) : IDpopKeySource
         return attempt;
     }
 
-    private static List<string> HeadersFor(string proof, HttpRequestOptions http)
+    private static string OriginOf(CurlUrl url) => url.Scheme.ToLowerInvariant() + "://" + url.Host.ToLowerInvariant() + ":" + url.Port;
+
+    /// <summary>Gives the <c>DPoP</c> header of a new proof, with its own <c>jti</c>, for one of the transfer's requests.</summary>
+    private static string ProofHeaderFor(DpopKey key, ITransferContext context, string method, CurlUrl url, string? nonce) =>
+        "DPoP: " + DpopProof.Create(key, new DpopRequest(DpopProof.NewId(), method, TargetUriOf(url), context.TimeProvider.GetUtcNow(), AccessTokenOf(context.Http!), nonce));
+
+    /// <summary>
+    /// Gives the signer of the transfer's further requests: it replaces the transfer's own proof header, and no other
+    /// header, with a proof naming the further request, carrying the last nonce that request's origin sent.
+    /// </summary>
+    private RequestHeadersSigner SignerReplacing(string transferProofHeader, DpopKey key, ITransferContext context) =>
+        (method, url, headers) =>
+            [.. headers.Select(header => header == transferProofHeader ? ProofHeaderFor(key, context, method, url, _noncesByOrigin.GetValueOrDefault(OriginOf(url))) : header)];
+
+    private static List<string> HeadersFor(string proofHeader, HttpRequestOptions http)
     {
-        List<string> headers = ["DPoP: " + proof];
+        List<string> headers = [proofHeader];
         if (http.BearerToken is { } bearer && HeaderTokenOf(http) is null)
         {
             headers.Add(AuthorizationPrefix + bearer);

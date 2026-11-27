@@ -5,6 +5,7 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Storage;
 
 /// <summary>curl's generic transfer options (BL-4615) for <c>s3://</c> against the reference S3 endpoint on its AWS host, virtual-hosted; each check is <see cref="StorageTransferChecks" />'s.</summary>
 [TestClass]
+[DoNotParallelize]
 public sealed class S3TransferCases
 {
     private static readonly StorageTransferTarget Target = new(

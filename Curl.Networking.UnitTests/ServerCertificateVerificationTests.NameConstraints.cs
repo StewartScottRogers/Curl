@@ -1611,6 +1611,53 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         return verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, host, []);
     }
 
+    // curl 8.21.0's Schannel build (BL-6026): of the subject emailAddresses only the first in encoding order is
+    // checked, whether the second has a relative name to itself or shares the first's.
+    [TestMethod]
+    [DataRow(true, "other.org", "good@example.com", "evil@other.org", 0)]
+    [DataRow(true, "other.org", "evil@other.org", "good@example.com", CertificateNameConstraints.Excluded)]
+    [DataRow(false, "example.com", "a@example.com", "evil@other.org", 0)]
+    [DataRow(false, "example.com", "evil@other.org", "a@example.com", CertificateNameConstraints.NotPermitted)]
+    public void FindViolation_SchannelBuildTwoSubjectEmailAddresses_ChecksTheFirstOnly(bool excluded, string constraint, string first, string second, int expected)
+    {
+        var constraints = EmailConstraints(excluded, constraint);
+
+        Assert.AreEqual(expected, FindViolationOfSubject(Subject([(EmailAddress, first)], [(EmailAddress, second)]), constraints, matchesSchannelBuild: true));
+    }
+
+    // DER orders the attributes of one relative name by their encoding, so the shorter address is the first.
+    [TestMethod]
+    [DataRow("a@example.com", "evil@other.org", 0)]
+    [DataRow("evil@other.org", "much.longer@example.com", CertificateNameConstraints.Excluded)]
+    public void FindViolation_SchannelBuildTwoEmailAddressesOfOneRelativeName_ChecksTheFirstEncodedOnly(string shorter, string longer, int expected) =>
+        Assert.AreEqual(
+            expected,
+            FindViolationOfSubject(Subject([(EmailAddress, longer), (EmailAddress, shorter)]), EmailConstraints(true, "other.org"), matchesSchannelBuild: true));
+
+    // curl 8.21.0's Schannel build (BL-6026): an rfc822Name alternative name takes the subject emailAddress's place.
+    [TestMethod]
+    [DataRow(true, "other.org", "evil@other.org", "good@example.com", 0)]
+    [DataRow(true, "other.org", "good@example.com", "evil@other.org", CertificateNameConstraints.Excluded)]
+    [DataRow(false, "example.com", "evil@other.org", "a@example.com", 0)]
+    [DataRow(false, "example.com", "a@example.com", "evil@other.org", CertificateNameConstraints.NotPermitted)]
+    public void FindViolation_SchannelBuildSubjectEmailAddressBesideAnEmailAlternativeName_ChecksTheAlternativeNameOnly(
+        bool excluded, string constraint, string subjectAddress, string alternativeAddress, int expected)
+    {
+        var violation = FindViolationOfSubject(
+            Subject([(EmailAddress, subjectAddress)]),
+            EmailConstraints(excluded, constraint),
+            matchesSchannelBuild: true,
+            alternativeNames: AlternativeNames(GeneralName(1, alternativeAddress)));
+
+        Assert.AreEqual(expected, violation);
+    }
+
+    private static byte[] EmailConstraints(bool excluded, string constraint)
+    {
+        var email = GeneralName(1, constraint);
+        return excluded ? Constraints(excludedName: email) : Constraints(permittedName: email);
+    }
+
     private static byte[] Constraints(
         string? permitted = null, string? excluded = null, byte[]? permittedIp = null, byte[]? excludedIp = null,
         bool permittedDirectoryName = false, byte[]? permittedName = null, byte[]? excludedName = null)

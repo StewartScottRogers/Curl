@@ -1,6 +1,6 @@
 # ADR-1422: The Schannel build reads multi-valued relative names against name constraints (BL-6007)
 
-Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1387.
+Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1387. Amended by ADR-1455.
 
 ## Context
 Fitness finding STD-161: the Schannel build checked a subject emailAddress and CN against a partial-chain anchor's name constraints only when it had a relative name to itself, so a refused address beside another attribute was accepted. Measured with curl 8.21.0 (Schannel, Windows), a loopback TLS server, `--ssl-no-revoke` and the constrained intermediate given as `--cacert`:

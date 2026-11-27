@@ -19,7 +19,7 @@ public sealed partial class ManagedEasyTransferTests
         TaskCompletionSource stalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
         RecordingProtocolHandler handler = new("http", async context =>
         {
-            context.Events.ReportRequestHeader(new byte[62]);
+            context.Events.ReportRequestHeader(Encoding.ASCII.GetBytes("GET /x HTTP/1.1\r\nHost: h\r\nUser-Agent: c\r\nAccept: */*\r\nX: y\r\n\r\n"));
             context.Events.ReportResponseHeader(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\n"));
             context.Events.ReportResponseHeader(new byte[59]);
             stalled.TrySetResult();

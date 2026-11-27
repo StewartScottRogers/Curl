@@ -16,4 +16,10 @@ internal sealed class GrpcClientException : Exception
 
     /// <summary>Gets the exit code the transfer ends with.</summary>
     public CurlExitCode ExitCode { get; }
+
+    /// <summary>
+    /// Gets what the transfer reports about the response that refused it, so that a hook can read its status and headers, or
+    /// <see langword="null" /> when no response did.
+    /// </summary>
+    public TransferReport? Report { get; init; }
 }

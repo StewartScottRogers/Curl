@@ -6,6 +6,7 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Storage;
 
 /// <summary>curl's generic transfer options (BL-4615) for <c>abfs://</c> against the reference DFS endpoint, with a bearer token and the full host; each check is <see cref="StorageTransferChecks" />'s.</summary>
 [TestClass]
+[DoNotParallelize]
 public sealed class AbfsTransferCases
 {
     private static readonly StorageTransferTarget Target = new(

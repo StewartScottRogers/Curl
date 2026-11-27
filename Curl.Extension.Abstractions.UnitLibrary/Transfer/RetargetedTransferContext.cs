@@ -10,8 +10,9 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// <param name="http">The HTTP options with the request's method, or <see langword="null" /> for a transfer that has none.</param>
 /// <param name="postData">The request body.</param>
 /// <param name="credentials">The credentials to send, or <see langword="null" /> for none.</param>
-internal sealed class RetargetedTransferContext(ITransferContext inner, CurlUrl url, HttpRequestOptions? http, ReadOnlyMemory<byte>? postData, System.Net.NetworkCredential? credentials) : ITransferContext
+internal sealed class RetargetedTransferContext(ITransferContext inner, CurlUrl url, HttpRequestOptions? http, ReadOnlyMemory<byte>? postData, System.Net.NetworkCredential? credentials) : IWrappingTransferContext
 {
+    public ITransferContext Inner => inner;
     public CurlUrl Url => url;
     public Stream Output => inner.Output;
     public Stream? Upload => inner.Upload;

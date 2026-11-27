@@ -18,6 +18,7 @@ public sealed class CredentialedTransferContextTests
 
         CredentialedTransferContext context = new(inner, credentials);
 
+        Assert.AreSame(inner, context.Inner);
         Assert.AreSame(inner.Output, context.Output);
         Assert.AreSame(inner.Http, context.Http);
         Assert.AreSame(inner.Url, context.Url);

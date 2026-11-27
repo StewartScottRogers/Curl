@@ -78,13 +78,14 @@ internal static class CertificateNameConstraints
     /// <summary>
     /// Finds the first name constraint a certificate's names break. The Schannel build checks the server
     /// certificate's names only: it reads the CAs from the leaf upwards and, for each, checks every name
-    /// against the permitted subtrees before any against the excluded ones. The OpenSSL build checks the
-    /// certificates from the top of the chain down, a self-issued one only when it is the server's own, each
-    /// against the CAs above it from the top down, and takes the names one at a time, each against the
-    /// permitted then the excluded subtrees: the subject, its emailAddresses, then the alternative names in
-    /// the order the certificate holds them, and last, for the server certificate, its subject CNs. The
-    /// OpenSSL build checks a SmtpUTF8Mailbox otherName against the rfc822Name subtrees, and refuses any
-    /// other otherName that a subtree of its type-id applies to.
+    /// against the permitted subtrees before any against the excluded ones. Of the subject emailAddresses
+    /// it checks only the first, and none when an alternative name is an rfc822Name. The OpenSSL build
+    /// checks the certificates from the top of the chain down, a self-issued one only when it is the
+    /// server's own, each against the CAs above it from the top down, and takes the names one at a time,
+    /// each against the permitted then the excluded subtrees: the subject, every emailAddress of it, then
+    /// the alternative names in the order the certificate holds them, and last, for the server certificate,
+    /// its subject CNs. The OpenSSL build checks a SmtpUTF8Mailbox otherName against the rfc822Name
+    /// subtrees, and refuses any other otherName that a subtree of its type-id applies to.
     /// </summary>
     /// <param name="chain">The chain built for the server certificate, leaf first.</param>
     /// <param name="matchesSchannelBuild">
@@ -222,9 +223,12 @@ internal static class CertificateNameConstraints
             .Select(address => (IpAddressTag, address.GetAddressBytes())));
 
         // otherName, directoryName, rfc822Name and URI names are constrained too; the subject counts as a directoryName (BL-5436)
-        // and its emailAddress attributes as rfc822Names (RFC 5280 Â§4.2.1.10, BL-5804).
-        names.AddRange(ListSubjectNames(leaf, ListEveryAttribute(leaf, EmailAddressOid)));
-        names.AddRange(ListAlternativeNames(leaf, SchannelAlternativeNameTags));
+        // and its first emailAddress attribute as an rfc822Name when no alternative name is one
+        // (RFC 5280 Â§4.2.1.10, BL-5804); CryptoAPI reads no later emailAddress (BL-6026).
+        var alternativeNames = ListAlternativeNames(leaf, SchannelAlternativeNameTags);
+        var emailAddressCount = alternativeNames.Exists(name => name.Tag == EmailTag) ? 0 : 1;
+        names.AddRange(ListSubjectNames(leaf, ListEveryAttribute(leaf, EmailAddressOid).Take(emailAddressCount).ToList()));
+        names.AddRange(alternativeNames);
         return names;
     }
 
@@ -328,8 +332,8 @@ internal static class CertificateNameConstraints
     private static List<string> ListEveryAttribute(X509Certificate2 certificate, string oid) =>
         ListEveryEncodedAttribute(certificate, oid).SelectMany(value => DecodeCharacterString(value)).ToList();
 
-    // OpenSSL's NAME_CONSTRAINTS_check and its CN check (BL-5940), and CryptoAPI (BL-6007), read every attribute
-    // of a type, multi-valued relative names included.
+    // The attributes of a type in encoding order, multi-valued relative names included, as OpenSSL's
+    // NAME_CONSTRAINTS_check and its CN check (BL-5940) and CryptoAPI (BL-6007) read them.
     private static List<byte[]> ListEveryEncodedAttribute(X509Certificate2 certificate, string oid)
     {
         var values = new List<byte[]>();

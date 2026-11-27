@@ -7,7 +7,7 @@ namespace Curl.Engine;
 /// <summary>
 /// Passes every event on to <paramref name="inner" /> unchanged and keeps what libcurl still reports after a
 /// transfer ends with <c>CURLE_OPERATION_TIMEDOUT</c> because it was too slow: the last response code and HTTP version, the bytes
-/// of the HTTP and RTSP response heads (never a mail or FTP reply line), the bytes of the request heads, the body bytes received, the connections opened and
+/// of the HTTP and RTSP response heads (never a mail or FTP reply line), the bytes of the HTTP and RTSP request heads (never a mail or FTP command), the body bytes received, the connections opened and
 /// the end points of the first. The handler that was
 /// cancelled returns no report, so <see cref="ReportOn" /> builds one from these (BL-3321).
 /// </summary>
@@ -103,8 +103,17 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
     {
-        requestSize += bytes.Length;
+        requestSize += IsARequestHead(bytes) ? bytes.Length : 0;
         inner.ReportRequestHeader(bytes);
+    }
+
+    // An HTTP or RTSP head comes whole, its request line naming the version. An FTP or mail command names none,
+    // and curl 8.22.0 counts none of them in %{size_request} (BL-6064).
+    private static bool IsARequestHead(ReadOnlySpan<byte> bytes)
+    {
+        int lineEnd = bytes.IndexOf((byte)'\n');
+        ReadOnlySpan<byte> requestLine = lineEnd < 0 ? bytes : bytes[..lineEnd];
+        return requestLine.IndexOf(" HTTP/"u8) >= 0 || requestLine.IndexOf(" RTSP/"u8) >= 0;
     }
 
     /// <inheritdoc />

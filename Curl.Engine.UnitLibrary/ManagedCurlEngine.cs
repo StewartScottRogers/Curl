@@ -199,7 +199,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     public IMultiTransfer CreateMulti()
     {
         ManagedEngineSharedState caches = shared.WithOwnCaches();
-        ManagedMultiTransfer multi = new(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, caches.Connections.CloseIdleAsync, caches.Connections.CloseIdleBeyondAsync, caches.DnsCache.Clear)
+        ManagedMultiTransfer multi = new(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, caches.CloseIdleConnectionsAsync, caches.Connections.CloseIdleBeyondAsync, caches.DnsCache.Clear)
         {
             CloseIdleConnectionsToMakeRoom = caches.Connections.CloseIdleToMakeRoomAsync,
         };
@@ -225,17 +225,20 @@ public sealed class ManagedCurlEngine : ICurlEngine
 
     /// <summary>
     /// Closes every connection the engine's transfers kept open (<c>curl_global_cleanup</c>): those of each library easy
-    /// handle's and multi handle's own pool, an FTP control connection with <c>QUIT</c>, then the engine-wide pool's (ADR-0789).
+    /// handle's and multi handle's own pool, an FTP control connection with <c>QUIT</c>, then the engine-wide pool's
+    /// (ADR-0789), with each pool's kept <c>--doh-url</c> connections (ADR-1458).
     /// </summary>
     /// <returns>A task that completes once they are closed.</returns>
     public async ValueTask DisposeAsync()
     {
-        foreach (KeyValuePair<Networking.ConnectionCache, Networking.ConnectionCache> own in shared.OwnConnectionCaches)
+        foreach (KeyValuePair<Networking.ConnectionCache, KeptDohResolver> own in shared.OwnConnectionCaches)
         {
             await own.Key.DisposeAsync().ConfigureAwait(false);
+            await own.Value.DisposeAsync().ConfigureAwait(false);
         }
 
         await shared.Connections.DisposeAsync().ConfigureAwait(false);
+        await shared.DohResolver.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -387,8 +390,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Creates a library handle's transports over the engine's caches. <c>CURLOPT_PIPEWAIT</c> stands where the
     /// curl tool's <c>-Z</c> without <c>--parallel-immediate</c> does, so the pool waits for a connection being
     /// opened to the same origin to show it multiplexes rather than opening another, as libcurl's does (BL-3351).
-    /// The transports are kept in <see cref="ManagedEngineSharedState.TransportsBuilt" />, which the perform running
-    /// over the state disposes when it ends.
+    /// Their <c>--doh-url</c> resolver comes from <see cref="ManagedEngineSharedState.DohResolver" />, kept beside the
+    /// state's connections, so a later perform over them asks on the connections an earlier one opened (ADR-1458).
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="shared">The engine's shared state.</param>
@@ -396,8 +399,6 @@ public sealed class ManagedCurlEngine : ICurlEngine
     internal static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
         EngineToolOptions tool = new(Parallel: options.Http.PipeWait, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null, TracesTransfer: options.Behaviour.Verbose);
-        CurlTransports transports = EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing, shared.SocketWait);
-        shared.TransportsBuilt?.Add(transports);
-        return transports;
+        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing, shared.SocketWait, keptDohResolver: shared.DohResolver);
     }
 }

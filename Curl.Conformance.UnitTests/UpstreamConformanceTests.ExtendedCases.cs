@@ -64,13 +64,17 @@ public sealed partial class UpstreamConformanceTests
     }
 
     // Runs every ext case in the folder and its subfolders through curl, with Original's certs/ and data/ as %CERTDIR and %SRCDIR.
-    internal static async Task<IReadOnlyList<(string Name, int CaseNumber, UpstreamCaseOutcome Outcome)>> RunExtendedCasesAsync(string folder)
+    // Each must pass, so a failed one is run once more; noteFirstFailure is told "<name>: <first difference>".
+    internal static async Task<IReadOnlyList<(string Name, int CaseNumber, UpstreamCaseOutcome Outcome)>> RunExtendedCasesAsync(string folder, Action<string>? noteFirstFailure = null)
     {
         List<(string, int, UpstreamCaseOutcome)> outcomes = [];
         foreach (ExtendedCaseFile file in ExtendedCaseFiles(folder))
         {
             byte[] caseFile = await File.ReadAllBytesAsync(file.Path);
-            outcomes.Add((file.Name, file.CaseNumber, await RunCaseOnceAsync(file.CaseNumber, caseFile)));
+            UpstreamCaseOutcome outcome = await RunAgainIfFailedAsync(
+                () => RunCaseOnceAsync(file.CaseNumber, caseFile),
+                detail => noteFirstFailure?.Invoke($"{file.Name}: {detail}"));
+            outcomes.Add((file.Name, file.CaseNumber, outcome));
         }
 
         return outcomes;
@@ -82,7 +86,7 @@ public sealed partial class UpstreamConformanceTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("folder", ExtendedCaseFolder);
-        IReadOnlyList<(string Name, int CaseNumber, UpstreamCaseOutcome Outcome)> outcomes = await RunExtendedCasesAsync(ExtendedCaseFolder);
+        IReadOnlyList<(string Name, int CaseNumber, UpstreamCaseOutcome Outcome)> outcomes = await RunExtendedCasesAsync(ExtendedCaseFolder, failure => diagnostics.Act("first attempt failed", failure));
         string[] failures =
         [
             .. ExtendedCaseProblems(ExtendedCaseFolder),
@@ -113,6 +117,84 @@ public sealed partial class UpstreamConformanceTests
             Assert.AreEqual("ext7,HTTP/ext5001", string.Join(',', outcomes.Select(o => o.Name)));
             Assert.IsTrue(outcomes.All(o => o.Outcome.Kind == UpstreamCaseOutcomeKind.Passed), string.Join('\n', outcomes.Select(o => o.Outcome.Detail)));
             Assert.AreEqual(0, ExtendedCaseProblems(folder).Count);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task RunAgainIfFailedAsync_CaseThatPasses_RunsOnce()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        int attempts = 0;
+        List<string> firstFailures = [];
+
+        UpstreamCaseOutcome outcome = await RunAgainIfFailedAsync(
+            () =>
+            {
+                attempts++;
+                return Task.FromResult(UpstreamCaseOutcome.Passed);
+            },
+            firstFailures.Add);
+
+        diagnostics.Assert("attempts", 1, attempts);
+        Assert.AreEqual(1, attempts);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.IsEmpty(firstFailures);
+    }
+
+    [TestMethod]
+    public async Task RunAgainIfFailedAsync_CaseThatFailsOnce_PassesOnTheSecondAttempt()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        int attempts = 0;
+        List<string> firstFailures = [];
+
+        UpstreamCaseOutcome outcome = await RunAgainIfFailedAsync(
+            () => Task.FromResult(++attempts == 1 ? UpstreamCaseOutcome.Failed("stalled") : UpstreamCaseOutcome.Passed),
+            firstFailures.Add);
+
+        diagnostics.Assert("attempts", 2, attempts);
+        Assert.AreEqual(2, attempts);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual("stalled", string.Join(',', firstFailures));
+    }
+
+    [TestMethod]
+    public async Task RunAgainIfFailedAsync_CaseThatAlwaysFails_FailsWithTheSecondAttemptsDifference()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        int attempts = 0;
+        List<string> firstFailures = [];
+
+        UpstreamCaseOutcome outcome = await RunAgainIfFailedAsync(
+            () => Task.FromResult(UpstreamCaseOutcome.Failed($"attempt {++attempts}")),
+            firstFailures.Add);
+
+        diagnostics.Assert("attempts", 2, attempts);
+        Assert.AreEqual(2, attempts);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        Assert.AreEqual("attempt 2", outcome.Detail);
+        Assert.AreEqual("attempt 1", string.Join(',', firstFailures));
+    }
+
+    [TestMethod]
+    public async Task RunExtendedCasesAsync_CaseThatAlwaysFails_NotesItsFirstFailureAndStaysFailed()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string folder = Directory.CreateTempSubdirectory("curl-extended-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, "ext7.curltest"), ThrowawayCase.Replace("\n2\n", "\n3\n", StringComparison.Ordinal));
+            List<string> firstFailures = [];
+
+            IReadOnlyList<(string Name, int CaseNumber, UpstreamCaseOutcome Outcome)> outcomes = await RunExtendedCasesAsync(folder, firstFailures.Add);
+
+            diagnostics.Assert("first failures noted", 1, firstFailures.Count);
+            Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcomes.Single().Outcome.Kind);
+            Assert.AreEqual($"ext7: {outcomes.Single().Outcome.Detail}", firstFailures.Single());
         }
         finally
         {

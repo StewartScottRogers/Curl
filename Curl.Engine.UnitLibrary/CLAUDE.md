@@ -556,3 +556,7 @@ while that handle has a callback queued or the transfer's perform has finished a
 reported (`TransferSocketWait.IsReadableOn`), so `curl_multi_waitfds` sockets polled on a second
 handle wake it at once, as real descriptors do (upstream test2407, ADR-1390). Its tests are
 `ManagedMultiTransferTests.SecondHandlePoll.cs`.
+
+## The kept `--doh-url` resolvers (BL-6065, BL-6067)
+
+Each connection cache has a `KeptDohResolver` beside it (`ManagedEngineSharedState.DohResolver`: each library handle's own, each multi handle's, the engine-wide one and each `ManagedShareHandle`'s, taken while it shares connections), which `ManagedCurlEngine.CreateTransports` gives `EngineComposition.CreateTransports` for the transports a perform builds, so a later transfer over that cache, on whichever handle, asks the DoH server over the connections an earlier one opened (ADR-1453, ADR-1458). It keeps one resolver for each set of options one was built from (the TLS options, and the network options but for the URL, port and `--connect-to` mappings), at most `KeptDohResolver.MostKept` (4), closing the one asked for longest ago. `Reset` keeps them; the cache's owner closes them: the easy handle's and the engine's `DisposeAsync`, the multi handle's `DisposeAsync` and `CurlNetworkChange.ClearConnections`, and the share handle's `Cleanup`. Its tests are in `EngineCompositionDohTests`.

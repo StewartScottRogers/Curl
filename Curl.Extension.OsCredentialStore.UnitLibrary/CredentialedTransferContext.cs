@@ -1,3 +1,5 @@
+using Curl.Extension.Abstractions.Transfer;
+
 namespace Curl.Extension.OsCredentialStore;
 
 /// <summary>
@@ -6,8 +8,10 @@ namespace Curl.Extension.OsCredentialStore;
 /// </summary>
 /// <param name="inner">The transfer's own context.</param>
 /// <param name="credentials">The credential read from the store.</param>
-internal sealed class CredentialedTransferContext(ITransferContext inner, System.Net.NetworkCredential credentials) : ITransferContext
+internal sealed class CredentialedTransferContext(ITransferContext inner, System.Net.NetworkCredential credentials) : IWrappingTransferContext
 {
+    public ITransferContext Inner => inner;
+
     public CurlUrl Url => inner.Url;
 
     public Stream Output => inner.Output;
