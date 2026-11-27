@@ -30,3 +30,4 @@ Seen in BL-6015 on 2026-11-26 with a linux-x64 self-contained publish of Curl.Co
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 30cb71e1 3d836d5e.
