@@ -1275,7 +1275,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
     private static byte[] Mailbox(string address) => OtherName(SmtpUtf8Mailbox, Text(address));
 
-    // The OpenSSL build's otherName rows below were measured with curl 8.18.0 and OpenSSL 3.5.5 (BL-6047, ADR-1441).
+    // The OpenSSL build's otherName rows below were measured with curl 8.18.0 and OpenSSL 3.5.5 (BL-6047, ADR-1442).
     [TestMethod]
     [DataRow(UserPrincipalName, "user@evil.test")]
     [DataRow(UserPrincipalName, "user@good.test")]

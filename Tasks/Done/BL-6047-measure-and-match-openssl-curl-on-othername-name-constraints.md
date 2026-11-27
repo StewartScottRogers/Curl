@@ -28,7 +28,7 @@ Found in BL-6011 (ADR-1430), which changed the Schannel build only: `Certificate
 
 ## Notes
 
-- Measured curl 8.18.0 / OpenSSL 3.5.5 (WSL Ubuntu) with a bash script run in WSL (openssl `s_server`, throwaway certificates). Answers are in ADR-1441: `otherName` under a same-type-id constraint is 51; a SmtpUTF8Mailbox `otherName` constraint is ignored; rfc822Name constraints apply to a SmtpUTF8Mailbox name (47, 48, 53, 1).
+- Measured curl 8.18.0 / OpenSSL 3.5.5 (WSL Ubuntu) with a bash script run in WSL (openssl `s_server`, throwaway certificates). Answers are in ADR-1442: `otherName` under a same-type-id constraint is 51; a SmtpUTF8Mailbox `otherName` constraint is ignored; rfc822Name constraints apply to a SmtpUTF8Mailbox name (47, 48, 53, 1).
 - `touches` widened with `OpenSslVerifyResult.cs`, `TlsFailureMessages.cs`, and new files `OpenSslSmtpUtf8Mailbox.cs`, `PunycodeLabel.cs`, `PunycodeLabelTests.cs`: the new verify codes need mapping and text, and the mailbox comparison is its own type. No other task in Doing on `origin/work/dark-factory` names any of them.
 - Removed `FindViolation_OpenSslBuildExcludedOtherName_IsLeftToTheChainEngine`, which pinned the unmeasured behaviour this task replaces.
 - Platform: the new tests drive the OpenSSL build through the same fakes as the existing cross-platform ones, with no OS-specific paths or text.
@@ -39,4 +39,4 @@ Found in BL-6011 (ADR-1430), which changed the Schannel build only: `Certificate
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: f20e1cc9 ec79c5dc 3d836d5e.
-- 2026-11-26: Doing -> Done. The OpenSSL build answers otherName name constraints below an intermediate anchor as OpenSSL curl does (ADR-1441).
+- 2026-11-26: Doing -> Done. The OpenSSL build answers otherName name constraints below an intermediate anchor as OpenSSL curl does (ADR-1442).

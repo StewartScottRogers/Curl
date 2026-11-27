@@ -1,4 +1,4 @@
-# ADR-1441: The OpenSSL build checks otherNames against name constraints as OpenSSL does (BL-6047)
+# ADR-1442: The OpenSSL build checks otherNames against name constraints as OpenSSL does (BL-6047)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1300 and ADR-1430.
 

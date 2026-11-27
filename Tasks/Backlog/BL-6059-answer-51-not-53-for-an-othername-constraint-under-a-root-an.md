@@ -18,7 +18,7 @@ With a self-signed root as `--cacert`, the OpenSSL build answers an `otherName` 
 
 ## Context
 
-Found in BL-6047 (ADR-1441). curl 8.18.0 with OpenSSL 3.5.5 answers 51 with the root as `--cacert` too. There the platform chain engine flags the refusal, and `OpenSslVerifyResult.KeepFirstNameConstraintRefusal` replaces flags only for a subtree refusal (47 or 48), so a chain flagged `HasNotSupportedNameConstraint` alone should be reported as 53 (ADR-1383; read from the code, not measured through the port on Linux). `CertificateNameConstraints.FindViolation` already returns `UnsupportedConstraintType`. The existing test `KeepFirstNameConstraintRefusal_NoSubtreeRefusalFlagged_TrustsTheChainEngine` pins today's behaviour.
+Found in BL-6047 (ADR-1442). curl 8.18.0 with OpenSSL 3.5.5 answers 51 with the root as `--cacert` too. There the platform chain engine flags the refusal, and `OpenSslVerifyResult.KeepFirstNameConstraintRefusal` replaces flags only for a subtree refusal (47 or 48), so a chain flagged `HasNotSupportedNameConstraint` alone should be reported as 53 (ADR-1383; read from the code, not measured through the port on Linux). `CertificateNameConstraints.FindViolation` already returns `UnsupportedConstraintType`. The existing test `KeepFirstNameConstraintRefusal_NoSubtreeRefusalFlagged_TrustsTheChainEngine` pins today's behaviour.
 
 ## Acceptance criteria
 

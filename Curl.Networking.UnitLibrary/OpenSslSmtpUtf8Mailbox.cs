@@ -5,7 +5,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Compares a SmtpUTF8Mailbox <c>otherName</c> with an rfc822Name constraint as OpenSSL's
-/// <c>nc_email_eai</c> does (measured with curl 8.18.0 and OpenSSL 3.5.5, ADR-1441).
+/// <c>nc_email_eai</c> does (measured with curl 8.18.0 and OpenSSL 3.5.5, ADR-1442).
 /// </summary>
 internal static class OpenSslSmtpUtf8Mailbox
 {
