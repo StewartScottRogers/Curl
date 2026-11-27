@@ -32,3 +32,4 @@ ADR-1453 (BL-6065): each `ManagedEasyTransfer` owns its `KeptDohResolver`, also 
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 70afa1aa e5b0c33b 11e1bcc7 3d836d5e.
