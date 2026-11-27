@@ -30,6 +30,10 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   other hooks get it: its JWK thumbprint and a proof for a `POST`. The hooking handler lends the first source among the
   hooks to the others as `TransferHookServices.DpopKeySource`, so a token one of them fetches is bound to the key
   (ADR-1367).
+- `Transfer/RequestHeadersSigner` signs a request a handler makes besides the transfer's own, such as a gRPC server
+  reflection request (ADR-1444). A hook puts one on the transfer with `context.WithRequestSigner(signer)` and the handler
+  asks `context.SignedHeadersFor(method, url, headers)` (`TransferContextRequestSigning`), which finds it through every
+  context that implements `IWrappingTransferContext`; a hook listed after `--dpop`'s that wraps a context implements it.
 - `Connection/IConnectionHook` supplies the connector (and optionally the datagram connector) a
   transfer runs over in place of curl's, given curl's so it can reach a first hop through it.
   `ConnectionHooks.ActivatedBy` keeps the one hook whose option was given and throws an

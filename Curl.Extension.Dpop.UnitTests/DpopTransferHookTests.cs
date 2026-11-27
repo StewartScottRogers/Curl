@@ -299,6 +299,25 @@ public sealed class DpopTransferHookTests
         Assert.AreEqual(target, claims.GetProperty("htu").GetString());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_AFurtherRequestOfTheTransfer_ReplacesOnlyItsOwnProofWithOneForThatRequest_Rfc9449Section4Point2()
+    {
+        var server = new FakeServer(Response(401, "n-1"), Response(200));
+        var hook = Hook();
+        await hook.ExecuteAsync(Context("https://a.example/r"), server.Invoke);
+        var request = server.Requests[1];
+
+        var signed = request.SignedHeadersFor("PATCH", CurlUrl.Parse("https://a.example/other?q=1"), ["X-A: 1", "DPoP: mine", .. request.Http!.Headers]);
+
+        var proof = signed[2]["DPoP: ".Length..];
+        CollectionAssert.AreEqual(new[] { "X-A: 1", "DPoP: mine", "DPoP: " + proof }, signed.ToArray());
+        var claims = DpopProofTests.Decode(proof.Split('.')[1]);
+        Assert.AreEqual("PATCH", claims.GetProperty("htm").GetString());
+        Assert.AreEqual("https://a.example/other", claims.GetProperty("htu").GetString());
+        Assert.AreEqual("n-1", claims.GetProperty("nonce").GetString());
+        Assert.AreNotEqual(DpopProofTests.Decode(ProofOf(request).Split('.')[1]).GetProperty("jti").GetString(), claims.GetProperty("jti").GetString());
+    }
+
     private async Task<string[]> SendStreamBodyRefusedForANonceAsync(Stream body)
     {
         var server = new FakeServer(Response(401, "n-1"), Response(200));

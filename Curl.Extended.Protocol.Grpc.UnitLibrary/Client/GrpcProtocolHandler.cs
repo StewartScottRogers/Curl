@@ -1,5 +1,6 @@
 using Curl.Extended.Protocol.Grpc.Reflection;
 using Curl.Extended.Protocol.Grpc.Wire;
+using Curl.Extension.Abstractions.Transfer;
 using Curl.Http2;
 using Curl.Protocol.Abstractions;
 
@@ -160,7 +161,7 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
         GrpcHttp2Session session = await GrpcHttp2Session.OpenAsync(stream, context.CancellationToken).ConfigureAwait(false);
         context.Progress.ReportTransferStarted();
         GrpcRequestHeaderValues headerValues = HeaderValuesOf(context);
-        method ??= await ServerReflectionClient.DescribeAsync(session, target, headerValues, context.CancellationToken).ConfigureAwait(false);
+        method ??= await ServerReflectionClient.DescribeAsync(session, target, SignedForReflection(context, headerValues), context.CancellationToken).ConfigureAwait(false);
         request ??= GrpcMessageJson.Encode(method.Input, body);
         var headers = GrpcRequestHeaders.Build(target, headerValues);
         long written = 0;
@@ -174,6 +175,16 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     /// </summary>
     private static GrpcRequestHeaderValues HeaderValuesOf(ITransferContext context) =>
         new(context.MaxTime, GrpcRequestHeaderValues.UserAgentFor(context.Http?.UserAgent), WithBasicLogin(context.Credentials, context.Http?.Headers ?? []));
+
+    /// <summary>
+    /// Gives the server reflection stream's header values: the call's, with what a hook signed for the call, such as a
+    /// <c>--dpop</c> proof, signed anew for the reflection stream's own HTTP <c>POST</c> and URL (ADR-1444).
+    /// </summary>
+    private static GrpcRequestHeaderValues SignedForReflection(ITransferContext context, GrpcRequestHeaderValues call)
+    {
+        var url = CurlUrl.Parse($"{context.Url.Scheme}://{AuthorityOf(context.Url)}/{ServerReflectionStream.Service}/{ServerReflectionStream.Method}");
+        return call with { CustomHeaders = context.SignedHeadersFor("POST", url, call.CustomHeaders) };
+    }
 
     /// <summary>
     /// Adds <c>-u user:password</c> as an <c>authorization: Basic</c> header in front of the <c>-H</c> values, unless one of them

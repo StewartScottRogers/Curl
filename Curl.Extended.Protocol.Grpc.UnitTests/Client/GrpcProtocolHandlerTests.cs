@@ -1,4 +1,10 @@
+using System.Buffers.Text;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using Curl.Extension.Abstractions;
+using Curl.Extension.Abstractions.Transfer;
+using Curl.Extension.Dpop;
 using Curl.Http2;
 using Curl.Protocol.Abstractions;
 
@@ -518,6 +524,72 @@ public sealed class GrpcProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         List<byte[]> call = await Reflection.ReflectionFixture.SentMessagesAsync(connection.Sent, 3);
         CollectionAssert.AreEqual(HelloWorld, call.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DpopWithoutGrpcProto_ProvesTheReflectionRequestAndTheCallEachForItsOwnPostAndUrl_Rfc9449Section4Point2()
+    {
+        string directory = Directory.CreateTempSubdirectory("grpc-dpop-").FullName;
+        try
+        {
+            string keyFile = Path.Combine(directory, "key.pem");
+            using (var key = ECDsa.Create(ECCurve.NamedCurves.nistP256))
+            {
+                await File.WriteAllTextAsync(keyFile, key.ExportECPrivateKeyPem());
+            }
+
+            ITransferHook dpop = DpopExtension.HookFor(new ExtensionOptionValues(new Dictionary<string, string> { [DpopExtension.Option.Name] = keyFile }))!;
+            byte[] reply = Reflection.ReflectionFixture.Server(
+                Reflection.ReflectionFixture.Headers(1, false, GrpcServerReply.OkHeaders),
+                Reflection.ReflectionFixture.Message(1, Reflection.ReflectionFixture.FilesResponse(Reflection.ReflectionFixture.HelloWorldFile)),
+                Reflection.ReflectionFixture.Trailers(1, 0),
+                Reflection.ReflectionFixture.Headers(3, false, GrpcServerReply.OkHeaders),
+                Reflection.ReflectionFixture.Message(3, ReplyHi),
+                Reflection.ReflectionFixture.Trailers(3, 0));
+            var connection = new ScriptedConnection(reply);
+            var handler = new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection, null)));
+            var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["X-Trace: abc"] } };
+
+            TransferResult result = await dpop.ExecuteAsync(context, handler.ExecuteAsync);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+            List<List<HeaderField>> requests = await SentHeaderBlocksAsync(connection.Sent);
+            Assert.HasCount(2, requests);
+            JsonElement[] proofs = [.. requests.Select(static headers => ClaimsOf(headers.Single(static field => field.Name == "dpop").Value))];
+            CollectionAssert.AreEqual(new[] { "POST", "POST" }, proofs.Select(static proof => proof.GetProperty("htm").GetString()).ToArray());
+            CollectionAssert.AreEqual(
+                new[] { "http://example.com:50051/grpc.reflection.v1.ServerReflection/ServerReflectionInfo", "http://example.com:50051/helloworld.Greeter/SayHello" },
+                proofs.Select(static proof => proof.GetProperty("htu").GetString()).ToArray());
+            Assert.AreNotEqual(proofs[0].GetProperty("jti").GetString(), proofs[1].GetProperty("jti").GetString());
+            Assert.IsTrue(requests.All(static headers => headers.Any(static field => field is { Name: "x-trace", Value: "abc" })));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    /// <summary>Gives the header block of each request sent, in order, decoded with the connection's one HPACK table.</summary>
+    private static async Task<List<List<HeaderField>>> SentHeaderBlocksAsync(byte[] sent)
+    {
+        using var stream = new MemoryStream(sent, Http2Connection.ClientPreface.Length, sent.Length - Http2Connection.ClientPreface.Length);
+        var decoder = new HpackDecoder();
+        List<List<HeaderField>> blocks = [];
+        while (await Http2FrameCodec.ReadAsync(stream, 1 << 20, CancellationToken.None) is { } frame)
+        {
+            if (frame.Type == Http2FrameType.Headers)
+            {
+                blocks.Add([.. decoder.Decode(frame.Payload.Span)]);
+            }
+        }
+
+        return blocks;
+    }
+
+    private static JsonElement ClaimsOf(string proof)
+    {
+        using var claims = JsonDocument.Parse(Base64Url.DecodeFromChars(proof.Split('.')[1]));
+        return claims.RootElement.Clone();
     }
 
     private static IOException Reset() => new("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset));
