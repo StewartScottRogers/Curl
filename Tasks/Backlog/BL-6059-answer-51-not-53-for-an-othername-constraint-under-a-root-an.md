@@ -1,5 +1,5 @@
 ---
-id: BL-6055
+id: BL-6059
 title: Answer 51, not 53, for an otherName constraint under a root anchor in the OpenSSL build
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6055 — Answer 51, not 53, for an otherName constraint under a root anchor in the OpenSSL build
+# BL-6059 — Answer 51, not 53, for an otherName constraint under a root anchor in the OpenSSL build
 
 ## Goal
 

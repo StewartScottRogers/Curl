@@ -33,7 +33,7 @@ Found in BL-6011 (ADR-1430), which changed the Schannel build only: `Certificate
 - Removed `FindViolation_OpenSslBuildExcludedOtherName_IsLeftToTheChainEngine`, which pinned the unmeasured behaviour this task replaces.
 - Platform: the new tests drive the OpenSSL build through the same fakes as the existing cross-platform ones, with no OS-specific paths or text.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 100% line, 100% branch, 0 failing members.
-- Follow-up: BL-6055 (root anchor, where the chain engine decides).
+- Follow-up: BL-6059 (root anchor, where the chain engine decides).
 
 ## Log
 

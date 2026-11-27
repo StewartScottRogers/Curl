@@ -44,4 +44,4 @@ Either subtree answers `unsupported or invalid name syntax (53)` for a value wit
 
 ## Consequences
 - Below an intermediate anchor the OpenSSL build gives curl's exit code and message for each case above.
-- Where the platform chain engine decides instead (a root anchor), a refusal flagged only as unsupported is still reported as 53 (ADR-1383), not the 51 measured with a root as `--cacert`; BL-6055 covers that.
+- Where the platform chain engine decides instead (a root anchor), a refusal flagged only as unsupported is still reported as 53 (ADR-1383), not the 51 measured with a root as `--cacert`; BL-6059 covers that.
