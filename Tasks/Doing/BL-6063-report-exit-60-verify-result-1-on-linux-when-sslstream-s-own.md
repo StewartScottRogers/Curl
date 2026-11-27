@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/SslStreamTlsProviderTests.UnspecifiedChain.cs]
+touches: [Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitLibrary/CertificateChainBuild.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/SslStreamTlsProviderTests.UnspecifiedChain.cs]
 requirement: none
 created: 2026-11-26
 completed:
@@ -22,9 +22,14 @@ Found in BL-6061 (ADR-1446). .NET on Linux builds the chain inside the handshake
 
 ## Acceptance criteria
 
-- [ ] A unit test that makes the handshake step throw that `CryptographicException` in the OpenSSL build gets exit 60 and the message above, on every platform; `-k`'s behaviour is decided, recorded in an ADR and pinned by a test.
+- [x] A unit test that makes the handshake step throw that `CryptographicException` in the OpenSSL build gets exit 60 and the message above, on every platform; `-k`'s behaviour is decided, recorded in an ADR and pinned by a test.
 
 ## Notes
+
+- Decision (ADR-1448): the OpenSSL build answers exit 60 with verify result 1; under `-k` the exit 35 connect error stands and only the verify result is added, since the handshake is already over. Completing it needs a second dial on the hand-built client: BL-6064.
+- The throw is matched bare or as an inner exception, because which form `SslStream` on Linux raises was not observed here (lanes run on Windows).
+- `touches` widened to `CertificateChainBuild.cs` (so .NET's message is matched in one place), `TlsFailureMessages.cs` (where every exit 60 message lives) and the library's `CLAUDE.md`; no other task in Doing named them.
+- Tests are platform-neutral (the handshake step is replaced). `dotnet build` clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
 
 ## Log
 

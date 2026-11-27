@@ -22,6 +22,14 @@ namespace Curl.Networking;
 /// </remarks>
 internal static class TlsFailureMessages
 {
+    private const string UnspecifiedVerifyError = "unspecified certificate verification error (1)";
+
+    /// <summary>
+    /// The OpenSSL build's exit 60 message for a verification that ends with OpenSSL's error 1
+    /// and leaves no certificate to name anything from (ADR-1446, ADR-1448).
+    /// </summary>
+    internal const string OpenSslUnspecifiedVerificationRefusal = "SSL certificate OpenSSL verify result: " + UnspecifiedVerifyError;
+
     /// <summary>
     /// The Schannel build's exit 60 message for a chain that ends in an untrusted root, which
     /// <see cref="SchannelFailureEcho" /> also reports under <c>-v</c> (BL-1323).
@@ -926,7 +934,7 @@ internal static class TlsFailureMessages
 
     private static string OpenSslEmptyChainError(X509Chain? chain) =>
         CertificateChainBuild.EndedAsUnspecified(chain)
-            ? "unspecified certificate verification error (1)"
+            ? UnspecifiedVerifyError
             : "unable to get local issuer certificate (20)";
 
     private static string OpenSslBuiltChainError(X509Chain chain)

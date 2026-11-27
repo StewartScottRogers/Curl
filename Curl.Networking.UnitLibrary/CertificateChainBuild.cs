@@ -35,12 +35,35 @@ internal static class CertificateChainBuild
         {
             return build();
         }
-        catch (CryptographicException exception) when (exception.Message.EndsWith(UnspecifiedErrorEnding, StringComparison.Ordinal))
+        catch (CryptographicException exception) when (IsUnspecifiedError(exception))
         {
             EndedUnspecified.AddOrUpdate(chain, exception);
             return false;
         }
     }
+
+    /// <summary>
+    /// Whether a handshake failed because the chain build <see cref="System.Net.Security.SslStream" />
+    /// makes inside it ended with OpenSSL's error 1: .NET throws there before the validation
+    /// callback, and the exception reaches the caller bare or wrapped (ADR-1448).
+    /// </summary>
+    /// <param name="handshakeFailure">What the handshake threw.</param>
+    /// <returns><see langword="true" /> when it, or an exception inside it, is that build's.</returns>
+    internal static bool EndedHandshakeAsUnspecified(Exception handshakeFailure)
+    {
+        for (var cause = handshakeFailure; cause is not null; cause = cause.InnerException)
+        {
+            if (IsUnspecifiedError(cause))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsUnspecifiedError(Exception exception) =>
+        exception is CryptographicException && exception.Message.EndsWith(UnspecifiedErrorEnding, StringComparison.Ordinal);
 
     /// <summary>Whether the chain is empty because its build ended with OpenSSL's error 1.</summary>
     /// <param name="chain">The chain, if there is one.</param>

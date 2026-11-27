@@ -1493,3 +1493,4 @@ Each option and the specific reason it lost.
 | [1448](ADR-1448-whoever-builds-the-transports-disposes-the-doh-url-resolver.md) | Whoever builds the transports disposes the --doh-url resolver (BL-6057) | Accepted | 2026-11-26 |
 | [1449](ADR-1449-corrupt-deflate-data-is-named-with-zlibs-own-text.md) | Corrupt deflate data is named with zlib's own text (BL-6018) | Accepted | 2026-11-26 |
 | [1451](ADR-1451-the-openssl-build-matches-rfc822name-constraints-as-openssls-nc-email-does.md) | The OpenSSL build matches rfc822Name constraints as OpenSSL's `nc_email` does (BL-6054) | Accepted | 2026-11-26 |
+| [1448](ADR-1448-an-sslstream-handshake-that-throws-for-openssl-error-1-is-verify-result-1.md) | An SslStream handshake that throws for OpenSSL error 1 is exit 60 with verify result 1; under -k it stays exit 35 until a redial (BL-6063) | Accepted | 2026-11-26 |
