@@ -363,6 +363,12 @@ jobs:
               --notes "The latest build of master, ${GITHUB_SHA:0:9}, made $(date -u +%Y-%m-%dT%H:%MZ), version 0.2.0-rolling.${GITHUB_RUN_NUMBER}. It is rebuilt on every merge to master; numbered releases are kept separately."
             exit 0
           fi
+          # A rerun of a tag's job (say, after the nuget.org push failed) finds its release made
+          # already: it keeps that release and goes on to the push rather than failing here.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME exists already; kept as it is."
+            exit 0
+          fi
           flags=(--generate-notes --title "$GITHUB_REF_NAME")
           [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" "${flags[@]}"
