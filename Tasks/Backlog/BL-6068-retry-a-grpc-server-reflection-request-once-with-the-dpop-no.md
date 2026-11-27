@@ -1,5 +1,5 @@
 ---
-id: BL-6062
+id: BL-6068
 title: Retry a gRPC server reflection request once with the DPoP-Nonce its refusal gives
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6062 — Retry a gRPC server reflection request once with the DPoP-Nonce its refusal gives
+# BL-6068 — Retry a gRPC server reflection request once with the DPoP-Nonce its refusal gives
 
 ## Goal
 

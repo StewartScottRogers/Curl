@@ -42,7 +42,7 @@ a proof per request.
   reflection stream is one HTTP request, so one proof.
 - Verified: `dotnet build` clean (0 warnings), fast tests all pass, `Measure-CodeQuality.ps1` on the four changed
   libraries 100% line and branch, 0 failing members. Platform-neutral (temporary directory only).
-- Follow-up filed: BL-6062 (retry a refused reflection request with its `DPoP-Nonce`).
+- Follow-up filed: BL-6068 (retry a refused reflection request with its `DPoP-Nonce`).
 
 ## Log
 
