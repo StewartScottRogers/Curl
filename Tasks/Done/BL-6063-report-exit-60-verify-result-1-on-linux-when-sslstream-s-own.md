@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitLibrary/CertificateChainBuild.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/SslStreamTlsProviderTests.UnspecifiedChain.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6063 — Report exit 60 verify result 1 on Linux when SslStream's own chain build throws for OpenSSL error 1
 
@@ -35,3 +35,4 @@ Found in BL-6061 (ADR-1446). .NET on Linux builds the chain inside the handshake
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 809eaa5e.
+- 2026-11-26: Doing -> Done. The OpenSSL build reports SslStream's own chain build throwing for OpenSSL error 1 as exit 60 with verify result 1 (ADR-1448); -k is filed as BL-6064.
