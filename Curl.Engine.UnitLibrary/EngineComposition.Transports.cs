@@ -134,7 +134,7 @@ internal static partial class EngineComposition
     /// </param>
     /// <param name="keptDohResolver">
     /// The library handle's kept <c>--doh-url</c> resolver, which gives <see cref="CurlTransports.DnsResolver" /> the one an
-    /// earlier perform built from the same settings (ADR-1449); <see langword="null" />, as for the curl tool, to build one.
+    /// earlier perform built from the same settings (ADR-1453); <see langword="null" />, as for the curl tool, to build one.
     /// Its owner closes it, so such transports are not disposed.
     /// </param>
     /// <returns>The connectors and the pieces they were built from.</returns>

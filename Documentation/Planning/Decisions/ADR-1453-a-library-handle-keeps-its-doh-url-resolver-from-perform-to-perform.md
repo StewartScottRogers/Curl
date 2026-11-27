@@ -1,4 +1,4 @@
-# ADR-1449 — A library handle keeps its `--doh-url` resolver from perform to perform
+# ADR-1453 — A library handle keeps its `--doh-url` resolver from perform to perform
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

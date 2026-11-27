@@ -1494,4 +1494,4 @@ Each option and the specific reason it lost.
 | [1449](ADR-1449-corrupt-deflate-data-is-named-with-zlibs-own-text.md) | Corrupt deflate data is named with zlib's own text (BL-6018) | Accepted | 2026-11-26 |
 | [1451](ADR-1451-the-openssl-build-matches-rfc822name-constraints-as-openssls-nc-email-does.md) | The OpenSSL build matches rfc822Name constraints as OpenSSL's `nc_email` does (BL-6054) | Accepted | 2026-11-26 |
 | [1452](ADR-1452-an-sslstream-handshake-that-throws-for-openssl-error-1-is-verify-result-1.md) | An SslStream handshake that throws for OpenSSL error 1 is exit 60 with verify result 1; under -k it stays exit 35 until a redial (BL-6063) | Accepted | 2026-11-26 |
-| [1449](ADR-1449-a-library-handle-keeps-its-doh-url-resolver-from-perform-to-perform.md) | A library handle keeps its --doh-url resolver from perform to perform (BL-6065) | Accepted | 2026-11-26 |
+| [1453](ADR-1453-a-library-handle-keeps-its-doh-url-resolver-from-perform-to-perform.md) | A library handle keeps its --doh-url resolver from perform to perform (BL-6065) | Accepted | 2026-11-26 |

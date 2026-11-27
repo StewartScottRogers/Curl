@@ -18,7 +18,7 @@ Library handles in one multi handle, or sharing connections through a share hand
 
 ## Context
 
-ADR-1449 (BL-6065): each `ManagedEasyTransfer` owns its `KeptDohResolver`, also inside a multi or share handle, and disposing only the engine leaves its connections open. Start at `ManagedEasyTransfer.PerformShared` and `ManagedEngineSharedState`, where the connection cache is chosen.
+ADR-1453 (BL-6065): each `ManagedEasyTransfer` owns its `KeptDohResolver`, also inside a multi or share handle, and disposing only the engine leaves its connections open. Start at `ManagedEasyTransfer.PerformShared` and `ManagedEngineSharedState`, where the connection cache is chosen.
 
 ## Acceptance criteria
 

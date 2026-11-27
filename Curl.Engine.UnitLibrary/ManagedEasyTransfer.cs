@@ -199,7 +199,7 @@ internal sealed partial class ManagedEasyTransfer(
 
     /// <summary>
     /// The <c>--doh-url</c> resolver the handle keeps from perform to perform and <see cref="Reset" />, so its DoH
-    /// connections are reused until <see cref="DisposeAsync" /> closes them (ADR-1449).
+    /// connections are reused until <see cref="DisposeAsync" /> closes them (ADR-1453).
     /// </summary>
     private readonly KeptDohResolver dohResolver = new();
 

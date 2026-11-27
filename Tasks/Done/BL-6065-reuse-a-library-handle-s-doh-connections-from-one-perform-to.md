@@ -28,9 +28,9 @@ ADR-1448 (BL-6057): each perform of `ManagedEasyTransfer` builds new transports,
 
 ## Notes
 
-- ADR-1449: each library handle owns a KeptDohResolver; ManagedCurlEngine.CreateTransports takes the --doh-url resolver from it, replacing the per-perform disposal of ADR-1448. Kept while the TLS options and the network options but for URL, CURLU and port are unchanged; closed by DisposeAsync.
+- ADR-1453: each library handle owns a KeptDohResolver; ManagedCurlEngine.CreateTransports takes the --doh-url resolver from it, replacing the per-perform disposal of ADR-1448. Kept while the TLS options and the network options but for URL, CURLU and port are unchanged; closed by DisposeAsync.
 - Chosen as the simplest scope: per handle, also inside a multi or share handle. Disposing only the engine leaves a handles DoH connections open.
-- Reuse not measured with a libcurl program (no libcurl development files here); it rests on ADR-1441s tool measurement and lib/doh.c adding its sub-transfers to the handles multi (ADR-1449).
+- Reuse not measured with a libcurl program (no libcurl development files here); it rests on ADR-1441s tool measurement and lib/doh.c adding its sub-transfers to the handles multi (ADR-1453).
 - touches widened to the six further Engine files above; no other task in Doing on origin/work/dark-factory named them.
 - Checks: dotnet build 0 warnings; all fast tests pass; Measure-CodeQuality -Library Curl.Engine.UnitLibrary: 0 failing members.
 

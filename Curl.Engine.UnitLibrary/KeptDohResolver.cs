@@ -8,7 +8,7 @@ namespace Curl.Engine;
 /// <summary>
 /// The <c>--doh-url</c> resolver a library handle keeps from one perform to the next, so a later perform asks the DoH
 /// server over the connections an earlier one opened, as libcurl keeps them in the handle's connection cache
-/// (ADR-1449). It is kept while the options it was built from are unchanged: the TLS options, and the network options
+/// (ADR-1453). It is kept while the options it was built from are unchanged: the TLS options, and the network options
 /// but for the URL and port a perform goes to. Disposing it closes every connection its resolvers kept.
 /// </summary>
 internal sealed class KeptDohResolver : IAsyncDisposable

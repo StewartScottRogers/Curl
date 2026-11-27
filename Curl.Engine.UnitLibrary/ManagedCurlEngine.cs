@@ -388,7 +388,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// curl tool's <c>-Z</c> without <c>--parallel-immediate</c> does, so the pool waits for a connection being
     /// opened to the same origin to show it multiplexes rather than opening another, as libcurl's does (BL-3351).
     /// Their <c>--doh-url</c> resolver is the one <see cref="ManagedEngineSharedState.DohResolver" /> keeps for the handle
-    /// the state performs for, so a later perform asks over the connections an earlier one opened (ADR-1449).
+    /// the state performs for, so a later perform asks over the connections an earlier one opened (ADR-1453).
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="shared">The engine's shared state.</param>

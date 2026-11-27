@@ -82,7 +82,7 @@ internal sealed partial class ManagedEasyTransfer
     /// takes the attached share handle's cookie lock for libcurl's cookie flush and detaches from it, then closes the
     /// connection a connect-only perform left open or upgraded, if any, the handle's WebSocket connection, if any, and the handle's own idle pooled connections
     /// (<see cref="OwnTheConnectionsOpened" />), as libcurl closes the handle's connection cache, FTP's sending <c>QUIT</c>,
-    /// and last the connections its <c>--doh-url</c> resolver kept (ADR-1449).
+    /// and last the connections its <c>--doh-url</c> resolver kept (ADR-1453).
     /// </summary>
     /// <returns>A task that completes once they are closed.</returns>
     public async ValueTask DisposeAsync()
