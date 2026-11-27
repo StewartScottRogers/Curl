@@ -62,6 +62,52 @@ public sealed class HttpContentCodingDecoderTests
     }
 
     /// <summary>
+    /// STD-208 (curl 8.22.0 Schannel and 8.18.0 OpenSSL): a raw deflate body sent as
+    /// <c>deflate</c> that copies from further back than it decoded exits 61 with zlib's
+    /// <c>invalid distance too far back</c>, and writes nothing of what it decoded in that read.
+    /// </summary>
+    [TestMethod]
+    public void Decode_RawDeflateCopyingTooFarBack_ThrowsZLibTextAndHandsOutNothing()
+    {
+        byte[] encoded = HttpDeflateFaultFinderTests.TheThenCopyFromFiveBack();
+        foreach (int chunkSize in ChunkSizes)
+        {
+            List<byte> decoded = [];
+
+            HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+                () => DecodeInto(decoded, "deflate", encoded, chunkSize));
+
+            Diagnostics.Act($"exit at chunk size {chunkSize}", $"{thrown.ExitCode}: {thrown.Message}");
+            Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(HttpTransferMessages.InvalidDistanceTooFarBack, thrown.Message, $"Chunk size {chunkSize}");
+        }
+
+        List<byte> whole = [];
+        Assert.ThrowsExactly<HttpTransferException>(() => DecodeInto(whole, "deflate", encoded, encoded.Length));
+        Assert.IsEmpty(whole);
+    }
+
+    /// <summary>
+    /// STD-208: a zlib <c>deflate</c> body whose first read decodes <c>The </c> and whose next
+    /// copies too far back writes <c>The </c>, then exits 61 with zlib's text: once bytes are
+    /// written curl does not read the body again as raw deflate.
+    /// </summary>
+    [TestMethod]
+    public void Decode_ZLibCopyingTooFarBackInALaterRead_HandsOutTheFirstReadThenThrowsZLibText()
+    {
+        byte[] encoded = [0x78, 0x01, .. HttpDeflateFaultFinderTests.TheThenCopyFromFiveBack()];
+        List<byte> decoded = [];
+        using HttpContentCodingDecoder decoder = new(HttpContentCoding.Deflate);
+
+        decoded.AddRange(decoder.Decode(encoded.AsMemory(0, 7)).SelectMany(piece => piece.ToArray()));
+        HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+            () => decoded.AddRange(decoder.Decode(encoded.AsMemory(7)).SelectMany(piece => piece.ToArray())));
+
+        Assert.AreEqual("The ", Encoding.ASCII.GetString([.. decoded]));
+        Assert.AreEqual(HttpTransferMessages.InvalidDistanceTooFarBack, thrown.Message);
+    }
+
+    /// <summary>
     /// Measured: the first 15 bytes of the gzip body alone make curl write <c>hell</c> and
     /// exit 0; a body that ends before its stream does is not an error.
     /// </summary>

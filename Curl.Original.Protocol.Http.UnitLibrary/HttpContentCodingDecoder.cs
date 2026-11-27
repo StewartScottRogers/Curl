@@ -108,7 +108,7 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     /// <summary>The first <see cref="HeadLength" /> encoded bytes of the body, to name an in-block fault zlib reports.</summary>
     private byte[] head = [];
 
-    private const int HeadLength = 64;
+    private const int HeadLength = 65536;
     private const int PlainGzipHeaderLength = 10;
     private const int ZLibHeaderLength = 2;
 
@@ -274,11 +274,11 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     }
 
     /// <summary>
-    /// Tells whether decoded bytes are held rather than handed out as they are read: a
-    /// <c>deflate</c> zlib stream's, before any has been handed out, because curl writes
-    /// nothing a zlib call decoded when that call fails.
+    /// Tells whether decoded bytes are held until the piece of the body they came from is decoded,
+    /// rather than handed out as they are read: a <c>deflate</c> body's, zlib-wrapped or raw,
+    /// because curl writes nothing a zlib call decoded when that call fails (STD-208, BL-6018).
     /// </summary>
-    private bool HoldsDecoded() => !handedOut && coding == HttpContentCoding.Deflate && decompressor is ZLibStream;
+    private bool HoldsDecoded() => coding == HttpContentCoding.Deflate;
 
     /// <summary>Hands out the decoded bytes <see cref="output" /> holds.</summary>
     private Memory<byte> TakeHeld()
@@ -655,64 +655,29 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
             : trailer?.CheckFailed([.. carried, .. readSingly], fedTotal - last);
 
     /// <summary>
-    /// Names zlib's text for a first deflate block it refuses, when the stream failed before
-    /// handing out anything. A <c>deflate</c> body that fails after its zlib header is read again
-    /// as raw deflate from its first byte, as curl does, so its text is the raw one; a gzip
-    /// member's block starts after its 10-byte header (one with flag bits has no answer).
+    /// Names zlib's text for the fault in the deflate data the stream failed on, as far as the
+    /// first <see cref="HeadLength" /> bytes hold it (STD-208, BL-6018). A <c>deflate</c> body that
+    /// fails after its zlib header before handing out anything is read again as raw deflate from
+    /// its first byte, as curl does, so its text is the raw one; once bytes are handed out curl
+    /// stays with zlib, so the data after the header is walked. A gzip member's data starts after
+    /// its 10-byte header (one with flag bits has no answer).
     /// </summary>
-    private string? InBlockFault()
-    {
-        if (handedOut)
-        {
-            return null;
-        }
+    private string? InBlockFault() => HttpDeflateFaultFinder.Find(DeflateDataInHead());
 
-        ReadOnlySpan<byte> data = head;
+    /// <summary>The deflate data <see cref="head" /> holds, as <see cref="InBlockFault" /> reads it.</summary>
+    private ReadOnlySpan<byte> DeflateDataInHead()
+    {
         if (decompressor is GZipStream)
         {
-            data = data.Length >= PlainGzipHeaderLength && data[3] == 0 ? data[PlainGzipHeaderLength..] : [];
-        }
-        else if (coding != HttpContentCoding.Deflate)
-        {
-            data = data[ZLibHeaderLength..];
+            return GzipDataInHead();
         }
 
-        return FirstBlockFault(data);
+        return decompressor is ZLibStream && (handedOut || coding != HttpContentCoding.Deflate) ? head.AsSpan(ZLibHeaderLength) : head;
     }
 
-    private static string? FirstBlockFault(ReadOnlySpan<byte> block)
-    {
-        if (block.IsEmpty)
-        {
-            return null;
-        }
-
-        // Plain conditions rather than a switch: a switch on two bits leaves the compiler's
-        // out-of-range edge, which no input can take, as an uncovered branch.
-        int blockType = (block[0] >> 1) & 0x03;
-        if (blockType == ReservedBlockType)
-        {
-            return HttpTransferMessages.InvalidBlockType;
-        }
-
-        if (blockType == StoredBlockType)
-        {
-            return StoredLengthsDisagree(block) ? HttpTransferMessages.InvalidStoredBlockLengths : null;
-        }
-
-        return blockType == DynamicBlockType ? DynamicHeaderFault(block, out _) : null;
-    }
-
-    private static bool StoredLengthsDisagree(ReadOnlySpan<byte> block)
-    {
-        // A block shorter than its header cannot fail a stream, so the missing bytes are read as
-        // all ones: the lengths then agree (0xFFFF and 0x0000 are complements) and nothing is named.
-        Span<byte> header = stackalloc byte[StoredBlockHeaderLength];
-        header.Fill(0xFF);
-        header[1] = header[2] = 0;
-        block[..Math.Min(StoredBlockHeaderLength, block.Length)].CopyTo(header);
-        return (header[1] | (header[2] << 8)) != (~(header[3] | (header[4] << 8)) & 0xFFFF);
-    }
+    /// <summary>The deflate data after a plain 10-byte gzip header in <see cref="head" />; none after one with flag bits.</summary>
+    private ReadOnlySpan<byte> GzipDataInHead() =>
+        head.Length >= PlainGzipHeaderLength && head[3] == 0 ? head.AsSpan(PlainGzipHeaderLength) : [];
 
     private static HttpTransferException Corrupt(string message) => new(CurlExitCode.BadContentEncoding, message);
 

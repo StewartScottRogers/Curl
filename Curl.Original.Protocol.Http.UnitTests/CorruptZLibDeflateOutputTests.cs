@@ -43,7 +43,7 @@ public sealed class CorruptZLibDeflateOutputTests
             () => Collect(decoder, Garbage, decoded));
 
         Assert.IsGreaterThan(0, handedOut);
-        Assert.AreEqual(HttpTransferMessages.BadContentEncoding, error.Message);
+        Assert.AreEqual(HttpTransferMessages.InvalidDistanceTooFarBack, error.Message);
     }
 
     [TestMethod]
