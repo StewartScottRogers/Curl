@@ -41,7 +41,7 @@ ADR-1435 (BL-6038) records what curl 8.18.0 on Ubuntu does: a second name in the
   the Networking `CLAUDE.md`, the older DoH tests that assumed a connection per query
   (`Cgr286Tests.cs`, the `DohDnsResolver*Tests.cs`, `TcpConnectorShuffledResolverTests.cs`,
   `Fakes/TurnTakingConnector.cs`) and `Curl.Engine.UnitTests/EngineCompositionDohTests.cs`.
-- Follow-ups: BL-6052 (dispose the resolver), BL-6053 (`conn_id` numbering under `--doh-url`).
+- Follow-ups: BL-6057 (dispose the resolver), BL-6058 (`conn_id` numbering under `--doh-url`).
 - Checks: `dotnet build` 0 warnings; fast tests pass in all projects; `Measure-CodeQuality.ps1
   -Library Curl.Networking.UnitLibrary` 0 failing members.
 

@@ -1,5 +1,5 @@
 ---
-id: BL-6052
+id: BL-6057
 title: Dispose the --doh-url resolver with its transports so its kept connections close
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6052 — Dispose the --doh-url resolver with its transports so its kept connections close
+# BL-6057 — Dispose the --doh-url resolver with its transports so its kept connections close
 
 ## Goal
 

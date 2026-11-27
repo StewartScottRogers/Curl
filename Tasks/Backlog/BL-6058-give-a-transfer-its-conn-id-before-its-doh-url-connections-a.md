@@ -1,5 +1,5 @@
 ---
-id: BL-6053
+id: BL-6058
 title: Give a transfer its conn_id before its --doh-url connections, as curl numbers them
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6053 — Give a transfer its conn_id before its --doh-url connections, as curl numbers them
+# BL-6058 — Give a transfer its conn_id before its --doh-url connections, as curl numbers them
 
 ## Goal
 
