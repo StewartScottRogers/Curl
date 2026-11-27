@@ -28,7 +28,7 @@ Found in BL-6046 (ADR-1437), which changed the Schannel build only. `Certificate
 
 ## Notes
 
-- Measured with `openssl verify` 3.5.7 (Git for Windows); table and decision in ADR-1448.
+- Measured with `openssl verify` 3.5.7 (Git for Windows); table and decision in ADR-1451.
 - Also matched, from the same measurement: an rfc822Name with no `@` under an rfc822Name constraint is
   unsupported name syntax (verify result 53), and the host is what follows the last `@` of each side.
 - The Schannel build is unchanged; its existing tests pass unchanged. The empty-constraint tests stay
@@ -38,4 +38,4 @@ Found in BL-6046 (ADR-1437), which changed the Schannel build only. `Certificate
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 86611341 4c860425 3d836d5e.
-- 2026-11-26: Doing -> Done. The OpenSSL build matches rfc822Name constraints as OpenSSL's nc_email does (ADR-1448).
+- 2026-11-26: Doing -> Done. The OpenSSL build matches rfc822Name constraints as OpenSSL's nc_email does (ADR-1451).

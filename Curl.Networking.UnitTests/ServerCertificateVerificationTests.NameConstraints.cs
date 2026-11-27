@@ -1248,7 +1248,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(0, FindViolationOfPermittedEmail(string.Empty, email, matchesSchannelBuild: true));
     }
 
-    // The OpenSSL build's rfc822Name rows below were measured with openssl verify 3.5.7 (BL-6054, ADR-1448).
+    // The OpenSSL build's rfc822Name rows below were measured with openssl verify 3.5.7 (BL-6054, ADR-1451).
     [TestMethod]
     [DataRow("@evil.test", "u@evil.test", true)]
     [DataRow("@evil.test", "U@EVIL.TEST", true)]

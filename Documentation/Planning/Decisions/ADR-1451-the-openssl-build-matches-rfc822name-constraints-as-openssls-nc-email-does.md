@@ -1,4 +1,4 @@
-# ADR-1448 - The OpenSSL build matches rfc822Name constraints as OpenSSL does
+# ADR-1451 - The OpenSSL build matches rfc822Name constraints as OpenSSL does
 
 - Status: Accepted
 - Date: 2026-11-26

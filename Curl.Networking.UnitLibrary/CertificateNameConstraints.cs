@@ -439,7 +439,7 @@ internal static class CertificateNameConstraints
         : IsWithin(name, subtree) ? 0
         : NotPermitted;
 
-    // OpenSSL's nc_email, measured with openssl verify 3.5 (BL-6054, ADR-1448): a name with no '@' cannot be
+    // OpenSSL's nc_email, measured with openssl verify 3.5 (BL-6054, ADR-1451): a name with no '@' cannot be
     // compared, whatever the constraint. Latin-1 keeps every byte of the two distinct.
     private static int CompareEmailForOpenSsl(byte[] constraint, byte[] name)
     {
