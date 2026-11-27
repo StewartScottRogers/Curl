@@ -43,3 +43,4 @@ Also:
 
 - 2026-11-27: Created.
 - 2026-11-27: Created from surly-05's question for the nuget.org-only Surly book (Stewart, 2026-11-27).
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 462d4c6b 51db2f06 51965029 23d63879 3d836d5e.
