@@ -30,3 +30,4 @@ A QUIC dial or a CONNECT-UDP proxy tunnel that `-m` ends on Linux prints `-v`'s 
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 73f0b96d 3d836d5e.
