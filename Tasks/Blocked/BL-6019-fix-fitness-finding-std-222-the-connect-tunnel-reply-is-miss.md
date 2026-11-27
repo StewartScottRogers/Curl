@@ -49,3 +49,4 @@ The finding, verbatim:
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: d90091a4 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Blocked. Blocked at shift start instead of refusing the shift: BL-6019 is in Doing and held by no lane, no parked branch factory/BL-6019-lane-* exists, and lane branches factory/lane-1, factory/lane-12 have commits beyond the shift branch, or git could not say; which one is its work cannot be told. Kept: factory/lane-1 is kept as factory/BL-6019-lane-12-20261126-174800; factory/lane-12 is kept as factory/BL-6019-lane-12-20261126-174800. Claude (an interactive session) finds the task's work among these, moves it to Backlog naming it, or Backlog with no work.
