@@ -9,7 +9,7 @@ namespace Curl.Networking;
 /// <summary>
 /// Pins what the provider reports when .NET on Linux throws from the chain build
 /// <see cref="System.Net.Security.SslStream" /> makes inside its handshake, for OpenSSL's error 1
-/// (ADR-1448, BL-6063). The handshake step is replaced by one that throws, so every platform runs it.
+/// (ADR-1452, BL-6063). The handshake step is replaced by one that throws, so every platform runs it.
 /// </summary>
 public sealed partial class SslStreamTlsProviderTests
 {

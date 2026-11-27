@@ -55,7 +55,7 @@ constraint that does not decode), which it answers as a refused, empty chain who
 1 (ADR-1446, BL-6061); `SslStream`'s own build inside a handshake does not go through it, so when that
 build throws, the OpenSSL build's `SslStreamTlsProvider` recognises it through
 `CertificateChainBuild.EndedHandshakeAsUnspecified` and answers exit 60 with verify result 1, or under
-`-k` keeps the exit 35 connect error and reports the verify result alone (ADR-1448, BL-6063). Both load `--cert` through
+`-k` keeps the exit 35 connect error and reports the verify result alone (ADR-1452, BL-6063). Both load `--cert` through
 `ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
 `--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included,
 except in the Schannel build with `--cacert`, which judges the pin first (ADR-0504, BL-2270):

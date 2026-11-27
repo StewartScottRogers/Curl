@@ -555,7 +555,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     // What a failed handshake says about the certificate: what the callbacks observed, except
     // when .NET on Linux threw from its own chain build for OpenSSL's error 1, before the
-    // validation callback (ADR-1448). The OpenSSL build refuses that as verify result 1. Under -k
+    // validation callback (ADR-1452). The OpenSSL build refuses that as verify result 1. Under -k
     // SslStream has no handshake left to go on with, so only the verify result is added and the
     // connect error stands.
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Refusal) JudgeFailedHandshake(

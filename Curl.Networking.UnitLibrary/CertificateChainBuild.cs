@@ -45,7 +45,7 @@ internal static class CertificateChainBuild
     /// <summary>
     /// Whether a handshake failed because the chain build <see cref="System.Net.Security.SslStream" />
     /// makes inside it ended with OpenSSL's error 1: .NET throws there before the validation
-    /// callback, and the exception reaches the caller bare or wrapped (ADR-1448).
+    /// callback, and the exception reaches the caller bare or wrapped (ADR-1452).
     /// </summary>
     /// <param name="handshakeFailure">What the handshake threw.</param>
     /// <returns><see langword="true" /> when it, or an exception inside it, is that build's.</returns>

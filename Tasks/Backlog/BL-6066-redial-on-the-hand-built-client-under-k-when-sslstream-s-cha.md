@@ -18,12 +18,12 @@ In the OpenSSL build, `-k` (or `--proxy-insecure`) against a server whose certif
 
 ## Context
 
-ADR-1448 (BL-6063): `SslStreamTlsProvider` can only report that handshake as exit 35, since it is over when the exception arrives and the provider holds one connection. `TcpConnector` would dial again and run the second handshake on `HandBuiltTlsProvider`, whose chain builds go through `CertificateChainBuild` (ADR-1446). Measure curl's `-v` output for such a chain before pinning any.
+ADR-1452 (BL-6063): `SslStreamTlsProvider` can only report that handshake as exit 35, since it is over when the exception arrives and the provider holds one connection. `TcpConnector` would dial again and run the second handshake on `HandBuiltTlsProvider`, whose chain builds go through `CertificateChainBuild` (ADR-1446). Measure curl's `-v` output for such a chain before pinning any.
 
 ## Acceptance criteria
 
 - [ ] A unit test over fakes, running on every platform, in which the first handshake fails that way under `-k` ends with a connection from the hand-built route and verify result 1.
-- [ ] Without `-k` the result stays exit 60 as ADR-1448 pins it, with no second dial.
+- [ ] Without `-k` the result stays exit 60 as ADR-1452 pins it, with no second dial.
 
 ## Notes
 

@@ -26,7 +26,7 @@ internal static class TlsFailureMessages
 
     /// <summary>
     /// The OpenSSL build's exit 60 message for a verification that ends with OpenSSL's error 1
-    /// and leaves no certificate to name anything from (ADR-1446, ADR-1448).
+    /// and leaves no certificate to name anything from (ADR-1446, ADR-1452).
     /// </summary>
     internal const string OpenSslUnspecifiedVerificationRefusal = "SSL certificate OpenSSL verify result: " + UnspecifiedVerifyError;
 
