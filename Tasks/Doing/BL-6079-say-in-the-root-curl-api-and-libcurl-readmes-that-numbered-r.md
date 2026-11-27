@@ -31,3 +31,4 @@ Since ADR-1443 (BL-2393) every `v*` tag pushes the packages to nuget.org (v0.4.0
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 3d587cf9 e6661b5b 3d836d5e.
