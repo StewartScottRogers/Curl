@@ -66,3 +66,4 @@ The finding, verbatim:
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 47fc27c5 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019; no code written, rule measured and recorded in Notes
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 47fc27c5 69116afe 3d836d5e.
