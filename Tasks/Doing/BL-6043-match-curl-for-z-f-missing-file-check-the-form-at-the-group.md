@@ -45,3 +45,4 @@ hangs (killed after 600 s).
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: bddf3c99 8fbaa4aa bad1a921 3d836d5e.
