@@ -27,7 +27,7 @@ ADR-1441 (BL-6051): `DohDnsResolver` keeps its DoH connections for later queries
 
 ## Notes
 
-- ADR-1446: `CurlTransports` is `IAsyncDisposable` (it closes its `DohDnsResolver` only); `TransferDispatch.KeptDohConnections` closes it with the console's option group; each library perform disposes the transports it built.
+- ADR-1448: `CurlTransports` is `IAsyncDisposable` (it closes its `DohDnsResolver` only); `TransferDispatch.KeptDohConnections` closes it with the console's option group; each library perform disposes the transports it built.
 - Added to `touches` (no other task in Doing on `origin/work/dark-factory` named them): `TransferDispatch.cs` (the console's owner of the transports), `ManagedCurlEngine.cs`, `ManagedEngineSharedState.cs`, `ManagedEasyTransfer.cs` and `ManagedEasyTransfer.Perform.cs` (the library host builds transports on every perform, the long-lived case Context names), and `CurlCommandRunnerDialingDohTests.cs`. `EngineComposition.Dns.cs` needed no change.
 - Tests: `EngineCompositionDohTests` (`DisposeAsync_*`, `PerformAsync_WithADohUrl_ClosesTheConnectionsTheDohResolverKept`) and `CurlCommandRunnerDialingDohTests`.
 - Checks: build with 0 warnings; the whole fast test run passed (exit 0). It found `PerformAsync` over the complexity gate, so the disposal moved to `PerformDisposingTransportsAsync`; the rebuild was clean and the Engine quality run, which reruns the test projects that reach the engine, passed at 100% line and branch with 0 failing members. `Curl.Console` was 100% with 0 failing members in the first quality run and did not change after it.

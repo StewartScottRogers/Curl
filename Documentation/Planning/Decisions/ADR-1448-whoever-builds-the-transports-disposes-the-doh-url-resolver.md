@@ -1,4 +1,4 @@
-# ADR-1446 — Whoever builds the transports disposes the `--doh-url` resolver
+# ADR-1448 — Whoever builds the transports disposes the `--doh-url` resolver
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

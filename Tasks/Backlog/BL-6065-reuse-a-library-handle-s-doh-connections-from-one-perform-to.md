@@ -18,7 +18,7 @@ A library handle's second perform asks the `--doh-url` server over the connectio
 
 ## Context
 
-ADR-1446 (BL-6057): each perform of `ManagedEasyTransfer` builds new transports, so a new `DohDnsResolver`, and disposes it when the perform ends. Reusing a connection needs a resolver kept by the handle (or its share or multi handle) while the DoH settings are unchanged, disposed with that owner. Start at `ManagedCurlEngine.CreateTransports`. Measure libcurl's reuse before pinning it.
+ADR-1448 (BL-6057): each perform of `ManagedEasyTransfer` builds new transports, so a new `DohDnsResolver`, and disposes it when the perform ends. Reusing a connection needs a resolver kept by the handle (or its share or multi handle) while the DoH settings are unchanged, disposed with that owner. Start at `ManagedCurlEngine.CreateTransports`. Measure libcurl's reuse before pinning it.
 
 ## Acceptance criteria
 
