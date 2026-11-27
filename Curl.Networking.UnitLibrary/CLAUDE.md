@@ -218,7 +218,7 @@ connect fails with exit 28 and `Connection timed out after N milliseconds`, N fr
 start and never below the limit, also reported as a `-v` line. It is that failure too when a
 cancellation arrives with at most a quarter of the limit, 500 ms at most, still to run, as a
 smaller `-m`'s does, its clock having started earlier, or when the limit's own timer fired before
-the clock read the limit (ADR-1453, BL-6039); an earlier cancellation escapes. Per ADR-0286 (BL-797) `ForFtpDataConnections()` gives a view of
+the clock read the limit (ADR-1457, BL-6039); an earlier cancellation escapes. Per ADR-0286 (BL-797) `ForFtpDataConnections()` gives a view of
 the same connector (DNS cache, numbering, every setting) whose connects run under the longest
 timer delay instead and that takes a `--connect-to` mapping's host but keeps the target's port (BL-1976, BL-2042), FTP's passive data connector; `PoolingConnector.Over(inner)` gives a pooling
 connector over the same cache, configuration and numbering that opens through `inner`. A dial whose

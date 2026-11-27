@@ -28,7 +28,7 @@ Seen in BL-6015 on 2026-11-26 with a linux-x64 self-contained publish of Curl.Co
 ## Notes
 
 - Cause: `-m`'s clock starts before the connect's, so on Linux its cancellation reached `TcpConnector` before the connector's own limit had passed, and escaped without the line. Windows' timer granularity hid it.
-- Decision (ADR-1453): the connect limit passed when the connector's own timer fired, or the clock is within a quarter of the limit (500 ms at most) of it; the reported N is never below the limit. Covers resolving too.
+- Decision (ADR-1457): the connect limit passed when the connector's own timer fired, or the clock is within a quarter of the limit (500 ms at most) of it; the reported N is never below the limit. Covers resolving too.
 - `touches` gained `Curl.Networking.UnitLibrary/CLAUDE.md`, whose sentence on cancellations the change made untrue; no task in Doing named it.
 - Verified in WSL Ubuntu with a linux-x64 self-contained publish (before the N-never-below-the-limit step, which the unit tests pin): `-sSv -m 3 http://192.0.2.20:1/` printed the line three runs of three, exit 28, at 2855, 3009 and 2961 ms; `-m 0.3`, `--connect-timeout 1` and `dict://` with `-m 1` printed it too.
 - Gates: `dotnet build` 0 warnings, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 0 failing members.
@@ -38,4 +38,4 @@ Seen in BL-6015 on 2026-11-26 with a linux-x64 self-contained publish of Curl.Co
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 30cb71e1 3d836d5e.
-- 2026-11-26: Doing -> Done. -m ending a TCP connect or resolve prints -v's timed out line on Linux too (ADR-1453)
+- 2026-11-26: Doing -> Done. -m ending a TCP connect or resolve prints -v's timed out line on Linux too (ADR-1457)

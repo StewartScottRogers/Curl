@@ -9,7 +9,7 @@ namespace Curl.Networking;
 /// <summary>
 /// Pins that <see cref="TcpConnector" /> reports <c>Connection timed out after &lt;n&gt; milliseconds</c>
 /// for a connect <c>-m</c> ends, whether the caller's <c>-m</c> cancellation or the connector's own
-/// limit fires first, as curl 8.18.0 prints it on Linux (BL-6039, ADR-1453). The caller's token
+/// limit fires first, as curl 8.18.0 prints it on Linux (BL-6039, ADR-1457). The caller's token
 /// stands for <c>-m</c>, whose clock starts before the connect's.
 /// </summary>
 [TestClass]

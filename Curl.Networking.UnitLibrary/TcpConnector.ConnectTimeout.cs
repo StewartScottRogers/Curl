@@ -69,7 +69,7 @@ public sealed partial class TcpConnector
 
     // True when this connect's own timer fired, which on Linux can be a few milliseconds before the clock reads the
     // limit, or when the clock is within CallerLimitLeadFor of the limit: -m is the same limit, but its clock starts
-    // before this connect's, so its cancellation arrives with that much of the limit still to run (ADR-1453).
+    // before this connect's, so its cancellation arrives with that much of the limit still to run (ADR-1457).
     private bool IsEndedByConnectLimit(CancellationTokenSource ownTimer, long started, TimeSpan connectLimit) =>
         ownTimer.IsCancellationRequested || timeProvider.GetElapsedTime(started) >= connectLimit - CallerLimitLeadFor(connectLimit);
 

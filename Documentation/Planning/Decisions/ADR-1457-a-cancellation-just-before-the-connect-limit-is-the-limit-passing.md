@@ -1,4 +1,4 @@
-# ADR-1453 — A cancellation just before the connect limit is the limit passing
+# ADR-1457 — A cancellation just before the connect limit is the limit passing
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

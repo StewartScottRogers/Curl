@@ -18,7 +18,7 @@ An HTTP connect `-m` ends, a redirect hop's included, prints `Connection timed o
 
 ## Context
 
-Found in BL-6039 (ADR-1453). With a linux-x64 publish in WSL, `curl -sSv -m 3 http://192.0.2.20:1/` printed `* Connection timed out after 2855 milliseconds` from `TcpConnector` and `curl: (28) Connection timed out after 2942 milliseconds` from `HttpTransferDeadline.WithinConnectTimeoutAsync`, which counts its own N after the connect unwound and can print one below the limit. A redirect hop that starts well before `-m` runs out gets no `-v` line at all, on every platform: the connector's limit is the whole `-m` again (ADR-0117, BL-510 amendment), so the cancellation reaches it early and escapes. Measure real curl for the hop with `Record-CurlExchange.ps1`.
+Found in BL-6039 (ADR-1457). With a linux-x64 publish in WSL, `curl -sSv -m 3 http://192.0.2.20:1/` printed `* Connection timed out after 2855 milliseconds` from `TcpConnector` and `curl: (28) Connection timed out after 2942 milliseconds` from `HttpTransferDeadline.WithinConnectTimeoutAsync`, which counts its own N after the connect unwound and can print one below the limit. A redirect hop that starts well before `-m` runs out gets no `-v` line at all, on every platform: the connector's limit is the whole `-m` again (ADR-0117, BL-510 amendment), so the cancellation reaches it early and escapes. Measure real curl for the hop with `Record-CurlExchange.ps1`.
 
 ## Acceptance criteria
 

@@ -18,7 +18,7 @@ A QUIC dial or a CONNECT-UDP proxy tunnel that `-m` ends on Linux prints `-v`'s 
 
 ## Context
 
-`TcpConnector.UdpTunnel.cs` and `QuicDialer.cs` report the line only once their own clock reads the limit, so on Linux, where `-m`'s cancellation arrives while the connect's limit still has its start-up time to run, the cancellation escapes without it. ADR-1453 gives the rule `TcpConnector.IsEndedByConnectLimit` applies; apply the same one. Measure real curl with `--http3-only` before pinning text.
+`TcpConnector.UdpTunnel.cs` and `QuicDialer.cs` report the line only once their own clock reads the limit, so on Linux, where `-m`'s cancellation arrives while the connect's limit still has its start-up time to run, the cancellation escapes without it. ADR-1457 gives the rule `TcpConnector.IsEndedByConnectLimit` applies; apply the same one. Measure real curl with `--http3-only` before pinning text.
 
 ## Acceptance criteria
 
