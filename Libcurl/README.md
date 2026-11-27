@@ -122,6 +122,6 @@ and a CRAP score at most 30, measured from the fast tests only. Its tests are in
 `CurlCode`) and `Curl.Engine.UnitLibrary` (the engine it drives), and the conformance runner
 `Curl.Conformance.UnitProgram.UnitLibrary` references it. Its .NET-idiomatic sibling over the same engine is [Curl.Api](../Curl.Api/README.md). See `CLAUDE.md` in this folder for the rules each area follows, and the [Glossary](../Documentation/Wiki/Glossary.md) for the terms.
 
-## Use the package from the preview release
+## Get the package
 
-Download `Surly.Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Surly.Libcurl --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.
+Numbered releases are on nuget.org: `dotnet add package Surly.Libcurl --prerelease` adds the package from there. The rolling `preview` release never reaches nuget.org. To use it, download `Surly.Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Surly.Libcurl --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else.
