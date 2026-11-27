@@ -1,5 +1,5 @@
 ---
-id: BL-6069
+id: BL-6070
 title: Stop OciTransferCases failing on SslStream's disposed SafeFreeCredential
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6069 — Stop OciTransferCases failing on SslStream's disposed SafeFreeCredential
+# BL-6070 — Stop OciTransferCases failing on SslStream's disposed SafeFreeCredential
 
 ## Goal
 
