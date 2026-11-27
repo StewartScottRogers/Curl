@@ -378,6 +378,23 @@ public sealed class AzureStorageProtocolHandlerTests
         Assert.HasCount(2, connector.Connections);
     }
 
+    [TestMethod]
+    [DataRow("az://account/container/k%E9", "path")]
+    [DataRow("az://account/container/k%E9/", "path")]
+    [DataRow("abfs://files%E9@account/dir/", "path")]
+    [DataRow("az://account/container/?prefix=k%E9", "query")]
+    [DataRow("az://account/container/blob?k%E9=1", "query")]
+    public async Task ExecuteAsync_EscapesNotUtf8_FailsWithExit3BeforeConnecting(string url, string field)
+    {
+        QueuedAzureStorageConnector connector = new();
+
+        TransferResult result = await Handler(connector, sas: Sas).ExecuteAsync(Context(url, new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual($"The Azure Storage {field} in the URL is not valid UTF-8", result.ErrorMessage);
+        Assert.IsEmpty(connector.Targets);
+    }
+
     private static AzureStorageProtocolHandler Handler(QueuedAzureStorageConnector connector, string? sas = null, int maxBlockCount = AzureBlobOperations.MaxBlockCount) =>
         new(connector, name => name == "AZURE_STORAGE_SAS_TOKEN" ? sas : null, 8, maxBlockCount);
 

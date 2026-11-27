@@ -36,4 +36,14 @@ public sealed class McpStdioCommandTests
     [DataRow("mcp+stdio:///npx")]
     public void From_RemoteHostOrNoProgram_GivesNull(string url) =>
         Assert.IsNull(McpStdioCommand.From(CurlUrl.Parse(url)));
+
+    [TestMethod]
+    [DataRow("mcp+stdio://localhost/server%E9", "program")]
+    [DataRow("mcp+stdio://localhost/server?a&b%E9", "argument")]
+    public void From_EscapesNotUtf8_FailsWithExit3NamingTheField(string url, string field)
+    {
+        McpClientException failure = Assert.ThrowsExactly<McpClientException>(() => McpStdioCommand.From(CurlUrl.Parse(url)));
+
+        Assert.AreEqual((CurlExitCode.UrlMalformat, $"The MCP {field} in the URL is not valid UTF-8"), (failure.ExitCode, failure.Message));
+    }
 }

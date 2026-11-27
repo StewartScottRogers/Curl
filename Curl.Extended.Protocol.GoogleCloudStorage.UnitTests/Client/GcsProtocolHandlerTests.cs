@@ -258,6 +258,20 @@ public sealed class GcsProtocolHandlerTests
     public void SupportedSchemes_IsGs() =>
         CollectionAssert.AreEqual(new[] { "gs" }, Handler(new QueuedGcsConnector(), null).SupportedSchemes.ToArray());
 
+    [TestMethod]
+    [DataRow("gs://bucket/k%E9", "object name")]
+    [DataRow("gs://bucket/dir/?prefix=k%E9", "query")]
+    public async Task ExecuteAsync_EscapesNotUtf8_FailsWithExit3BeforeConnecting(string url, string field)
+    {
+        QueuedGcsConnector connector = new();
+
+        TransferResult result = await Handler(connector, Emulator).ExecuteAsync(Context(url, new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual($"The Cloud Storage {field} in the URL is not valid UTF-8", result.ErrorMessage);
+        Assert.IsEmpty(connector.Targets);
+    }
+
     private static GcsProtocolHandler Handler(QueuedGcsConnector connector, string? emulatorHost) =>
         new(connector, name => name == "STORAGE_EMULATOR_HOST" ? emulatorHost : null);
 

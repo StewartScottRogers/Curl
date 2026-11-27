@@ -321,6 +321,21 @@ public sealed class S3ProtocolHandlerTests
     private static S3ProtocolHandler Handler(QueuedS3Connector connector, string? endpointUrl) =>
         new(connector, name => name == "AWS_ENDPOINT_URL" ? endpointUrl : null, 8);
 
+    [TestMethod]
+    [DataRow("s3://bucket/k%E9", "object key")]
+    [DataRow("s3://bucket/dir/?prefix=k%E9", "query")]
+    [DataRow("s3://bucket/k?k%E9=1", "query")]
+    public async Task ExecuteAsync_EscapesNotUtf8_FailsWithExit3BeforeConnecting(string url, string field)
+    {
+        QueuedS3Connector connector = new();
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(Context(url, new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual($"The S3 {field} in the URL is not valid UTF-8", result.ErrorMessage);
+        Assert.IsEmpty(connector.Targets);
+    }
+
     private static TransferContext Context(string url, Stream output, NetworkCredential? credentials = null, string? upload = null) => new()
     {
         Url = CurlUrl.Parse(url),

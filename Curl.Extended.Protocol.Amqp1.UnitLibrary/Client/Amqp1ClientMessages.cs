@@ -13,6 +13,9 @@ internal static class Amqp1ClientMessages
     /// <summary>The URL names no address after its '/'.</summary>
     internal const string NoAddress = "No AMQP 1.0 address found. Forgot to URL encode it?";
 
+    /// <summary>The URL's address decodes to bytes that are not valid UTF-8.</summary>
+    internal const string AddressNotUtf8 = "The AMQP 1.0 address in the URL is not valid UTF-8";
+
     /// <summary>The peer closed the connection before the flow ended.</summary>
     internal const string ConnectionDisconnected = "Connection disconnected";
 

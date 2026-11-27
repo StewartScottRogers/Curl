@@ -1,4 +1,5 @@
 using Curl.Extended.Protocol.DnsQuery.Wire;
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.DnsQuery.Client;
@@ -28,19 +29,21 @@ internal sealed record DnsQueryRequest(string? Server, int Port, string Name, us
     /// <param name="url">The <c>dns:</c> URL.</param>
     /// <param name="defaultPort">The port when the URL names none: the transport's.</param>
     /// <returns>The request.</returns>
-    /// <exception cref="DnsQueryException">The URL names no name, or a query element that is not a known TYPE= or CLASS= (exit 3).</exception>
+    /// <exception cref="DnsQueryException">The URL names no name or one that is not valid UTF-8 once decoded (ADR-1429), or a query element that is not a known TYPE= or CLASS= (exit 3).</exception>
     public static DnsQueryRequest Of(CurlUrl url, int defaultPort = DefaultPort)
     {
-        string name = Uri.UnescapeDataString(url.AbsolutePath.TrimStart('/'));
-        if (name.Length == 0)
-        {
-            throw Malformed("The dns: URL names no DNS name to query");
-        }
-
+        string name = NameOf(url);
         DnsQueryRequest request = new(url.IdnHost.Length == 0 ? null : url.IdnHost, url.Port >= 0 ? url.Port : defaultPort, name, AddressType, InternetClass);
         return (url.Query ?? string.Empty)
             .Split([';', '&'], StringSplitOptions.RemoveEmptyEntries)
             .Aggregate(request, WithElement);
+    }
+
+    private static string NameOf(CurlUrl url)
+    {
+        string name = UrlPercentDecoding.Utf8TextOf(url.AbsolutePath.TrimStart('/'))
+            ?? throw Malformed("The dns: URL's DNS name is not valid UTF-8");
+        return name.Length > 0 ? name : throw Malformed("The dns: URL names no DNS name to query");
     }
 
     private static DnsQueryRequest WithElement(DnsQueryRequest request, string element)

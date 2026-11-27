@@ -106,6 +106,7 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
     /// <summary>Takes the list parameters the operation owns out of the URL's query so each is sent once: the URL's <c>prefix</c> extends the path's, its <c>delimiter</c> replaces <c>/</c>, and <c>restype</c>, <c>comp</c> and <c>marker</c> are dropped.</summary>
     /// <param name="query">The URL's query, percent-encoded, without a <c>?</c>.</param>
     /// <returns>The decoded URL prefix, the percent-encoded delimiter, and the query left to send as it is.</returns>
+    /// <exception cref="AzureStorageTransferException">Exit 3 when a name or the prefix is not valid UTF-8 once decoded.</exception>
     internal static (string Prefix, string Delimiter, string Remainder) SplitListQuery(string query)
     {
         string prefix = string.Empty;
@@ -114,12 +115,12 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
         foreach (string pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
             int at = pair.IndexOf('=', StringComparison.Ordinal);
-            string name = Uri.UnescapeDataString(at < 0 ? pair : pair[..at]);
+            string name = AzureStorageClient.TextOf(at < 0 ? pair : pair[..at], "query");
             string value = at < 0 ? string.Empty : pair[(at + 1)..];
             switch (name)
             {
                 case "prefix":
-                    prefix = Uri.UnescapeDataString(value);
+                    prefix = AzureStorageClient.TextOf(value, "query");
                     break;
                 case "delimiter":
                     delimiter = value;

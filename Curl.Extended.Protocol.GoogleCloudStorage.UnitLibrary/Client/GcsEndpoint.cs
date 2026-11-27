@@ -1,3 +1,6 @@
+using Curl.Extension.Abstractions;
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 
 /// <summary>
@@ -41,6 +44,7 @@ internal sealed record GcsEndpoint(string Host, int Port, bool UseTls)
     /// <summary>Splits a <c>gs://</c> URL's query string into its parameters, percent-decoded (a <c>+</c> is a space); a parameter with no <c>=</c> has an empty value.</summary>
     /// <param name="query">The query string without its <c>?</c>, or <see langword="null"/> when the URL has none.</param>
     /// <returns>The parameters in the order the URL gives them.</returns>
+    /// <exception cref="GcsTransferException">Exit 3 when a name or value is not valid UTF-8 once decoded.</exception>
     internal static List<KeyValuePair<string, string>> QueryOf(string? query) =>
         [.. (query ?? string.Empty).Split('&', StringSplitOptions.RemoveEmptyEntries).Select(parameter =>
         {
@@ -64,7 +68,16 @@ internal sealed record GcsEndpoint(string Host, int Port, bool UseTls)
         return name.Length == 0 || name[0] == '[' ? fallback : name;
     }
 
-    private static string Decode(string text) => Uri.UnescapeDataString(text.Replace('+', ' '));
+    private static string Decode(string text) => TextOf(text.Replace('+', ' '), "query");
+
+    /// <summary>Percent-decodes a part of the URL.</summary>
+    /// <param name="escaped">The percent-encoded part.</param>
+    /// <param name="field">What the part names, for the failure's message.</param>
+    /// <returns>The decoded text.</returns>
+    /// <exception cref="GcsTransferException">Exit 3 when the part is not valid UTF-8 once decoded (ADR-1429).</exception>
+    internal static string TextOf(string escaped, string field) =>
+        UrlPercentDecoding.Utf8TextOf(escaped)
+            ?? throw new GcsTransferException(CurlExitCode.UrlMalformat, $"The Cloud Storage {field} in the URL is not valid UTF-8");
 
     /// <summary>Gives the path, before percent-encoding, of <paramref name="objectName"/> in <paramref name="bucket"/>; an empty name gives the bucket itself.</summary>
     /// <param name="bucket">The bucket.</param>

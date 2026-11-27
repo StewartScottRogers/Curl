@@ -63,4 +63,14 @@ public sealed class DnsQueryRequestTests
     [DataRow("dns://h/example.com?ttl=5")]
     public void Of_NoNameOrAnUnknownQueryElement_FailsWithExit3(string url) =>
         Assert.AreEqual(CurlExitCode.UrlMalformat, Assert.ThrowsExactly<DnsQueryException>(() => DnsQueryRequest.Of(CurlUrl.Parse(url))).ExitCode);
+
+    [TestMethod]
+    [DataRow("dns://h/k%E9.example", "The dns: URL's DNS name is not valid UTF-8")]
+    [DataRow("dns://h/example.com?type=%E9", "The dns: URL's query element \"type=%E9\" is not TYPE= or CLASS= with a known value")]
+    public void Of_EscapesNotUtf8_FailsWithExit3NamingThePart(string url, string message)
+    {
+        DnsQueryException failure = Assert.ThrowsExactly<DnsQueryException>(() => DnsQueryRequest.Of(CurlUrl.Parse(url)));
+
+        Assert.AreEqual((CurlExitCode.UrlMalformat, message), (failure.ExitCode, failure.Message));
+    }
 }
