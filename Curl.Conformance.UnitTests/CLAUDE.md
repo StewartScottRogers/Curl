@@ -32,14 +32,15 @@ reason, its first difference, or a note that it passes and can be listed. A list
 `<features>` only another platform's Curl meets (test2087 and test3023 need `Schannel`, so they
 run on Windows only) is `Inconclusive` where it cannot run, not a failure; any other skip of a
 listed case fails it (ADR-0488). A listed case that
-fails is run once more before it is judged, since a stall of a busy CI runner can hold any case
-past a time limit - the harness's (curl past 20 seconds, or the whole case past 30; BL-1859) or
-the case's own, as test303's `-m 8` (BL-2093). When a change makes
+fails is run once more before it is judged, and so is a failing case of our own (below), since a
+stall of a busy CI runner can hold any case past a time limit - the harness's (curl past 20
+seconds, or the whole case past 30; BL-1859, BL-6069) or the case's own, as test303's `-m 8`
+(BL-2093). When a change makes
 a case pass, add its number to the list in the same commit.
 
 ## Our own cases
 
-`CurlTestCases/Extended/` holds our own cases as `ext<number>.curltest` in the upstream format (see its `README.md`); in one subfolder per protocol (`DICT/` ... `WS/`), each owning a block of numbers (`HTTP/` is `ext5001` to `ext5999`; see the README); `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` runs them all, fails a number outside its folder's block or used twice, apart from the upstream ratchet and `PassingUpstreamCases.txt` (ADR-0810).
+`CurlTestCases/Extended/` holds our own cases as `ext<number>.curltest` in the upstream format (see its `README.md`); in one subfolder per protocol (`DICT/` ... `WS/`), each owning a block of numbers (`HTTP/` is `ext5001` to `ext5999`; see the README); `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` runs them all, runs a failing one once more, fails a number outside its folder's block or used twice, apart from the upstream ratchet and `PassingUpstreamCases.txt` (ADR-0810).
 
 ## Debugging one case
 

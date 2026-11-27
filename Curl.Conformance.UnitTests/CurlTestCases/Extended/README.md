@@ -11,7 +11,8 @@ from a curl release tag leaves these cases alone.
 - **Run environment.** `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` runs every case here
   with `Original/`'s `certs/` as `%CERTDIR` and `Original/`'s `data/` as `%SRCDIR/data`.
 - **Not upstream.** These cases are not on `PassingUpstreamCases.txt` and never change the upstream pass
-  count, the ratchet or the gap office's behaviour score; each one must simply pass.
+  count, the ratchet or the gap office's behaviour score; each one must simply pass. A case that fails is
+  run once more, as a listed upstream case is, so a stall of a busy CI runner does not fail the run.
 
 ## Folders and number blocks
 
