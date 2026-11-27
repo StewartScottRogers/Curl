@@ -17,6 +17,7 @@
       name      what the file is, for example "curl (win-x64)"
       kind      cli             the curl command-line tool, one native archive per platform
                 mcp-server      a Curl.Mcp NuGet package (the tool, or one platform's native binary)
+                dotnet-tool     a Surly.Curl NuGet package (the tool, or one platform's native curl)
                 dotnet-library  a Curl.Api or Libcurl NuGet package, platform-neutral
                 checksums       SHA256SUMS, covering the curl archives and the .nupkg files
                 ai-help         ai-help.md, the output of "curl --ai-help all" from this build
@@ -62,6 +63,17 @@ function Get-ResourceDescription([string]$File) {
             return @{ name = 'Curl.Mcp'; kind = 'mcp-server'; platform = 'any'
                 use = 'Put every Curl.Mcp nupkg file in one folder and run the server over stdio with: dnx Surly.Curl.Mcp --yes --prerelease --add-source <folder>.'
                 docs = "$blob/Curl.Mcp/README.md" }
+        }
+        '^Surly\.Curl\.(?<rid>(win|linux|osx)-(x64|arm64))\.\d' {
+            $rid = $Matches['rid']
+            return @{ name = "Surly.Curl native binary ($rid)"; kind = 'dotnet-tool'; platform = $rid
+                use = 'Installed for you by the Surly.Curl tool package; install that one, not this.'
+                docs = "$blob/DOWNLOAD.md" }
+        }
+        '^Surly\.Curl\.\d' {
+            return @{ name = 'Surly.Curl'; kind = 'dotnet-tool'; platform = 'any'
+                use = 'Put every Surly.Curl nupkg file in one folder and run curl with: dnx Surly.Curl@<version> --yes --source <folder> -- <curl arguments>. In PowerShell write the separator as ''--''.'
+                docs = "$blob/DOWNLOAD.md" }
         }
         '^Surly\.Curl\.Api\.\d' {
             return @{ name = 'Curl.Api'; kind = 'dotnet-library'; platform = 'any'
