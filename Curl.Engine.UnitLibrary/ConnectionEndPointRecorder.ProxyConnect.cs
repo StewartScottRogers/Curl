@@ -64,24 +64,15 @@ internal sealed partial class ConnectionEndPointRecorder
 
     /// <summary>
     /// <paramref name="report" /> with the last CONNECT reply's status, every reply's bytes added to its header size and
-    /// the last reply's header lines counted as <see cref="CountedConnectReplyHeaders" /> says (ADR-1434). A reply with
-    /// header lines also removes <see cref="TransferReport.TransferCompleteStandInHeader" />, which curl does not count
-    /// beside them.
+    /// the last reply's header lines counted as <see cref="CountedConnectReplyHeaders" /> says (ADR-1434).
     /// </summary>
-    private TransferReport WithConnectReplies(TransferReport report)
-    {
-        IReadOnlyList<KeyValuePair<string, string>> ownPseudoHeaders =
-            connectReplyHeaderCount > 0 && report.PseudoHeaders.SequenceEqual([TransferReport.TransferCompleteStandInHeader])
-                ? []
-                : report.PseudoHeaders;
-        return report with
+    private TransferReport WithConnectReplies(TransferReport report) =>
+        report with
         {
             ProxyConnectResponseCode = proxyConnectResponseCode,
             HeaderSize = report.HeaderSize + proxyConnectHeaderBytes,
-            PseudoHeaders = ownPseudoHeaders,
-            ConnectReplyHeaderCount = CountedConnectReplyHeaders(ownPseudoHeaders.Count + report.ResponseHeaders.Count),
+            ConnectReplyHeaderCount = CountedConnectReplyHeaders(report.PseudoHeaders.Count + report.ResponseHeaders.Count),
         };
-    }
 
     /// <summary>
     /// The last CONNECT reply's header lines that curl still counts: all of them, except when the transfer had one reply

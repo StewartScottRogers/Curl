@@ -29,12 +29,9 @@ public sealed class Std222Tests
     }
 
     [TestMethod]
-    public async Task ReportOn_TwoTunnelsAndTheFtpStandInHeader_CountsTheLastReplyAlone()
+    public async Task ReportOn_TwoTunnelsAndNoHeadersOfItsOwn_CountsTheLastReplyAlone()
     {
-        TransferReport report = await ReportOfAsync(
-            new TransferReport { PseudoHeaders = [TransferReport.TransferCompleteStandInHeader] },
-            Tunnel(headers: 3),
-            Tunnel());
+        TransferReport report = await ReportOfAsync(new TransferReport(), Tunnel(headers: 3), Tunnel());
 
         Assert.AreEqual(124, report.HeaderSize);
         Assert.AreEqual(1, report.ConnectReplyHeaderCount);
@@ -63,14 +60,12 @@ public sealed class Std222Tests
     }
 
     [TestMethod]
-    public async Task ReportOn_AReplyWithNoHeaderLines_KeepsTheFtpStandInHeader()
+    public async Task ReportOn_AReplyWithNoHeaderLinesAndAGreetingLine_CountsTheLineAlone()
     {
-        TransferReport report = await ReportOfAsync(
-            new TransferReport { PseudoHeaders = [TransferReport.TransferCompleteStandInHeader] },
-            Tunnel(headers: 0));
+        TransferReport report = await ReportOfAsync(new TransferReport { PseudoHeaders = [GreetingLine] }, Tunnel(headers: 0));
 
         Assert.AreEqual(0, report.ConnectReplyHeaderCount);
-        CollectionAssert.AreEqual(new[] { TransferReport.TransferCompleteStandInHeader }, report.PseudoHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { GreetingLine }, report.PseudoHeaders.ToArray());
     }
 
     [TestMethod]
