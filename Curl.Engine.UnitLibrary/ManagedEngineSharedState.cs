@@ -252,17 +252,17 @@ internal sealed class ManagedEngineSharedState
     /// </summary>
     /// <returns>The state, sharing every cache with this one.</returns>
     internal ManagedEngineSharedState WithoutFtpPwdStop() =>
-        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts, keepsFtpPwdStop: false) { SocketWait = SocketWait, TransportsBuilt = TransportsBuilt };
+        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts, keepsFtpPwdStop: false) { SocketWait = SocketWait, DohResolver = DohResolver };
 
     /// <summary>
-    /// Gets where <see cref="ManagedCurlEngine.CreateTransports" /> keeps the transports it builds over this state,
-    /// for the perform running over it to dispose; <see langword="null" /> outside a perform.
+    /// Gets the <c>--doh-url</c> resolver of the handle performing over this state, which
+    /// <see cref="ManagedCurlEngine.CreateTransports" /> builds its transports with; <see langword="null" /> outside a perform.
     /// </summary>
-    internal ConcurrentBag<CurlTransports>? TransportsBuilt { get; private init; }
+    internal KeptDohResolver? DohResolver { get; private init; }
 
-    /// <summary>Gives this state with <paramref name="transportsBuilt" /> as its <see cref="TransportsBuilt" />.</summary>
-    /// <param name="transportsBuilt">Where the transports built over the state are kept.</param>
+    /// <summary>Gives this state with <paramref name="dohResolver" /> as its <see cref="DohResolver" />.</summary>
+    /// <param name="dohResolver">The performing handle's kept resolver.</param>
     /// <returns>The state, sharing every cache with this one.</returns>
-    internal ManagedEngineSharedState KeepingTransportsBuiltIn(ConcurrentBag<CurlTransports> transportsBuilt) =>
-        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts) { SocketWait = SocketWait, TransportsBuilt = transportsBuilt };
+    internal ManagedEngineSharedState KeepingDohResolverIn(KeptDohResolver dohResolver) =>
+        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts) { SocketWait = SocketWait, DohResolver = dohResolver };
 }

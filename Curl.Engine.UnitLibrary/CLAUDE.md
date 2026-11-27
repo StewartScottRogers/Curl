@@ -556,3 +556,7 @@ while that handle has a callback queued or the transfer's perform has finished a
 reported (`TransferSocketWait.IsReadableOn`), so `curl_multi_waitfds` sockets polled on a second
 handle wake it at once, as real descriptors do (upstream test2407, ADR-1390). Its tests are
 `ManagedMultiTransferTests.SecondHandlePoll.cs`.
+
+## The handle's kept `--doh-url` resolver (BL-6065)
+
+Each `ManagedEasyTransfer` owns a `KeptDohResolver`, which `ManagedCurlEngine.CreateTransports` gives `EngineComposition.CreateTransports` for the transports a perform builds, so a later perform asks the DoH server over the connections an earlier one opened (ADR-1449). It is kept while the TLS options and the network options but for the URL and port are unchanged; a replaced resolver closes its connections when the perform ends, `Reset` keeps it, and `DisposeAsync` closes it. Its tests are in `EngineCompositionDohTests`.

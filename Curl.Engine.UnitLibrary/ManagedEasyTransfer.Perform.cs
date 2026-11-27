@@ -45,7 +45,7 @@ internal sealed partial class ManagedEasyTransfer
         ConnectOnly.PerformRunning = true;
         try
         {
-            return await PerformDisposingTransportsAsync(cancellationToken).ConfigureAwait(false);
+            return await PerformClosingReplacedDohResolversAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -53,22 +53,14 @@ internal sealed partial class ManagedEasyTransfer
         }
     }
 
-    // However the perform ends, its transfers are then over, so each of the transports it built closes what its
-    // --doh-url resolver kept before the perform's outcome, a cancellation included, reaches the caller.
-    private async ValueTask<CurlCode> PerformDisposingTransportsAsync(CancellationToken cancellationToken)
+    // However the perform ends, its transfers are then over, so a --doh-url resolver that changed settings replaced
+    // closes its connections before the perform's outcome, a cancellation included, reaches the caller.
+    private async ValueTask<CurlCode> PerformClosingReplacedDohResolversAsync(CancellationToken cancellationToken)
     {
         Task<CurlCode> performed = PerformRunningAsync(cancellationToken).AsTask();
         await ((Task)performed).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        await DisposeTransportsBuiltAsync().ConfigureAwait(false);
+        await dohResolver.CloseReplacedAsync().ConfigureAwait(false);
         return await performed.ConfigureAwait(false);
-    }
-
-    private async ValueTask DisposeTransportsBuiltAsync()
-    {
-        while (transportsBuilt.TryTake(out CurlTransports? built))
-        {
-            await built.DisposeAsync().ConfigureAwait(false);
-        }
     }
 
     private async ValueTask<CurlCode> PerformRunningAsync(CancellationToken cancellationToken)

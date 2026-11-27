@@ -465,24 +465,94 @@ public sealed class EngineCompositionDohTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_WithADohUrl_ClosesTheConnectionsTheDohResolverKept()
+    public async Task PerformAsync_TwiceWithTheSameDohUrl_OpensNoNewDohConnectionForTheSecondHost()
     {
-        byte[] webResponse = Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = webResponse };
-        ManagedCurlEngine engine = new(TimeProvider.System, null, readEnvironmentVariable: _ => null, dialing: new EngineDialing(dialer, new LoopbackDnsResolver(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no udp")));
-        await using IEasyTransfer easy = engine.CreateEasy();
-        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://example.test:48712/", DohUrl = PlainDohUrl } };
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        await using IEasyTransfer easy = DialingEngine(dialer).CreateEasy();
+        await PerformThroughDohAsync(easy, "http://example.test:48712/", new EasyNetworkOptions { DohUrl = PlainDohUrl });
+        List<DisposalRecordingConnection> openedByTheFirst = dialer.DohConnections;
+
+        await PerformThroughDohAsync(easy, "http://other.test:48712/", easy.Options.Network);
+
+        Diagnostics.Assert("DoH connections after the second perform", 2, dialer.DohConnections.Count);
+        Assert.HasCount(2, openedByTheFirst);
+        CollectionAssert.AreEqual(openedByTheFirst, dialer.DohConnections);
+        // Each connection carried one query of each name, and stays open for a later perform.
+        Assert.IsTrue(openedByTheFirst.All(connection => connection.Requests == 2));
+        Assert.IsFalse(openedByTheFirst.Any(connection => connection.IsDisposed));
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfAHandle_ClosesTheKeptDohConnections()
+    {
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        IEasyTransfer easy = DialingEngine(dialer).CreateEasy();
+        await PerformThroughDohAsync(easy, "http://example.test:48712/", new EasyNetworkOptions { DohUrl = PlainDohUrl });
+        easy.Reset();
+        int closedBefore = dialer.DohConnections.Count(connection => connection.IsDisposed);
+
+        await easy.DisposeAsync();
+
+        Diagnostics.Assert("closed before the dispose", 0, closedBefore);
+        Assert.AreEqual(0, closedBefore);
+        Assert.HasCount(2, dialer.DohConnections);
+        Assert.IsTrue(dialer.DohConnections.All(connection => connection.IsDisposed));
+    }
+
+    [TestMethod]
+    [DataRow("doh url")]
+    [DataRow("doh verify peer")]
+    public async Task PerformAsync_AfterADohSettingChanges_ClosesTheReplacedConnectionsAndOpensNewOnes(string setting)
+    {
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        await using IEasyTransfer easy = DialingEngine(dialer).CreateEasy();
+        await PerformThroughDohAsync(easy, "http://example.test:48712/", new EasyNetworkOptions { DohUrl = PlainDohUrl });
+        List<DisposalRecordingConnection> replaced = dialer.DohConnections;
+        if (setting == "doh verify peer")
+        {
+            easy.Options = easy.Options with { Tls = easy.Options.Tls with { DohVerifyPeer = false } };
+        }
+
+        EasyNetworkOptions network = setting == "doh url" ? easy.Options.Network with { DohUrl = PlainDohUrl + "?other" } : easy.Options.Network;
+
+        await PerformThroughDohAsync(easy, "http://other.test:48712/", network);
+
+        Diagnostics.Assert("DoH connections after the second perform", 4, dialer.DohConnections.Count);
+        Assert.HasCount(4, dialer.DohConnections);
+        Assert.IsTrue(replaced.All(connection => connection.IsDisposed));
+        Assert.IsFalse(dialer.DohConnections.Except(replaced).Any(connection => connection.IsDisposed));
+    }
+
+    [TestMethod]
+    public async Task ResolverFor_ADohUrlThatMakesNoDohResolver_LeavesTheKeptResolverOpen()
+    {
+        await using KeptDohResolver keeper = new();
+        EasyNetworkOptions network = new() { DohUrl = PlainDohUrl };
+        IDnsResolver kept = keeper.ResolverFor(network, new EasyTlsOptions(), () => EngineComposition.CreateDohResolver(PlainDohUrl, new ScriptedConnector([]), AddressFamily.Unspecified, readEnvironmentVariable: _ => null));
+        UnusableDohUrlResolver unusable = new();
+
+        IDnsResolver other = keeper.ResolverFor(network with { DohUrl = "bogus" }, new EasyTlsOptions(), () => unusable);
+        IDnsResolver again = keeper.ResolverFor(network with { Url = "http://other.test/", Port = 8080 }, new EasyTlsOptions(), () => unusable);
+
+        Diagnostics.Assert("kept resolver given again", kept.GetType().Name, again.GetType().Name);
+        Assert.AreSame(unusable, other);
+        Assert.AreSame(kept, again);
+    }
+
+    private static readonly byte[] EmptyWebResponse = Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+
+    private static ManagedCurlEngine DialingEngine(ITcpDialer dialer) =>
+        new(TimeProvider.System, null, readEnvironmentVariable: _ => null, dialing: new EngineDialing(dialer, new LoopbackDnsResolver(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no udp")));
+
+    // One perform of url on the handle, its other network options as given, which must succeed.
+    private async Task PerformThroughDohAsync(IEasyTransfer easy, string url, EasyNetworkOptions network)
+    {
+        easy.Options = easy.Options with { Network = network with { Url = url } };
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
-        Diagnostics.Assert("code", CurlCode.Ok, code);
+        Diagnostics.Act("perform", $"{url} -> {code} {easy.ErrorText}");
         Assert.AreEqual(CurlCode.Ok, code);
-        List<DisposalRecordingConnection> dohConnections = [.. dialer.Dialled.Where(connection => connection.Port == 48711)];
-        Diagnostics.Assert("DoH connections opened", 2, dohConnections.Count);
-        Assert.HasCount(2, dohConnections);
-        Assert.IsTrue(dohConnections.All(connection => connection.IsDisposed));
-        // The web server's connection stays in the handle's pool.
-        Assert.IsFalse(dialer.Dialled.Single(connection => connection.Port == 48712).IsDisposed);
     }
 
     // The transports a run dialing in memory builds for --doh-url, or for no DoH URL when it is empty.
@@ -492,12 +562,14 @@ public sealed class EngineCompositionDohTests
         return EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections: null, tlsSessions: null, diagnosticLog: null, runDnsCache: null, easyErrorText: null, traces: null, static lookUps => lookUps, new EngineDialing(dialer, resolver, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no udp")), socketWait: null);
     }
 
-    // Answers each dialled connection with one reply: the DoH answer on the DoH server's port, else OtherPortReply.
+    // Answers each request on a dialled connection with one reply: the DoH answer on the DoH server's port, else OtherPortReply.
     private sealed class DohRecordingDialer(byte[] dohReply) : ITcpDialer
     {
         public byte[] OtherPortReply { get; init; } = [];
 
         public List<DisposalRecordingConnection> Dialled { get; } = [];
+
+        public List<DisposalRecordingConnection> DohConnections => [.. Dialled.Where(connection => connection.Port == 48711)];
 
         public ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
         {
@@ -525,6 +597,8 @@ public sealed class EngineCompositionDohTests
 
         public bool IsDisposed { get; private set; }
 
+        public int Requests { get; private set; }
+
         public bool IsSecure => false;
 
         public EndPoint? RemoteEndPoint => null;
@@ -537,7 +611,17 @@ public sealed class EngineCompositionDohTests
             return ValueTask.FromResult(count);
         }
 
-        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        // A request written once the last reply has been read gets the reply again.
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        {
+            Requests++;
+            if (unread.IsEmpty)
+            {
+                unread = reply;
+            }
+
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 

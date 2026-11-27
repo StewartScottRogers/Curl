@@ -132,15 +132,21 @@ internal static partial class EngineComposition
     /// <see langword="null" />, or one that keeps curl's, for the socket QUIC dialer. Under <paramref name="dialing" /> it replaces only the datagram connector QUIC opens through (BL-4357).
     /// <see cref="CurlTransports.UdpDatagramConnector" /> stays curl's, which the dispatch hands the hook again for the datagram protocols.
     /// </param>
+    /// <param name="keptDohResolver">
+    /// The library handle's kept <c>--doh-url</c> resolver, which gives <see cref="CurlTransports.DnsResolver" /> the one an
+    /// earlier perform built from the same settings (ADR-1449); <see langword="null" />, as for the curl tool, to build one.
+    /// Its owner closes it, so such transports are not disposed.
+    /// </param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null, TransferSocketWait? socketWait = null, Func<long>? takeDohConnectionId = null, Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector = null)
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null, TransferSocketWait? socketWait = null, Func<long>? takeDohConnectionId = null, Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector = null, KeptDohResolver? keptDohResolver = null)
     {
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(traces) ? new() : null;
-        IDnsResolver dnsResolver = dialing is null
+        Func<IDnsResolver> createResolver = () => dialing is null
             ? CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces, takeDohConnectionId: takeDohConnectionId)
             : DialingResolverOf(dialing, network, tls, timeProvider, resolverEvents, easyErrorText, traces);
+        IDnsResolver dnsResolver = keptDohResolver?.ResolverFor(network, tls, createResolver) ?? createResolver();
         IDnsResolver lookUps = LookUpsOf(dnsResolver, network, resolver => wrapLookUps(SocketActionGatedResolver.Over(resolver, socketWait)));
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile, tracesHandshakeMessages: tool.TracesTransfer);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
