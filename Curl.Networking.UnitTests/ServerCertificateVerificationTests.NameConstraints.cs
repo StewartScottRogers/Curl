@@ -1248,21 +1248,56 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(0, FindViolationOfPermittedEmail(string.Empty, email, matchesSchannelBuild: true));
     }
 
+    // The OpenSSL build's rfc822Name rows below were measured with openssl verify 3.5.7 (BL-6054, ADR-1448).
     [TestMethod]
-    [DataRow("u@evil.test", false)]
-    [DataRow("@evil.test", true)]
-    public void FindViolation_OpenSslBuildEmailConstraintStartingWithAt_MatchesOnlyThatText(string email, bool within)
+    [DataRow("@evil.test", "u@evil.test", true)]
+    [DataRow("@evil.test", "U@EVIL.TEST", true)]
+    [DataRow("@evil.test", "a@b@evil.test", true)]
+    [DataRow("@evil.test", "@evil.test", true)]
+    [DataRow("@evil.test", "u@sub.evil.test", false)]
+    [DataRow("@evil.test", "u@", false)]
+    [DataRow("u@evil.test", "u@evil.test", true)]
+    [DataRow("u@evil.test", "u@EVIL.TEST", true)]
+    [DataRow("u@evil.test", "U@evil.test", false)]
+    [DataRow("u@evil.test", "@evil.test", false)]
+    [DataRow("u@evil.test", "a@b@evil.test", false)]
+    [DataRow("a@b@evil.test", "a@b@evil.test", true)]
+    [DataRow("b@evil.test", "a@b@evil.test", false)]
+    [DataRow("@", "u@", true)]
+    [DataRow("@", "b@evil.test", false)]
+    [DataRow("evil.test", "a@b@evil.test", true)]
+    [DataRow("evil.test", "u@sub.evil.test", false)]
+    [DataRow(".evil.test", "u@sub.evil.test", true)]
+    [DataRow(".evil.test", "u@evil.test", false)]
+    [DataRow(".a@evil.test", ".a@evil.test", true)]
+    [DataRow(".a@evil.test", "x.a@evil.test", false)]
+    public void FindViolation_OpenSslBuildEmailConstraint_MatchesAsOpenSslDoes(string constraint, string email, bool within)
     {
-        Assert.AreEqual(within ? CertificateNameConstraints.Excluded : 0, FindViolationOfExcludedEmail("@evil.test", email, matchesSchannelBuild: false));
-        Assert.AreEqual(within ? 0 : CertificateNameConstraints.NotPermitted, FindViolationOfPermittedEmail("@evil.test", email, matchesSchannelBuild: false));
+        Assert.AreEqual(within ? CertificateNameConstraints.Excluded : 0, FindViolationOfExcludedEmail(constraint, email, matchesSchannelBuild: false));
+        Assert.AreEqual(within ? 0 : CertificateNameConstraints.NotPermitted, FindViolationOfPermittedEmail(constraint, email, matchesSchannelBuild: false));
     }
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // An empty constraint is not measured against macOS's certificate parser.
-    public void FindViolation_OpenSslBuildEmptyEmailConstraint_DoesNotMatchAMailbox()
+    [DataRow("u@evil.test", false)]
+    [DataRow("U@evil.test", false)]
+    [DataRow("@evil.test", false)]
+    [DataRow("u@", true)]
+    public void FindViolation_OpenSslBuildEmptyEmailConstraint_MatchesOnlyAnEmptyHost(string email, bool within)
     {
-        Assert.AreEqual(0, FindViolationOfExcludedEmail(string.Empty, "u@evil.test", matchesSchannelBuild: false));
-        Assert.AreEqual(CertificateNameConstraints.NotPermitted, FindViolationOfPermittedEmail(string.Empty, "u@evil.test", matchesSchannelBuild: false));
+        Assert.AreEqual(within ? CertificateNameConstraints.Excluded : 0, FindViolationOfExcludedEmail(string.Empty, email, matchesSchannelBuild: false));
+        Assert.AreEqual(within ? 0 : CertificateNameConstraints.NotPermitted, FindViolationOfPermittedEmail(string.Empty, email, matchesSchannelBuild: false));
+    }
+
+    [TestMethod]
+    [DataRow("@evil.test", "evil.test")]
+    [DataRow("u@evil.test", "evil.test")]
+    [DataRow("evil.test", "evil.test")]
+    [DataRow(".evil.test", "x.evil.test")]
+    public void FindViolation_OpenSslBuildEmailNameWithNoAt_IsUnsupportedNameSyntax(string constraint, string email)
+    {
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedNameSyntax, FindViolationOfExcludedEmail(constraint, email, matchesSchannelBuild: false));
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedNameSyntax, FindViolationOfPermittedEmail(constraint, email, matchesSchannelBuild: false));
     }
 
     private static int FindViolationOfExcludedEmail(string constraint, string email, bool matchesSchannelBuild) =>

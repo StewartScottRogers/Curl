@@ -17,7 +17,8 @@ internal static class CertificateNameConstraints
     /// Schannel's <c>CERT_TRUST_HAS_NOT_SUPPORTED_NAME_CONSTRAINT</c>: the Schannel build's refusal of an
     /// otherName under a permitted subtree whose value is not a character string (BL-6011), and the OpenSSL
     /// build's refusal of a subject CN holding a NUL, or of a subject emailAddress that is not an IA5String
-    /// (<c>X509_V_ERR_UNSUPPORTED_NAME_SYNTAX</c>), and of a SmtpUTF8Mailbox it cannot compare (BL-6047).
+    /// (<c>X509_V_ERR_UNSUPPORTED_NAME_SYNTAX</c>), of a SmtpUTF8Mailbox it cannot compare (BL-6047), and of an
+    /// rfc822Name with no <c>@</c> under an rfc822Name constraint (BL-6054).
     /// </summary>
     internal const int UnsupportedNameSyntax = 0x1000;
 
@@ -157,14 +158,6 @@ internal static class CertificateNameConstraints
             .FirstOrDefault();
         return anchor == 0 ? elements.Count : anchor;
     }
-
-    // How a build compares an rfc822Name constraint with an rfc822Name.
-    private delegate bool EmailMatcher(string constraint, string name);
-
-    // Held in fields, so converting the methods adds no branch where they are passed.
-    private static readonly EmailMatcher SchannelEmailMatcher = SchannelEmailMatches;
-
-    private static readonly EmailMatcher OpenSslEmailMatcher = EmailMatches;
 
     // How a build checks a group of names against one authority's subtrees.
     private delegate int NamesCheck(
@@ -442,8 +435,39 @@ internal static class CertificateNameConstraints
     // OpenSSL can compare no other otherName with a subtree of its type-id (BL-6047).
     private static int CompareForOpenSsl((Asn1Tag Tag, byte[] Value) subtree, (Asn1Tag Tag, byte[] Value) name) =>
         name.Tag == OtherNameTag ? UnsupportedConstraintType
-        : IsWithin(name, subtree, OpenSslEmailMatcher) ? 0
+        : name.Tag == EmailTag ? CompareEmailForOpenSsl(subtree.Value, name.Value)
+        : IsWithin(name, subtree) ? 0
         : NotPermitted;
+
+    // OpenSSL's nc_email, measured with openssl verify 3.5 (BL-6054, ADR-1448): a name with no '@' cannot be
+    // compared, whatever the constraint. Latin-1 keeps every byte of the two distinct.
+    private static int CompareEmailForOpenSsl(byte[] constraint, byte[] name)
+    {
+        var address = System.Text.Encoding.Latin1.GetString(name);
+        var addressAt = address.LastIndexOf('@');
+        if (addressAt < 0)
+        {
+            return UnsupportedNameSyntax;
+        }
+
+        return OpenSslEmailMatches(System.Text.Encoding.Latin1.GetString(constraint), address, addressAt) ? 0 : NotPermitted;
+    }
+
+    // A constraint starting '.' with no '@' matches the end of the address. Any other matches the host after the
+    // address's last '@' ignoring case with what follows its own last '@' (all of it when it has none), and what
+    // precedes that '@', if anything, must be the address's local part exactly. So an empty constraint matches
+    // only an address with an empty host.
+    private static bool OpenSslEmailMatches(string constraint, string address, int addressAt)
+    {
+        var constraintAt = constraint.LastIndexOf('@');
+        if (constraintAt < 0 && constraint.StartsWith('.'))
+        {
+            return address.EndsWith(constraint, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return (constraintAt <= 0 || address.AsSpan(0, addressAt).SequenceEqual(constraint.AsSpan(0, constraintAt)))
+            && address.AsSpan(addressAt + 1).Equals(constraint.AsSpan(constraintAt + 1), StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool IsSmtpUtf8Mailbox((Asn1Tag Tag, byte[] Value) name) =>
         name.Tag == OtherNameTag && ReadEncodedOtherName(name.Value).TypeId == OpenSslSmtpUtf8Mailbox.TypeId;
@@ -478,7 +502,7 @@ internal static class CertificateNameConstraints
             return 0;
         }
 
-        var deciding = ofItsKind.FirstOrDefault(subtree => IsOtherNameWithoutText(subtree) || IsWithin(name, subtree, SchannelEmailMatcher));
+        var deciding = ofItsKind.FirstOrDefault(subtree => IsOtherNameWithoutText(subtree) || IsWithin(name, subtree));
         return deciding.Value is null ? NotPermitted : IsOtherNameWithoutText(deciding) ? UnsupportedNameSyntax : 0;
     }
 
@@ -490,20 +514,21 @@ internal static class CertificateNameConstraints
         subtree.Tag == name.Tag && (subtree.Tag != OtherNameTag || ReadOtherName(subtree.Value).TypeId == ReadOtherName(name.Value).TypeId);
 
     // A constraint applies to a name of its kind, an address constraint only to its own family, and then must match.
-    private static bool IsWithin((Asn1Tag Tag, byte[] Value) name, (Asn1Tag Tag, byte[] Value) subtree, EmailMatcher matchesEmail) =>
+    // The OpenSSL build compares rfc822Names itself (CompareEmailForOpenSsl) and never asks this about one.
+    private static bool IsWithin((Asn1Tag Tag, byte[] Value) name, (Asn1Tag Tag, byte[] Value) subtree) =>
         IsSameKind(subtree, name)
         && (subtree.Tag != IpAddressTag || subtree.Value.Length == name.Value.Length * 2)
-        && Matches(subtree.Tag, subtree.Value, name.Value, matchesEmail);
+        && Matches(subtree.Tag, subtree.Value, name.Value);
 
     private static bool BreaksExcluded(List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names) =>
-        names.Any(name => excluded.Any(subtree => IsWithin(name, subtree, SchannelEmailMatcher)));
+        names.Any(name => excluded.Any(subtree => IsWithin(name, subtree)));
 
-    private static bool Matches(Asn1Tag tag, byte[] constraint, byte[] name, EmailMatcher matchesEmail) =>
+    private static bool Matches(Asn1Tag tag, byte[] constraint, byte[] name) =>
         tag == OtherNameTag ? OtherNameMatches(constraint, name)
         : tag == DnsNameTag ? DnsMatches(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name))
         : tag == IpAddressTag ? IpMatches(constraint, name)
         : tag == DirectoryNameTag ? DirectoryNameMatches(constraint, name)
-        : tag == EmailTag ? matchesEmail(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name))
+        : tag == EmailTag ? SchannelEmailMatches(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name))
         : UriMatches(System.Text.Encoding.ASCII.GetString(constraint), System.Text.Encoding.ASCII.GetString(name));
 
     // The two have one type-id; a value that is not a character string matches nothing.
