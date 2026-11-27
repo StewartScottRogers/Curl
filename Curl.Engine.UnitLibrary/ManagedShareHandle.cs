@@ -55,7 +55,7 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     /// <summary>Gets the pooled connections the attached transfers share under <see cref="CurlLockData.Connect" />.</summary>
     internal ConnectionCache Connections { get; } = new(timeProvider);
 
-    /// <summary>Gets the <c>--doh-url</c> resolvers kept beside <see cref="Connections" />, whose DoH connections the attached transfers share with them (ADR-1454).</summary>
+    /// <summary>Gets the <c>--doh-url</c> resolvers kept beside <see cref="Connections" />, whose DoH connections the attached transfers share with them (ADR-1458).</summary>
     internal KeptDohResolver DohResolver { get; } = new();
 
     /// <summary>Gets the HSTS cache the attached transfers share under <see cref="CurlLockData.Hsts" />.</summary>

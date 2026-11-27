@@ -83,7 +83,7 @@ internal sealed partial class ManagedEasyTransfer
     /// connection a connect-only perform left open or upgraded, if any, the handle's WebSocket connection, if any, and the handle's own idle pooled connections
     /// (<see cref="OwnTheConnectionsOpened" />), as libcurl closes the handle's connection cache, FTP's sending <c>QUIT</c>,
     /// and last the <c>--doh-url</c> connections kept in the handle's own cache; those kept in a multi handle's or a
-    /// share handle's cache stay until it is cleaned up (ADR-1454).
+    /// share handle's cache stay until it is cleaned up (ADR-1458).
     /// </summary>
     /// <returns>A task that completes once they are closed.</returns>
     public async ValueTask DisposeAsync()

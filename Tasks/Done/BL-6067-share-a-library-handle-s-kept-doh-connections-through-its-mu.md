@@ -29,7 +29,7 @@ ADR-1453 (BL-6065): each `ManagedEasyTransfer` owns its `KeptDohResolver`, also 
 
 ## Notes
 
-- Design (ADR-1454): `KeptDohResolver` now sits beside each connection cache
+- Design (ADR-1458): `KeptDohResolver` now sits beside each connection cache
   (`ManagedEngineSharedState.DohResolver`), not on each easy handle. It keeps one resolver per set of
   settings, at most four, so transfers with different settings over one cache do not close each
   other's connections; ADR-1453's close-on-replace at the end of a perform is gone, so its test now

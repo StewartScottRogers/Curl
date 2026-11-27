@@ -8,7 +8,7 @@ namespace Curl.Engine;
 /// <summary>
 /// The <c>--doh-url</c> resolvers kept beside one connection cache from perform to perform, so a later perform over
 /// that cache asks the DoH server over the connections an earlier one opened, whichever handle ran it, as libcurl keeps
-/// them in its connection cache (ADR-1453, ADR-1454). There is one resolver for each set of options one was built from:
+/// them in its connection cache (ADR-1453, ADR-1458). There is one resolver for each set of options one was built from:
 /// the TLS options, and the network options but for the URL, the port and the <c>--connect-to</c> mappings a perform
 /// goes to. At most <see cref="MostKept" /> are kept, the one asked for longest ago being closed to make room.
 /// Disposing it closes every connection its resolvers kept; it keeps new ones afterwards.

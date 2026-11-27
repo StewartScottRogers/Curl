@@ -226,7 +226,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <summary>
     /// Closes every connection the engine's transfers kept open (<c>curl_global_cleanup</c>): those of each library easy
     /// handle's and multi handle's own pool, an FTP control connection with <c>QUIT</c>, then the engine-wide pool's
-    /// (ADR-0789), with each pool's kept <c>--doh-url</c> connections (ADR-1454).
+    /// (ADR-0789), with each pool's kept <c>--doh-url</c> connections (ADR-1458).
     /// </summary>
     /// <returns>A task that completes once they are closed.</returns>
     public async ValueTask DisposeAsync()
@@ -391,7 +391,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// curl tool's <c>-Z</c> without <c>--parallel-immediate</c> does, so the pool waits for a connection being
     /// opened to the same origin to show it multiplexes rather than opening another, as libcurl's does (BL-3351).
     /// Their <c>--doh-url</c> resolver comes from <see cref="ManagedEngineSharedState.DohResolver" />, kept beside the
-    /// state's connections, so a later perform over them asks on the connections an earlier one opened (ADR-1454).
+    /// state's connections, so a later perform over them asks on the connections an earlier one opened (ADR-1458).
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="shared">The engine's shared state.</param>

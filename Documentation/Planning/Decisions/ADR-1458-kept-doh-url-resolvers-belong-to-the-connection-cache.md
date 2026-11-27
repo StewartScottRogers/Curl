@@ -1,4 +1,4 @@
-# ADR-1454 — Kept `--doh-url` resolvers belong to the connection cache
+# ADR-1458 — Kept `--doh-url` resolvers belong to the connection cache
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

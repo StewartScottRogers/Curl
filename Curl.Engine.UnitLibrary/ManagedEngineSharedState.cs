@@ -144,7 +144,7 @@ internal sealed class ManagedEngineSharedState
 
     /// <summary>
     /// Gets the pools of the engine's library easy handles and multi handles, each with its kept <c>--doh-url</c>
-    /// resolver, which the engine closes when it is disposed (ADR-0789, ADR-1454).
+    /// resolver, which the engine closes when it is disposed (ADR-0789, ADR-1458).
     /// </summary>
     internal ConditionalWeakTable<ConnectionCache, KeptDohResolver> OwnConnectionCaches { get; }
 
@@ -267,7 +267,7 @@ internal sealed class ManagedEngineSharedState
     /// <summary>
     /// Gets the <c>--doh-url</c> resolvers kept beside <see cref="Connections" />, which
     /// <see cref="ManagedCurlEngine.CreateTransports" /> builds its transports with, so every transfer over that cache
-    /// reuses its DoH connections (ADR-1454).
+    /// reuses its DoH connections (ADR-1458).
     /// </summary>
     internal KeptDohResolver DohResolver { get; init; }
 
