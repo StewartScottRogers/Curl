@@ -41,3 +41,4 @@ where curl, which numbers a connection before it resolves its host (ADR-1463), p
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 5803d7d8 68c9dd61 21d6d7bb 3d836d5e.
