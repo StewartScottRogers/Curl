@@ -99,7 +99,7 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// connect timeout or <c>-m</c> passes first. A connector that returns its own exit 28 result
     /// has reported it, so that result is returned; otherwise the failure is curl's
     /// <c>Connection timed out after N milliseconds</c>, N counted from the start of this request,
-    /// also reported once on the target's events as a <c>-v</c> line (ADR-1459).
+    /// also reported once on the target's events as a <c>-v</c> line (ADR-1460).
     /// </summary>
     /// <param name="connector">The connector to open the connection with.</param>
     /// <param name="target">What to connect to.</param>
@@ -176,7 +176,7 @@ internal sealed class HttpTransferDeadline : IDisposable
 
     /// <summary>
     /// What the connect the limit ended left behind: the connector's own exit 28 result, whose message it has already
-    /// reported, so the <c>-v</c> line and <c>curl: (28)</c> carry one N (ADR-1459); else the timings it took before
+    /// reported, so the <c>-v</c> line and <c>curl: (28)</c> carry one N (ADR-1460); else the timings it took before
     /// the limit, so the failure still reports the name lookup it did (STD-145).
     /// A connector that honours its token finishes within <see cref="ConnectorUnwindGrace" />; one that does not leaves nothing.
     /// </summary>

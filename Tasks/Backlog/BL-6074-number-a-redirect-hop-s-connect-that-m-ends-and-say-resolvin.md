@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Found in BL-6071 (ADR-1459). `curl -svSL -m 3` following a 302, answered after 1.5 s, to `http://192.0.2.20:1/` prints `* closing connection #0` in Curl and `#1` in curl 8.22.0 and 8.23.0 (measured with `Record-CurlExchange.ps1`). The connector's limit is the whole `-m`, so `TcpConnector` lets the cancellation escape and gives the connect no number, and `HttpTransferDeadline.TimedOut` returns a result with `ConnectionNumber` 0. The same path always says `Connection timed out`, also when the cancellation arrived during the resolve (`CanceledWhileResolvingException`); measure real curl for that message first. `ConnectTimings.CarriedOnCancellationKey` is how the connector already hands facts to the handler on a cancellation. Widen `touches` if the pooling connector numbers it.
+Found in BL-6071 (ADR-1460). `curl -svSL -m 3` following a 302, answered after 1.5 s, to `http://192.0.2.20:1/` prints `* closing connection #0` in Curl and `#1` in curl 8.22.0 and 8.23.0 (measured with `Record-CurlExchange.ps1`). The connector's limit is the whole `-m`, so `TcpConnector` lets the cancellation escape and gives the connect no number, and `HttpTransferDeadline.TimedOut` returns a result with `ConnectionNumber` 0. The same path always says `Connection timed out`, also when the cancellation arrived during the resolve (`CanceledWhileResolvingException`); measure real curl for that message first. `ConnectTimings.CarriedOnCancellationKey` is how the connector already hands facts to the handler on a cancellation. Widen `touches` if the pooling connector numbers it.
 
 ## Acceptance criteria
 

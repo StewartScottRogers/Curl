@@ -6,7 +6,7 @@ namespace Curl.Original.Protocol.Http;
 
 /// <summary>
 /// A connect a time limit ends prints one <c>Connection timed out after N milliseconds</c>,
-/// the same N in the <c>-v</c> line and in the failure (BL-6071, ADR-1459).
+/// the same N in the <c>-v</c> line and in the failure (BL-6071, ADR-1460).
 /// </summary>
 [TestClass]
 public sealed class HttpConnectTimedOutLineTests

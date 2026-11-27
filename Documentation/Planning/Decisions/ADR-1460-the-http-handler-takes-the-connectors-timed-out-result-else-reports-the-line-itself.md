@@ -1,4 +1,4 @@
-# ADR-1459 — The HTTP handler takes the connector's timed-out result, else reports the line itself
+# ADR-1460 — The HTTP handler takes the connector's timed-out result, else reports the line itself
 
 - **Status:** Accepted
 - **Date:** 2026-11-26
