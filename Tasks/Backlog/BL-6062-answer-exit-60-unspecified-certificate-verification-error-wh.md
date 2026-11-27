@@ -4,7 +4,7 @@ title: Answer exit 60 unspecified certificate verification error when .NET's cha
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-6061]
+depends-on: [BL-6061, BL-6063]
 touches: [Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.UnspecifiedChainError.cs]
 requirement: none
 created: 2026-11-26
@@ -27,7 +27,12 @@ Found by BL-6060 (CI run 45917093887, Ubuntu): .NET's `X509Chain.Build` throws `
 
 ## Notes
 
+- 2026-11-26, first claim, no code changed. Checked what BL-6061 (ADR-1446) already did: `CertificateChainBuild.Build` wraps every chain build the library makes itself (`HandBuiltCertificateVerifier.BuildChain`, `JudgeCertificateOfClientCertificateRequest`, `RebuildAgainstAnchors`), and `OpenSslVerifyResult` and `TlsFailureMessages` report the empty chain as verify result 1. No unguarded `Build` call is left.
+- What is still wrong is the build `SslStream` makes inside its handshake. BL-6063 covers exactly that (and decides `-k`), so it is left to BL-6063, which this task now depends on.
+- Left for this task once BL-6063 is Done: the hand-built path's test in `ServerCertificateVerificationTests.UnspecifiedChainError.cs`. `HandBuiltCertificateVerifier.BuildChain` calls `CertificateChainBuild.Build(chain, sent[0])` directly, so the test needs a seam there (an injectable build step passed to the `Build(chain, Func<bool>)` overload), because Windows does not throw. Tick the `SslStream` half of the first criterion from BL-6063's test, if it asserts the exit code and message.
+
 ## Log
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 09ddef69 773a4772.
+- 2026-11-26: Doing -> Backlog. Waits on BL-6063, which covers the SslStream handshake path (SslStreamTlsProvider.cs); only the hand-built path's test is left for this task after it
