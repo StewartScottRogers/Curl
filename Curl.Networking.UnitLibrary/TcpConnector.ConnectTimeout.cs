@@ -12,6 +12,9 @@ public sealed partial class TcpConnector
     /// </summary>
     public static TimeSpan MinimumLoopbackConnectTimeout { get; } = TimeSpan.FromMilliseconds(100);
 
+    // The most the caller's own limit can run out ahead of this connect's and still be taken for it (CallerLimitLeadFor).
+    private static readonly TimeSpan LongestCallerLimitLead = TimeSpan.FromMilliseconds(500);
+
     private TimeSpan LimitForDestination(ConnectTarget target, ConnectDestination destination, TimeSpan connectLimit) =>
         UnixSocket is null && TunnelProxyOf(target) is null && IsLoopbackDestination(destination.Host) && connectLimit < MinimumLoopbackConnectTimeout
             ? MinimumLoopbackConnectTimeout
@@ -23,10 +26,10 @@ public sealed partial class TcpConnector
     /// <summary>
     /// Runs the resolve, dials, any tunnel and any TLS handshake under <paramref name="connectLimit" />
     /// on the injected <see cref="TimeProvider" />, counted from <paramref name="started" /> (ADR-0117).
-    /// A cancellation that arrives once the limit has passed on the clock, whoever cancelled, is
+    /// A cancellation that ends the connect at its limit (<see cref="IsEndedByConnectLimit" />) is
     /// curl 8.21.0's exit 28 <c>Connection timed out after &lt;n&gt; milliseconds</c>, also
     /// reported on the target's events as its <c>-v</c> repeats it (measured, BL-510); any
-    /// earlier cancellation escapes.
+    /// other cancellation escapes.
     /// </summary>
     private async ValueTask<ConnectResult> ConnectWithinTimeoutAsync(
         ConnectTarget target,
@@ -49,19 +52,37 @@ public sealed partial class TcpConnector
                 ? await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false)
                 : await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false);
         }
-        catch (CanceledWhileResolvingException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
+        catch (CanceledWhileResolvingException) when (IsEndedByConnectLimit(timeout, started, connectLimit))
         {
-            // Only a resolve cancelled once the limit has passed is curl's "Resolving timed out" (CGR-284); a cancellation before the limit escapes.
-            var message = $"Resolving timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
+            // Only a resolve cancelled at the limit is curl's "Resolving timed out" (CGR-284); an earlier cancellation escapes.
+            var message = $"Resolving timed out after {TimedOutMilliseconds(started, connectLimit)} milliseconds";
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
         }
-        catch (OperationCanceledException canceled) when (timeProvider.GetElapsedTime(started) >= connectLimit)
+        catch (OperationCanceledException canceled) when (IsEndedByConnectLimit(timeout, started, connectLimit))
         {
-            var message = $"Connection timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
+            var message = $"Connection timed out after {TimedOutMilliseconds(started, connectLimit)} milliseconds";
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message, (canceled as CanceledAfterResolveException)?.Timings);
         }
+    }
+
+    // True when this connect's own timer fired, which on Linux can be a few milliseconds before the clock reads the
+    // limit, or when the clock is within CallerLimitLeadFor of the limit: -m is the same limit, but its clock starts
+    // before this connect's, so its cancellation arrives with that much of the limit still to run (ADR-1453).
+    private bool IsEndedByConnectLimit(CancellationTokenSource ownTimer, long started, TimeSpan connectLimit) =>
+        ownTimer.IsCancellationRequested || timeProvider.GetElapsedTime(started) >= connectLimit - CallerLimitLeadFor(connectLimit);
+
+    // A quarter of the limit, at most LongestCallerLimitLead.
+    private static TimeSpan CallerLimitLeadFor(TimeSpan connectLimit) =>
+        connectLimit / 4 < LongestCallerLimitLead ? connectLimit / 4 : LongestCallerLimitLead;
+
+    // The N of a timed-out message: the time since the connect started, but never less than the limit that passed,
+    // since curl's N counts from the transfer's start, where -m's clock started, and so is never below the limit.
+    private long TimedOutMilliseconds(long started, TimeSpan connectLimit)
+    {
+        var elapsed = timeProvider.GetElapsedTime(started);
+        return (long)(elapsed > connectLimit ? elapsed : connectLimit).TotalMilliseconds;
     }
 
     private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>
