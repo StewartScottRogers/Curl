@@ -212,7 +212,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     /// <summary>
     /// Gets the provider that runs a redialled handshake in place of the
-    /// <see cref="HandBuiltTlsProvider" /> built from the same settings (ADR-1453), or
+    /// <see cref="HandBuiltTlsProvider" /> built from the same settings (ADR-1459), or
     /// <see langword="null" />, the default, for that one; tests replace it.
     /// </summary>
     internal ITlsProvider? HandBuiltRedialProvider { get; init; }
@@ -600,7 +600,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         _redialRequests.TryGetValue(handshake, out _);
 
     // Under -k the OpenSSL build goes on past a chain that ends with error 1, which this provider
-    // cannot: SslStream's handshake is already over when .NET throws (ADR-1453).
+    // cannot: SslStream's handshake is already over when .NET throws (ADR-1459).
     private bool IsRunAgainByHand(Exception failure) =>
         _options.Insecure && EndedAsOpenSslError1(failure);
 
@@ -620,7 +620,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // What a failed handshake says about the certificate: what the callbacks observed, except
     // when .NET on Linux threw from its own chain build for OpenSSL's error 1, before the
     // validation callback (ADR-1452). The OpenSSL build refuses that as verify result 1. Under -k
-    // only the verify result is added: the connect error stands until the redial (ADR-1453).
+    // only the verify result is added: the connect error stands until the redial (ADR-1459).
     private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Refusal) JudgeFailedHandshake(
         Exception failure,
         PeerVerification observed,

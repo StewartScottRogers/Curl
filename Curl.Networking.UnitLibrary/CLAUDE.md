@@ -57,7 +57,7 @@ build throws, the OpenSSL build's `SslStreamTlsProvider` recognises it through
 `CertificateChainBuild.EndedHandshakeAsUnspecified` and answers exit 60 with verify result 1, or under
 `-k` marks its exit 35 result as asking for a redial (`ITlsProviderWithHandBuiltRedial`), which
 `TcpConnector` answers by dialling again and handshaking with that host on a `HandBuiltTlsProvider`,
-as it does for the rest of the run (ADR-1452, ADR-1453, BL-6063, BL-6066). Both load `--cert` through
+as it does for the rest of the run (ADR-1452, ADR-1459, BL-6063, BL-6066). Both load `--cert` through
 `ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
 `--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included,
 except in the Schannel build with `--cacert`, which judges the pin first (ADR-0504, BL-2270):

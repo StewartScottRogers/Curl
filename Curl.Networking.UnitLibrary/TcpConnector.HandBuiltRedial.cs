@@ -5,7 +5,7 @@ namespace Curl.Networking;
 public sealed partial class TcpConnector
 {
     // Runs a connect and, each time one of its handshakes asks to be run again by the hand-built
-    // client (ADR-1453), runs it once more from the dial in what is left of the connect's limit. A
+    // client (ADR-1459), runs it once more from the dial in what is left of the connect's limit. A
     // provider that asked for a host never asks for it again, so this ends.
     private async ValueTask<ConnectResult> ConnectRedialingByHandAsync(
         ConnectTarget target,

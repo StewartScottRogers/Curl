@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-`-v` for a `-k` transfer redialled by ADR-1453 shows the lines of one connection, as OpenSSL curl writes them.
+`-v` for a `-k` transfer redialled by ADR-1459 shows the lines of one connection, as OpenSSL curl writes them.
 
 ## Context
 
-ADR-1453 (BL-6066): `TcpConnector` repeats the whole connect, so the lines before the handshake
+ADR-1459 (BL-6066): `TcpConnector` repeats the whole connect, so the lines before the handshake
 (`Host ... was resolved`, `Trying`, the TLS trust lines) appear twice. Measure OpenSSL curl's `-v`
 output for a chain whose name constraint does not decode (ADR-1446) before pinning any line;
 `CURL_SSL_BACKEND=openssl` with a multi-TLS curl may do so on Windows.

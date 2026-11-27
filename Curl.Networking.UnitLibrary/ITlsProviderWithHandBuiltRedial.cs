@@ -4,7 +4,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// An <see cref="ITlsProvider" /> that cannot finish some handshakes itself and asks for them to be
-/// run again, over a newly dialled connection, by the hand-built TLS client (ADR-1453, BL-6066).
+/// run again, over a newly dialled connection, by the hand-built TLS client (ADR-1459, BL-6066).
 /// </summary>
 internal interface ITlsProviderWithHandBuiltRedial : ITlsProvider
 {

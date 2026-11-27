@@ -1,4 +1,4 @@
-# ADR-1453: Under -k an SslStream chain build that throws is redialled on the hand-built client
+# ADR-1459: Under -k an SslStream chain build that throws is redialled on the hand-built client
 
 - Status: Accepted
 - Date: 2026-11-26

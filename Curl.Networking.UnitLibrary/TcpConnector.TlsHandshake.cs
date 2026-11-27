@@ -131,7 +131,7 @@ public sealed partial class TcpConnector
                 : [];
 
     // A provider that cannot finish a handshake itself runs the next one with the host on the
-    // hand-built client: its failed handshake unwinds the connect, which dials again (ADR-1453).
+    // hand-built client: its failed handshake unwinds the connect, which dials again (ADR-1459).
     private static async ValueTask<ConnectResult> AuthenticateAsync(
         ITlsProvider provider,
         IConnection plaintext,

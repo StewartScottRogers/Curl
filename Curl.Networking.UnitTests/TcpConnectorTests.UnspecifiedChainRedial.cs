@@ -10,7 +10,7 @@ namespace Curl.Networking;
 /// Drives the second dial <see cref="TcpConnector" /> makes under <c>-k</c> when .NET on Linux
 /// throws from the chain build <see cref="System.Net.Security.SslStream" /> makes inside its
 /// handshake, for OpenSSL's error 1: the redialled handshake runs on the hand-built client
-/// (ADR-1453, BL-6066). The first handshake step is replaced by one that throws and the hand-built
+/// (ADR-1459, BL-6066). The first handshake step is replaced by one that throws and the hand-built
 /// client by a fake, so every platform runs it.
 /// </summary>
 public sealed partial class TcpConnectorTests
