@@ -8,7 +8,7 @@ depends-on: [BL-6039]
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpTransferDeadline.cs, Curl.Original.Protocol.Http.UnitTests/HttpConnectTimedOutLineTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6071 — Print one Connection timed out after N in both lines when -m ends an HTTP connect, redirect hops included
 
@@ -22,13 +22,19 @@ Found in BL-6039 (ADR-1457). With a linux-x64 publish in WSL, `curl -sSv -m 3 ht
 
 ## Acceptance criteria
 
-- [ ] A unit test pins that the failure's message carries the connector's N when the connector returned the timed-out result.
-- [ ] A unit test pins that a connect ended by `-m` that the connector did not report gets the `-v` line once, with the same N as the failure.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A unit test pins that the failure's message carries the connector's N when the connector returned the timed-out result.
+- [x] A unit test pins that a connect ended by `-m` that the connector did not report gets the `-v` line once, with the same N as the failure.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision (ADR-1459): the deadline returns the connector's exit 28 result as it is; otherwise it counts N from the start of the request, reports the `-v` line itself, and stays silent for a connect abandoned by a race.
+- Measured, curl 8.22.0 and 8.23.0 on Windows: on a redirect hop N counts from the hop's start, so it is below `-m`; "never below the `-m` limit" holds for the first request, where the connector's N is used (ADR-1457). curl also ends the hop at its next one-second poll tick, past `-m` when the redirect came early; Curl keeps ending it at `-m` (ADR-1459).
+- Seen, not fixed here (needs the connector): the hop ends `closing connection #0` where curl prints `#1`, and a resolve `-m` ends on a hop says `Connection timed out`. Filed as BL-6073.
+- Verified with the built `curl.exe`: the hop and a first connect to `192.0.2.20` each print the line once with the N of `curl: (28)`. Measure-CodeQuality for the HTTP library: 100% line and branch, 0 failing.
 
 ## Log
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: ef3bad98 b19c3c7d 3d836d5e.
+- 2026-11-26: Doing -> Done. An HTTP connect -m or the connect timeout ends prints one Connection timed out after N line with the N of curl: (28) (ADR-1459); hop connection number filed as BL-6073.
