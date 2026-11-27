@@ -1506,3 +1506,4 @@ Each option and the specific reason it lost.
 | [1462](ADR-1462-a-cancelled-connect-carries-the-resolving-fact-and-a-connection-number-taker.md) | A cancelled connect carries the resolving fact and a connection number taker (BL-6074) | Accepted | 2026-11-26 |
 | [1463](ADR-1463-a-transfer-is-numbered-before-its-doh-url-connections.md) | A transfer is numbered before its `--doh-url` connections (BL-6058) | Accepted | 2026-11-26 |
 | [1464](ADR-1464-the-curl-program-is-published-to-nuget-org-as-the-tool-surly-curl.md) | The curl program is published to nuget.org as the .NET tool `Surly.Curl` (command `curl`), native AOT per platform (BL-6078) | Accepted | 2026-11-27 |
+| [1465](ADR-1465-under-f-a-connect-407-curl-gives-up-on-prints-the-generic-exit-22-text.md) | Under -f a CONNECT 407 curl gives up on prints the generic exit 22 text (BL-6024) | Accepted | 2026-11-27 |
