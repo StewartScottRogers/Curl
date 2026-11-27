@@ -123,7 +123,7 @@ public sealed class QuicDialer
     /// <param name="request">What to dial.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>The open connection with its timings, or curl's exit code and message.</returns>
-    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled before the connect's limit; a handshake cancelled at the limit is exit 28 (ADR-1457).</exception>
     internal async ValueTask<MultiplexedConnectResult> DialAsync(QuicDialRequest request, CancellationToken cancellationToken)
     {
         request = WithoutDefaultConnectTimeout(request);
@@ -232,7 +232,7 @@ public sealed class QuicDialer
 
         var handshakeStarted = _timeProvider.GetTimestamp();
         var handshake = new QuicClientConnectionState(new QuicClientSettings { Tls = tls }, _random, verifier, _timeProvider);
-        var (failure, cancellation) = await RunHandshakeAsync(handshake, channel, handshakeTimeout, cancellationToken).ConfigureAwait(false);
+        var (failure, cancellation) = await RunHandshakeAsync(request, handshake, channel, handshakeTimeout, cancellationToken).ConfigureAwait(false);
         if (failure is null && cancellation is null)
         {
             return (Connected(request, endPoint, handshake, channel, verifier, handshakeStarted), false);
@@ -396,9 +396,11 @@ public sealed class QuicDialer
         return MultiplexedConnectResult.Failed(exitCode, message);
     }
 
-    // The channel's socket failing is curl's recvfrom() failure, exit 56; a cancellation is
-    // handed back for the caller to rethrow once it has disposed the handshake and channel.
+    // The channel's socket failing is curl's recvfrom() failure, exit 56. A cancellation at the
+    // connect's limit, as -m's is, is the handshake timing out (ADR-1457); any other is handed
+    // back for the caller to rethrow once it has disposed the handshake and channel.
     private async ValueTask<(QuicHandshakeFailure? Failure, ExceptionDispatchInfo? Cancellation)> RunHandshakeAsync(
+        QuicDialRequest request,
         QuicClientConnectionState handshake,
         IDatagramChannel channel,
         TimeSpan? handshakeTimeout,
@@ -412,11 +414,19 @@ public sealed class QuicDialer
         {
             return (new QuicHandshakeFailure(CurlExitCode.RecvError, $"QUIC: recvfrom() unexpectedly returned -1 (errno={exception.ErrorCode}; {SocketFailureReason(exception)})"), null);
         }
+        catch (OperationCanceledException) when (IsAtConnectLimit(request))
+        {
+            // Failed words this timeout itself, from the connect's start.
+            return (new QuicHandshakeFailure(CurlExitCode.OperationTimedOut, string.Empty), null);
+        }
         catch (OperationCanceledException exception)
         {
             return (null, ExceptionDispatchInfo.Capture(exception));
         }
     }
+
+    private bool IsAtConnectLimit(QuicDialRequest request) =>
+        request.ConnectTimeout is { } limit && TcpConnector.IsAtConnectLimit(_timeProvider.GetElapsedTime(request.Started), limit);
 
     // A timeout used the connect's time up; any other failure leaves the next address worth trying.
     private static bool LeavesTimeForTheNextAddress(QuicHandshakeFailure failure) =>
@@ -520,10 +530,12 @@ public sealed class QuicDialer
         return MultiplexedConnectResult.Failed(exitCode, message);
     }
 
-    // --connect-timeout counts from the connect's start, across every address (ADR-0117).
+    // --connect-timeout counts from the connect's start, across every address (ADR-0117), and the
+    // message never names less than it (ADR-1457). Only a connect with a limit times out.
     private MultiplexedConnectResult TimedOut(QuicDialRequest request)
     {
-        var message = $"Connection timed out after {(long)_timeProvider.GetElapsedTime(request.Started).TotalMilliseconds} milliseconds";
+        var milliseconds = TcpConnector.TimedOutMilliseconds(_timeProvider.GetElapsedTime(request.Started), request.ConnectTimeout.GetValueOrDefault());
+        var message = $"Connection timed out after {milliseconds} milliseconds";
         request.Target.Events.ReportInfo(message);
         return MultiplexedConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
     }

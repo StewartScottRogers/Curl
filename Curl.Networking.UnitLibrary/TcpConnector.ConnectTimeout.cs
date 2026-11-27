@@ -68,10 +68,15 @@ public sealed partial class TcpConnector
     }
 
     // True when this connect's own timer fired, which on Linux can be a few milliseconds before the clock reads the
-    // limit, or when the clock is within CallerLimitLeadFor of the limit: -m is the same limit, but its clock starts
-    // before this connect's, so its cancellation arrives with that much of the limit still to run (ADR-1457).
+    // limit, or when the clock has reached the limit as IsAtConnectLimit judges it (ADR-1457).
     private bool IsEndedByConnectLimit(CancellationTokenSource ownTimer, long started, TimeSpan connectLimit) =>
-        ownTimer.IsCancellationRequested || timeProvider.GetElapsedTime(started) >= connectLimit - CallerLimitLeadFor(connectLimit);
+        ownTimer.IsCancellationRequested || IsAtConnectLimit(timeProvider.GetElapsedTime(started), connectLimit);
+
+    // True when a cancellation this long into a connect is its limit passing: the clock is within CallerLimitLeadFor
+    // of the limit or past it. -m is the same limit, but its clock starts before the connect's, so its cancellation
+    // arrives with that much of the limit still to run (ADR-1457).
+    internal static bool IsAtConnectLimit(TimeSpan elapsed, TimeSpan connectLimit) =>
+        elapsed >= connectLimit - CallerLimitLeadFor(connectLimit);
 
     // A quarter of the limit, at most LongestCallerLimitLead.
     private static TimeSpan CallerLimitLeadFor(TimeSpan connectLimit) =>
@@ -79,11 +84,11 @@ public sealed partial class TcpConnector
 
     // The N of a timed-out message: the time since the connect started, but never less than the limit that passed,
     // since curl's N counts from the transfer's start, where -m's clock started, and so is never below the limit.
-    private long TimedOutMilliseconds(long started, TimeSpan connectLimit)
-    {
-        var elapsed = timeProvider.GetElapsedTime(started);
-        return (long)(elapsed > connectLimit ? elapsed : connectLimit).TotalMilliseconds;
-    }
+    private long TimedOutMilliseconds(long started, TimeSpan connectLimit) =>
+        TimedOutMilliseconds(timeProvider.GetElapsedTime(started), connectLimit);
+
+    internal static long TimedOutMilliseconds(TimeSpan elapsed, TimeSpan connectLimit) =>
+        (long)(elapsed > connectLimit ? elapsed : connectLimit).TotalMilliseconds;
 
     private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>
         connectTimeout is { } given && given > TimeSpan.Zero ? given : DefaultConnectTimeout;
