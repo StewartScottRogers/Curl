@@ -69,8 +69,50 @@ public sealed class NameConstraintVerifyResultTests
             OpenSslVerifyResult.KeepFirstNameConstraintRefusal(X509ChainStatusFlags.HasNotPermittedNameConstraint, chain));
     }
 
+    // curl 8.18.0 with OpenSSL 3.5.5 and the root as --cacert (BL-6047): a UPN under a permitted or an
+    // excluded UPN constraint is 51, which the chain engine flags only as unsupported (BL-6059).
     [TestMethod]
-    public void KeepFirstNameConstraintRefusal_NoSubtreeRefusalFlagged_TrustsTheChainEngine()
+    [DataRow(0)]
+    [DataRow(1)]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)] // The chain under an otherName constraint is the platform engine's, pinned on the Windows and Linux ones.
+    public void KeepFirstNameConstraintRefusal_UpnUnderARootsUpnConstraint_IsUnsupportedConstraintType(int subtreesTag)
+    {
+        using var root = CreateCertificate("CN=Upn Constrained Root", null, UserPrincipalNameConstraints(subtreesTag, "evil.test"));
+        using var intermediate = CreateCertificate("CN=Upn Constrained Intermediate", root, null);
+        using var chain = BuildChain(root, intermediate, "user@evil.test");
+
+        var status = OpenSslVerifyResult.KeepFirstNameConstraintRefusal(X509ChainStatusFlags.HasNotSupportedNameConstraint, chain);
+
+        Assert.AreEqual(OpenSslVerifyResult.UnsupportedConstraintType, OpenSslVerifyResult.OfChainStatus(status, 3, false));
+        Assert.AreEqual("unsupported name constraint type (51)", TlsFailureMessages.OpenSslExtensionOrSignatureError(status, []));
+    }
+
+    [TestMethod]
+    public void KeepFirstNameConstraintRefusal_UnsupportedFlaggedAndNothingFound_IsUnsupportedNameSyntax()
+    {
+        using var root = CreateCertificate("CN=Nothing Found Root", null, null);
+        using var intermediate = CreateCertificate("CN=Nothing Found Intermediate", root, null);
+        using var chain = BuildChain(root, intermediate);
+
+        var status = OpenSslVerifyResult.KeepFirstNameConstraintRefusal(X509ChainStatusFlags.HasNotSupportedNameConstraint, chain);
+
+        Assert.AreEqual(OpenSslVerifyResult.UnsupportedNameSyntax, OpenSslVerifyResult.OfChainStatus(status, 3, false));
+    }
+
+    [TestMethod]
+    public void KeepFirstNameConstraintRefusal_NoNameConstraintRefusalFlagged_KeepsEveryFlag()
+    {
+        using var root = CreateCertificate("CN=Unflagged Root", null, NameConstraints(subtreesTag: 1, "localhost"));
+        using var intermediate = CreateCertificate("CN=Unflagged Intermediate", root, null);
+        using var chain = BuildChain(root, intermediate);
+
+        Assert.AreEqual(
+            X509ChainStatusFlags.NotTimeValid,
+            OpenSslVerifyResult.KeepFirstNameConstraintRefusal(X509ChainStatusFlags.NotTimeValid, chain));
+    }
+
+    [TestMethod]
+    public void KeepFirstNameConstraintRefusal_UnsupportedFlaggedAndASubtreeViolationFound_TrustsTheChainEngine()
     {
         using var root = CreateCertificate("CN=Unsupported Flag Root", null, NameConstraints(subtreesTag: 1, "localhost"));
         using var intermediate = CreateCertificate("CN=Unsupported Flag Intermediate", root, null);
@@ -81,10 +123,11 @@ public sealed class NameConstraintVerifyResultTests
             OpenSslVerifyResult.KeepFirstNameConstraintRefusal(X509ChainStatusFlags.HasNotSupportedNameConstraint, chain));
     }
 
-    // A chain of the server certificate (DNS localhost), the intermediate and the trusted root.
-    private static X509Chain BuildChain(X509Certificate2 root, X509Certificate2 intermediate)
+    // A chain of the server certificate (DNS localhost, and the UPN if one is given), the intermediate
+    // and the trusted root.
+    private static X509Chain BuildChain(X509Certificate2 root, X509Certificate2 intermediate, string? userPrincipalName = null)
     {
-        using var leaf = CreateCertificate("CN=localhost", intermediate, null, isAuthority: false);
+        using var leaf = CreateCertificate("CN=localhost", intermediate, null, isAuthority: false, userPrincipalName);
         var chain = new X509Chain();
         chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
         chain.ChainPolicy.CustomTrustStore.Add(root);
@@ -109,7 +152,28 @@ public sealed class NameConstraintVerifyResultTests
         return writer.Encode();
     }
 
-    private static X509Certificate2 CreateCertificate(string subject, X509Certificate2? issuer, byte[]? nameConstraints, bool isAuthority = true)
+    // One otherName subtree of the User Principal Name type-id: permitted under tag 0, excluded under tag 1.
+    private static byte[] UserPrincipalNameConstraints(int subtreesTag, string value)
+    {
+        var otherNameTag = new Asn1Tag(TagClass.ContextSpecific, 0, true);
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, subtreesTag, true)))
+        using (writer.PushSequence())
+        using (writer.PushSequence(otherNameTag))
+        {
+            writer.WriteObjectIdentifier("1.3.6.1.4.1.311.20.2.3");
+            using (writer.PushSequence(otherNameTag))
+            {
+                writer.WriteCharacterString(UniversalTagNumber.UTF8String, value);
+            }
+        }
+
+        return writer.Encode();
+    }
+
+    private static X509Certificate2 CreateCertificate(
+        string subject, X509Certificate2? issuer, byte[]? nameConstraints, bool isAuthority = true, string? userPrincipalName = null)
     {
         var key = RSA.Create(2048);
         var request = new CertificateRequest(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -124,6 +188,11 @@ public sealed class NameConstraintVerifyResultTests
         {
             var names = new SubjectAlternativeNameBuilder();
             names.AddDnsName("localhost");
+            if (userPrincipalName is not null)
+            {
+                names.AddUserPrincipalName(userPrincipalName);
+            }
+
             request.CertificateExtensions.Add(names.Build());
         }
 
