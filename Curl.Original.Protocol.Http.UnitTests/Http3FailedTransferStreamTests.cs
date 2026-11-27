@@ -118,12 +118,14 @@ public sealed class Http3FailedTransferStreamTests
         .. new Http3DataFrame("hello\n"u8.ToArray()).ToBytes(),
     ];
 
+    // A clock no test advances: on the real clock a slow machine can pass the handler's stream
+    // cleanup limit and drop the cancellation the test expects (BL-6052).
     private static TransferContext Context(RecordingTransferEvents events, CurlExitCode failure, CancellationToken cancellationToken = default) => new()
     {
         CancellationToken = cancellationToken,
         Url = CurlUrl.Parse("https://example.com/"),
         Output = failure == CurlExitCode.WriteError ? new FailingWriteStream(1, new IOException("disk full")) : new MemoryStream(),
-        TimeProvider = TimeProvider.System,
+        TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
         ConnectTimeout = TimeSpan.FromSeconds(1),
         MaxFileSize = failure == CurlExitCode.FilesizeExceeded ? 1 : null,
         Events = events,

@@ -37,10 +37,10 @@ internal sealed class XmppProtocolHandler(IConnector connector, ITlsProvider tls
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        string path = Uri.UnescapeDataString(context.Url.AbsolutePath.TrimStart('/'));
         XElement request;
         try
         {
+            string path = XmppRequests.DecodedAddress(context.Url.AbsolutePath.TrimStart('/'));
             request = XmppRequests.For(path.Length > 0 ? path : context.Url.Host, context.Url.Query, await RequestBodyAsync(context).ConfigureAwait(false));
         }
         catch (XmppClientException failure)

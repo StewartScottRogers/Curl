@@ -7,30 +7,51 @@ namespace Curl.Networking;
 // How the A and AAAA queries are run, and the sub-transfer lines written between them.
 public sealed partial class DohDnsResolver
 {
-    // Untraced, the queries run in parallel as curl runs them, and their outcomes are reported
-    // once both are in; traced, one after another, each outcome after its own sub-transfer's
-    // lines, so each sub-transfer's lines come whole. Either way the last query's outcome, AAAA's, is
-    // reported first, as curl 8.22.0 reports it, and traced its sub-transfer runs first too; the results
-    // keep the queries' order (ADR-0380, BL-2973).
-    private async Task<DohQueryResult[]> RunAddressQueriesAsync(List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
-    {
-        TakeConnectionIdsFor(queries.Count);
-        DohQueryResult[] results;
-        if (ReferenceEquals(SubTransferEvents, NoTransferEvents.Instance))
-        {
-            results = await Task.WhenAll(queries.Select(query => QueryAsync(query.Query, query.Type, SubTransferEvents, cancellationToken))).ConfigureAwait(false);
-            for (var index = results.Length - 1; index >= 0; index--)
-            {
-                ReportOutcome(results[index], index);
-            }
+    private bool IsTraced => !ReferenceEquals(SubTransferEvents, NoTransferEvents.Instance);
 
-            return results;
+    private Task<DohQueryResult[]> RunAddressQueriesAsync(List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
+    {
+        var kept = TakeKeptConnections(queries.Count);
+        return queries.Count > 1
+            ? RunBothQueriesAsync(queries, kept, cancellationToken)
+            : QueryOnAConnectionEachAsync(queries, kept, cancellationToken);
+    }
+
+    // Both queries go on a kept HTTP/2 connection (ADR-1441). Over TLS with no kept connection, the
+    // second waits for the first one's (ADR-1435). Else each query goes on a kept HTTP/1.x connection
+    // or a new one.
+    private Task<DohQueryResult[]> RunBothQueriesAsync(List<(byte[] Query, DnsRecordType Type)> queries, List<DohConnection> kept, CancellationToken cancellationToken)
+    {
+        if (kept.Find(connection => connection.IsHttp2) is { } shared)
+        {
+            return QueryOnOneHttp2ConnectionAsync(shared, queries, isKept: true, cancellationToken);
         }
 
-        results = new DohQueryResult[queries.Count];
+        return kept.Count == 0 && _dohServer.UseTls
+            ? RunQueriesAfterTheFirstConnectionAsync(queries, cancellationToken)
+            : QueryOnAConnectionEachAsync(queries, kept, cancellationToken);
+    }
+
+    // Untraced, the queries run in parallel as curl runs them, and their outcomes are reported once
+    // all are in; traced, one after another, each outcome after its own sub-transfer's lines, so each
+    // sub-transfer's lines come whole. The last query's outcome, AAAA's, is reported first, as curl
+    // 8.22.0 reports it, and traced its sub-transfer runs first too (ADR-0380, BL-2973), so it takes
+    // the first kept connection (ADR-1441). The results keep the queries' order.
+    private async Task<DohQueryResult[]> QueryOnAConnectionEachAsync(List<(byte[] Query, DnsRecordType Type)> queries, List<DohConnection> kept, CancellationToken cancellationToken)
+    {
+        Task<DohQueryResult> RunAsync(int index) =>
+            QueryAsync(kept.ElementAtOrDefault(queries.Count - 1 - index), queries[index].Query, queries[index].Type, cancellationToken);
+
+        var results = IsTraced
+            ? new DohQueryResult[queries.Count]
+            : await Task.WhenAll(Enumerable.Range(0, queries.Count).Select(RunAsync)).ConfigureAwait(false);
         for (var index = queries.Count - 1; index >= 0; index--)
         {
-            results[index] = await QueryAsync(queries[index].Query, queries[index].Type, SubTransferEvents, cancellationToken).ConfigureAwait(false);
+            if (IsTraced)
+            {
+                results[index] = await RunAsync(index).ConfigureAwait(false);
+            }
+
             ReportOutcome(results[index], index);
         }
 

@@ -6,6 +6,12 @@ namespace Curl.Original.Protocol.Http;
 public sealed partial class HttpProtocolHandler
 {
     /// <summary>
+    /// How long ending the stream of a failed or timed-out transfer may wait for a peer that
+    /// has stopped taking what is written (ADR-1421).
+    /// </summary>
+    private static readonly TimeSpan StreamCleanupLimit = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// Sends <paramref name="plan" /> on <paramref name="connection" />, then each retry that
     /// may go on the same connection; then marks the connection reusable when the last
     /// response is reported left intact - it persists, or it is an HTTP/1.0 keep-alive body the
@@ -69,6 +75,31 @@ public sealed partial class HttpProtocolHandler
         unheldSession?.ShutDownAsync(CancellationToken.None) ?? ValueTask.CompletedTask;
 
     /// <summary>
+    /// Runs <paramref name="cleanup" /> under a token that cancels after
+    /// <see cref="StreamCleanupLimit" /> on <paramref name="timeProvider" />, and gives it up
+    /// then: the transfer has its outcome, and a peer that has stopped reading must not keep it
+    /// from ending (BL-6006). Any other cancellation goes to the caller. Nothing runs, and no
+    /// timer starts, when there is no <paramref name="stream" />, as over HTTP/1.x.
+    /// </summary>
+    private static async ValueTask WithinStreamCleanupLimitAsync(IHttpStreamConnection? stream, TimeProvider timeProvider, Func<CancellationToken, ValueTask> cleanup)
+    {
+        if (stream is null)
+        {
+            return;
+        }
+
+        using CancellationTokenSource limit = new(StreamCleanupLimit, timeProvider);
+        try
+        {
+            await cleanup(limit.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (limit.IsCancellationRequested)
+        {
+            // The peer is not taking the frames. A write cut off part way leaves its session taking no new stream.
+        }
+    }
+
+    /// <summary>
     /// Marks the connection reusable when it can carry the next transfer
     /// (<see cref="CarriesNextTransfer" />), so a pool keeps it (BL-735), or reports that a pooled connection that died is being given up.
     /// </summary>
@@ -118,27 +149,41 @@ public sealed partial class HttpProtocolHandler
     }
 
     /// <summary>
-    /// Ends what a failed exchange leaves open of its stream: when the failure ends only the
-    /// stream (<see cref="FailsOnlyItsStream" />, or the server reset an HTTP/3 one,
-    /// BL-5997), the stream unless it has ended both ways
+    /// Ends the stream of an exchange that timed out (<see cref="EndGivenUpStreamAsync" />),
+    /// giving up after <see cref="StreamCleanupLimit" />.
+    /// </summary>
+    private static ValueTask EndTimedOutStreamAsync(IHttpStreamConnection? stream, ConnectResult connect, TimeProvider timeProvider) =>
+        WithinStreamCleanupLimitAsync(stream, timeProvider, cleanup => EndGivenUpStreamAsync(stream, connect, cleanup));
+
+    /// <summary>
+    /// Ends what a failed exchange leaves open of its stream (<see cref="EndFailedStreamAsync" />),
+    /// giving up after <see cref="StreamCleanupLimit" />. The transfer has already failed, so
+    /// none of this is cancelled with the transfer's token: one that fires meanwhile would
+    /// replace the failure with a cancellation and leave the transfer not marked done
+    /// (BL-5998).
+    /// </summary>
+    private static ValueTask ResetFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, ConnectResult connect, IConnection connection, TimeProvider timeProvider) =>
+        WithinStreamCleanupLimitAsync(TrailerStreamOf(requestStream, connection), timeProvider, cleanup => EndFailedStreamAsync(failure, requestStream, connect, connection, cleanup));
+
+    /// <summary>
+    /// When the failure ends only the stream (<see cref="FailsOnlyItsStream" />, or the server
+    /// reset an HTTP/3 one, BL-5997), ends the stream unless it has ended both ways
     /// (<see cref="EndGivenUpStreamAsync" />), an HTTP/3 one after reading what has arrived of
     /// its response (<see cref="Http3StreamConnection.ReadArrivedResponseAsync" />); and after
-    /// any failure, an HTTP/2 one whose response ended it with the upload unsent
+    /// any failure, resets an HTTP/2 one whose response ended it with the upload unsent
     /// (<see cref="ResetFailedStreamUploadAsync" />), even on a connection that takes no new
-    /// stream. The transfer has already failed, so none of this is cancelled with the
-    /// transfer's token: one that fires meanwhile would replace the failure with a
-    /// cancellation and leave the transfer not marked done (BL-5998).
+    /// stream.
     /// </summary>
-    private static async ValueTask ResetFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, ConnectResult connect, IConnection connection)
+    private static async ValueTask EndFailedStreamAsync(HttpTransferException failure, IHttpStreamConnection? requestStream, ConnectResult connect, IConnection connection, CancellationToken cancellationToken)
     {
         IHttpStreamConnection? stream = TrailerStreamOf(requestStream, connection);
         if (FailsOnlyItsStream(failure.ExitCode, stream is Http3StreamConnection) || ResetsHttp3Stream(failure, stream))
         {
             await ((stream as Http3StreamConnection)?.ReadArrivedResponseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
-            await EndGivenUpStreamAsync(stream, connect, CancellationToken.None).ConfigureAwait(false);
+            await EndGivenUpStreamAsync(stream, connect, cancellationToken).ConfigureAwait(false);
         }
 
-        await ResetFailedStreamUploadAsync(requestStream, CancellationToken.None).ConfigureAwait(false);
+        await ResetFailedStreamUploadAsync(requestStream, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -243,5 +288,5 @@ public sealed partial class HttpProtocolHandler
     private IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
         (IHttpStreamSession?)(connection as Http3Session)
             ?? (connection.Session as IHttpStreamSession)
-            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection, isPushEnabled: Http2PushSink is not null) : null);
+            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection, isPushEnabled: Http2PushSink is not null, plan.Context.TimeProvider) : null);
 }

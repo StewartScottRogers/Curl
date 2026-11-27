@@ -7,7 +7,7 @@ namespace Curl.Engine;
 /// <summary>
 /// Passes every event on to <paramref name="inner" /> unchanged and keeps what libcurl still reports after a
 /// transfer ends with <c>CURLE_OPERATION_TIMEDOUT</c> because it was too slow: the last response code and HTTP version, the bytes
-/// of the response heads, the bytes of the request heads, the body bytes received, the connections opened and
+/// of the HTTP and RTSP response heads (never a mail or FTP reply line), the bytes of the request heads, the body bytes received, the connections opened and
 /// the end points of the first. The handler that was
 /// cancelled returns no report, so <see cref="ReportOn" /> builds one from these (BL-3321).
 /// </summary>
@@ -16,6 +16,8 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
 {
     private const string StatusLinePrefix = "HTTP/";
 
+    // Whether a status line has started a response head on the latest connection: only those bytes are libcurl's header size.
+    private bool countsHeaderBytes;
     private int responseCode;
     private Version? httpVersion;
     private long headerSize;
@@ -62,6 +64,7 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     {
         responseCode = 0;
         httpVersion = null;
+        countsHeaderBytes = false;
         connectionCount++;
         if (connectionCount == 1)
         {
@@ -107,7 +110,8 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     /// <inheritdoc />
     public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
     {
-        headerSize += bytes.Length;
+        countsHeaderBytes |= StartsAResponseHead(bytes);
+        headerSize += countsHeaderBytes ? bytes.Length : 0;
         if (StatusOf(bytes) is (int code, var version))
         {
             responseCode = code;
@@ -116,6 +120,10 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
 
         inner.ReportResponseHeader(bytes);
     }
+
+    // An FTP, IMAP, POP3 or SMTP reply line starts no head, and curl 8.22.0 counts none of them in %{size_header} (BL-6053).
+    private static bool StartsAResponseHead(ReadOnlySpan<byte> bytes) =>
+        bytes.StartsWith("HTTP/"u8) || bytes.StartsWith("RTSP/"u8);
 
     /// <inheritdoc />
     public void ReportDataSent(ReadOnlySpan<byte> bytes) => inner.ReportDataSent(bytes);

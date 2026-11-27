@@ -19,6 +19,9 @@ namespace Curl.Engine;
 /// </param>
 internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText)
 {
+    /// <summary>The key a cancelled transfer's closing <c>-v</c> line is read from, spelled as <c>FtpSession</c> spells it (BL-6053).</summary>
+    private const string CancelledClosingLineDataKey = "Curl.Engine.ClosingConnectionLine";
+
     /// <summary>The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.</summary>
     private long nextConnectionId;
 
@@ -189,11 +192,11 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
         }
         catch (OperationCanceledException cancelled) when (HasStoppedTheTransfer(watchdog))
         {
-            return await FinishedByWatchdogAsync(follower, context, WithReportOf(cancelled, watchdog!.Failure)).ConfigureAwait(false);
+            return await FinishedByWatchdogAsync(follower, context, cancelled, watchdog!.Failure).ConfigureAwait(false);
         }
         catch (OperationCanceledException cancelled) when (HasStoppedTheTransfer(maxTimeWatchdog))
         {
-            return await FinishedByWatchdogAsync(follower, context, WithReportOf(cancelled, maxTimeWatchdog!.Failure)).ConfigureAwait(false);
+            return await FinishedByWatchdogAsync(follower, context, cancelled, maxTimeWatchdog!.Failure).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -258,13 +261,26 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
     }
 
     /// <summary>
-    /// Tells the transfer's handler that a watchdog's exit 28 ended it, which the follower could not, as the
+    /// Ends a transfer a watchdog cancelled: writes the closing <c>-v</c> lines the cancellation asks for, then
+    /// tells the transfer's handler that the watchdog's exit 28 ended it, which the follower could not, as the
     /// cancellation left it before any result existed (BL-5165).
     /// </summary>
-    private static async Task<TransferResult> FinishedByWatchdogAsync(RedirectFollower follower, TransferContext context, TransferResult failure)
+    private static async Task<TransferResult> FinishedByWatchdogAsync(RedirectFollower follower, TransferContext context, OperationCanceledException cancelled, TransferResult failure)
     {
-        await follower.NotifyChainFinishedAsync(context, failure).ConfigureAwait(false);
-        return failure;
+        ReportClosingLines(context.Events, cancelled, failure.ErrorMessage!);
+        TransferResult reported = WithReportOf(cancelled, failure);
+        await follower.NotifyChainFinishedAsync(context, reported).ConfigureAwait(false);
+        return reported;
+    }
+
+    // A handler that names its connection's closing line gets curl's two: the failure's text, as failf echoes it, then that line (BL-6053).
+    private static void ReportClosingLines(ITransferEvents events, OperationCanceledException cancelled, string message)
+    {
+        if (cancelled.Data[CancelledClosingLineDataKey] is string closingLine)
+        {
+            events.ReportInfo(message);
+            events.ReportInfo(closingLine);
+        }
     }
 
     /// <summary>

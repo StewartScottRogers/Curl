@@ -56,7 +56,7 @@ public sealed class ResumableUploadTransferHookTests
         var result = await new ResumableUploadTransferHook().ExecuteAsync(context, next.SendAsync);
 
         Assert.AreEqual(
-            "OPTIONS http://up.example.com/files?x=1 [] -|POST http://up.example.com/files?x=1 [Tus-Resumable: 1.0.0,Upload-Length: 5] |"
+            "OPTIONS http://up.example.com/files?x=1 [] -|POST http://up.example.com/files?x=1 [Tus-Resumable: 1.0.0,Upload-Length: 5,Content-Length: 0] -|"
             + "PATCH http://up.example.com/files/24e5 [Tus-Resumable: 1.0.0,Upload-Offset: 0,Content-Type: application/offset+octet-stream] hello",
             Describe(next));
         Assert.IsTrue(next.Sent.All(sent => sent.Context.Http!.Fail == HttpFailMode.None && sent.Context.HeaderOutput is not null && sent.Context.DumpHeaderOutput is null));
@@ -107,7 +107,7 @@ public sealed class ResumableUploadTransferHookTests
 
         Assert.AreEqual(
             "OPTIONS http://up.example.com/files [Authorization: Bearer t,upload-offset: 9,NoColon] -|"
-            + "PUT http://up.example.com/files [Upload-Draft-Interop-Version: 6,Upload-Complete: ?0,Upload-Length: 5,Authorization: Bearer t,upload-offset: 9,NoColon] |"
+            + "PUT http://up.example.com/files [Upload-Draft-Interop-Version: 6,Upload-Complete: ?0,Upload-Length: 5,Content-Length: 0,Authorization: Bearer t,upload-offset: 9,NoColon] -|"
             + "PATCH http://up.example.com/uploads/7 [Upload-Draft-Interop-Version: 6,Upload-Complete: ?1,Upload-Offset: 0,Content-Type: application/partial-upload,Authorization: Bearer t,NoColon] hello",
             Describe(next));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -115,6 +115,57 @@ public sealed class ResumableUploadTransferHookTests
         Assert.AreEqual("HTTP/1.1 200 R\r\nContent-Length: 4\r\n\r\n", Encoding.ASCII.GetString(headerOutput.ToArray()));
         CollectionAssert.AreEqual(headerOutput.ToArray(), dumpHeaderOutput.ToArray());
         Assert.AreEqual(headerOutput.Length, result.Report!.HeaderSize);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task ExecuteAsync_Creation_HasNoBodyForMultiPassAuthenticationToProbeAndSendAgain(bool tus)
+    {
+        // EXT-129: curl's handler sends a request with a body as an empty --digest or --ntlm probe and again after a 2xx,
+        // which would create a second upload resource. A request with no body, chunked by -H included, is sent once.
+        var next = new ScriptedNext(tus ? TusOptions : PlainOptions, tus ? TusCreated : IetfCreated, tus ? TusPatched : IetfAppended);
+        var http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest, Headers = ["transfer-encoding: chunked"] };
+
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", http: http), next.SendAsync);
+
+        var creation = next.Sent[1];
+        Assert.IsNull(creation.Context.Upload);
+        Assert.IsNull(creation.Context.PostData);
+        Assert.AreEqual("Content-Length: 0", creation.Headers[^1]);
+        CollectionAssert.Contains(next.Sent[2].Headers.ToArray(), "transfer-encoding: chunked");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_IetfAppend_GivesItsEmptyAuthenticationProbeUploadCompleteFalse()
+    {
+        // ADR-1440: curl's handler may send an append's header fields first with no content for --digest or --ntlm, and a
+        // server that asks for no authentication would complete an upload whose probe said Upload-Complete: ?1.
+        var next = new ScriptedNext(PlainOptions, IetfCreated, IetfAppended);
+        var http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest, Headers = ["X-A: 1", "upload-complete: ?1"] };
+
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files", http: http), next.SendAsync);
+
+        var append = next.Sent[2];
+        Assert.AreEqual(
+            "Upload-Draft-Interop-Version: 6,Upload-Complete: ?1,Upload-Offset: 0,Content-Type: application/partial-upload,X-A: 1",
+            string.Join(',', append.Headers));
+        Assert.AreEqual(
+            "Upload-Draft-Interop-Version: 6,Upload-Complete: ?0,Upload-Offset: 0,Content-Type: application/partial-upload,X-A: 1",
+            string.Join(',', append.Context.Http!.AuthProbeHeaders!));
+        Assert.AreEqual("hello", append.Upload);
+        Assert.IsNull(next.Sent[0].Context.Http!.AuthProbeHeaders);
+        Assert.IsNull(next.Sent[1].Context.Http!.AuthProbeHeaders);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TusAppend_GivesItsEmptyAuthenticationProbeTheAppendsOwnFields()
+    {
+        var next = new ScriptedNext(TusOptions, TusCreated, TusPatched);
+
+        await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), next.SendAsync);
+
+        CollectionAssert.AreEqual(next.Sent[2].Headers.ToArray(), next.Sent[2].Context.Http!.AuthProbeHeaders!.ToArray());
     }
 
     [TestMethod]

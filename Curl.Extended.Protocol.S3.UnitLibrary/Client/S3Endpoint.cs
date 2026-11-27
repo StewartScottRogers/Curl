@@ -1,3 +1,6 @@
+using Curl.Extension.Abstractions;
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Extended.Protocol.S3.Client;
 
 /// <summary>
@@ -40,6 +43,7 @@ internal sealed record S3Endpoint(string Host, int Port, bool UseTls, bool PathS
     /// <summary>Splits an <c>s3://</c> URL's query string into its parameters, percent-decoded (a <c>+</c> is a space, as S3 reads it); a parameter with no <c>=</c> has an empty value.</summary>
     /// <param name="query">The query string without its <c>?</c>, or <see langword="null"/> when the URL has none.</param>
     /// <returns>The parameters in the order the URL gives them.</returns>
+    /// <exception cref="S3TransferException">Exit 3 when a name or value is not valid UTF-8 once decoded.</exception>
     internal static List<KeyValuePair<string, string>> QueryOf(string? query) =>
         [.. (query ?? string.Empty).Split('&', StringSplitOptions.RemoveEmptyEntries).Select(parameter =>
         {
@@ -63,7 +67,16 @@ internal sealed record S3Endpoint(string Host, int Port, bool UseTls, bool PathS
         return name.Length == 0 || name[0] == '[' ? fallback : name;
     }
 
-    private static string Decode(string text) => Uri.UnescapeDataString(text.Replace('+', ' '));
+    private static string Decode(string text) => TextOf(text.Replace('+', ' '), "query");
+
+    /// <summary>Percent-decodes a part of the URL.</summary>
+    /// <param name="escaped">The percent-encoded part.</param>
+    /// <param name="field">What the part names, for the failure's message.</param>
+    /// <returns>The decoded text.</returns>
+    /// <exception cref="S3TransferException">Exit 3 when the part is not valid UTF-8 once decoded (ADR-1429).</exception>
+    internal static string TextOf(string escaped, string field) =>
+        UrlPercentDecoding.Utf8TextOf(escaped)
+            ?? throw new S3TransferException(CurlExitCode.UrlMalformat, $"The S3 {field} in the URL is not valid UTF-8");
 
     /// <summary>Gives the path, before percent-encoding, of <paramref name="key"/> in <paramref name="bucket"/>; an empty key names the bucket itself.</summary>
     /// <param name="bucket">The bucket.</param>

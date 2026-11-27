@@ -74,4 +74,15 @@ internal sealed record CurlTransports(
     bool TracesSsh = false,
     bool TracesHttp2 = false,
     bool TracesHttp3 = false,
-    bool TracesRead = false);
+    bool TracesRead = false) : IAsyncDisposable
+{
+    /// <summary>
+    /// Closes the connections the <c>--doh-url</c> resolver keeps for later queries, when
+    /// <see cref="DnsResolver" /> is that <see cref="DohDnsResolver" /> (ADR-1441), which whoever builds the
+    /// transports does once their transfers are done. Any other resolver, which an <see cref="EngineDialing" />'s
+    /// caller may own, is left alone, as are the pooled connections: whoever holds <see cref="PoolingConnector" />
+    /// disposes it.
+    /// </summary>
+    /// <returns>A task that completes once the kept connections are closed.</returns>
+    public ValueTask DisposeAsync() => DnsResolver is DohDnsResolver doh ? doh.DisposeAsync() : ValueTask.CompletedTask;
+}

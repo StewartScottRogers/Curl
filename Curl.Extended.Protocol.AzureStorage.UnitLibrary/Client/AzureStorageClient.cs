@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Extended.Protocol.AzureStorage.Bodies;
 using Curl.Extended.Protocol.AzureStorage.Http;
 using Curl.Extended.Protocol.AzureStorage.Requests;
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.AzureStorage.Client;
@@ -142,12 +143,31 @@ internal sealed class AzureStorageClient(IConnector connector, ITransferContext 
     /// <summary>Splits a percent-encoded <c>/first/rest</c> path into its decoded first segment and the decoded rest.</summary>
     /// <param name="path">The path, starting with <c>/</c>.</param>
     /// <returns>The first segment (the container or file system) and the remainder (the blob or path name), either possibly empty.</returns>
+    /// <exception cref="AzureStorageTransferException">Exit 3 when the path is not valid UTF-8 once decoded.</exception>
     internal static (string First, string Remainder) Split(string path)
     {
-        string decoded = Uri.UnescapeDataString(path)[1..];
+        string decoded = TextOf(path, "path")[1..];
         int slash = decoded.IndexOf('/', StringComparison.Ordinal);
         return slash < 0 ? (decoded, string.Empty) : (decoded[..slash], decoded[(slash + 1)..]);
     }
+
+    /// <summary>Refuses an endpoint whose path or query is not valid UTF-8 once percent-decoded, before anything is signed or sent (ADR-1429).</summary>
+    /// <param name="endpoint">The URL's endpoint.</param>
+    /// <exception cref="AzureStorageTransferException">Exit 3, naming the path or the query.</exception>
+    internal static void RefuseNonUtf8(AzureStorageEndpoint endpoint)
+    {
+        TextOf(endpoint.Path, "path");
+        TextOf(endpoint.Query, "query");
+    }
+
+    /// <summary>Percent-decodes a part of the URL.</summary>
+    /// <param name="escaped">The percent-encoded part.</param>
+    /// <param name="field">What the part names, for the failure's message.</param>
+    /// <returns>The decoded text.</returns>
+    /// <exception cref="AzureStorageTransferException">Exit 3 when the part is not valid UTF-8 once decoded.</exception>
+    internal static string TextOf(string escaped, string field) =>
+        UrlPercentDecoding.Utf8TextOf(escaped)
+            ?? throw new AzureStorageTransferException(CurlExitCode.UrlMalformat, $"The Azure Storage {field} in the URL is not valid UTF-8");
 
     /// <summary>Gives the failure for an Azure Storage error: exit 22 with its code and message, or only the status when the body is no <c>Error</c>.</summary>
     /// <param name="statusCode">The response's status code.</param>

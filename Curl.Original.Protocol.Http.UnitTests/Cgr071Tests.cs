@@ -16,8 +16,6 @@ public sealed class Cgr071Tests
 {
     private const string Body = "hello compressed world\n";
 
-    private const string Generic = "Unrecognized or bad HTTP Content or Transfer-Encoding";
-
     private static readonly int[] ChunkSizes = [1, 3, 5, 7, 11, 16, 17, 65536];
 
     [TestMethod]
@@ -45,7 +43,7 @@ public sealed class Cgr071Tests
 
     [TestMethod]
     [DataRow("gzip", "1F8B080000000000000AFFFFFFFFFFFFFFFFFFFF", "Error while processing content unencoding: invalid block type", DisplayName = "gzip: corrupt data read together")]
-    [DataRow("deflate", "000100FEFF4107", Generic, DisplayName = "deflate: raw block after decoded output")]
+    [DataRow("deflate", "000100FEFF4107", "Error while processing content unencoding: invalid block type", DisplayName = "deflate: raw block after decoded output")]
     public void Decode_CorruptDeflateData_ThrowsZlibsText(string coding, string hex, string message)
     {
         byte[] encoded = Convert.FromHexString(hex);

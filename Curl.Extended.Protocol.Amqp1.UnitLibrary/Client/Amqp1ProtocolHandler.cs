@@ -1,3 +1,4 @@
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Amqp1.Client;
@@ -5,7 +6,8 @@ namespace Curl.Extended.Protocol.Amqp1.Client;
 /// <summary>
 /// Serves <c>amqp1://host[:5672]/address</c> and <c>amqp1s://host[:5671]/address</c> (TLS from the connector) with
 /// AMQP 1.0 (OASIS AMQP Version 1.0): with a request body (<c>-d</c>, <c>-T</c>) it sends one message to the URL's
-/// URL-decoded address, otherwise it receives one message from it and writes its body to the output. <c>--user</c>
+/// URL-decoded address, otherwise it receives one message from it and writes its body to the output. An address that is not
+/// valid UTF-8 once decoded ends with exit 3 before anything is connected (ADR-1429). <c>--user</c>
 /// authenticates with SASL PLAIN, otherwise ANONYMOUS. The exchange itself is <see cref="Amqp1ClientFlow"/>.
 /// </summary>
 public sealed class Amqp1ProtocolHandler : IProtocolHandler
@@ -40,7 +42,9 @@ public sealed class Amqp1ProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.UrlMalformat, Amqp1ClientMessages.NoAddress);
         }
 
-        return await TransferAsync(context, Uri.UnescapeDataString(path[1..])).ConfigureAwait(false);
+        return UrlPercentDecoding.Utf8TextOf(path[1..]) is { } address
+            ? await TransferAsync(context, address).ConfigureAwait(false)
+            : TransferResult.Failure(CurlExitCode.UrlMalformat, Amqp1ClientMessages.AddressNotUtf8);
     }
 
     internal static ConnectTarget TargetOf(ITransferContext context)

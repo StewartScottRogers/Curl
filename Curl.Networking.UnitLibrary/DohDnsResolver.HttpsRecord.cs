@@ -75,8 +75,8 @@ public sealed partial class DohDnsResolver
             return null;
         }
 
-        TakeConnectionIdsFor(1);
-        var result = await QueryAsync(query, DnsRecordType.Https, SubTransferEvents, cancellationToken).ConfigureAwait(false);
+        var kept = TakeKeptConnections(1).SingleOrDefault();
+        var result = await QueryAsync(kept, query, DnsRecordType.Https, cancellationToken).ConfigureAwait(false);
         DohTraceLines.ReportHttpsRecord(_dohTrace, _describeExitCode, result, HttpsRecordTrace);
         return FirstHttpsRecordOf(result);
     }

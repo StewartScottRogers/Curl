@@ -410,7 +410,12 @@ internal static class CurlComposition
         IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>> resolverActivators = ResolverHookActivatorsOf(extensionResolverHookActivators);
         IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>> connectionActivators = ConnectionHookActivatorsOf(extensionConnectionHookActivators);
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector, clock), clock)), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes, connectionActivators, clock, extensionProcessStarter)),
+            SharingRunCookies((options, cookies) =>
+            {
+                IDnsResolver serverResolver = DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector, clock);
+                IDnsResolver groupResolver = DialingDohResolverOf(options, tcpDialer, serverResolver, clock);
+                return CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(groupResolver), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes, connectionActivators, clock, extensionProcessStarter, BuiltDohResolverOf(groupResolver, serverResolver));
+            }),
             RunFileSystemOf(fileSystem),
             new PhysicalFileSystem(),
             standardOutput,
@@ -495,6 +500,18 @@ internal static class CurlComposition
     }
 
     /// <summary>
+    /// The DoH resolver an option group of the dialing runner built, which the group's dispatch disposes:
+    /// <paramref name="groupResolver" /> when <see cref="DialingDohResolverOf" /> made a <see cref="DohDnsResolver" />;
+    /// <see langword="null" /> when it handed <paramref name="serverResolver" /> back, which is not the group's to
+    /// dispose, or made one that keeps no connection.
+    /// </summary>
+    /// <param name="groupResolver">What <see cref="DialingDohResolverOf" /> returned.</param>
+    /// <param name="serverResolver">The resolver it was given.</param>
+    /// <returns>The resolver to dispose, or <see langword="null" />.</returns>
+    private static DohDnsResolver? BuiltDohResolverOf(IDnsResolver groupResolver, IDnsResolver serverResolver) =>
+        ReferenceEquals(groupResolver, serverResolver) ? null : groupResolver as DohDnsResolver;
+
+    /// <summary>
     /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool, IReadOnlyList{ExtensionOption}?, IReadOnlyList{Func{ExtensionOptionValues, IResolverHook?}}?, IReadOnlyList{Func{ExtensionOptionValues, IConnectionHook?}}?, TimeProvider?, IExtensionProcessStarter?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
@@ -519,6 +536,7 @@ internal static class CurlComposition
     /// <param name="connectionActivators">One per extension: its connection hook when its option was given, otherwise <see langword="null" />.</param>
     /// <param name="clock">The clock the group's TLS providers, its TCP and pooling connectors, its QUIC dialer and its security contexts run their timers on.</param>
     /// <param name="extensionProcessStarter">Starts the programs extension handlers run and reads the environment they find them in (ADR-1184); <see langword="null" /> leaves each extension its real process starter.</param>
+    /// <param name="builtDohResolver">The group's DoH resolver (<see cref="BuiltDohResolverOf" />), which the dispatch disposes; <see langword="null" /> for none.</param>
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateDialingTransferDispatch(
         ITcpDialer tcpDialer,
@@ -538,7 +556,8 @@ internal static class CurlComposition
         Func<int, byte[]>? digestRandomBytes,
         IEnumerable<Func<ExtensionOptionValues, IConnectionHook?>> connectionActivators,
         TimeProvider clock,
-        IExtensionProcessStarter? extensionProcessStarter)
+        IExtensionProcessStarter? extensionProcessStarter,
+        DohDnsResolver? builtDohResolver)
     {
         ConnectionHooks connectionHooks = ExtensionConnectionHooksOf(options, connectionActivators);
         CertificateCheckHooks certificateCheckHooks = ExtensionCertificateCheckHooksOf(options);
@@ -568,6 +587,7 @@ internal static class CurlComposition
             tcpConnector.LoadResolveEntries)
         {
             FeatureMask = featureMask,
+            KeptDohConnections = builtDohResolver,
         };
     }
 
@@ -958,7 +978,7 @@ internal static class CurlComposition
     /// <param name="extensionConnectionHooks">The connection hook the option group's extension options activated, or <see langword="null" /> for none.</param>
     /// <param name="extensionResolverHooks">The resolver hook the option group's extension options activated, or <see langword="null" /> for none.</param>
     /// <param name="extensionCertificateCheckHooks">The certificate checks the option group's extension options activated, or <see langword="null" /> for none.</param>
-    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
+    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader; disposing it disposes the pool and then <paramref name="transports" />.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null, ConnectionHooks? extensionConnectionHooks = null, ResolverHooks? extensionResolverHooks = null, CertificateCheckHooks? extensionCertificateCheckHooks = null)
     {
         Func<string, string?> readEnvironmentVariable = ProcessEnvironmentVariable;
@@ -968,7 +988,10 @@ internal static class CurlComposition
             cookies,
             new ProxySelector(readEnvironmentVariable),
             transports.PoolingConnector,
-            transports.TcpConnector.LoadResolveEntries);
+            transports.TcpConnector.LoadResolveEntries)
+        {
+            KeptDohConnections = transports,
+        };
     }
 
     /// <summary>

@@ -201,10 +201,17 @@ and Encrypted Client Hello (BL-706, ADR-0233).
   certificates, SNI name, stapled OCSP response) and answers a `ServerCertificateVerdict`.
 - OCSP stapling (ADR-0173): `OcspStapleVerifier.Verify(response, chain, now)` checks a
   stapled response (RFC 6960) in curl's OpenSSL order and returns an
-  `OcspStapleOutcome` (`OcspStapleStatus` and the CRL reason or `responseStatus`). It
+  `OcspStapleOutcome` (`OcspStapleStatus` and the CRL reason or `responseStatus`). A
+  delegated responder outside its validity at `now` is `ResponderNotAuthorised` (no
+  leeway); `VerifyForSchannelRevocationCheck`, the Windows stapled-status and
+  below-anchor checks' entry, accepts one not yet valid, as curl's Schannel build does
+  (ADR-1438). Only a SHA-1 `CertID`
+  names the certificate (ADR-1431). It
   reads with the internal `OcspBasicResponse`, `OcspSingleResponse` and
   `OcspCertificateFields`, and maps signature and `CertID` hash OIDs with
-  `OcspSignatureAlgorithm`. With `RequestOcspStatus` (and the settings' `TimeProvider`)
+  `OcspSignatureAlgorithm`, which verifies an RSASSA-PSS signature with the MGF1 hash and
+  salt length its parameters state, through `Curl.Cryptography`'s `RsaPssVerification`
+  (ADR-1432). With `RequestOcspStatus` (and the settings' `TimeProvider`)
   both handshakes run it once the verifier accepts the chain, expose `CertificateStatus`,
   and fail anything but good with `bad_certificate_status_response` and
   `TlsHandshakeFailure.CertificateStatusRejection`.

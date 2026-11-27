@@ -9,6 +9,7 @@ namespace Curl.Extended.Protocol.AzureStorage.Client;
 /// <c>abfs[s]://filesystem@account/path</c> through <see cref="AzureDataLakeOperations"/> (ADR-1105): with <c>-T</c> it
 /// uploads, with an empty name or one ending in <c>/</c> it lists, otherwise it downloads. The URL is mapped by
 /// <see cref="AzureStorageUrlMapping"/> and authorized with the credential <see cref="AzureStorageCredential.Choose"/> picks.
+/// A path or query that is not valid UTF-8 once percent-decoded ends with exit 3 before any connection (ADR-1429).
 /// </summary>
 /// <param name="connector">Opens each connection.</param>
 /// <param name="environment">Gives an environment variable's value, or <see langword="null"/> when it is unset.</param>
@@ -32,6 +33,7 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
         try
         {
             AzureStorageEndpoint endpoint = AzureStorageUrlMapping.Map(new Uri(context.Url.OriginalString));
+            AzureStorageClient.RefuseNonUtf8(endpoint);
             AzureStorageCredential credential = AzureStorageCredential.Choose(context.Http?.BearerToken, environment, context.Credentials);
             AzureStorageClient client = new(connector, context, new AzureStorageRequestAuthorizer(context.TimeProvider), credential, headReporter);
             context.Progress.ReportTransferStarted();

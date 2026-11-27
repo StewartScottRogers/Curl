@@ -1459,3 +1459,38 @@ Each option and the specific reason it lost.
 | [1415](ADR-1415-a-max-filesize-or-write-failure-over-http-3-keeps-its-connection.md) | A --max-filesize or write failure over HTTP/3 keeps its connection (BL-5996) | Accepted | 2026-11-25 |
 | [1416](ADR-1416-a-stream-the-server-resets-over-http-3-keeps-its-connection.md) | A stream the server resets over HTTP/3 keeps its connection (BL-5997) | Accepted | 2026-11-25 |
 | [1417](ADR-1417-git-alone-owns-line-endings-not-editorconfig.md) | Git alone owns line endings; .editorconfig names none (BL-5923) | Accepted | 2026-11-26 |
+| [1418](ADR-1418-a-windows-telnet-read-that-fails-on-an-unanswered-upload-exits-56.md) | A Windows TELNET read that fails on an unanswered upload exits 56 (BL-6012) | Accepted | 2026-11-26 |
+| [1419](ADR-1419-an-expired-crl-that-lists-a-certificate-below-an-anchor-still-revokes-it.md) | An expired CRL that lists a certificate below an anchor still revokes it (BL-6009) | Accepted | 2026-11-26 |
+| [1420](ADR-1420-a-z-telnet-session-holds-back-later-transfers.md) | Under -Z a telnet session holds back later transfers, and telnet -t values are not judged at setup (BL-6017) | Accepted | 2026-11-26 |
+| [1421](ADR-1421-ending-a-failed-http-stream-waits-at-most-one-second.md) | Ending a failed HTTP stream waits at most one second (BL-6006) | Accepted | 2026-11-26 |
+| [1422](ADR-1422-the-schannel-build-reads-multi-valued-relative-names-against-name-constraints.md) | The Schannel build reads multi-valued relative names against name constraints (BL-6007) | Accepted | 2026-11-26 |
+| [1423](ADR-1423-an-expired-delegated-ocsp-responder-is-not-authorised.md) | An expired delegated OCSP responder is not authorised (BL-6008) | Superseded in part by ADR-1438 | 2026-11-26 |
+| [1424](ADR-1424-doh-url-offers-h2-and-speaks-http-2-to-a-server-that-picks-it.md) | --doh-url offers h2 by ALPN and speaks HTTP/2 to a server that picks it (BL-6015) | Accepted | 2026-11-26 |
+| [1425](ADR-1425-the-trace-file-opens-at-the-first-trace-event.md) | The trace file opens at the first trace event (BL-6023) | Accepted | 2026-11-26 |
+| [1426](ADR-1426-dpop-signs-inside-the-resumable-upload.md) | --dpop signs inside --resumable-upload, one proof per request (BL-6029) | Accepted | 2026-11-26 |
+| [1427](ADR-1427-cache-dir-refuses-a-path-under-an-existing-file.md) | --cache-dir refuses a path under an existing file (BL-6032) | Accepted | 2026-11-26 |
+| [1428](ADR-1428-the-resumable-upload-creation-request-has-no-body.md) | The resumable upload creation request has no body (BL-6034) | Accepted | 2026-11-26 |
+| [1429](ADR-1429-percent-escapes-in-extension-protocol-urls-become-bytes-and-text-fields-must-be-utf-8.md) | Percent-escapes in extension protocol URLs become bytes, and text fields must be UTF-8 (BL-6030) | Accepted | 2026-11-26 |
+| [1430](ADR-1430-the-schannel-build-matches-other-names-against-name-constraints-as-cryptoapi-does.md) | The Schannel build matches otherNames against name constraints as CryptoAPI does (BL-6011) | Accepted | 2026-11-26 |
+| [1431](ADR-1431-only-a-sha-1-certid-names-a-certificate-in-an-ocsp-response.md) | Only a SHA-1 CertID names a certificate in an OCSP response (BL-6027) | Accepted | 2026-11-26 |
+| [1432](ADR-1432-ocsp-rsassa-pss-signatures-are-verified-with-their-stated-salt-and-mask-hash.md) | OCSP RSASSA-PSS signatures are verified with their stated salt and mask hash (BL-6010) | Accepted | 2026-11-26 |
+| [1433](ADR-1433-closing-an-http-2-connection-waits-at-most-one-second.md) | Closing an HTTP/2 connection waits at most one second (BL-6036) | Accepted | 2026-11-26 |
+| [1434](ADR-1434-a-connect-reply-counts-in-size-header-and-num-headers-for-every-protocol.md) | A CONNECT reply counts in size_header and num_headers for every protocol (BL-6019) | Accepted | 2026-11-26 |
+| [1435](ADR-1435-doh-url-sends-the-a-and-aaaa-queries-on-one-http-2-connection.md) | --doh-url sends the A and AAAA queries on one HTTP/2 connection (BL-6038) | Accepted | 2026-11-26 |
+| [1436](ADR-1436-a-response-body-throws-only-to-its-reader.md) | A response body throws only to its reader (BL-6054) | Accepted | 2026-11-26 |
+| [1437](ADR-1437-the-schannel-build-matches-empty-and-at-rfc822name-constraints-against-the-end-of-the-name.md) | The Schannel build matches empty and `@` rfc822Name constraints against the end of the name (BL-6046) | Accepted | 2026-11-26 |
+| [1438](ADR-1438-cert-status-refuses-a-not-yet-valid-delegated-ocsp-responder.md) | `--cert-status` refuses a not-yet-valid delegated OCSP responder; the Schannel revocation checks accept it (BL-6037) | Accepted | 2026-11-26 |
+| [1439](ADR-1439-dpop-signs-inside-every-request-changing-hook.md) | --dpop signs inside every hook that repeats or changes a request (BL-6042) | Accepted | 2026-11-26 |
+| [1440](ADR-1440-the-empty-probe-of-an-ietf-append-says-the-upload-is-incomplete.md) | The empty probe of an IETF append says the upload is incomplete (BL-6044) | Accepted | 2026-11-26 |
+| [1441](ADR-1441-doh-url-keeps-its-connections-for-later-queries.md) | --doh-url keeps its connections for later queries (BL-6051) | Accepted | 2026-11-26 |
+| [1442](ADR-1442-the-openssl-build-checks-other-names-against-name-constraints-as-openssl-does.md) | The OpenSSL build checks otherNames against name constraints as OpenSSL does (BL-6047) | Accepted | 2026-11-26 |
+| [1443](ADR-1443-nuget-org-packages-are-published-with-trusted-publishing.md) | Every numbered tag publishes its packages to nuget.org with Trusted Publishing, as Surl does (BL-2393) | Accepted | 2026-11-26 |
+| [1444](ADR-1444-transfers-behind-a-fatally-failed-z-telnet-session.md) | -Z reports the transfers behind a fatally failed telnet session as curl does (BL-6035) | Accepted | 2026-11-26 |
+| [1445](ADR-1445-an-upload-keeps-an-s3-or-gs-bucket-name-as-typed.md) | An upload keeps an s3 or gs bucket name as typed (BL-6031) | Accepted | 2026-11-26 |
+| [1450](ADR-1450-an-unsupported-constraint-type-under-a-root-anchor-is-verify-result-51.md) | The OpenSSL build answers 51 for an unsupported name constraint type under a root anchor (BL-6059) | Accepted | 2026-11-26 |
+| [1446](ADR-1446-a-chain-build-that-throws-for-openssl-error-1-is-verify-result-1.md) | A chain build that .NET ends with an exception for OpenSSL error 1 is a refused chain with verify result 1 (BL-6061) | Accepted | 2026-11-26 |
+| [1447](ADR-1447-the-remaining-extension-protocols-refuse-url-escapes-that-are-not-utf-8.md) | The remaining extension protocols refuse URL escapes that are not valid UTF-8 (BL-6045) | Accepted | 2026-11-26 |
+| [1448](ADR-1448-whoever-builds-the-transports-disposes-the-doh-url-resolver.md) | Whoever builds the transports disposes the --doh-url resolver (BL-6057) | Accepted | 2026-11-26 |
+| [1449](ADR-1449-corrupt-deflate-data-is-named-with-zlibs-own-text.md) | Corrupt deflate data is named with zlib's own text (BL-6018) | Accepted | 2026-11-26 |
+| [1451](ADR-1451-the-openssl-build-matches-rfc822name-constraints-as-openssls-nc-email-does.md) | The OpenSSL build matches rfc822Name constraints as OpenSSL's `nc_email` does (BL-6054) | Accepted | 2026-11-26 |
+| [1452](ADR-1452-an-sslstream-handshake-that-throws-for-openssl-error-1-is-verify-result-1.md) | An SslStream handshake that throws for OpenSSL error 1 is exit 60 with verify result 1; under -k it stays exit 35 until a redial (BL-6063) | Accepted | 2026-11-26 |

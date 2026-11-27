@@ -13,7 +13,9 @@ public sealed class Cgr286Tests
     public async Task ResolveAsync_TwoNames_TakesOneConnectionIdForEachQueryRunningAtOnceOnly()
     {
         long taken = 0;
-        var resolver = new DohDnsResolver(new FakeConnector(), new Uri("http://127.0.0.1:21800/dns-query")) { TakeConnectionId = () => taken++ };
+        byte[] empty = [.. "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8];
+        var connector = new TurnTakingConnector(null, [empty, empty], [empty, empty]);
+        var resolver = new DohDnsResolver(connector, new Uri("http://127.0.0.1:21800/dns-query")) { TakeConnectionId = () => taken++ };
 
         await resolver.ResolveAsync("foo.test", CancellationToken.None);
         await resolver.ResolveAsync("bar.test", CancellationToken.None);

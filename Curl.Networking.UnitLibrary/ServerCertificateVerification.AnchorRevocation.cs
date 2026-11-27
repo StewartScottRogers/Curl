@@ -120,17 +120,26 @@ internal sealed partial class ServerCertificateVerification
     private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget) =>
         OcspRevocationOf(certificate, issuer, budget) ?? ListRevocationOf(certificate, issuer, budget);
 
+    // CryptoAPI stops at the first usable list: a later address, in the same point (STD-206) or a later
+    // one (STD-163), is never asked, so its answer cannot overrule it. An expired list is not usable, yet
+    // CryptoAPI still reports the certificate revoked when it lists it and no usable list is found (STD-216).
     private BelowAnchorRevocation ListRevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        // CryptoAPI stops at the first usable list: a later address, in the same point (STD-206) or a later
-        // one (STD-163), is never asked, so its answer cannot overrule it.
-        var first = CrlDistributionPointUris(certificate)
-            .Select(uri => UsableRevocationList(uri, certificate, issuer, budget))
-            .OfType<CertificateRevocationList>()
-            .FirstOrDefault();
-        return first is null
-            ? BelowAnchorRevocation.Unresolved
-            : first.Revokes(certificate) ? RevokedUnlessDeltaReleases(first, certificate, issuer, budget) : DeltaRevocationOf(first, certificate, issuer, budget);
+        var listedOnAnExpiredList = false;
+        var lists = CrlDistributionPointUris(certificate)
+            .Select(uri => ApplicableRevocationList(uri, certificate, issuer, budget))
+            .OfType<CertificateRevocationList>();
+        foreach (var list in lists)
+        {
+            if (list.IsUnexpiredAt(timeProvider.GetUtcNow()))
+            {
+                return list.Revokes(certificate) ? RevokedUnlessDeltaReleases(list, certificate, issuer, budget) : DeltaRevocationOf(list, certificate, issuer, budget);
+            }
+
+            listedOnAnExpiredList |= list.Revokes(certificate);
+        }
+
+        return listedOnAnExpiredList ? BelowAnchorRevocation.Revoked : BelowAnchorRevocation.Unresolved;
     }
 
     // The delta lists a base list or the certificate points to through freshestCRL (RFC 5280, 5.2.6): each
@@ -181,12 +190,12 @@ internal sealed partial class ServerCertificateVerification
             .ToArray();
     }
 
-    // A list is usable when it decodes, is the issuer's, is signed by the issuer, has not expired and covers the certificate.
-    private CertificateRevocationList? UsableRevocationList(Uri uri, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
+    // A list applies when it decodes, is the issuer's, is signed by the issuer and covers the certificate; it may have expired.
+    private CertificateRevocationList? ApplicableRevocationList(Uri uri, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
         var der = TryFetchRevocationList(uri, budget);
         var list = der is null ? null : DecodeOrNothing(der);
-        return list is not null && IsCurrentListOf(list, certificate, issuer, uri) ? list : null;
+        return list is not null && IsListFor(list, certificate, issuer, uri) ? list : null;
     }
 
     private byte[]? TryFetchRevocationList(Uri uri, CancellationToken budget) => TryFetch(FetchRevocationList, "CRL", uri, budget);
@@ -210,8 +219,8 @@ internal sealed partial class ServerCertificateVerification
         }
     }
 
-    private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer, Uri uri) =>
-        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.IsUnexpiredAt(timeProvider.GetUtcNow()) && list.CoversScopeOf(certificate, uri);
+    private static bool IsListFor(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer, Uri uri) =>
+        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.CoversScopeOf(certificate, uri);
 
     // A list served as DER or as PEM text (curl accepts both); PEM armour is stripped before decoding.
     internal static CertificateRevocationList? DecodeOrNothing(byte[] body)

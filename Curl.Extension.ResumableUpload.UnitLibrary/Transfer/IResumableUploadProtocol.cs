@@ -22,6 +22,14 @@ internal interface IResumableUploadProtocol
     /// <returns>The fields.</returns>
     IReadOnlyList<KeyValuePair<string, string>> AppendHeaders(long offset);
 
+    /// <summary>
+    /// Gives the header fields of the append's empty authentication probe, which curl's handler may send before the content
+    /// for <c>--digest</c> or <c>--ntlm</c>: fields a server can accept with no content without completing the upload.
+    /// </summary>
+    /// <param name="offset">Where the appended content starts.</param>
+    /// <returns>The fields.</returns>
+    IReadOnlyList<KeyValuePair<string, string>> AppendProbeHeaders(long offset);
+
     /// <summary>Reads the offset an offset retrieval response gives.</summary>
     /// <param name="response">The response.</param>
     /// <param name="offset">The offset, when there is a valid one.</param>

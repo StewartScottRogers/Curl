@@ -5,7 +5,8 @@ namespace Curl.Extension.ResumableUpload.Transfer;
 /// <summary>
 /// draft-ietf-httpbis-resumable-upload: upload creation with <c>Upload-Complete: ?0</c> and <c>Upload-Length</c>, upload
 /// append (<c>PATCH</c>, <c>Content-Type: application/partial-upload</c>, <c>Upload-Offset</c>, <c>Upload-Complete: ?1</c>)
-/// and offset retrieval (<c>HEAD</c>), every request with <c>Upload-Draft-Interop-Version</c>.
+/// and offset retrieval (<c>HEAD</c>), every request with <c>Upload-Draft-Interop-Version</c>. An empty authentication
+/// probe of an append says <c>Upload-Complete: ?0</c>, so it completes nothing (ADR-1440).
 /// </summary>
 /// <param name="creationMethod">The method curl's options give the transfer: <c>PUT</c> for <c>-T</c>, or <c>-X</c>'s.</param>
 internal sealed class IetfUploadProtocol(string creationMethod) : IResumableUploadProtocol
@@ -27,15 +28,20 @@ internal sealed class IetfUploadProtocol(string creationMethod) : IResumableUplo
         [Interop, new(IetfUploadCompleteField.Name, IetfUploadCompleteField.Format(false)), new(IetfUploadLengthField.Name, IetfUploadLengthField.Format(length))];
 
     /// <inheritdoc />
-    public IReadOnlyList<KeyValuePair<string, string>> AppendHeaders(long offset) =>
-    [
-        Interop,
-        new(IetfUploadCompleteField.Name, IetfUploadCompleteField.Format(true)),
-        new(IetfUploadOffsetField.Name, IetfUploadOffsetField.Format(offset)),
-        new("Content-Type", ResumableUploadMediaTypes.PartialUpload),
-    ];
+    public IReadOnlyList<KeyValuePair<string, string>> AppendHeaders(long offset) => PartialUploadHeaders(offset, complete: true);
+
+    /// <inheritdoc />
+    public IReadOnlyList<KeyValuePair<string, string>> AppendProbeHeaders(long offset) => PartialUploadHeaders(offset, complete: false);
 
     /// <inheritdoc />
     public bool TryReadOffset(ResumableUploadExchange response, out long offset) =>
         IetfUploadOffsetField.TryParse(response.FindHeader(IetfUploadOffsetField.Name), out offset);
+
+    private static IReadOnlyList<KeyValuePair<string, string>> PartialUploadHeaders(long offset, bool complete) =>
+    [
+        Interop,
+        new(IetfUploadCompleteField.Name, IetfUploadCompleteField.Format(complete)),
+        new(IetfUploadOffsetField.Name, IetfUploadOffsetField.Format(offset)),
+        new("Content-Type", ResumableUploadMediaTypes.PartialUpload),
+    ];
 }

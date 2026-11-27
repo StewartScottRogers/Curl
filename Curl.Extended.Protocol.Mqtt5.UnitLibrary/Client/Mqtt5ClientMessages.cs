@@ -9,6 +9,9 @@ internal static class Mqtt5ClientMessages
     /// <summary>curl's text for a URL whose path names no topic.</summary>
     internal const string NoTopic = "No MQTT topic found. Forgot to URL encode it?";
 
+    /// <summary>The URL's topic decodes to bytes that are not valid UTF-8.</summary>
+    internal const string TopicNotUtf8 = "The MQTT topic in the URL is not valid UTF-8";
+
     /// <summary>curl's text for the peer closing the connection while a packet is awaited.</summary>
     internal const string ConnectionDisconnected = "Connection disconnected";
 

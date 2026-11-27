@@ -255,7 +255,11 @@ the running transfers finish. As curl 8.22.0 sets up `--parallel-max` plus one t
 performs any, `ParallelRun` holds that first batch unstarted, opening each `-T` file as it is held; a
 setup failure among them abandons the batch, nothing starts and each held transfer is reported with
 the failure's code, while a URL past it that is not a well-formed glob is taken as written and the run
-carries on with the glob's exit code (CGR-170, ADR-0954). Each transfer also writes standard output through a
+carries on with the glob's exit code (CGR-170, ADR-0954). A `telnet` transfer holds back every later
+start until its session ends, as curl runs the whole session inside one call of its loop (ADR-1420);
+when that session fails fatally in the first batch, a lone transfer waiting within `--parallel-max` is
+performed and reported as exit 42, two or more are reported as 42 unstarted, those past the limit get
+the session's code, and nothing past the batch starts (ADR-1444). Each transfer also writes standard output through a
 `StandardOutputFailureDeferringStream` of its own (`RunningTransferState.StandardOutput`), so a write
 failure ends only the transfer whose write failed with exit 23, and the others' bodies and `-w` text
 still reach standard output (BL-773). Without `-Z` nothing changes: every transfer shares the run's one.
@@ -442,7 +446,9 @@ Under `-v`, `--trace` or `--trace-ascii` every transfer's context carries the ru
 as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s
 `VerboseTransferEventWriter` on standard error, with no `[N bytes data]` lines when standard
 output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `--trace-time`, into
-the named file (opened once per run, truncated), standard output for `-`, standard error for `%`,
+the named file (`TraceFileOpenedOnFirstWriteStream`: opened and truncated once per run, at the first
+trace event, so a run that fails before one leaves no file, except a trace file that is also a `-T`
+value, opened up front, ADR-1425), standard output for `-`, standard error for `%`,
 and standard error, with no warning, for a file that cannot be opened. On Windows each is text
 mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). A transfer URL curl's parser rejects is
 reported to the transfer's events before connecting as the info line `URL rejected: <reason>`,

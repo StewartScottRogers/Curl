@@ -318,8 +318,9 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
         return Convert.FromHexString(header + HttpsQuestion + string.Concat(answers));
     }
 
+    // Closes its connection, so each query these tests pin is on a connection of its own.
     private static byte[] Ok(byte[] answer) =>
-        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
+        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
 
     // The curl_easy_strerror texts of curl 8.22.0 for the codes these lines carry.
     private static string DescribeExitCode(CurlExitCode exitCode) => exitCode switch

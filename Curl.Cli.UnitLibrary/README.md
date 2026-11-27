@@ -52,7 +52,7 @@ and `MaxTime` among them.
 | `QueryUrl` | Appends the `-G` body, or else the `--url-query` values, to a URL as curl 8.21.0 does. Pure string work; the URL layer parses and validates the result. |
 | `UrlEncodedContent` | Escapes `--data-urlencode` and `--url-query` content as `curl_easy_escape` does, a space written as `+`. |
 | `UploadUrl` | Completes the URL of a `-T`/`--upload-file` transfer: when the URL path names no file, appends the local file's base name the way curl's `add_file_name_to_url` does (ADR-0004). Pure string work; never reads the file system. |
-| `UploadTransferUrl` | Resolves the URL a `-T` transfer is sent to: appends the file name with `UploadUrl`, parses the result with `CurlUrl` and writes it back out normalised, or fails for exit 3 (ADR-0051). Reads no file. |
+| `UploadTransferUrl` | Resolves the URL a `-T` transfer is sent to: appends the file name with `UploadUrl`, parses the result with `CurlUrl` and writes it back out normalised (an `s3` or `gs` bucket name stays as typed), or fails for exit 3 (ADR-0051). Reads no file. |
 
 ## How they connect
 

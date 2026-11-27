@@ -114,6 +114,7 @@ public sealed class TcpConnectorShuffledResolverTests
     private static byte[] DohPost(byte[] query) =>
         [.. Encoding.Latin1.GetBytes($"POST /dns-query HTTP/1.1\r\nHost: 127.0.0.1:41444\r\nAccept: */*\r\nContent-Type: application/dns-message\r\nContent-Length: {query.Length}\r\n\r\n"), .. query];
 
+    // Closes its connection, so each query is on a connection of its own.
     private static byte[] Ok(byte[] answer) =>
-        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
+        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/dns-message\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
 }

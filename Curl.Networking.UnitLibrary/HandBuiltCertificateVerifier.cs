@@ -142,7 +142,7 @@ internal sealed class HandBuiltCertificateVerifier(
         }
 
         chain.ChainPolicy.ExtraStore.AddRange(sent.Skip(1).ToArray());
-        var errors = chain.Build(sent[0]) ? SslPolicyErrors.None : SslPolicyErrors.RemoteCertificateChainErrors;
+        var errors = CertificateChainBuild.Build(chain, sent[0]) ? SslPolicyErrors.None : SslPolicyErrors.RemoteCertificateChainErrors;
         return MatchesAsCurlDoes(sent[0], SslStreamTlsProvider.VerifiedHostName(targetHost, insecure: false)!)
             ? errors
             : errors | SslPolicyErrors.RemoteCertificateNameMismatch;

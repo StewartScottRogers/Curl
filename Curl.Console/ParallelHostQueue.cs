@@ -95,6 +95,19 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     }
 
     /// <summary>
+    /// Notes the end of a transfer that never counted at a host, one curl fails before it looks for a connection:
+    /// frees the transfers waiting for a host's first transfer to end (CGR-172, BL-6040), for
+    /// <see cref="StartReleased" /> to start.
+    /// </summary>
+    internal void EndWithoutHost()
+    {
+        lock (hosts)
+        {
+            FreeWaitersForFirstToEnd();
+        }
+    }
+
+    /// <summary>
     /// Frees the transfers still waiting for another host's first transfer to end: curl 8.22.0 retries its
     /// pending transfers whenever any transfer ends, at any host or with a failed connect, and by then that
     /// host's first connection shows it does not multiplex, so the retried transfer opens a connection of its

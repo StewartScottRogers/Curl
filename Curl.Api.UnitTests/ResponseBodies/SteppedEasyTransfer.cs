@@ -23,6 +23,7 @@ internal sealed class SteppedEasyTransfer : IEasyTransfer
     private readonly Channel<object> _steps = Channel.CreateUnbounded<object>();
     private readonly SemaphoreSlim _resumed = new(0);
     private readonly TaskCompletionSource _paused = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _pauseThrew = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public EasyOptions Options { get; set; } = new();
 
@@ -55,6 +56,15 @@ internal sealed class SteppedEasyTransfer : IEasyTransfer
 
     public void Finish(CurlCode result) => _steps.Writer.TryWrite(result);
 
+    /// <summary>Makes the running perform throw <paramref name="exception"/>.</summary>
+    public void Fault(Exception exception) => _steps.Writer.TryWrite(exception);
+
+    /// <summary>What <see cref="Pause"/> throws, when set.</summary>
+    public Exception? PauseThrows { get; set; }
+
+    /// <summary>Completes the first time <see cref="Pause"/> throws <see cref="PauseThrows"/>.</summary>
+    public Task PauseThrew => _pauseThrew.Task;
+
     public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
     {
         PerformedToken = cancellationToken;
@@ -86,6 +96,11 @@ internal sealed class SteppedEasyTransfer : IEasyTransfer
                 return result;
             }
 
+            if (step is Exception fault)
+            {
+                throw fault;
+            }
+
             byte[] chunk = (byte[])step;
             long taken;
             while ((taken = Options.Callbacks.Write!(chunk)) == WriteCallbackResult.Pause)
@@ -104,6 +119,12 @@ internal sealed class SteppedEasyTransfer : IEasyTransfer
 
     public CurlCode Pause(CurlPause directions)
     {
+        if (PauseThrows is not null)
+        {
+            _pauseThrew.TrySetResult();
+            throw PauseThrows;
+        }
+
         if (directions == CurlPause.Continue)
         {
             ResumeCount++;

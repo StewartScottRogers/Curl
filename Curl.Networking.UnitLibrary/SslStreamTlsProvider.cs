@@ -542,6 +542,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         clientCertificate?.Dispose();
         await DisposeAfterFailedHandshakeAsync(sslStream, plaintext).ConfigureAwait(false);
         RethrowIfCancellation(failure);
+        (peerVerification, verificationFailure) = JudgeFailedHandshake(failure, peerVerification, verificationFailure);
         peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
         ReportFailedHandshake(
             events, judgedHandshake, verificationFailure.HasValue, peerVerification, peerCertificates, isProxy, targetHost);
@@ -550,6 +551,26 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return SchannelFailureEcho.Report(events, _matchesSchannelBuild, verificationFailure is { } rejected
             ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure)));
+    }
+
+    // What a failed handshake says about the certificate: what the callbacks observed, except
+    // when .NET on Linux threw from its own chain build for OpenSSL's error 1, before the
+    // validation callback (ADR-1452). The OpenSSL build refuses that as verify result 1. Under -k
+    // SslStream has no handshake left to go on with, so only the verify result is added and the
+    // connect error stands.
+    private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Refusal) JudgeFailedHandshake(
+        Exception failure,
+        PeerVerification observed,
+        (CurlExitCode ExitCode, string Message)? refusal)
+    {
+        if (_matchesSchannelBuild || !CertificateChainBuild.EndedHandshakeAsUnspecified(failure))
+        {
+            return (observed, refusal);
+        }
+
+        return (
+            new PeerVerification(false, OpenSslVerifyResult.Unspecified, []),
+            _options.Insecure ? null : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslUnspecifiedVerificationRefusal));
     }
 
     /// <summary>
@@ -575,7 +596,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CertificateRevocationListFile? revocationLists)
     {
         using var chain = new X509Chain { ChainPolicy = chainPolicy };
-        var errors = chain.Build(X509CertificateLoader.LoadCertificate(remote.GetRawCertData()))
+        var errors = CertificateChainBuild.Build(chain, X509CertificateLoader.LoadCertificate(remote.GetRawCertData()))
             ? SslPolicyErrors.None
             : SslPolicyErrors.RemoteCertificateChainErrors;
         var peerCertificates = ListPeerCertificates(remote, chain);

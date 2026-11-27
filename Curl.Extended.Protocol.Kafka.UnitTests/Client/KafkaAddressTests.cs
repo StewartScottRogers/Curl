@@ -23,6 +23,7 @@ public sealed class KafkaAddressTests
     [DataRow("kafka://b/t?offset=", KafkaClientMessages.BadQuery)]
     [DataRow("kafka://b/t?offset=-5", KafkaClientMessages.BadQuery)]
     [DataRow("kafka://b/t?from=5", KafkaClientMessages.BadQuery)]
+    [DataRow("kafka://b/t%E9", "The Kafka topic in the URL is not valid UTF-8")]
     public void Parse_Malformed_ThrowsUrlMalformat(string url, string message)
     {
         KafkaClientException thrown = Assert.ThrowsExactly<KafkaClientException>(() => KafkaAddress.Parse(CurlUrl.Parse(url)));

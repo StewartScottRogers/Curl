@@ -454,6 +454,49 @@ internal static class HttpTransferMessages
     internal const string InvalidCodeLengthsSet = "Error while processing content unencoding: invalid code lengths set";
 
     /// <summary>
+    /// The exit 61 message for a dynamic block whose code lengths repeat a length before the
+    /// first, or run past the symbol counts: zlib's text (STD-208, BL-6018).
+    /// </summary>
+    internal const string InvalidBitLengthRepeat = "Error while processing content unencoding: invalid bit length repeat";
+
+    /// <summary>
+    /// The exit 61 message for a dynamic block that gives the end-of-block symbol no code: zlib's
+    /// text (STD-208, BL-6018).
+    /// </summary>
+    internal const string MissingEndOfBlock = "Error while processing content unencoding: invalid code -- missing end-of-block";
+
+    /// <summary>
+    /// The exit 61 message for a dynamic block whose literal/length code is over-subscribed or
+    /// incomplete: zlib's text (STD-208, BL-6018).
+    /// </summary>
+    internal const string InvalidLiteralLengthsSet = "Error while processing content unencoding: invalid literal/lengths set";
+
+    /// <summary>
+    /// The exit 61 message for a dynamic block whose distance code is over-subscribed or
+    /// incomplete: zlib's text (STD-208, BL-6018).
+    /// </summary>
+    internal const string InvalidDistancesSet = "Error while processing content unencoding: invalid distances set";
+
+    /// <summary>
+    /// The exit 61 message for compressed data that reads a literal/length code no symbol has:
+    /// zlib's text (STD-208, BL-6018).
+    /// </summary>
+    internal const string InvalidLiteralLengthCode = "Error while processing content unencoding: invalid literal/length code";
+
+    /// <summary>
+    /// The exit 61 message for compressed data that reads a distance code no symbol has: zlib's
+    /// text (STD-208, BL-6018).
+    /// </summary>
+    internal const string InvalidDistanceCode = "Error while processing content unencoding: invalid distance code";
+
+    /// <summary>
+    /// The exit 61 message for compressed data that copies from further back than it has
+    /// decoded: zlib's text, what curl 8.22.0 and 8.18.0 say for a corrupt raw deflate body
+    /// (STD-208, BL-6018).
+    /// </summary>
+    internal const string InvalidDistanceTooFarBack = "Error while processing content unencoding: invalid distance too far back";
+
+    /// <summary>
     /// The exit 61 message for a gzip member whose CRC-32, or a zlib stream whose Adler-32,
     /// does not match the bytes it decoded to: zlib's text (CGR-071, BL-3600).
     /// </summary>

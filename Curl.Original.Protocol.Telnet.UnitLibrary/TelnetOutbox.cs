@@ -20,17 +20,34 @@ internal sealed class TelnetOutbox(ITransferEvents events, bool runsOnWindows)
 
     private bool writeFailed;
 
+    private bool uploadSent;
+
+    private bool sentSinceDataWritten;
+
     /// <summary>
     /// Tells whether a connection read that fails now is a receive failure. On Linux and
-    /// macOS every failed read is one (BL-5918, ADR-1382). On Windows only a read that
-    /// struck the option negotiation is, as the session lost what the server sent: a reply
+    /// macOS every failed read is one (BL-5918, ADR-1382). On Windows a read is one when it
+    /// struck the option negotiation, as the session lost what the server sent: a reply
     /// the connection did not take, or replies sent while no data has been written yet
-    /// (BL-5882, ADR-1352).
+    /// (BL-5882, ADR-1352). It is also one when it struck an upload the server had yet to
+    /// answer: upload bytes have been sent in this session, and a reply or upload bytes
+    /// have gone out since data was last written (BL-6012, ADR-1418).
     /// </summary>
     /// <param name="bytesWritten">The bytes written to the output so far.</param>
     /// <returns><see langword="true" /> when the failed read is a receive failure.</returns>
     public bool FailedReadIsReceiveError(long bytesWritten) =>
-        !runsOnWindows || writeFailed || (writeTried && bytesWritten == 0);
+        !runsOnWindows || writeFailed || (writeTried && bytesWritten == 0) || (uploadSent && sentSinceDataWritten);
+
+    /// <summary>Notes that a buffer of the upload is being sent to the server.</summary>
+    public void NoteUploadSent()
+    {
+        uploadSent = true;
+        sentSinceDataWritten = true;
+    }
+
+    /// <summary>Notes how many bytes of one read's data were written to the output.</summary>
+    /// <param name="count">The bytes written; 0 for a read that held no data.</param>
+    public void NoteDataWritten(int count) => sentSinceDataWritten &= count == 0;
 
     /// <summary>Queues an information line.</summary>
     /// <param name="text">The line.</param>
@@ -78,6 +95,7 @@ internal sealed class TelnetOutbox(ITransferEvents events, bool runsOnWindows)
             }
 
             writeTried = true;
+            sentSinceDataWritten = true;
             if (await trySend(reply).ConfigureAwait(false) is { } failure)
             {
                 writeFailed = true;

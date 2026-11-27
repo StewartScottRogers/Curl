@@ -47,7 +47,7 @@ public sealed class OcspStapleVerifierTests
     }
 
     [TestMethod]
-    public void AResponseWithAVersionAndExtensionsAndAnSha256CertIdPasses()
+    public void AResponseWithAVersionAndExtensionsPasses()
     {
         using OcspTestPki pki = new();
         OcspResponseBuilder response = pki.Response(Now) with
@@ -56,14 +56,27 @@ public sealed class OcspStapleVerifierTests
             IncludeResponseExtensions = true,
             IncludeSingleExtensions = true,
             NextUpdateOffset = null,
-            CertIdHashOid = OcspResponseBuilder.Sha256Oid,
         };
-        Diagnostics.Arrange("response", "with a version, response and single extensions, no nextUpdate, a SHA-256 CertID");
+        Diagnostics.Arrange("response", "with a version, response and single extensions, no nextUpdate");
 
         OcspStapleStatus status = Verify(pki, response).Status;
 
         Diagnostics.Assert("status", OcspStapleStatus.Good, status);
         Assert.AreEqual(OcspStapleStatus.Good, status);
+    }
+
+    [TestMethod]
+    [DataRow(OcspStapleStatus.Good)]
+    [DataRow(OcspStapleStatus.Revoked)]
+    public void AnSha256CertIdDoesNotNameTheCertificate(OcspStapleStatus certStatus)
+    {
+        using OcspTestPki pki = new();
+        Diagnostics.Arrange("response", $"{certStatus}, identifying the certificate by a SHA-256 CertID");
+
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { CertStatus = certStatus, CertIdHashOid = OcspResponseBuilder.Sha256Oid }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.CertificateNotFound, status);
+        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, status);
     }
 
     [TestMethod]
@@ -369,6 +382,74 @@ public sealed class OcspStapleVerifierTests
         using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using X509Certificate2 responder = pki.IssueResponder(responderKey, "1.3.6.1.5.5.7.3.1", OcspTestPki.OcspSigningOid);
         Diagnostics.Arrange("responder", "issued by the CA for serverAuth and OCSPSigning");
+
+        OcspStapleStatus status = Verify(pki, Delegated(pki, responder, responderKey)).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Good, status);
+        Assert.AreEqual(OcspStapleStatus.Good, status);
+    }
+
+    [TestMethod]
+    [DataRow(-2880, OcspStapleStatus.ResponderNotAuthorised)]
+    [DataRow(-1, OcspStapleStatus.ResponderNotAuthorised)]
+    [DataRow(0, OcspStapleStatus.Good)]
+    public void ADelegatedResponderIsAuthorisedOnlyUntilItsNotAfter(int notAfterSecondsFromNow, OcspStapleStatus expected)
+    {
+        using OcspTestPki pki = new();
+        using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using X509Certificate2 responder = pki.IssueResponderValid(responderKey, Now.AddDays(-30), Now.AddSeconds(notAfterSecondsFromNow));
+        Diagnostics.Arrange("responder's notAfter", $"{notAfterSecondsFromNow} seconds from now");
+
+        OcspStapleStatus status = Verify(pki, Delegated(pki, responder, responderKey)).Status;
+
+        Diagnostics.Assert("status", expected, status);
+        Assert.AreEqual(expected, status);
+    }
+
+    [TestMethod]
+    [DataRow(172800, OcspStapleStatus.ResponderNotAuthorised)]
+    [DataRow(1, OcspStapleStatus.ResponderNotAuthorised)]
+    [DataRow(0, OcspStapleStatus.Good)]
+    public void ADelegatedResponderIsAuthorisedForCertStatusOnlyFromItsNotBefore(int notBeforeSecondsFromNow, OcspStapleStatus expected)
+    {
+        using OcspTestPki pki = new();
+        using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using X509Certificate2 responder = pki.IssueResponderValid(responderKey, Now.AddSeconds(notBeforeSecondsFromNow), Now.AddDays(30));
+        Diagnostics.Arrange("responder's notBefore", $"{notBeforeSecondsFromNow} seconds from now");
+
+        OcspStapleStatus status = Verify(pki, Delegated(pki, responder, responderKey)).Status;
+
+        Diagnostics.Assert("status", expected, status);
+        Assert.AreEqual(expected, status);
+    }
+
+    [TestMethod]
+    public void TheSchannelRevocationCheckAcceptsANotYetValidResponderButNoExpiredOne()
+    {
+        using OcspTestPki pki = new();
+        using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using X509Certificate2 notYetValid = pki.IssueResponderValid(responderKey, Now.AddDays(2), Now.AddDays(30));
+        using X509Certificate2 expired = pki.IssueResponderValid(responderKey, Now.AddDays(-30), Now.AddDays(-2));
+        byte[] fromNotYetValid = Delegated(pki, notYetValid, responderKey).Build();
+        byte[] fromExpired = Delegated(pki, expired, responderKey).Build();
+        Diagnostics.Arrange("responders", "not yet valid, and expired");
+
+        OcspStapleStatus notYetValidStatus = OcspStapleVerifier.VerifyForSchannelRevocationCheck(fromNotYetValid, pki.Chain, Now).Status;
+        OcspStapleStatus expiredStatus = OcspStapleVerifier.VerifyForSchannelRevocationCheck(fromExpired, pki.Chain, Now).Status;
+
+        Diagnostics.Assert("not-yet-valid status", OcspStapleStatus.Good, notYetValidStatus);
+        Diagnostics.Assert("expired status", OcspStapleStatus.ResponderNotAuthorised, expiredStatus);
+        Assert.AreEqual(OcspStapleStatus.Good, notYetValidStatus);
+        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, expiredStatus);
+    }
+
+    [TestMethod]
+    public void ADelegatedResponderExpiringAfter2049IsAuthorised()
+    {
+        using OcspTestPki pki = new();
+        using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using X509Certificate2 responder = pki.IssueResponderValid(responderKey, Now.AddDays(-1), new DateTimeOffset(2050, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        Diagnostics.Arrange("responder", "notAfter written as GeneralizedTime");
 
         OcspStapleStatus status = Verify(pki, Delegated(pki, responder, responderKey)).Status;
 

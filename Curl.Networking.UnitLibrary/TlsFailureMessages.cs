@@ -22,6 +22,14 @@ namespace Curl.Networking;
 /// </remarks>
 internal static class TlsFailureMessages
 {
+    private const string UnspecifiedVerifyError = "unspecified certificate verification error (1)";
+
+    /// <summary>
+    /// The OpenSSL build's exit 60 message for a verification that ends with OpenSSL's error 1
+    /// and leaves no certificate to name anything from (ADR-1446, ADR-1452).
+    /// </summary>
+    internal const string OpenSslUnspecifiedVerificationRefusal = "SSL certificate OpenSSL verify result: " + UnspecifiedVerifyError;
+
     /// <summary>
     /// The Schannel build's exit 60 message for a chain that ends in an untrusted root, which
     /// <see cref="SchannelFailureEcho" /> also reports under <c>-v</c> (BL-1323).
@@ -225,6 +233,8 @@ internal static class TlsFailureMessages
         [OpenSslVerifyResult.PermittedSubtreeViolation] = "permitted subtree violation",
         [OpenSslVerifyResult.ExcludedSubtreeViolation] = "excluded subtree violation",
         [OpenSslVerifyResult.UnsupportedNameSyntax] = "unsupported or invalid name syntax",
+        [OpenSslVerifyResult.UnsupportedConstraintType] = "unsupported name constraint type",
+        [OpenSslVerifyResult.Unspecified] = "unspecified certificate verification error",
         [OpenSslVerifyResult.InvalidCaCertificate] = "invalid CA certificate",
     }.ToFrozenDictionary();
 
@@ -437,7 +447,8 @@ internal static class TlsFailureMessages
     /// </remarks>
     public static string OpenSslPeerFailedVerification(SslPolicyErrors errors, X509Chain? chain, string targetHost)
     {
-        if (!errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch))
+        // A chain whose build ended with error 1 holds no certificate to name a mismatch from.
+        if (!errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch) || CertificateChainBuild.EndedAsUnspecified(chain))
         {
             return $"SSL certificate OpenSSL verify result: {OpenSslVerifyError(chain)}";
         }
@@ -918,13 +929,16 @@ internal static class TlsFailureMessages
         $"failed setting TLS 1.3 cipher suite: {tls13Ciphers}";
 
     // OpenSSL reports a failed trust before a failed validity period.
-    private static string OpenSslVerifyError(X509Chain? chain)
-    {
-        if (chain is null || chain.ChainElements.Count == 0)
-        {
-            return "unable to get local issuer certificate (20)";
-        }
+    private static string OpenSslVerifyError(X509Chain? chain) =>
+        chain is { ChainElements.Count: > 0 } ? OpenSslBuiltChainError(chain) : OpenSslEmptyChainError(chain);
 
+    private static string OpenSslEmptyChainError(X509Chain? chain) =>
+        CertificateChainBuild.EndedAsUnspecified(chain)
+            ? UnspecifiedVerifyError
+            : "unable to get local issuer certificate (20)";
+
+    private static string OpenSslBuiltChainError(X509Chain chain)
+    {
         var status = OpenSslVerifyResult.StatusOf(chain);
         if (RefusesPurposeOfATrustedChain(status, chain))
         {

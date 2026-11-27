@@ -16,7 +16,8 @@ internal static class OpenSslVerifyResult
 
     /// <summary>
     /// <c>X509_V_ERR_UNSPECIFIED</c>: what curl's OpenSSL build reports once its own host name
-    /// check refused a certificate, whatever the chain's code (measured 2026-09-30, BL-661).
+    /// check refused a certificate, whatever the chain's code (measured 2026-09-30, BL-661), and OpenSSL's own
+    /// refusal under a name constraint it cannot decode (BL-6047).
     /// </summary>
     internal const long Unspecified = 1;
 
@@ -56,6 +57,9 @@ internal static class OpenSslVerifyResult
     /// <summary><c>X509_V_ERR_EXCLUDED_VIOLATION</c>.</summary>
     internal const long ExcludedSubtreeViolation = 48;
 
+    /// <summary><c>X509_V_ERR_UNSUPPORTED_CONSTRAINT_TYPE</c>.</summary>
+    internal const long UnsupportedConstraintType = 51;
+
     /// <summary><c>X509_V_ERR_UNSUPPORTED_NAME_SYNTAX</c>.</summary>
     internal const long UnsupportedNameSyntax = 53;
 
@@ -75,7 +79,13 @@ internal static class OpenSslVerifyResult
     internal const long UnableToGetIssuerCertificateLocally = 20;
 
     private const X509ChainStatusFlags NameConstraintFlags = X509ChainStatusFlags.HasNotPermittedNameConstraint
-        | X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.HasNotSupportedNameConstraint;
+        | X509ChainStatusFlags.HasExcludedNameConstraint | X509ChainStatusFlags.HasNotSupportedNameConstraint
+        | UnsupportedConstraintTypeFlag | UnspecifiedErrorFlag;
+
+    // Refusals no X509ChainStatusFlags value stands for: only CertificateNameConstraints gives them.
+    private const X509ChainStatusFlags UnsupportedConstraintTypeFlag = (X509ChainStatusFlags)CertificateNameConstraints.UnsupportedConstraintType;
+
+    private const X509ChainStatusFlags UnspecifiedErrorFlag = (X509ChainStatusFlags)CertificateNameConstraints.UnspecifiedError;
 
     private const X509ChainStatusFlags RefusedSubtreeFlags =
         X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.HasExcludedNameConstraint;
@@ -109,7 +119,7 @@ internal static class OpenSslVerifyResult
 
         if (chain is null || chain.ChainElements.Count == 0)
         {
-            return null;
+            return CertificateChainBuild.EndedAsUnspecified(chain) ? Unspecified : null;
         }
 
         var status = StatusOf(chain);
@@ -146,18 +156,30 @@ internal static class OpenSslVerifyResult
     /// OpenSSL stops at the first name it refuses, but a platform chain engine keeps no order among the
     /// refusals it flags and may flag another one than OpenSSL's. A chain flagged with a subtree refusal
     /// (47 or 48) is given the flag for the refusal OpenSSL meets first in place of every
-    /// name-constraint flag (BL-5953, BL-5954).
+    /// name-constraint flag (BL-5953, BL-5954). A chain flagged only
+    /// <see cref="X509ChainStatusFlags.HasNotSupportedNameConstraint" />, which stands for several OpenSSL
+    /// errors, is given 51's flag instead when that first refusal is an unsupported constraint type
+    /// (BL-6059).
     /// </summary>
     /// <param name="status">Every status flag of the chain, combined.</param>
     /// <param name="chain">The chain built for the server certificate.</param>
     /// <returns>
-    /// The status with one name-constraint flag, or unchanged when no subtree refusal is flagged or
-    /// <see cref="CertificateNameConstraints.FindViolation(X509Chain, bool)" /> finds no violation.
+    /// The status with one name-constraint flag; or unchanged when no subtree or unsupported-constraint
+    /// refusal is flagged, when <see cref="CertificateNameConstraints.FindViolation(X509Chain, bool)" />
+    /// finds no violation, or when no subtree refusal is flagged and it finds another violation than an
+    /// unsupported constraint type.
     /// </returns>
-    internal static X509ChainStatusFlags KeepFirstNameConstraintRefusal(X509ChainStatusFlags status, X509Chain chain) =>
-        (status & RefusedSubtreeFlags) == 0
-            ? status
-            : WithNameConstraintViolation(status, CertificateNameConstraints.FindViolation(chain), replacesPartialChain: false);
+    internal static X509ChainStatusFlags KeepFirstNameConstraintRefusal(X509ChainStatusFlags status, X509Chain chain)
+    {
+        if ((status & (RefusedSubtreeFlags | X509ChainStatusFlags.HasNotSupportedNameConstraint)) == 0)
+        {
+            return status;
+        }
+
+        var violation = CertificateNameConstraints.FindViolation(chain);
+        var replacesFlags = (status & RefusedSubtreeFlags) != 0 || violation == CertificateNameConstraints.UnsupportedConstraintType;
+        return replacesFlags ? WithNameConstraintViolation(status, violation, replacesPartialChain: false) : status;
+    }
 
     /// <summary>
     /// Replaces a chain's name-constraint flags with the one violation OpenSSL reports.
@@ -225,11 +247,13 @@ internal static class OpenSslVerifyResult
     /// root, before it checks validity dates: its <c>check_chain_extensions</c> finds an issuer
     /// that may not act as a CA (79) or whose path length is exceeded (25), then
     /// <c>check_name_constraints</c> a name outside a permitted subtree (47), inside an excluded one
-    /// (48) or of a syntax it cannot check (53), and last
+    /// (48), of a syntax (53) or a constraint type (51) it cannot check, or under a constraint it cannot
+    /// decode (1), and last
     /// <c>internal_verify</c> a signature that does not verify (7) before it checks dates
     /// (BL-5104). .NET reports both 79 and 25 as <see cref="X509ChainStatusFlags.InvalidBasicConstraints" />,
     /// and 53 as <see cref="X509ChainStatusFlags.HasNotSupportedNameConstraint" />, which it also sets for
-    /// OpenSSL's other unsupported-constraint errors; 53 is answered for all of them (ADR-1383).
+    /// OpenSSL's other unsupported-constraint errors; 53 is answered for that flag (ADR-1383), so
+    /// <see cref="StatusOf" /> first replaces it with 51's flag where it finds that refusal (BL-6059).
     /// </summary>
     /// <param name="status">Every status flag of the chain, combined.</param>
     /// <param name="pathLengthExceeded">Whether a CA in the chain has its path length exceeded.</param>
@@ -257,7 +281,17 @@ internal static class OpenSslVerifyResult
             return ExcludedSubtreeViolation;
         }
 
-        return (status & X509ChainStatusFlags.HasNotSupportedNameConstraint) != 0 ? UnsupportedNameSyntax : null;
+        return (status & X509ChainStatusFlags.HasNotSupportedNameConstraint) != 0 ? UnsupportedNameSyntax : OfUncomparedNameConstraints(status);
+    }
+
+    private static long? OfUncomparedNameConstraints(X509ChainStatusFlags status)
+    {
+        if ((status & UnsupportedConstraintTypeFlag) != 0)
+        {
+            return UnsupportedConstraintType;
+        }
+
+        return (status & UnspecifiedErrorFlag) != 0 ? Unspecified : null;
     }
 
     /// <summary>

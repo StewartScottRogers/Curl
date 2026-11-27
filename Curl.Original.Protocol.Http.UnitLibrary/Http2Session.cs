@@ -65,6 +65,11 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// <summary>The bytes of <see cref="UpgradedStreamSettings" />, written as one.</summary>
     private static readonly byte[] UpgradedStreamSettingsFrame = Http2FrameCodec.Serialize(UpgradedStreamSettings);
 
+    /// <summary>How long <see cref="ShutDownAsync" /> waits for the peer to take the closing frames, as long as ending a failed stream waits (ADR-1421).</summary>
+    private static readonly TimeSpan ClosingLimit = TimeSpan.FromSeconds(1);
+
+    private readonly TimeProvider timeProvider;
+
     private readonly HpackEncoder encoder = new();
 
     private readonly HpackDecoder decoder = new();
@@ -102,8 +107,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// 1 and each PUSH_PROMISE is offered to its stream's <see cref="Http2StreamConnection.PushSink" />;
     /// without it the preface sends 0, as curl's does when no push callback is set.
     /// </param>
-    public Http2Session(IConnection connection, bool isPushEnabled = false)
+    /// <param name="timeProvider">The clock <see cref="ShutDownAsync" />'s limit runs on, or <see langword="null" /> for the system's.</param>
+    public Http2Session(IConnection connection, bool isPushEnabled = false, TimeProvider? timeProvider = null)
     {
+        this.timeProvider = timeProvider ?? TimeProvider.System;
         Connection = connection;
         incoming = new ReadAheadConnectionStream(connection);
         Frames = new Http2Connection(incoming) { IsPushEnabled = isPushEnabled };
@@ -181,17 +188,34 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// Resets each unfinished stream (<see cref="ResetUnfinishedStreamsAsync" />), then sends
     /// GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
     /// curl 8.18.0 does when it closes an HTTP/2 connection (measured, BL-817 and BL-5906 Notes); nothing
-    /// when no preface went out, when a GOAWAY already has, after <see cref="SkipClosingGoAway" />, or when the peer closed the
-    /// connection. A connection that fails the write is closing anyway, so that is not an error.
+    /// when no preface went out, when a GOAWAY already has, after <see cref="SkipClosingGoAway" />, when the peer closed the
+    /// connection, or after a write was cancelled part way, since the peer was not taking it and
+    /// these writes could wait for ever (BL-6006). A connection that fails the write is closing anyway, so that is not an error.
+    /// A peer that stops reading only now is waited for <see cref="ClosingLimit" /> on the session's
+    /// <see cref="TimeProvider" />, the wait for the frame lock included; the frames are then given up (BL-6036, ADR-1433).
     /// </summary>
     /// <param name="cancellationToken">Cancels the writes.</param>
-    /// <returns>A task that completes when the frames are written, or at once when none is due.</returns>
+    /// <returns>A task that completes when the frames are written or given up, or at once when none is due.</returns>
     public async ValueTask ShutDownAsync(CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource limit = new(ClosingLimit, timeProvider);
+        using CancellationTokenSource bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, limit.Token);
+        try
+        {
+            await SendClosingFramesAsync(bounded.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (limit.IsCancellationRequested)
+        {
+            // The peer has stopped reading; the connection is closed without the rest.
+        }
+    }
+
+    private async ValueTask SendClosingFramesAsync(CancellationToken cancellationToken)
     {
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (!isPrefaceSent || isClosingGoAwaySkipped || Frames.IsGoAwaySent || Frames.IsClosedByPeer)
+            if (!isPrefaceSent || isClosingGoAwaySkipped || Frames.IsGoAwaySent || Frames.IsClosedByPeer || incoming.IsWriteCancelled)
             {
                 return;
             }

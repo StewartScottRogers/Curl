@@ -25,14 +25,18 @@ public sealed partial class DohDnsResolver
     internal static string HttpsQueryName(string host, int port) =>
         port == 443 ? host : $"_{port}._https.{host}";
 
+    // The DoH server as Host or :authority names it: with the port only when it is not the default.
+    private string HostHeaderValue => _dohUrl.IsDefaultPort ? _dohUrl.Host : $"{_dohUrl.Host}:{_dohUrl.Port}";
+
     // The request line and header block of the POST curl sends for one query: through a forwarding
-    // proxy the target is absolute and Proxy-Connection follows Accept (measured, CGR-037).
-    private byte[] BuildRequestHead(byte[] query)
+    // proxy the target is absolute and Proxy-Connection follows Accept (measured, CGR-037). Over
+    // HTTP/2 this is the head -v shows, its request line naming that version.
+    private byte[] BuildRequestHead(byte[] query, string version = "HTTP/1.1")
     {
-        var host = _dohUrl.IsDefaultPort ? _dohUrl.Host : $"{_dohUrl.Host}:{_dohUrl.Port}";
+        var host = HostHeaderValue;
         var forwarded = ForwardsThroughProxy;
         var target = forwarded ? $"{_dohUrl.Scheme}://{host}{_dohUrl.PathAndQuery}" : _dohUrl.PathAndQuery;
-        var head = $"POST {target} HTTP/1.1\r\n"
+        var head = $"POST {target} {version}\r\n"
             + $"Host: {host}\r\n"
             + BasicAuthorizationLine(_dohUrl.UserInfo)
             + "Accept: */*\r\n"
@@ -50,16 +54,17 @@ public sealed partial class DohDnsResolver
     /// </summary>
     /// <param name="userInfo">The DoH URL's user information, still percent-encoded.</param>
     /// <returns>The header line with its CRLF, or the empty string.</returns>
-    internal static string BasicAuthorizationLine(string userInfo)
+    internal static string BasicAuthorizationLine(string userInfo) =>
+        BasicAuthorizationValue(userInfo) is { } value ? $"Authorization: {value}\r\n" : string.Empty;
+
+    // The Authorization header's value for the DoH URL's user information; null when it sends none.
+    private static string? BasicAuthorizationValue(string userInfo)
     {
         var separator = userInfo.IndexOf(':', StringComparison.Ordinal);
         var user = Uri.UnescapeDataString(separator < 0 ? userInfo : userInfo[..separator]);
         var password = separator < 0 ? string.Empty : Uri.UnescapeDataString(userInfo[(separator + 1)..]);
-        if (user.Length + password.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        return $"Authorization: Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes($"{user}:{password}"))}\r\n";
+        return user.Length + password.Length == 0
+            ? null
+            : $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes($"{user}:{password}"))}";
     }
 }

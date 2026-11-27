@@ -68,16 +68,20 @@ internal static class DohResponseReader
             events.ReportDataReceived(body);
         }
 
-        return body is null ? null : new Response(head.StatusCode, body);
+        return body is null ? null : new Response(head.StatusCode, body) { KeepsConnectionOpen = head.KeepsConnectionOpen };
     }
 
     private static async ValueTask<ResponseHead?> ReadHeadAsync(ConnectionByteReader reader, ITransferEvents events, CancellationToken cancellationToken)
     {
         var statusLine = await ReadHeadLineAsync(reader, events, cancellationToken).ConfigureAwait(false);
         return statusLine?.StartsWith("HTTP/", StringComparison.Ordinal) == true
-            ? await ReadHeaderFieldsAsync(reader, events, StatusCodeOf(statusLine), cancellationToken).ConfigureAwait(false)
+            ? await ReadHeaderFieldsAsync(reader, events, HeadOf(statusLine), cancellationToken).ConfigureAwait(false)
             : null;
     }
+
+    // The head a status line starts: from HTTP/1.1 the connection stays open unless a field says close.
+    private static ResponseHead HeadOf(string statusLine) =>
+        new(StatusCodeOf(statusLine), statusLine.StartsWith("HTTP/1.1 ", StringComparison.Ordinal));
 
     // The status line's code; 0 when it has none that reads as a number.
     private static int StatusCodeOf(string statusLine)
@@ -86,9 +90,8 @@ internal static class DohResponseReader
         return parts.Length > 1 && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var code) ? code : 0;
     }
 
-    private static async ValueTask<ResponseHead?> ReadHeaderFieldsAsync(ConnectionByteReader reader, ITransferEvents events, int statusCode, CancellationToken cancellationToken)
+    private static async ValueTask<ResponseHead?> ReadHeaderFieldsAsync(ConnectionByteReader reader, ITransferEvents events, ResponseHead head, CancellationToken cancellationToken)
     {
-        var head = new ResponseHead(statusCode);
         string? line;
         do
         {
@@ -228,13 +231,25 @@ internal static class DohResponseReader
     /// <summary>One response's status code and body.</summary>
     /// <param name="StatusCode">The status line's code; 0 when it has none that reads as a number.</param>
     /// <param name="Body">The body.</param>
-    internal sealed record Response(int StatusCode, byte[] Body);
-
-    /// <summary>The status code and the two header fields that frame the body.</summary>
-    /// <param name="statusCode">The status line's code.</param>
-    private sealed class ResponseHead(int statusCode)
+    internal sealed record Response(int StatusCode, byte[] Body)
     {
+        /// <summary>
+        /// Gets whether the connection can carry another request: the server leaves it open and the
+        /// body's end was framed by something other than the close.
+        /// </summary>
+        public bool KeepsConnectionOpen { get; init; }
+    }
+
+    /// <summary>The status code and the header fields that frame the body or close the connection.</summary>
+    /// <param name="statusCode">The status line's code.</param>
+    /// <param name="isPersistentByDefault">Whether the status line's version leaves the connection open unasked.</param>
+    private sealed class ResponseHead(int statusCode, bool isPersistentByDefault)
+    {
+        private bool _isPersistent = isPersistentByDefault;
+
         public int StatusCode { get; } = statusCode;
+
+        public bool KeepsConnectionOpen => _isPersistent && (IsChunked || ContentLength is not null);
 
         public long? ContentLength { get; private set; }
 
@@ -261,8 +276,19 @@ internal static class DohResponseReader
                 return true;
             }
 
+            if (name.Equals("Connection", StringComparison.OrdinalIgnoreCase))
+            {
+                ReadConnection(value);
+                return true;
+            }
+
             return !name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) || ReadContentLength(value);
         }
+
+        // "close" ends the connection after this response; "keep-alive" leaves an HTTP/1.0 one open.
+        private void ReadConnection(string value) =>
+            _isPersistent = !value.Contains("close", StringComparison.OrdinalIgnoreCase)
+                && (_isPersistent || value.Contains("keep-alive", StringComparison.OrdinalIgnoreCase));
 
         private bool ReadContentLength(string value)
         {

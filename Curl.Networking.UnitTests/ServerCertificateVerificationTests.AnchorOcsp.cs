@@ -96,6 +96,58 @@ public sealed class ServerCertificateVerificationAnchorOcspTests
     }
 
     [TestMethod]
+    public void VerifyPeer_OcspGoodFromAnExpiredDelegatedResponder_LeavesItToTheList()
+    {
+        using var revoking = new Pki(List.Revoking, Responder);
+        using var listless = new Pki(List.None, Responder);
+
+        var revoked = Verify(revoking, _ => revoking.DelegatedGoodResponse(TimeSpan.FromDays(-2)));
+        var unknown = Verify(listless, _ => listless.DelegatedGoodResponse(TimeSpan.FromDays(-2)));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, revoked?.ExitCode);
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, revoked?.Message);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, unknown?.ExitCode);
+        Assert.AreEqual(TlsFailureMessages.SchannelRevocationStatusUnknown, unknown?.Message);
+    }
+
+    [TestMethod]
+    [DataRow(OcspStapleStatus.Good, false)]
+    [DataRow(OcspStapleStatus.Revoked, false)]
+    [DataRow(OcspStapleStatus.Revoked, true)]
+    public void VerifyPeer_OcspAnswerUnderASha256CertId_IsUnknownUnlessBestEffort(OcspStapleStatus status, bool bestEffort)
+    {
+        using var pki = new Pki(List.None, Responder);
+
+        var failure = Verify(
+            pki,
+            _ => (pki.ResponseBuilder(status) with { CertIdHashOid = OcspResponseBuilder.Sha256Oid }).Build(),
+            bestEffort);
+
+        Assert.AreEqual(bestEffort ? null : TlsFailureMessages.SchannelRevocationStatusUnknown, failure?.Message);
+        Assert.AreEqual(bestEffort ? null : CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_OcspGoodFromAValidDelegatedResponder_Accepts()
+    {
+        using var pki = new Pki(List.Revoking, Responder);
+
+        var failure = Verify(pki, _ => pki.DelegatedGoodResponse(TimeSpan.FromDays(5)));
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_OcspGoodFromANotYetValidDelegatedResponder_Accepts()
+    {
+        using var pki = new Pki(List.Revoking, Responder);
+
+        var failure = Verify(pki, _ => pki.DelegatedGoodResponse(TimeSpan.FromDays(5), TimeSpan.FromDays(2)));
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
     public void VerifyPeer_FirstResponderUnfetchableAndSecondRevokes_IsRevoked()
     {
         using var pki = new Pki(List.Clean, Responder, SecondResponder);
@@ -256,6 +308,27 @@ public sealed class ServerCertificateVerificationAnchorOcspTests
         };
 
         public byte[] Response(OcspStapleStatus status) => ResponseBuilder(status).Build();
+
+        // "good", signed by a responder the intermediate issued for OCSP signing, which the response carries.
+        public byte[] DelegatedGoodResponse(TimeSpan responderExpiresIn, TimeSpan? responderStartsIn = null)
+        {
+            var now = DateTimeOffset.UtcNow;
+            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            var request = new X509CertificateRequest("CN=Ocsp Delegate", key, HashAlgorithmName.SHA256);
+            request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(OcspTestPki.OcspSigningOid)], false));
+            using var responder = request.Create(
+                Intermediate.SubjectName,
+                X509SignatureGenerator.CreateForECDsa(_intermediateKey),
+                now + (responderStartsIn ?? TimeSpan.FromDays(-30)),
+                now + responderExpiresIn,
+                [4]);
+            return (ResponseBuilder(OcspStapleStatus.Good) with
+            {
+                Signer = OcspResponseBuilder.EcdsaSigner(key),
+                ResponderName = responder.SubjectName.RawData,
+                Certificates = [responder.RawData],
+            }).Build();
+        }
 
         public void Dispose()
         {

@@ -169,6 +169,12 @@ internal sealed class FtpSession(
 
     private const string OutOfMemoryMessage = "Out of memory";
 
+    /// <summary>The key the engine reads a cancelled transfer's report from, spelled as <c>EndPointReportingProtocolHandler.ReportDataKey</c> spells it.</summary>
+    private const string CancelledReportDataKey = "Curl.Engine.TransferReport";
+
+    /// <summary>The key the engine reads a cancelled transfer's closing <c>-v</c> line from, spelled as <c>TransferPerformer.CancelledClosingLineDataKey</c> spells it.</summary>
+    private const string CancelledClosingLineDataKey = "Curl.Engine.ClosingConnectionLine";
+
     /// <summary>The parser a wildcard download's <c>LIST</c> reply goes to instead of the output; <see langword="null" /> otherwise.</summary>
     private FtpFileListParser? listParser;
 
@@ -360,6 +366,18 @@ internal sealed class FtpSession(
         {
             result = lost.Result;
         }
+        catch (OperationCanceledException cancelled)
+        {
+            // A cancellation that leaves the session, -m passing during the data connect for one, still
+            // reports what was read: the engine takes this report off the exception (STD-111, BL-6016).
+            cancelled.Data[CancelledReportDataKey] = new TransferReport
+            {
+                ResponseCode = lastReplyCode,
+                FtpEntryPath = entryPath,
+                PseudoHeaders = CountedPseudoHeaders(),
+            };
+            throw;
+        }
 
         trace.Ended(result.ExitCode);
         log.SessionEnded(result, context.TimeProvider.GetElapsedTime(started));
@@ -370,7 +388,7 @@ internal sealed class FtpSession(
             {
                 ResponseCode = lastReplyCode,
                 FtpEntryPath = entryPath,
-                PseudoHeaders = PseudoHeadersOf(result),
+                PseudoHeaders = CountedPseudoHeaders(),
                 DownloadSize = uploaded ? 0 : result.BytesTransferred,
                 UploadSize = uploaded ? result.BytesTransferred : 0,
                 RequestSize = uploaded ? result.BytesTransferred : 0,
@@ -1550,16 +1568,14 @@ internal sealed class FtpSession(
     private readonly List<KeyValuePair<string, string>> writtenHeaders = [];
 
     /// <summary>
-    /// The lines counted by <c>%{num_headers}</c>: every server reply line holding a colon plus those
-    /// <c>-I</c> wrote (BL-5470), or, when no reply holds a colon, the one line curl 8.22.0 counts for a
-    /// successful download (BL-5403).
+    /// The lines counted by <c>%{num_headers}</c>, as curl 8.22.0 counts them: every server reply line
+    /// holding a colon plus those <c>-I</c> wrote (BL-5470), so none when there are neither (BL-6020). With
+    /// none it is the shared empty list, so two such reports compare equal.
     /// </summary>
-    private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result)
+    private IReadOnlyList<KeyValuePair<string, string>> CountedPseudoHeaders()
     {
         KeyValuePair<string, string>[] counted = [.. control.ColonReplyLines, .. writtenHeaders];
-        return counted.Length > 0 ? counted
-            : context.NoBody || !result.IsSuccess ? []
-            : [FtpHeadHeaderLines.TransferComplete];
+        return counted.Length > 0 ? counted : [];
     }
 
     /// <summary>
@@ -2217,7 +2233,18 @@ internal sealed class FtpSession(
             DiagnosticLog = context.DiagnosticLog,
             TcpIoTrace = protectData ? null : FtpTcpIoTraces.Data,
         };
-        ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        ConnectResult connected;
+        try
+        {
+            connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException cancelled)
+        {
+            // -m passing here closes the control connection: the engine writes this -v line after the timeout's (BL-6053).
+            cancelled.Data[CancelledClosingLineDataKey] = FtpTransferMessages.ClosingConnection(controlName.Number);
+            throw;
+        }
+
         dataConnection = connected.Connection;
         if (dataConnection is null)
         {

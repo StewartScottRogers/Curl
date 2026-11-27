@@ -67,8 +67,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// for a <c>--raw</c> one, whose trailers curl 8.22.0 writes only to the output, with its
     /// chunks (measured, BL-3162 Notes). After a failure it holds the trailer lines decoded before it.
     /// </summary>
-    internal ReadOnlyMemory<byte> TrailerBytes =>
-        passesChunks ? ReadOnlyMemory<byte>.Empty : decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
+    internal ReadOnlyMemory<byte> TrailerBytes => decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
     /// Gets or sets the trailers of an HTTP/2 or HTTP/3 stream as header pairs, which count
@@ -91,8 +90,9 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal int HeadersStored => HeadersStoredBefore + ChunkedTrailerCount;
 
     /// <summary>
-    /// Gets how many trailers the chunked body's decoder has read so far (0 without chunked framing);
-    /// <c>%{num_headers}</c> prints it instead of the head's header count (BL-5039).
+    /// Gets how many trailers the chunked body's decoder has kept so far (0 without chunked framing,
+    /// and for a <c>--raw</c> body, BL-6021); when above 0, <c>%{num_headers}</c> prints it instead of
+    /// the head's header count (BL-5039).
     /// </summary>
     internal int ChunkedTrailerCount => decoder?.TrailerCount ?? 0;
 
@@ -523,12 +523,17 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// its data to <paramref name="output" /> until the empty line after its trailers. With
     /// <paramref name="passesChunks" /> (<c>--raw</c>) it writes each read whole as it arrived
     /// instead, chunk lines, trailers and any bytes after the end in that read included, and
-    /// still stops reading at that empty line, as curl 8.22.0 does (measured, BL-3162 Notes).
+    /// still stops reading at that empty line, as curl 8.22.0 does (measured, BL-3162 Notes); those
+    /// trailers are neither stored nor counted as headers (BL-6021).
     /// </summary>
     private async ValueTask CopyChunkedAsync(ReadOnlyMemory<byte> bytes, bool passesChunks, Stream output, CancellationToken cancellationToken)
     {
         this.passesChunks = passesChunks;
-        decoder = new HttpChunkedDecoder { TrailerLimit = HttpResponseHeadReader.MaximumHeaderCount - HeadersStoredBefore };
+        decoder = new HttpChunkedDecoder
+        {
+            TrailerLimit = HttpResponseHeadReader.MaximumHeaderCount - HeadersStoredBefore,
+            KeepsTrailers = !passesChunks,
+        };
         ReportReceived(bytes);
         byte[] buffer = new byte[WriteSize];
         while (true)

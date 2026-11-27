@@ -98,6 +98,83 @@ public sealed class Cgr175Tests
         Assert.AreEqual(26, exitCode);
         Assert.IsEmpty(sent);
     }
+    // STD-228 (BL-6025): curl 8.22.0 abandons the batch at the failing group's first URL, so it reports every
+    // earlier group's transfer and that one, and nothing after it (measured 2026-11-26).
+    [TestMethod]
+    [DataRow("a", "e", "", "0 26 000 0\n1 26 000 0\n", DisplayName = "One URL in each group")]
+    [DataRow("a b", "e", "", "0 26 000 0\n1 26 000 0\n2 26 000 0\n", DisplayName = "Two URLs before the failing group")]
+    [DataRow("a", "e g", "", "0 26 000 0\n1 26 000 0\n", DisplayName = "Two URLs in the failing group")]
+    [DataRow("a", "e", "h", "0 26 000 0\n1 26 000 0\n", DisplayName = "A group after the failing one")]
+    public async Task RunAsync_ParallelMissingFileFormInLaterGroup_ReportsThroughThatGroupsFirstUrl(
+        string earlierUrls, string failingUrls, string laterUrls, string expectedStdout)
+    {
+        const string Template = "%{urlnum} %{exitcode} %{http_code} %{size_upload}\n";
+        string[] later = laterUrls.Length == 0 ? [] : ["--next", "-w", Template, .. UrlsOf(laterUrls)];
+
+        (int exitCode, string stdout, string stderr, List<long> sent) = await RunAsync(
+        [
+            "-Z", .. UrlsOf(earlierUrls),
+            "--next", "-w", Template, "-F", "f=@nofile.txt", .. UrlsOf(failingUrls),
+            .. later,
+        ]);
+
+        Diagnostics.Diff("stdout", expectedStdout, stdout.ReplaceLineEndings("\n"));
+        Assert.AreEqual(26, exitCode);
+        Assert.IsEmpty(sent);
+        Assert.AreEqual(expectedStdout, stdout.ReplaceLineEndings("\n"));
+        Assert.AreEqual(
+            string.Concat(Enumerable.Repeat(
+                "curl: (26) Failed to open/read local data from file/application\n",
+                expectedStdout.Count(character => character == '\n'))),
+            stderr);
+    }
+
+    private static IEnumerable<string> UrlsOf(string paths) =>
+        paths.Split(' ').Select(path => $"http://127.0.0.1:22000/{path}");
+
+    // BL-6043: curl 8.22.0 checks the form while setting up the group's first URL, so a batch holding that URL and
+    // not the group's last one is abandoned too (measured 2026-11-26).
+    [TestMethod]
+    [DataRow("1", "a", "e g", "0 26 000 0\n1 26 000 0\n", DisplayName = "The first URL is the batch's extra one")]
+    [DataRow("2", "a", "e g h", "0 26 000 0\n1 26 000 0\n", DisplayName = "The group's last URL is past the batch")]
+    public async Task RunAsync_ParallelMissingFileFormWhoseGroupRunsPastTheBatch_SendsNothing(
+        string parallelMax, string earlierUrls, string failingUrls, string expectedStdout)
+    {
+        (int exitCode, string stdout, string stderr, List<long> sent) = await RunAsync(
+        [
+            "-Z", "--parallel-max", parallelMax, .. UrlsOf(earlierUrls),
+            "--next", "-w", "%{urlnum} %{exitcode} %{http_code} %{size_upload}\n", "-F", "f=@nofile.txt",
+            .. UrlsOf(failingUrls),
+        ]);
+
+        Diagnostics.Diff("stdout", expectedStdout, stdout.ReplaceLineEndings("\n"));
+        Assert.AreEqual(26, exitCode);
+        Assert.IsEmpty(sent);
+        Assert.AreEqual(expectedStdout, stdout.ReplaceLineEndings("\n"));
+        Assert.AreEqual(2, stderr.Split("curl: (26)").Length - 1);
+    }
+
+    // BL-6043: only the transfer whose file cannot be opened has no xfer_id; the earlier ones of the batch keep
+    // theirs, and none has a connection (curl 8.22.0, measured 2026-11-26, for -F and -T alike).
+    [TestMethod]
+    [DataRow("-F", "f=@nofile.txt", DisplayName = "A -F file that cannot be opened")]
+    [DataRow("-T", "nofile.txt", DisplayName = "A -T file that cannot be opened")]
+    public async Task RunAsync_ParallelMissingFileInLaterGroup_ReportsTheEarlierTransfersIds(string option, string value)
+    {
+        const string Template = "%{conn_id} %{xfer_id}\n";
+        files.UnreadablePaths.Add("nofile.txt");
+
+        (int exitCode, string stdout, _, List<long> sent) = await RunAsync(
+            "-Z", "-w", Template, "http://127.0.0.1:22000/a", "http://127.0.0.1:22000/b",
+            "--next", "-w", Template, option, value, "http://127.0.0.1:22000/e");
+
+        // RunAsync's own -w, in the first group, gives way to the later -w of that group.
+        Diagnostics.Diff("stdout", "-1 0\n-1 1\n-1 -1\n", stdout.ReplaceLineEndings("\n"));
+        Assert.AreEqual(26, exitCode);
+        Assert.IsEmpty(sent);
+        Assert.AreEqual("-1 0\n-1 1\n-1 -1\n", stdout.ReplaceLineEndings("\n"));
+    }
+
     [TestMethod]
     public async Task RunAsync_ParallelTextFormForTwoUrls_SetsTheLastFormUpAndSendsItOnlyToTheLast()
     {

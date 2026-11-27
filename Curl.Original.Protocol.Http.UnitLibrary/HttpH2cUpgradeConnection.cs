@@ -20,7 +20,11 @@ namespace Curl.Original.Protocol.Http;
 /// Where the switch's and stream 1's <c>--trace-config http/2</c> lines go (<see cref="Http2FrameTrace" />,
 /// BL-1205), or <see langword="null" /> for none.
 /// </param>
-internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferEvents events, string scheme, ITransferEvents? traceEvents = null) : IConnection
+/// <param name="timeProvider">
+/// The clock the upgraded session's closing limit runs on (<see cref="Http2Session.ShutDownAsync" />), or
+/// <see langword="null" /> for the system's.
+/// </param>
+internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferEvents events, string scheme, ITransferEvents? traceEvents = null, TimeProvider? timeProvider = null) : IConnection
 {
     private const int ReadSize = 16384;
 
@@ -235,7 +239,7 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
         }
 
         frameTrace?.SessionCreatedByUpgrade();
-        UpgradedSession = new Http2Session(new HttpPrefixedConnection(afterHead, transport));
+        UpgradedSession = new Http2Session(new HttpPrefixedConnection(afterHead, transport), timeProvider: timeProvider);
         Http2StreamConnection stream = new(UpgradedSession, scheme, 0, frameTrace: frameTrace);
         await stream.StartUpgradedAsync(isHeadRequest, cancellationToken).ConfigureAwait(false);
         return stream;

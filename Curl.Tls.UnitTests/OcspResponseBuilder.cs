@@ -1,4 +1,5 @@
 using System.Formats.Asn1;
+using System.Numerics;
 using System.Security.Cryptography;
 
 namespace Curl.Tls;
@@ -16,6 +17,7 @@ internal sealed record OcspResponseBuilder(byte[] Certificate, byte[] Issuer, Da
     public const string EcdsaSha256Oid = "1.2.840.10045.4.3.2";
     public const string RsaSha256Oid = "1.2.840.113549.1.1.11";
     public const string RsaPssOid = "1.2.840.113549.1.1.10";
+    public const string Mgf1Oid = "1.2.840.113549.1.1.8";
 
     private const string BasicResponseOid = "1.3.6.1.5.5.7.48.1.1";
     private const string NonceOid = "1.3.6.1.5.5.7.48.1.2";
@@ -72,9 +74,13 @@ internal sealed record OcspResponseBuilder(byte[] Certificate, byte[] Issuer, Da
     public static (byte[] Algorithm, Func<byte[], byte[]> Sign) RsaSigner(RSA key) =>
         (AlgorithmIdentifier(RsaSha256Oid, null), data => key.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
 
-    /// <summary>An RSASSA-PSS signer; <paramref name="hashOid" /> <see langword="null" /> leaves the parameters empty, which means SHA-1.</summary>
+    /// <summary>
+    /// An RSASSA-PSS signer whose salt is as long as the hash and whose MGF1 uses it;
+    /// <paramref name="hashOid" /> <see langword="null" /> leaves the parameters empty, which means
+    /// SHA-1 and its 20-byte salt.
+    /// </summary>
     public static (byte[] Algorithm, Func<byte[], byte[]> Sign) RsaPssSigner(RSA key, string? hashOid, HashAlgorithmName hash) =>
-        (PssAlgorithmIdentifier(hashOid), data => key.SignData(data, hash, RSASignaturePadding.Pss));
+        (PssAlgorithmIdentifier(hashOid, hashOid, hashOid is null ? null : CryptographicOperations.HashData(hash, []).Length), data => key.SignData(data, hash, RSASignaturePadding.Pss));
 
     public static byte[] AlgorithmIdentifier(string oid, byte[]? parameters)
     {
@@ -91,21 +97,41 @@ internal sealed record OcspResponseBuilder(byte[] Certificate, byte[] Issuer, Da
         return writer.Encode();
     }
 
-    public static byte[] PssAlgorithmIdentifier(string? hashOid)
+    /// <summary>
+    /// <c>RSASSA-PSS-params</c> holding only the fields given: <c>[0]</c> the hash,
+    /// <c>[1]</c> MGF1 (or <paramref name="maskOid" />) over <paramref name="maskHashOid" />,
+    /// <c>[2]</c> the salt length and <c>[3]</c> the trailer field.
+    /// </summary>
+    public static byte[] PssAlgorithmIdentifier(string? hashOid, string? maskHashOid = null, BigInteger? saltLength = null, int? trailerField = null, string maskOid = Mgf1Oid)
     {
         AsnWriter parameters = new(AsnEncodingRules.DER);
         using (parameters.PushSequence())
         {
-            if (hashOid is not null)
-            {
-                using (parameters.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)))
-                {
-                    parameters.WriteEncodedValue(AlgorithmIdentifier(hashOid, null));
-                }
-            }
+            WritePssField(parameters, 0, hashOid is null ? null : AlgorithmIdentifier(hashOid, null));
+            WritePssField(parameters, 1, maskHashOid is null ? null : AlgorithmIdentifier(maskOid, AlgorithmIdentifier(maskHashOid, null)));
+            WritePssField(parameters, 2, saltLength is { } salt ? Integer(salt) : null);
+            WritePssField(parameters, 3, trailerField is { } trailer ? Integer(trailer) : null);
         }
 
         return AlgorithmIdentifier(RsaPssOid, parameters.Encode());
+    }
+
+    private static void WritePssField(AsnWriter parameters, int number, byte[]? value)
+    {
+        if (value is not null)
+        {
+            using (parameters.PushSequence(new Asn1Tag(TagClass.ContextSpecific, number)))
+            {
+                parameters.WriteEncodedValue(value);
+            }
+        }
+    }
+
+    private static byte[] Integer(BigInteger value)
+    {
+        AsnWriter writer = new(AsnEncodingRules.DER);
+        writer.WriteInteger(value);
+        return writer.Encode();
     }
 
     public byte[] Build()

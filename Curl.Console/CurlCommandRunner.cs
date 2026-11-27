@@ -2248,13 +2248,15 @@ internal sealed class CurlCommandRunner(
             failure => ReportSkippedAsync(dispatch, options, transfer, state, failure));
         if (!await UploadFileOpensAsync(transfer.UploadFile).ConfigureAwait(false))
         {
+            stateWhoseSetupAbandonedFirstBatch = state;
             await run.AbandonFirstBatchAsync(CannotOpenUploadFileFailure, startsOthersWhenExtraFails: true).ConfigureAwait(false);
             return true;
         }
 
         if (await FormSetupFailureAsync(options, transfer).ConfigureAwait(false) is { } formFailure)
         {
-            await run.AbandonFirstBatchAsync(formFailure, reportsOnlyFirst: true).ConfigureAwait(false);
+            stateWhoseSetupAbandonedFirstBatch = state;
+            await run.AbandonFirstBatchAsync(formFailure).ConfigureAwait(false);
             return true;
         }
 
@@ -2269,6 +2271,13 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>The fatal setup failure that abandoned a <c>-Z</c> run's first batch, reported as it is.</summary>
     private TransferResult? fatalSetupFailure;
+
+    /// <summary>
+    /// The state of the transfer whose <c>-T</c> or <c>-F</c> file could not be opened while a <c>-Z</c> run's first
+    /// batch was being set up; <see langword="null" /> while none has. curl 8.22.0 prints <c>%{xfer_id}</c> -1 for it
+    /// alone, and each other transfer of the batch keeps its number (measured 2026-11-26, BL-6043).
+    /// </summary>
+    private RunningTransferState? stateWhoseSetupAbandonedFirstBatch;
 
     /// <summary>
     /// Finds the failure curl 8.22.0 meets while setting an <c>rtsp</c> or <c>telnet</c> transfer up, one of its fatal
@@ -2314,35 +2323,21 @@ internal sealed class CurlCommandRunner(
             return TransferResult.Failure(CurlExitCode.UnknownOption, $"Unknown telnet option {option}");
         }
 
+        // A known option's value is not judged here: curl 8.22.0 connects with a NEW_ENV without a comma or an
+        // over-long TTYPE or XDISPLOC, and fails only if the server's subnegotiation asks for it (STD-183, BL-6017).
         return string.Equals(name, known, StringComparison.OrdinalIgnoreCase)
-            ? BadTelnetOptionValueFailure(known, option[(separator + 1)..])
+            ? null
             : TransferResult.Failure(CurlExitCode.UnknownOption, "An unknown option was passed in to libcurl");
-    }
-
-    /// <summary>
-    /// Finds the exit 43 curl's <c>check_telnet_options</c> gives a known option whose value cannot be held: a
-    /// <c>NEW_ENV</c> without a comma, a <c>TTYPE</c> of 32 or more characters or an <c>XDISPLOC</c> of 128 or more
-    /// (STD-074, BL-5811).
-    /// </summary>
-    private static TransferResult? BadTelnetOptionValueFailure(string known, string value)
-    {
-        bool bad = known switch
-        {
-            "NEW_ENV" => !value.Contains(',', StringComparison.Ordinal),
-            "TTYPE" => value.Length >= 32,
-            "XDISPLOC" => value.Length >= 128,
-            _ => false,
-        };
-        return bad ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, "A libcurl function was given a bad argument") : null;
     }
 
     private static bool ReadsStandardInput(EasyMimeBody mimePost) =>
         MultipartFormPartMapping.FromMimeBody(mimePost).Any(part => part.ReadsStandardInput);
 
     /// <summary>
-    /// Sets up the <c>-F</c> form of an option group's last URL in a <c>-Z</c> run's first batch, as curl 8.22.0 sets
+    /// Sets up the <c>-F</c> form of an option group's first URL in a <c>-Z</c> run's first batch, as curl 8.22.0 sets
     /// every handle up before it performs any: a part whose file cannot be opened abandons the batch with exit 26 and
-    /// nothing is sent (STD-123, BL-5441). A form reading standard input is left to the transfer, which must not drain it.
+    /// nothing is sent (STD-123, BL-5441; BL-6043). A form reading standard input is left to the transfer, which must
+    /// not drain it.
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
@@ -2350,7 +2345,7 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult?> FormSetupFailureAsync(CommandLineOptions options, UrlTransfer transfer)
     {
         EasyMimeBody? mimePost = EasyOptionsFromCommandLine.HttpOf(options).MimePost;
-        if (mimePost is null || transfer.UrlIndex != options.Urls.Count - 1 || ReadsStandardInput(mimePost))
+        if (mimePost is null || transfer.UrlIndex != 0 || ReadsStandardInput(mimePost))
         {
             return null;
         }
@@ -2423,12 +2418,35 @@ internal sealed class CurlCommandRunner(
             run.Queue.BatchAddedTimestamp = timeProvider.GetTimestamp();
         }
 
+        return await StartInFreeSlotAsync(run, dispatch, options, transfer, state).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Starts one transfer of a <c>-Z</c> run in the slot it waited for, unless the run has ended or failed
+    /// early. curl 8.22.0 runs a whole <c>telnet</c> session inside one call of its <c>-Z</c> loop, so for a
+    /// <c>telnet</c> transfer this completes, and later transfers start, only once the session has ended
+    /// (STD-183, BL-6017, ADR-1420). A session that fails fatally is noted on the run
+    /// (<see cref="ParallelRun.NoteFatalSessionFailure" />, BL-6035).
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <returns>As <see cref="StartInParallelAsync" />.</returns>
+    private async Task<bool> StartInFreeSlotAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        RunningTransferState state)
+    {
         if (run.HasEnded)
         {
             return true;
         }
 
-        if (run.HasFailedEarly)
+        if (run.HasFailedEarly && !run.IsStartingBehindFatalSession)
         {
             DeferReportOfEarlyFailure(run, dispatch, options, transfer, state);
             return false;
@@ -2437,7 +2455,16 @@ internal sealed class CurlCommandRunner(
         state.ParallelProgress = run.ProgressMeter?.AddTransfer();
 
         LogParallelScheduler("started", transfer);
-        run.Queue.Add(TransferInParallelAsync(run, dispatch, options, transfer, state));
+        Task<TransferResult> running = TransferInParallelAsync(run, dispatch, options, transfer, state);
+        run.Queue.Add(running);
+
+        if (UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol).StartsWith("telnet:", StringComparison.OrdinalIgnoreCase)
+            && await running.ConfigureAwait(false) is var session
+            && IsFatalFailure(session))
+        {
+            run.NoteFatalSessionFailure(session);
+        }
+
         return false;
     }
 
@@ -2470,8 +2497,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
     /// <param name="state">The transfer's state.</param>
-    /// <returns>A task that completes when the transfer and its report, if not deferred, are done.</returns>
-    private async Task TransferInParallelAsync(
+    /// <returns>The transfer's result, once it and its report, if not deferred, are done.</returns>
+    private async Task<TransferResult> TransferInParallelAsync(
         ParallelRun run,
         TransferDispatch dispatch,
         CommandLineOptions options,
@@ -2483,7 +2510,7 @@ internal sealed class CurlCommandRunner(
         bool cancelledWhileWaiting = false;
         try
         {
-            ended = await TransferOnceHostIsFreeAsync(run, dispatch, options, transfer, run.StopStartsToken).ConfigureAwait(false);
+            ended = await TransferOnceHostIsFreeAsync(run, dispatch, options, transfer, run.HostWaitToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (run.HasFailedEarly)
         {
@@ -2496,6 +2523,7 @@ internal sealed class CurlCommandRunner(
         await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended, cancelledWhileWaiting))
             .ConfigureAwait(false);
         state.ParallelProgress?.End();
+        return ended.Result;
     }
 
     /// <summary>
@@ -2516,7 +2544,10 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one transfer of a <c>-Z</c> run once its host is free (<see cref="ParallelHostQueue" />:
-    /// <c>--parallel-max-host</c> and <c>--parallel-immediate</c>), counting it at the host until it ends.
+    /// <c>--parallel-max-host</c> and <c>--parallel-immediate</c>), counting it at the host until it ends. One with a
+    /// malformed <c>--resolve</c> entry neither waits for the host nor counts there, as curl 8.22.0 fails it before it
+    /// looks for a connection; its end still frees the transfers waiting for a host's first to end (BL-6040,
+    /// measured with <c>Record-CurlExchange.ps1</c> on 2026-11-26).
     /// </summary>
     /// <param name="run">The run.</param>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
@@ -2532,7 +2563,8 @@ internal sealed class CurlCommandRunner(
         CancellationToken abortToken)
     {
         string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
-        if (await WaitForHostWithinMaxTimeAsync(run, options, url, abortToken).ConfigureAwait(false) is { } timedOut)
+        bool failsBeforeItsHost = ResolveParseErrorOf(options) is not null;
+        if (!failsBeforeItsHost && await WaitForHostWithinMaxTimeAsync(run, options, url, abortToken).ConfigureAwait(false) is { } timedOut)
         {
             return (timedOut, transfer.Url, url);
         }
@@ -2549,7 +2581,24 @@ internal sealed class CurlCommandRunner(
         }
         finally
         {
-            run.Hosts.Leave(url, connectionStayedOpen);
+            LeaveHost(run.Hosts, url, failsBeforeItsHost, connectionStayedOpen);
+        }
+    }
+
+    /// <summary>Tells the <c>-Z</c> host queue that a transfer has ended, whether or not it ever counted at its host.</summary>
+    /// <param name="hosts">The run's host queue.</param>
+    /// <param name="url">The transfer's URL, with its scheme.</param>
+    /// <param name="failedBeforeItsHost">Whether it never waited for or counted at its host.</param>
+    /// <param name="connectionStayedOpen">Whether its connection was kept for reuse.</param>
+    private static void LeaveHost(ParallelHostQueue hosts, string url, bool failedBeforeItsHost, bool connectionStayedOpen)
+    {
+        if (failedBeforeItsHost)
+        {
+            hosts.EndWithoutHost();
+        }
+        else
+        {
+            hosts.Leave(url, connectionStayedOpen);
         }
     }
 
@@ -2645,6 +2694,11 @@ internal sealed class CurlCommandRunner(
             return Task.CompletedTask;
         }
 
+        if (run.FatalSessionFailure is not null)
+        {
+            return ReportAsync(dispatch, options, transfer, state, ResultBehindFatalSessionOf(run, state, ended.Result), ended.GivenUrl, ended.TransferUrl);
+        }
+
         if (run.IsAborted || cancelledWhileWaiting)
         {
             run.DeferReport(
@@ -2653,12 +2707,7 @@ internal sealed class CurlCommandRunner(
             return Task.CompletedTask;
         }
 
-        if (ReferenceEquals(ended.Result, CannotOpenUploadFileFailure))
-        {
-            run.RecordSetupFailure(ended.Result, endsTheRun: true);
-        }
-
-        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly || IsFatalFailure(ended.Result));
+        RecordParallelTransferEnd(run, options, ended.Result);
 
         if (state.SkippedExistingOutputFile)
         {
@@ -2669,6 +2718,44 @@ internal sealed class CurlCommandRunner(
         }
 
         return ReportAsync(dispatch, options, transfer, state, ended.Result, ended.GivenUrl, ended.TransferUrl);
+    }
+
+    /// <summary>
+    /// Records on a <c>-Z</c> run how a transfer ended, a <c>-T</c> file that could not be opened as the run's
+    /// setup failure too.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="result">The transfer's result.</param>
+    private void RecordParallelTransferEnd(ParallelRun run, CommandLineOptions options, TransferResult result)
+    {
+        if (ReferenceEquals(result, CannotOpenUploadFileFailure))
+        {
+            run.RecordSetupFailure(result, endsTheRun: true);
+        }
+
+        run.RecordEnd(result, EndsTheRun(options, result), options.FailEarly || IsFatalFailure(result));
+    }
+
+    /// <summary>
+    /// Gives the result a <c>-Z</c> transfer ending after a <c>telnet</c> session failed fatally is reported with:
+    /// <see cref="AbortedResultOf" /> once the run has aborted it; a success that beat the abort keeps its
+    /// response and bytes but is aborted too, as curl 8.22.0 reports it; its own failure stands (BL-6035).
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <param name="ended">How the transfer ended.</param>
+    /// <returns>The result to report.</returns>
+    private static TransferResult ResultBehindFatalSessionOf(ParallelRun run, RunningTransferState state, TransferResult ended)
+    {
+        if (run.IsAborted)
+        {
+            return AbortedResultOf(state);
+        }
+
+        return ended.IsSuccess
+            ? ended with { ExitCode = CurlExitCode.AbortedByCallback, ErrorMessage = ParallelRun.AbortedMessage }
+            : ended;
     }
 
     /// <summary>
@@ -3750,17 +3837,24 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Parses <paramref name="url" /> with any <c>-G</c> / <c>--url-query</c> query appended, or says why curl refuses it:
-    /// a URL curl cannot parse before the query goes on fails to set the query (CGR-190, BL-3719).
+    /// Parses <paramref name="url" /> with any <c>-G</c> / <c>--url-query</c> query appended, or says why curl refuses the
+    /// transfer before it connects, in curl's order: a URL curl cannot parse before the query goes on fails to set the query
+    /// (CGR-190, BL-3719), then a malformed <c>--resolve</c> entry, then a URL curl cannot parse.
     /// </summary>
-    private bool TryParseQueriedUrl(string url, CommandLineOptions options, UrlTransfer transfer, [NotNullWhen(true)] out CurlUrl? transferUrl, [NotNullWhen(false)] out TransferResult? failure)
+    private bool TryCheckResolveEntriesAndParseUrl(string url, CommandLineOptions options, UrlTransfer transfer, [NotNullWhen(true)] out CurlUrl? transferUrl, [NotNullWhen(false)] out TransferResult? failure)
     {
         string queriedUrl = QueryUrl.Append(url, options);
-        failure = null;
         if (QueryRejected(url, queriedUrl))
         {
             transferUrl = null;
             failure = TransferResult.Failure(CurlExitCode.UrlMalformat, "Could not parse the URL, failed to set query");
+            return false;
+        }
+
+        failure = MalformedResolveFailure(options, EventsBeforeConnecting(transfer));
+        if (failure is not null)
+        {
+            transferUrl = null;
             return false;
         }
 
@@ -3769,17 +3863,18 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        failure = MalformedResolveFailure(options, EventsBeforeConnecting(transfer)) ?? TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
+        failure = TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
         return false;
     }
 
     /// <summary>
     /// The exit 49 failure for a malformed <c>--resolve</c> entry, or <see langword="null" /> when every entry parses: curl loads
-    /// <c>CURLOPT_RESOLVE</c> before it parses the URL, so the entry is reported ahead of a URL rejection (AF-0807), as an info line first (BL-5263). A <c>-G</c> query rejection comes before it: the tool fails that one itself (exit 3).
+    /// <c>CURLOPT_RESOLVE</c> as each transfer starts, so the entry fails the transfer before any connection is made or reused
+    /// (STD-225, BL-6022) and ahead of a URL rejection (AF-0807), as an info line first (BL-5263). A <c>-G</c> query rejection comes before it: the tool fails that one itself (exit 3).
     /// </summary>
     private static TransferResult? MalformedResolveFailure(CommandLineOptions options, ITransferEvents events)
     {
-        if (ResolveOverrides.Parse(EasyOptionsFromCommandLine.NetworkOf(options).Resolve).ParseError is not { } parseError)
+        if (ResolveParseErrorOf(options) is not { } parseError)
         {
             return null;
         }
@@ -3787,6 +3882,10 @@ internal sealed class CurlCommandRunner(
         events.ReportInfo(parseError);
         return TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, parseError);
     }
+
+    /// <summary>curl's message for the first malformed <c>--resolve</c> entry, or <see langword="null" /> when every entry parses.</summary>
+    private static string? ResolveParseErrorOf(CommandLineOptions options) =>
+        ResolveOverrides.Parse(EasyOptionsFromCommandLine.NetworkOf(options).Resolve).ParseError;
 
     /// <summary>
     /// Whether curl refuses the URL it was given when <c>-G</c> / <c>--url-query</c> has a query to append: its tool parses the URL
@@ -3847,7 +3946,7 @@ internal sealed class CurlCommandRunner(
             Scheme = Running.UploadFileCouldNotBeOpened ? null : TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
             Referer = info.Referer ?? options.Referer,
             ConnectionId = connectionId,
-            TransferId = HasNoTransferNumber(result) || Running.UploadFileCouldNotBeOpened ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
+            TransferId = HasNoTransferNumber(result) || LostItsTransferNumberToUnopenedFile ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
             SslVerifyResult = Running.SslVerifyResult,
             ProxySslVerifyResult = Running.ProxySslVerifyResult,
             EarlyDataSent = Running.TlsEarlyDataSent,
@@ -3863,8 +3962,18 @@ internal sealed class CurlCommandRunner(
     private const long NoTransferId = -1;
 
     /// <summary>
+    /// Gets whether the running transfer's <c>%{xfer_id}</c> is <see cref="NoTransferId" /> because its <c>-T</c> or
+    /// <c>-F</c> file could not be opened. A transfer reported only because another's file abandoned a <c>-Z</c> run's
+    /// first batch keeps its number (<see cref="stateWhoseSetupAbandonedFirstBatch" />).
+    /// </summary>
+    private bool LostItsTransferNumberToUnopenedFile =>
+        Running.UploadFileCouldNotBeOpened
+        && (stateWhoseSetupAbandonedFirstBatch is null || ReferenceEquals(Running, stateWhoseSetupAbandonedFirstBatch));
+
+    /// <summary>
     /// Tells whether a transfer got as far as a connection of its own: every transfer does
-    /// but one whose URL curl rejects before connecting, with exit 1 or 3. curl 8.21.0 printed
+    /// but one curl refuses before connecting, for a rejected URL (exit 1 or 3) or a malformed
+    /// <c>--resolve</c> entry (exit 49; <c>-1</c> measured on curl 8.22.0, BL-6022). curl 8.21.0 printed
     /// <c>conn_id</c> <c>0</c> for a refused connection (exit 7) and <c>-1</c> for a rejected
     /// URL (exit 3); no connection is reused, so each transfer that connects takes the next number
     /// (measured 2026-09-26, BL-284 Notes).
@@ -3874,7 +3983,14 @@ internal sealed class CurlCommandRunner(
     private static bool UsedAConnection(TransferResult result) =>
         result.ExitCode is not CurlExitCode.UrlMalformat
         && !IsUnsupportedProtocolRejection(result)
+        && !IsMalformedResolveRejection(result)
         && !IsIpfsGatewayFailure(result);
+
+    /// <summary>Tells whether a result is the exit 49 refusal of a malformed <c>--resolve</c> entry, which happens before any connection.</summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for that refusal; a <c>--connect-to</c> or <c>-t</c> exit 49 is not one.</returns>
+    private static bool IsMalformedResolveRejection(TransferResult result) =>
+        result.ErrorMessage?.StartsWith("Could not parse CURLOPT_RESOLVE entry ", StringComparison.Ordinal) == true;
 
     /// <summary>
     /// Tells whether a result is an exit 1 refusal of a URL's scheme, which happens before any connection;
@@ -4568,7 +4684,7 @@ internal sealed class CurlCommandRunner(
         EasyProxyOptions proxyOptions = EasyOptionsFromCommandLine.ProxyOf(options);
         EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
 
-        if (!TryParseQueriedUrl(url, options, transfer, out CurlUrl? transferUrl, out TransferResult? urlFailure))
+        if (!TryCheckResolveEntriesAndParseUrl(url, options, transfer, out CurlUrl? transferUrl, out TransferResult? urlFailure))
         {
             return urlFailure;
         }

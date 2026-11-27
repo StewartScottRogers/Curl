@@ -94,9 +94,6 @@ public sealed class CurlCommandRunnerFatalErrorTests
     [TestMethod]
     [DataRow("rtsp://h.test/m", "Session: 1", 43, "(43) Session ID cannot be set as a custom header.")]
     [DataRow("telnet://h.test", "x", 48, "(48) An unknown option was passed in to libcurl")]
-    [DataRow("telnet://h.test", "NEW_ENV=nocomma", 43, "(43) A libcurl function was given a bad argument")]
-    [DataRow("telnet://h.test", "TTYPE=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 43, "(43) A libcurl function was given a bad argument")]
-    [DataRow("telnet://h.test", "XDISPLOC=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 43, "(43) A libcurl function was given a bad argument")]
     public async Task RunAsync_FatalSetupFailureUnderParallel_StartsNothingAndAbortsTheOthers(string url, string marker, int code, string line)
     {
         RecordingProtocolHandler http = Handler(CurlExitCode.Ok);
@@ -128,15 +125,38 @@ public sealed class CurlCommandRunnerFatalErrorTests
 
         int exitCode = await RunWithAsync(
             [http, telnet],
-            ["-sS", "-Z", "--parallel-max", "1", "-w", "[%{exitcode}]\n", "telnet://h.test", "-t", "NEW_ENV=nocomma", "--next", "-w", "[%{exitcode}]\n", "http://h.test/hello"]);
+            ["-sS", "-Z", "--parallel-max", "1", "-w", "[%{exitcode}]\n", "telnet://h.test", "-t", "NOPE=1", "--next", "-w", "[%{exitcode}]\n", "http://h.test/hello"]);
 
-        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual(48, exitCode);
         Assert.IsEmpty(http.Contexts);
-        Assert.AreEqual("[43]\n[43]\n", StandardOutputText);
+        Assert.AreEqual("[48]\n[48]\n", StandardOutputText);
         Assert.DoesNotContain("Index", StandardErrorText, StringComparison.Ordinal);
         Assert.AreEqual(
-            "curl: (43) A libcurl function was given a bad argument\ncurl: (43) A libcurl function was given a bad argument\n",
+            "curl: (48) Unknown telnet option NOPE=1\ncurl: (48) Unknown telnet option NOPE=1\n",
             StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("NEW_ENV=nocomma", "")]
+    [DataRow("TTYPE=0123456789012345678901234567890123456789", "")]
+    [DataRow("XDISPLOC=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "")]
+    [DataRow("NEW_ENV=nocomma", "1")]
+    [DataRow("TTYPE=0123456789012345678901234567890123456789", "1")]
+    public async Task RunAsync_TelnetOptionValueCurlJudgesOnlyOnSubnegotiationUnderParallel_StartsEveryTransfer(string option, string parallelMax)
+    {
+        RecordingProtocolHandler http = Handler(CurlExitCode.Ok);
+        RecordingProtocolHandler telnet = new("telnet", _ => ValueTask.FromResult(TransferResult.Success(0)));
+        string[] maximum = parallelMax.Length == 0 ? [] : ["--parallel-max", parallelMax];
+
+        int exitCode = await RunWithAsync(
+            [http, telnet],
+            ["-sS", "-Z", .. maximum, "-w", "[%{exitcode}]\n", "telnet://h.test", "-t", option, "--next", "-w", "[%{exitcode}]\n", "http://h.test/hello"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(1, telnet.Contexts);
+        Assert.HasCount(1, http.Contexts);
+        Assert.AreEqual("[0]\nhi[0]\n", StandardOutputText);
+        Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
     [TestMethod]
@@ -147,12 +167,12 @@ public sealed class CurlCommandRunnerFatalErrorTests
 
         int exitCode = await RunWithAsync(
             [http, telnet],
-            ["-sS", "-Z", "--parallel-max", "1", "-w", "[%{exitcode}]\n", "http://h.test/hello", "--next", "-w", "[%{exitcode}]\n", "telnet://h.test", "-t", "NEW_ENV=x", "--next", "-w", "[%{exitcode}]\n", "http://h.test/hello"]);
+            ["-sS", "-Z", "--parallel-max", "1", "-w", "[%{exitcode}]\n", "http://h.test/hello", "--next", "-w", "[%{exitcode}]\n", "telnet://h.test", "-t", "NOPE=1", "--next", "-w", "[%{exitcode}]\n", "http://h.test/hello"]);
 
-        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual(48, exitCode);
         Assert.HasCount(1, http.Contexts);
         Assert.IsEmpty(telnet.Contexts);
-        Assert.AreEqual("hi[0]\n[43]\n", StandardOutputText);
+        Assert.AreEqual("hi[0]\n[48]\n", StandardOutputText);
         Assert.DoesNotContain("Index", StandardErrorText, StringComparison.Ordinal);
     }
 

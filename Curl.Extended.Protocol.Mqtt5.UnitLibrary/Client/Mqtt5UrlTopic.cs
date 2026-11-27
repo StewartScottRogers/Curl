@@ -1,4 +1,5 @@
 using Curl.Extended.Protocol.Mqtt5.Packets;
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Mqtt5.Client;
@@ -8,7 +9,7 @@ internal static class Mqtt5UrlTopic
 {
     /// <summary>
     /// The URL's topic. A URL with no path after '/' ends the transfer with <see cref="CurlExitCode.UrlMalformat"/>, as
-    /// curl's <c>mqtt://</c> does.
+    /// curl's <c>mqtt://</c> does; so does a topic that decodes to bytes that are not valid UTF-8 (ADR-1429).
     /// </summary>
     internal static string Decode(CurlUrl url)
     {
@@ -18,6 +19,7 @@ internal static class Mqtt5UrlTopic
             throw new Mqtt5ClientException(CurlExitCode.UrlMalformat, Mqtt5ClientMessages.NoTopic);
         }
 
-        return Uri.UnescapeDataString(path[1..]);
+        return UrlPercentDecoding.Utf8TextOf(path[1..])
+            ?? throw new Mqtt5ClientException(CurlExitCode.UrlMalformat, Mqtt5ClientMessages.TopicNotUtf8);
     }
 }

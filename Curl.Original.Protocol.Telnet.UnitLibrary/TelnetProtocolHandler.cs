@@ -282,7 +282,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
                 }
             }
 
-            if (await TrySendUploadAsync(upload, connection, cancellationToken).ConfigureAwait(false) is { } uploadFailure)
+            if (await TrySendUploadAsync(upload, connection, outbox, cancellationToken).ConfigureAwait(false) is { } uploadFailure)
             {
                 ObserveFault(read ?? Task.CompletedTask);
                 return SendFailure(uploadFailure, bytesWritten);
@@ -337,6 +337,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         }
 
         bytesWritten += data.Count;
+        outbox.NoteDataWritten(data.Count);
         context.Progress.ReportDownloaded(bytesWritten, null);
         if (await TrySendRepliesAsync(outbox, connection, context.CancellationToken).ConfigureAwait(false) is { } sendFailure)
         {
@@ -385,8 +386,9 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     /// The result for a read the connection fails. A receive failure
     /// (<see cref="TelnetOutbox.FailedReadIsReceiveError" />) is exit 56, with the socket
     /// filter's <c>Recv failure:</c> text for a socket error: every reset as curl 8.18.0 on
-    /// Linux ends it (measured, BL-5918), and a reset during the option negotiation as curl
-    /// 8.23.0 on Windows ends it (measured, BL-5882). Any other ends the session like a
+    /// Linux ends it (measured, BL-5918), and on Windows a reset during the option
+    /// negotiation (measured against curl 8.23.0, BL-5882) or one that struck an upload the
+    /// server had yet to answer (BL-6012, ADR-1418). Any other ends the session like a
     /// close, with exit 0: curl on Windows sees a reset of an idle session as the socket's
     /// close event.
     /// </summary>
@@ -507,15 +509,23 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     /// <summary>
     /// Sends the upload's next buffer, IAC doubled, when its read has completed, returning
     /// <see langword="null" /> when it went or there was none to send, or the failure when
-    /// the connection did not take it.
+    /// the connection did not take it. The send is noted in <paramref name="outbox" />, which
+    /// judges a read that fails later by it.
     /// </summary>
     private static async Task<IOException?> TrySendUploadAsync(
         TelnetUploadReader? upload,
         IConnection connection,
-        CancellationToken cancellationToken) =>
-        upload?.TakeCompletedBuffer() is { } bytes
-            ? await TrySendAsync(connection, EscapeInterpretAsCommand(bytes), cancellationToken).ConfigureAwait(false)
-            : null;
+        TelnetOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        if (upload?.TakeCompletedBuffer() is not { } bytes)
+        {
+            return null;
+        }
+
+        outbox.NoteUploadSent();
+        return await TrySendAsync(connection, EscapeInterpretAsCommand(bytes), cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// When the server closed (<paramref name="ended" /> is exit 0), sends every buffer of the

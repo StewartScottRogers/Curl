@@ -42,7 +42,7 @@ internal sealed class OcspTestPki : IDisposable
         ResponderName = Ca.SubjectName.RawData,
     };
 
-    /// <summary>A responder certificate the CA issues, with the given extended key usages.</summary>
+    /// <summary>A responder certificate the CA signs, with the given extended key usages, valid from 2026-01-01 so the tests' fixed times fall within it.</summary>
     public X509Certificate2 IssueResponder(ECDsa key, params string[] keyUsages)
     {
         X509CertificateRequest request = new("CN=Test OCSP Responder", key, HashAlgorithmName.SHA256);
@@ -57,7 +57,16 @@ internal sealed class OcspTestPki : IDisposable
             request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(usages, true));
         }
 
-        return Issue(request, [0x77]);
+        DateTimeOffset notBefore = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        return request.Create(Ca.SubjectName, X509SignatureGenerator.CreateForECDsa(CaKey), notBefore, DateTimeOffset.UtcNow.AddDays(29), [0x77]);
+    }
+
+    /// <summary>A responder certificate the CA signs for OCSP signing, valid from <paramref name="notBefore" /> to <paramref name="notAfter" />.</summary>
+    public X509Certificate2 IssueResponderValid(ECDsa key, DateTimeOffset notBefore, DateTimeOffset notAfter)
+    {
+        X509CertificateRequest request = new("CN=Test OCSP Responder", key, HashAlgorithmName.SHA256);
+        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(OcspSigningOid)], false));
+        return request.Create(Ca.SubjectName, X509SignatureGenerator.CreateForECDsa(CaKey), notBefore, notAfter, [0x79]);
     }
 
     /// <summary>A responder certificate with OCSP signing that names the CA as issuer but is signed by another key.</summary>

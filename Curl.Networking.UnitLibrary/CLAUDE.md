@@ -49,7 +49,13 @@ cut to the signature schemes and groups the client can honour, and the options c
 captures the first record and rebuilds it from the profile. Both providers judge the server's certificate with
 `ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
 exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which
-builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert` through
+builds the chain and the `SslPolicyErrors` `SslStream` would. Every chain build this project makes
+itself goes through `CertificateChainBuild`: .NET on Linux throws for OpenSSL's error 1 (a name
+constraint that does not decode), which it answers as a refused, empty chain whose verify result is
+1 (ADR-1446, BL-6061); `SslStream`'s own build inside a handshake does not go through it, so when that
+build throws, the OpenSSL build's `SslStreamTlsProvider` recognises it through
+`CertificateChainBuild.EndedHandshakeAsUnspecified` and answers exit 60 with verify result 1, or under
+`-k` keeps the exit 35 connect error and reports the verify result alone (ADR-1452, BL-6063). Both load `--cert` through
 `ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
 `--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included,
 except in the Schannel build with `--cacert`, which judges the pin first (ADR-0504, BL-2270):
@@ -423,10 +429,23 @@ malformed one with a `ServiceBindingFailure`.
 `DohDnsResolver` (ADR-0152 and its BL-641 amendment) is the `IDnsResolver` behind `--doh-url`. It
 takes an `IConnector` for the DoH connections (a `TcpConnector` of its own, built with the system
 resolver and the DoH TLS options) and the DoH URL, and for each name POSTs the A query and the AAAA
-query in parallel on two connections, A first, each request written byte for byte as curl 8.21.0
+query, A first (on two connections at once for a first name over plain HTTP; over TLS and for later names as below), each request written byte for byte as curl 8.21.0
 writes it (no `User-Agent`; `Host` with the port only when it is not the default). The target
-carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohResponseReader` reads the
-response as curl does: `Content-Type` ignored, a `Content-Length`, chunked or close-delimited
+carries `PoolScheme` `https` and names `h2`, `http/1.1` as its `ApplicationProtocols` (ADR-1424), so
+the handshake offers both; a connection that picked `h2` carries the same POST on a stream of a
+`Curl.Http2` connection, its answer read from the HEADERS and DATA frames (`DohDnsResolver.Http2.cs`,
+STD-221), with the `-v` lines `using HTTP/2` and `[HTTP/2] [1]`. Per ADR-1435 (BL-6038), over TLS the
+second address query waits for the first one's connection, as curl's `CURLOPT_PIPEWAIT` does: on `h2`
+it is stream 3 of that connection (A on 1, AAAA on 3, one connection number, outcomes in the order the
+streams end, `left intact` once), and traced, `DohPipeWaitTraceEvents` writes curl 8.18.0's waiting
+lines after the first `Trying` (not through a proxy); on HTTP/1.x it runs after the first one's answer.
+Per ADR-1441 (BL-6051) the resolver keeps every connection a response leaves open (`DohConnection`,
+`DohDnsResolver.ConnectionReuse.cs`) until `DisposeAsync`: a later query takes the kept `h2` one
+(a name's two queries on its next two streams) or the lowest-numbered kept HTTP/1.x one, writing
+`Reusing existing https: connection with host H`, else opens one; a kept connection that answers
+nothing is replaced and the query asked again. One lookup holds a connection at a time, so a lookup
+beside another opens its own. `DohResponseReader` reads the
+HTTP/1.x response as curl does: `Content-Type` ignored, a `Content-Length`, chunked or close-delimited
 (CGR-160, BL-3689) body of at most 3000 bytes, anything else a failure; it hands on the status code, and a status outside 200-299
 fails the query undecoded with `[DoH] [DoH] [A] error: HTTP status N`, as curl 8.22.0's
 `doh_probe_done` does (BL-2972). It returns the AAAA answer's addresses, then the A

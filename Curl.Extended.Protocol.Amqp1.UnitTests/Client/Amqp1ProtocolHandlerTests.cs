@@ -127,5 +127,17 @@ public sealed class Amqp1ProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { "amqp1", "amqp1s" }, new Amqp1ProtocolHandler(new ScriptedAmqp1Connector(ConnectResult.Refused("x"))).SupportedSchemes.ToArray());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_AddressNotUtf8_FailsWithExit3BeforeConnecting()
+    {
+        ScriptedAmqp1Connector connector = new(ConnectResult.Connected(new ScriptedAmqp1Connection([])));
+
+        TransferResult result = await new Amqp1ProtocolHandler(connector).ExecuteAsync(Context("amqp1://broker/q%E9", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual("The AMQP 1.0 address in the URL is not valid UTF-8", result.ErrorMessage);
+        Assert.IsNull(connector.Target);
+    }
+
     private static TransferContext Context(string url, Stream output) => new() { Url = CurlUrl.Parse(url), Output = output };
 }

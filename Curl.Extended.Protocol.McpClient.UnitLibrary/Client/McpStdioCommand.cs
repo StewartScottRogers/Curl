@@ -1,3 +1,4 @@
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.McpClient.Client;
@@ -14,9 +15,10 @@ namespace Curl.Extended.Protocol.McpClient.Client;
 internal sealed record McpStdioCommand(string FileName, IReadOnlyList<string> Arguments)
 {
     /// <summary>Reads the command from <paramref name="url"/>, or gives <see langword="null"/> when it names a remote host or no program.</summary>
+    /// <exception cref="McpClientException">The program or an argument is not valid UTF-8 once decoded (exit 3, ADR-1429).</exception>
     public static McpStdioCommand? From(CurlUrl url)
     {
-        string path = Uri.UnescapeDataString(url.AbsolutePath);
+        string path = TextOf(url.AbsolutePath, "program");
         bool isLocal = string.Equals(url.Host, "localhost", StringComparison.OrdinalIgnoreCase);
         if (!isLocal || path.Length <= 1)
         {
@@ -34,5 +36,9 @@ internal sealed record McpStdioCommand(string FileName, IReadOnlyList<string> Ar
         path.IndexOf('/', 1) < 0 || (char.IsAsciiLetter(path[1]) && path[2] == ':') ? path[1..] : path;
 
     private static string[] ArgumentsOf(string? query) =>
-        string.IsNullOrEmpty(query) ? [] : [.. query.Split('&').Select(Uri.UnescapeDataString)];
+        string.IsNullOrEmpty(query) ? [] : [.. query.Split('&').Select(argument => TextOf(argument, "argument"))];
+
+    private static string TextOf(string escaped, string field) =>
+        UrlPercentDecoding.Utf8TextOf(escaped)
+            ?? throw new McpClientException(CurlExitCode.UrlMalformat, $"The MCP {field} in the URL is not valid UTF-8");
 }

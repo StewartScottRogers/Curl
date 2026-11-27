@@ -124,6 +124,18 @@ public sealed class StompProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DestinationEscapesThatAreNotUtf8_EndsWithUrlMalformatBeforeConnecting()
+    {
+        ScriptedStompConnector connector = new(ConnectResult.Refused("x"));
+
+        TransferResult result = await new StompProtocolHandler(connector).ExecuteAsync(Context("stomp://broker/queue/s%E9", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual("The STOMP destination in the URL is not valid UTF-8", result.ErrorMessage);
+        Assert.IsNull(connector.Target);
+    }
+
+    [TestMethod]
     [DataRow("a\nb", "p", "X: y", "login")]
     [DataRow("u", "a\rb", "X: y", "passcode")]
     [DataRow("u", "p", "host: /\nlogin:x", "host")]

@@ -1,5 +1,6 @@
 using Curl.Extended.Protocol.GoogleCloudStorage.Http;
 using Curl.Extended.Protocol.GoogleCloudStorage.Signing;
+using Curl.Extension.Abstractions;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
@@ -11,6 +12,7 @@ namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 /// access token; otherwise <c>--user ACCESS_ID:SECRET</c> signs with an HMAC key; with neither the requests go
 /// unauthenticated, for public objects. A region other than <c>auto</c> is named in curl's own
 /// <c>--aws-sigv4 provider1:provider2:region:service</c> form (ADR-1191). The server is <see cref="GcsEndpoint"/>; the requests are <see cref="GcsOperations"/>.
+/// An object name or query that is not valid UTF-8 once percent-decoded ends with exit 3 before any connection (ADR-1429).
 /// </summary>
 /// <param name="connector">Opens each connection.</param>
 /// <param name="environment">Gives an environment variable's value, or <see langword="null"/> when it is unset.</param>
@@ -23,7 +25,11 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        string objectName = ObjectNameOf(context.Url);
+        if (ObjectNameOf(context.Url) is not { } objectName)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, "The Cloud Storage object name in the URL is not valid UTF-8");
+        }
+
         if (RefusalOf(context, objectName) is { } refusal)
         {
             return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
@@ -63,11 +69,8 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
     private static string? BearerTokenOf(ITransferContext context) =>
         context.Http?.BearerToken is { } token && !string.IsNullOrWhiteSpace(token) ? token : null;
 
-    private static string ObjectNameOf(CurlUrl url)
-    {
-        string path = Uri.UnescapeDataString(url.AbsolutePath);
-        return path[Math.Min(1, path.Length)..];
-    }
+    private static string? ObjectNameOf(CurlUrl url) =>
+        UrlPercentDecoding.Utf8TextOf(url.AbsolutePath) is { } path ? path[Math.Min(1, path.Length)..] : null;
 
     // An unsendable method is refused first; then -r and -C, which only an object download honours.
     private static string? RefusalOf(ITransferContext context, string objectName) =>

@@ -30,6 +30,15 @@ public sealed record HttpRequestOptions
     public IReadOnlyList<string> Headers { get; init; } = [];
 
     /// <summary>
+    /// Gets the header values a <c>--digest</c> or NTLM probe, the request sent first with an
+    /// empty body in place of its own, carries instead of <see cref="Headers" />, in that form;
+    /// <see langword="null" />, as for every command line, when the probe carries
+    /// <see cref="Headers" />. <c>--resumable-upload</c> sets it so the probe of an upload
+    /// append does not say the upload is complete (ADR-1440).
+    /// </summary>
+    public IReadOnlyList<string>? AuthProbeHeaders { get; init; }
+
+    /// <summary>
     /// Gets each <c>--proxy-header</c> value verbatim, in command-line order; empty when
     /// none was given. A request sent to a forward proxy carries them after the
     /// <c>-H</c> values; a request sent to the origin, directly or through a tunnel, never

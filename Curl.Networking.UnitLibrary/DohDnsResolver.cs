@@ -7,13 +7,21 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Resolves a host name through an RFC 8484 DNS-over-HTTPS server, as curl 8.21.0 does for
-/// <c>--doh-url</c> (ADR-0152, BL-641): it POSTs an A query and an AAAA query in parallel, each on
-/// a connection of its own, and returns the AAAA answer's addresses and then the A answer's. Under
-/// <c>-4</c> or <c>-6</c> (<see cref="AddressFamily" />) it sends only that family's query (BL-939).
+/// <c>--doh-url</c> (ADR-0152, BL-641): it POSTs an A query and an AAAA query, as two streams of one
+/// connection to an HTTP/2 server (ADR-1435), and returns the AAAA answer's addresses and then the A
+/// answer's. Under <c>-4</c> or <c>-6</c> (<see cref="AddressFamily" />) it sends only that family's
+/// query (BL-939). It keeps each connection its response leaves open for later queries until it is
+/// disposed (ADR-1441): a later name's queries both go on the kept HTTP/2 connection, or each on a
+/// kept HTTP/1.x one or a new one, and over TLS an HTTP/1.x server's second query of the first name
+/// waits for the first one's answer and goes on its connection.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Each POST is the one curl sends, byte for byte: <c>POST &lt;path&gt; HTTP/1.1</c>, <c>Host</c>
+/// An <c>https://</c> DoH URL's handshake offers <c>h2</c> and <c>http/1.1</c> through ALPN, and a
+/// server that picks <c>h2</c> gets the same POST over HTTP/2 (ADR-1424).
+/// </para>
+/// <para>
+/// Over HTTP/1.1 each POST is the one curl sends, byte for byte: <c>POST &lt;path&gt; HTTP/1.1</c>, <c>Host</c>
 /// (with the port only when it is not the scheme's default), <c>Accept: */*</c>,
 /// <c>Content-Type: application/dns-message</c>, <c>Content-Length</c>, and the query
 /// <see cref="DnsQueryEncoder" /> writes; there is no <c>User-Agent</c>. The response is read by
@@ -40,15 +48,6 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
     private readonly ConnectTarget _dohServer;
     private readonly ITransferEvents _dohTrace;
     private readonly Func<CurlExitCode, string> _describeExitCode;
-
-    // The DoH connections opened so far: curl numbers them after the transfer's own #0, so the
-    // first is #1 (ADR-0380).
-    private long _connectionCount;
-
-    // The run's %{conn_id}s the DoH connections have taken: curl reuses an idle DoH connection, so a
-    // query takes a new number only when more queries run at once than numbers were taken (CGR-286).
-    private readonly object _connectionIdsLock = new();
-    private int _connectionIdsTaken;
 
     /// <summary>Initializes a new instance of the <see cref="DohDnsResolver" /> class.</summary>
     /// <param name="connector">
@@ -95,7 +94,12 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
         _dohTrace = dohTrace;
         _describeExitCode = describeExitCode;
         var isHttps = string.Equals(dohUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
-        _dohServer = new ConnectTarget(dohUrl.IdnHost, dohUrl.Port, isHttps) { PoolScheme = dohUrl.Scheme };
+        // curl asks its DoH sub-transfers for HTTP/2 over TLS, so the handshake offers h2 first (ADR-1424).
+        _dohServer = new ConnectTarget(dohUrl.IdnHost, dohUrl.Port, isHttps)
+        {
+            PoolScheme = dohUrl.Scheme,
+            ApplicationProtocols = isHttps ? HttpApplicationProtocols.H2ThenHttp11 : null,
+        };
     }
 
     /// <summary>
@@ -108,33 +112,24 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
 
     /// <summary>
     /// Gets the function that takes the run's next <c>%{conn_id}</c>, called once for each DoH connection
-    /// curl opens (one per query running at once, reused by later queries) so the connection numbers
-    /// <c>-v</c> prints for the transfer's own connections count them (CGR-286); <see langword="null" /> to take none.
+    /// opened so the connection numbers <c>-v</c> prints for the transfer's own connections count them
+    /// (CGR-286); the DoH connection's own <c>-v</c> number is the one taken when that is past the next
+    /// DoH number (ADR-1441). <see langword="null" /> takes none.
     /// </summary>
     public Func<long>? TakeConnectionId { get; init; }
-
-    // Takes a connection number for each of the queries running at once that no taken number covers.
-    private void TakeConnectionIdsFor(int queriesAtOnce)
-    {
-        lock (_connectionIdsLock)
-        {
-            while (_connectionIdsTaken < queriesAtOnce)
-            {
-                _connectionIdsTaken++;
-                TakeConnectionId?.Invoke();
-            }
-        }
-    }
 
     /// <summary>
     /// Gets the events each DoH sub-transfer reports its own <c>-v</c> lines on, as curl 8.21.0
     /// writes them under <c>--trace-config dns</c>, <c>doh</c> or <c>all</c> (BL-1180): the
-    /// connector's connect lines, <c>using HTTP/1.x</c>, the POST's head and body, <c>upload
+    /// connector's connect lines, <c>using HTTP/1.x</c> or <c>using HTTP/2</c> (then the
+    /// <c>[HTTP/2] [1]</c> stream lines), the POST's head and body, <c>upload
     /// completely sent off</c>, the answer's head and body, <c>Connection #N to host H:P left
     /// intact</c> and <c>DoH request complete, K to go</c>. The composition root wraps them so
     /// each line gets curl 8.22.0's <c>[DoH] </c> prefix. When given, the queries run one after
     /// another, AAAA's whole before A's as curl 8.22.0 runs them, so the lines come in a fixed order (ADR-0380); the default,
-    /// <see cref="NoTransferEvents.Instance" />, reports nothing and runs them in parallel.
+    /// <see cref="NoTransferEvents.Instance" />, reports nothing. Two streams of one HTTP/2 connection
+    /// run together either way, A's first (ADR-1435); an untraced first name over TLS to an HTTP/1.x
+    /// server runs A's query and then AAAA's (ADR-1441), and other untraced queries run in parallel.
     /// </summary>
     public ITransferEvents SubTransferEvents { get; init; } = NoTransferEvents.Instance;
 

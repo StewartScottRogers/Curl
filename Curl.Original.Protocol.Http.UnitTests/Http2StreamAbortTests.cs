@@ -344,13 +344,15 @@ public sealed class Http2StreamAbortTests
 
     private static HttpProtocolHandler Handler(IConnection connection) => new(QueueConnector.For(connection), new SilentAuthenticator());
 
+    // A clock no test advances, unless given one: on the real clock a slow machine can pass the
+    // handler's stream cleanup limit and drop the reset the test expects (BL-6052).
     private static TransferContext Context(HttpVersionPreference version, TimeProvider? time = null, TimeSpan? maxTime = null, bool noBody = false, RecordingTransferEvents? events = null, Stream? output = null, HttpFailMode fail = HttpFailMode.None) =>
         new()
         {
             Url = CurlUrl.Parse("http://example.com/"),
             Output = output ?? new MemoryStream(),
             Http = new HttpRequestOptions { Version = version, Fail = fail },
-            TimeProvider = time ?? TimeProvider.System,
+            TimeProvider = time ?? new FakeTimeProvider(DateTimeOffset.UnixEpoch),
             MaxTime = maxTime,
             NoBody = noBody,
             Events = events ?? new RecordingTransferEvents(),

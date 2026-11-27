@@ -25,6 +25,9 @@ public sealed class FakeConnector : IConnector
     /// </summary>
     public List<byte[]> BytesToRead { get; } = [];
 
+    /// <summary>Gets or sets the ALPN protocol every connection reports the server picked, or <see langword="null" /> for none.</summary>
+    public string? ApplicationProtocol { get; set; }
+
     /// <summary>Gets or sets the exception every opened connection's reads throw, or <see langword="null" /> to answer reads.</summary>
     public Exception? ReadException { get; set; }
 
@@ -69,6 +72,7 @@ public sealed class FakeConnector : IConnector
             new IPEndPoint(IPAddress.Loopback, 50000 + number),
             proxyConnectResponseCode: 200,
             peerCertificates: [new byte[] { (byte)number }],
+            applicationProtocol: ApplicationProtocol,
             unixSocketPath: UnixSocketPath,
             mappedHost: MappedHost,
             mappedPort: MappedPort,

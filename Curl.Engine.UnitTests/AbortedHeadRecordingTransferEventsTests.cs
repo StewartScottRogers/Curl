@@ -33,6 +33,29 @@ public sealed class AbortedHeadRecordingTransferEventsTests
     }
 
     [TestMethod]
+    public void ReportOn_ReplyLinesThatStartNoResponseHead_CountNoHeaderSize()
+    {
+        AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);
+        events.ReportResponseHeader(Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n"));
+        events.ReportConnectionOpened(Opened);
+        events.ReportResponseHeader(Encoding.ASCII.GetBytes("220 hi: there\r\n"));
+
+        TransferReport report = events.ReportOn(new TransferResult(CurlExitCode.OperationTimedOut, 0))!.Report!;
+
+        Assert.AreEqual(37, report.HeaderSize);
+    }
+
+    [TestMethod]
+    public void ReportOn_AnRtspHead_CountsItsBytes()
+    {
+        AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);
+        events.ReportResponseHeader(Encoding.ASCII.GetBytes("RTSP/1.0 200 OK\r\n"));
+        events.ReportResponseHeader(Encoding.ASCII.GetBytes("CSeq: 1\r\n"));
+
+        Assert.AreEqual(26, events.ReportOn(new TransferResult(CurlExitCode.OperationTimedOut, 0))!.Report!.HeaderSize);
+    }
+
+    [TestMethod]
     public void ReportOn_TooSlowAfterTheHead_ReportsTheFirstConnectionEndPointsAndTheBodyBytes()
     {
         AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);

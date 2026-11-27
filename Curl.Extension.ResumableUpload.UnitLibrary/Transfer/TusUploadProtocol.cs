@@ -33,6 +33,10 @@ internal sealed class TusUploadProtocol : IResumableUploadProtocol
         [Resumable, new(TusUploadOffsetField.Name, TusUploadOffsetField.Format(offset)), new("Content-Type", ResumableUploadMediaTypes.TusOffsetOctetStream)];
 
     /// <inheritdoc />
+    /// <remarks>The append's own: a tus server appends nothing for an empty <c>PATCH</c>.</remarks>
+    public IReadOnlyList<KeyValuePair<string, string>> AppendProbeHeaders(long offset) => AppendHeaders(offset);
+
+    /// <inheritdoc />
     public bool TryReadOffset(ResumableUploadExchange response, out long offset) =>
         TusUploadOffsetField.TryParse(response.FindHeader(TusUploadOffsetField.Name), out offset);
 }

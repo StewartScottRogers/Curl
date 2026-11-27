@@ -58,15 +58,15 @@ public sealed class CorruptDeflateMessageTests
     }
 
     [TestMethod]
-    public void Decode_FixedBlockWithDistanceTooFarBack_FailsWithGenericText()
+    public void Decode_FixedBlockWithDistanceTooFarBack_FailsWithInvalidDistanceTooFarBack()
     {
-        Assert.AreEqual(HttpTransferMessages.BadContentEncoding, Fail(HttpContentCoding.Gzip, [0x78, 0x9C, 0x03, 0x02, 0, 0]));
+        Assert.AreEqual(HttpTransferMessages.InvalidDistanceTooFarBack, Fail(HttpContentCoding.Gzip, [0x78, 0x9C, 0x03, 0x02, 0, 0]));
     }
 
     [TestMethod]
-    public void Decode_StoredBlockWithAgreeingLengthsThenReservedBlock_FailsWithGenericText()
+    public void Decode_StoredBlockWithAgreeingLengthsThenReservedBlock_FailsWithInvalidBlockType()
     {
-        Assert.AreEqual(HttpTransferMessages.BadContentEncoding, Fail(HttpContentCoding.Gzip, [0x78, 0x9C, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x07, 0, 0]));
+        Assert.AreEqual(HttpTransferMessages.InvalidBlockType, Fail(HttpContentCoding.Gzip, [0x78, 0x9C, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x07, 0, 0]));
     }
 
     private static string Fail(HttpContentCoding coding, byte[] body)

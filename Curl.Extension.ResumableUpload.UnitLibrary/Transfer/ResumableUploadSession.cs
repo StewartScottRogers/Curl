@@ -34,18 +34,24 @@ internal sealed class ResumableUploadSession(ITransferContext context, Func<ITra
     /// <summary>Sends one request and reads its final response whole.</summary>
     /// <param name="method">The request method.</param>
     /// <param name="uri">Where the request goes.</param>
-    /// <param name="headers">The flow's header fields; <c>-H</c>'s follow, except one naming a flow field or <c>Content-Length</c>.</param>
+    /// <param name="headers">The flow's header fields; <c>-H</c>'s follow, except one naming a flow field or <c>Content-Length</c>, and, on a request without a body, <c>Transfer-Encoding</c>.</param>
     /// <param name="body">The whole upload, seekable, or <see langword="null" /> for a request without a body.</param>
     /// <param name="offset">Where in <paramref name="body" /> the request's content starts.</param>
+    /// <param name="probeHeaders">The flow's header fields for the empty authentication probe curl's handler may send before the content, <c>-H</c>'s following as for <paramref name="headers" />; <see langword="null" /> to probe with <paramref name="headers" />.</param>
     /// <returns>The request and its final response.</returns>
     /// <exception cref="ResumableUploadTransferException">The transfer failed; a connection that broke or answered nothing can be resumed.</exception>
     public async Task<ResumableUploadExchange> SendAsync(
-        string method, Uri uri, IReadOnlyList<KeyValuePair<string, string>> headers, Stream? body = null, long offset = 0)
+        string method,
+        Uri uri,
+        IReadOnlyList<KeyValuePair<string, string>> headers,
+        Stream? body = null,
+        long offset = 0,
+        IReadOnlyList<KeyValuePair<string, string>>? probeHeaders = null)
     {
         var output = new MemoryStream();
         var head = new MemoryStream();
         var content = body is null ? null : new UploadRemainderStream(body, offset);
-        var result = await next(RequestFor(method, uri, headers, content, output, head));
+        var result = await next(RequestFor(method, uri, headers, probeHeaders, content, output, head));
         if (result.ExitCode != CurlExitCode.Ok)
         {
             throw new ResumableUploadTransferException(result.ExitCode, result.ErrorMessage ?? string.Empty, CanResume(result.ExitCode));
@@ -58,13 +64,19 @@ internal sealed class ResumableUploadSession(ITransferContext context, Func<ITra
         new(method, uri, report?.ResponseCode ?? 0, report?.ResponseHeaders ?? [], head.ToArray(), output.ToArray());
 
     private ResumableUploadRequestContext RequestFor(
-        string method, Uri uri, IReadOnlyList<KeyValuePair<string, string>> headers, Stream? content, Stream output, Stream head)
+        string method,
+        Uri uri,
+        IReadOnlyList<KeyValuePair<string, string>> headers,
+        IReadOnlyList<KeyValuePair<string, string>>? probeHeaders,
+        Stream? content,
+        Stream output,
+        Stream head)
     {
         var sameOrigin = SameOrigin(uri);
         return new ResumableUploadRequestContext(
             context,
             CurlUrl.Parse(uri.AbsoluteUri, pathAsIs: true),
-            HttpFor(method, headers, sameOrigin),
+            HttpFor(method, headers, probeHeaders, content is not null, sameOrigin),
             content,
             method == "HEAD",
             output,
@@ -74,13 +86,15 @@ internal sealed class ResumableUploadSession(ITransferContext context, Func<ITra
 
     private static bool CanResume(CurlExitCode exitCode) => ConnectionBreaks.Contains(exitCode);
 
-    private HttpRequestOptions HttpFor(string method, IReadOnlyList<KeyValuePair<string, string>> own, bool sameOrigin)
+    private HttpRequestOptions HttpFor(
+        string method, IReadOnlyList<KeyValuePair<string, string>> own, IReadOnlyList<KeyValuePair<string, string>>? probe, bool hasContent, bool sameOrigin)
     {
         var http = context.Http ?? new HttpRequestOptions();
         return http with
         {
             CustomMethod = method == "HEAD" ? null : method,
-            Headers = [.. own.Select(field => $"{field.Key}: {field.Value}"), .. http.Headers.Where(line => IsSent(line, own, sameOrigin))],
+            Headers = HeaderLines(http, own, hasContent, sameOrigin),
+            AuthProbeHeaders = probe is null ? null : HeaderLines(http, probe, hasContent, sameOrigin),
             Body = null,
             RequestTarget = null,
             Fail = HttpFailMode.None,
@@ -89,14 +103,20 @@ internal sealed class ResumableUploadSession(ITransferContext context, Func<ITra
         };
     }
 
-    private static bool IsSent(string line, IReadOnlyList<KeyValuePair<string, string>> own, bool sameOrigin)
+    private static List<string> HeaderLines(HttpRequestOptions http, IReadOnlyList<KeyValuePair<string, string>> own, bool hasContent, bool sameOrigin) =>
+        [.. own.Select(field => $"{field.Key}: {field.Value}"), .. http.Headers.Where(line => IsSent(line, own, hasContent, sameOrigin))];
+
+    private static bool IsSent(string line, IReadOnlyList<KeyValuePair<string, string>> own, bool hasContent, bool sameOrigin)
     {
         var colon = line.IndexOf(':');
         var name = (colon < 0 ? line : line[..colon]).Trim();
-        return !name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)
-            && !own.Any(field => field.Key.Equals(name, StringComparison.OrdinalIgnoreCase))
-            && (sameOrigin || !IsCredential(name));
+        return !IsReplaced(name, own, hasContent) && (sameOrigin || !IsCredential(name));
     }
+
+    private static bool IsReplaced(string name, IReadOnlyList<KeyValuePair<string, string>> own, bool hasContent) =>
+        name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)
+        || (!hasContent && name.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
+        || own.Any(field => field.Key.Equals(name, StringComparison.OrdinalIgnoreCase));
 
     private static bool IsCredential(string name) =>
         name.Equals("Authorization", StringComparison.OrdinalIgnoreCase)

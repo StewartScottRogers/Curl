@@ -9,7 +9,8 @@ namespace Curl.Extension.Composition;
 /// extension task adds its own line and nothing else here; the file is marked <c>merge=union</c> in
 /// <c>.gitattributes</c> and listed in <c>Tasks/SharedListFiles.txt</c>, so lanes adding different extensions
 /// do not overlap. A host passes them to <see cref="TransferHooks.ActivatedBy" /> for each option group. Plain
-/// method references, no reflection, so native AOT sees every type.
+/// method references, no reflection, so native AOT sees every type. A hook that sends several requests, or changes a
+/// request's method or URL, is listed before the <c>--dpop</c> hook, so each request is signed on its own (ADR-1439).
 /// </summary>
 public static class ExtensionTransferHookCatalogue
 {
@@ -27,7 +28,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.HttpCache.HttpCacheExtension.HookFor,
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.HookFor,
         OAuth2.Options.OAuth2Options.ActivatedBy,
-        Curl.Extension.Dpop.DpopExtension.HookFor,
         Curl.Extension.ResumableUpload.ResumableUploadExtension.HookFor,
         Curl.Extension.WebDavTools.WebDavToolsExtension.HookFor,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.HookFor,
@@ -45,6 +45,7 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.WebSocketExtendedConnect.Option.WebSocketExtendedConnectExtension.HookFor,
         Curl.Extension.GrpcWeb.GrpcWebExtension.HookFor,
         Curl.Extension.RecordReplay.RecordReplayExtension.HookFor,
+        Curl.Extension.Dpop.DpopExtension.HookFor,
         Curl.Extended.Protocol.DnsQuery.Client.DnsQueryExtension.HookFor,
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.HookFor,
         Curl.Extended.Protocol.Grpc.Client.GrpcExtension.HookFor,

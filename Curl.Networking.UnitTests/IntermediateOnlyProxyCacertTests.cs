@@ -151,6 +151,55 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
     }
 
+    // CryptoAPI reports a certificate listed on an expired list revoked, which --ssl-revoke-best-effort does not tolerate (STD-216).
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void VerifyPeer_ExpiredListRevokingTheLeaf_IsRevoked(bool revokeBestEffort)
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var expired = pki.BuildCrlOfIssuer([pki.LeafSerial], DateTimeOffset.UtcNow.AddDays(-3));
+
+        var failure = VerifyStubbed(pki, expired, revokeBestEffort);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_ExpiredListWithoutTheLeafAndRevokeBestEffort_Accepts()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        Assert.IsNull(VerifyStubbed(pki, pki.BuildCrlOfIssuer([], DateTimeOffset.UtcNow.AddDays(-3)), revokeBestEffort: true));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void VerifyPeer_ExpiredFirstListAndCurrentSecondList_TheCurrentOneAnswers(bool currentRevokes)
+    {
+        using var pki = new Pki(revokeLeaf: currentRevokes, secondDistributionPoint: SecondPointAddress);
+        var expired = pki.BuildCrlOfIssuer(currentRevokes ? [] : [pki.LeafSerial], DateTimeOffset.UtcNow.AddDays(-3));
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? pki.CrlBytes : expired, NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.AreEqual(currentRevokes ? TlsFailureMessages.SchannelChainRevoked : null, failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_ExpiredFirstListRevokingTheLeafAndSecondUnfetchable_IsRevoked()
+    {
+        using var pki = new Pki(revokeLeaf: false, secondDistributionPoint: SecondPointAddress);
+        var expired = pki.BuildCrlOfIssuer([pki.LeafSerial], DateTimeOffset.UtcNow.AddDays(-3));
+
+        var failure = VerifyStubbedWith(
+            pki, (uri, _) => uri.AbsolutePath == "/second.crl" ? throw new IOException("404") : expired, NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+    }
+
     [TestMethod]
     public void VerifyPeer_ListNamingNoNextUpdateWithoutTheLeaf_Succeeds()
     {
@@ -651,9 +700,9 @@ public sealed class IntermediateOnlyProxyCacertTests
         return verification.VerifyPeer(errors, chain, Host, []);
     }
 
-    private (CurlExitCode ExitCode, string Message)? VerifyStubbed(Pki pki, byte[]? list)
+    private (CurlExitCode ExitCode, string Message)? VerifyStubbed(Pki pki, byte[]? list, bool revokeBestEffort = false)
     {
-        var verification = ProxyVerification(pki.Intermediate, skipRevocationCheck: false, list, stubStatuses: true);
+        var verification = ProxyVerification(pki.Intermediate, skipRevocationCheck: false, list, stubStatuses: true, revokeBestEffort);
         var (chainPolicy, _, _) = verification.ReadTrustAnchors();
         chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
         chainPolicy.ExtraStore.Add(pki.Intermediate);
@@ -662,13 +711,13 @@ public sealed class IntermediateOnlyProxyCacertTests
         return verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, []);
     }
 
-    private ServerCertificateVerification ProxyVerification(X509Certificate2 anchor, bool skipRevocationCheck, byte[]? list, bool stubStatuses = false)
+    private ServerCertificateVerification ProxyVerification(X509Certificate2 anchor, bool skipRevocationCheck, byte[]? list, bool stubStatuses = false, bool revokeBestEffort = false)
     {
         var caFile = Path.Combine(_directory, "proxy-cacert.pem");
         File.WriteAllText(caFile, anchor.ExportCertificatePem());
         X509ChainStatus[] unknown = [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }];
         X509ChainStatus[] partial = [new() { Status = X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.RevocationStatusUnknown }];
-        var options = new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: skipRevocationCheck);
+        var options = new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: skipRevocationCheck, RevocationCheckBestEffort: revokeBestEffort);
         return stubStatuses
             ? new ServerCertificateVerification(options, true, TimeProvider.System)
             {

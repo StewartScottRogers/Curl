@@ -187,10 +187,10 @@ public sealed class HttpCacheTransferHookTests
     public async Task ExecuteAsync_ACacheDirectoryThatCannotBeWritten_LeavesTheTransferAsItWas()
     {
         var parentFile = _directory + "-file";
-        await File.WriteAllTextAsync(parentFile, "a file, not a directory");
+        var hook = HttpCacheExtension.HookFor(new(new Dictionary<string, string> { [HttpCacheExtension.Option.Name] = Path.Combine(parentFile, "cache") }))!;
+        await File.WriteAllTextAsync(parentFile, "a file, not a directory, made after the hook accepted the path");
         try
         {
-            var hook = HttpCacheExtension.HookFor(new(new Dictionary<string, string> { [HttpCacheExtension.Option.Name] = Path.Combine(parentFile, "cache") }))!;
             var context = Context(Noon);
             var result = await hook.ExecuteAsync(context, Origin(200, "OK", "body", "Cache-Control: max-age=60").Invoke);
 

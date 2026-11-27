@@ -8,6 +8,9 @@ internal static class KafkaClientMessages
     /// <summary>The URL names no topic.</summary>
     internal const string NoTopic = "No Kafka topic found in the URL";
 
+    /// <summary>The URL's topic decodes to bytes that are not valid UTF-8.</summary>
+    internal const string TopicNotUtf8 = "The Kafka topic in the URL is not valid UTF-8";
+
     /// <summary>The URL's path has more than a topic and a partition.</summary>
     internal const string PathTooLong = "Kafka URL path is /topic or /topic/partition";
 
