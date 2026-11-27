@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-6019]
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.Connecting.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerProxyConnectFailTests.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultProxyAuthenticationTests.cs, Curl.Networking.UnitLibrary/TcpConnector.ProxyChallenge.cs, Curl.Networking.UnitLibrary/TcpConnector.ProxyTunnelFailure.cs, Curl.Networking.UnitLibrary/NumberedConnectFailure.cs, Curl.Networking.UnitLibrary/ConnectTunnelVerboseLines.cs, Curl.Networking.UnitTests/TcpConnectorProxyAuthProblemTests.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.Connecting.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerProxyConnectFailTests.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultProxyAuthenticationTests.cs, Curl.Networking.UnitLibrary/TcpConnector.ProxyChallenge.cs, Curl.Networking.UnitLibrary/TcpConnector.ProxyTunnelFailure.cs, Curl.Networking.UnitLibrary/NumberedConnectFailure.cs, Curl.Networking.UnitLibrary/ConnectTunnelVerboseLines.cs, Curl.Networking.UnitLibrary/TcpConnector.HttpProxyTunnel.cs, Curl.Networking.UnitLibrary/TcpConnector.ProxyConnect.cs, Curl.Networking.UnitTests/TcpConnectorProxyAuthProblemTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-27
 ---
 # BL-6024 — Fix fitness finding STD-227: -f with a proxy CONNECT 407 prints a different error text
 
@@ -35,9 +35,9 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] stderr equals REF's line.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] stderr equals REF's line.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -61,9 +61,21 @@ The finding, verbatim:
   `FailedConnectResult`; ADR for the choice. `SocketCallbackConnector.Rewrapped` copies successes only.
 - Requeued: `TcpConnector.cs` is held by BL-6019 (Doing), so `touches` was widened and BL-6019 added to `depends-on`.
 
+- 2026-11-27 (lane 2): done as planned, decided in ADR-1465. `ConnectResult.IsProxyAuthenticationProblem` (set through
+  `WithProxyAuthenticationProblem`, since `ConnectResult` is a class, not a record) is set in `TcpConnector.TunnelFailure` from
+  `ConnectTunnelVerboseLines.DrawsAuthenticationProblem`, the same rule as the `-v` problem line, kept by `NumberedConnectFailure`
+  and `WithTimingsWhenFailedWithout`; `HttpProtocolHandler.FailedConnectStatusMessage` gives `HTTP response code said error` for it.
+  `touches` widened to `TcpConnector.HttpProxyTunnel.cs` (passes the sent `Proxy-Authorization` to `TunnelFailure`) and
+  `TcpConnector.ProxyConnect.cs` (`WithTimingsWhenFailedWithout`); no task in Doing on origin/work/dark-factory names them.
+- Measured with `Record-CurlExchange.ps1` (proxy answering 407 + `Proxy-Authenticate: Basic realm="p"`, the finding's command line):
+  reference curl and Curl both write `curl: (22) HTTP response code said error`, stdout `[22]`, exit 22.
+- Tests: `TcpConnectorProxyAuthProblemTests.cs`, `HttpProtocolHandlerProxyConnectFailTests.cs`, `ConnectResultProxyAuthenticationTests.cs`.
+  Build clean, fast tests green; Measure-CodeQuality for the three libraries: 0 failing members. Platform-neutral (no paths, OS text or certificates).
+
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 47fc27c5 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019; no code written, rule measured and recorded in Notes
 - 2026-11-27: Backlog -> Doing. Criteria at claim: 47fc27c5 69116afe 3d836d5e.
+- 2026-11-27: Doing -> Done. -f with a proxy CONNECT 407 curl gives up on prints curl's 'HTTP response code said error'
