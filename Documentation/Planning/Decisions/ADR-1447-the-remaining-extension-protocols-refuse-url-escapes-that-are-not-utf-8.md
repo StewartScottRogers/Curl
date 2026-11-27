@@ -1,4 +1,4 @@
-# ADR-1446: The remaining extension protocols refuse URL escapes that are not valid UTF-8
+# ADR-1447: The remaining extension protocols refuse URL escapes that are not valid UTF-8
 
 - Status: Accepted
 - Date: 2026-11-26

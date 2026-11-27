@@ -30,7 +30,7 @@ escapes undecoded. Not reproduced yet: confirm each by a unit test first. Use `U
 
 ## Notes
 
-- Confirmed by unit tests; all six now refuse with exit 3 naming the field, before anything connects or starts (ADR-1446).
+- Confirmed by unit tests; all six now refuse with exit 3 naming the field, before anything connects or starts (ADR-1447).
   Refusing rather than sending bytes: every one of these fields is text to its protocol or to this client (the dns name
   is presentation-format ASCII; `\DDD` already names any octet).
 - Azure checks the whole path and query up front, because the Shared Key signer (outside touches) signs them decoded.
@@ -41,4 +41,4 @@ escapes undecoded. Not reproduced yet: confirm each by a unit test first. Use `U
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 11d35580 3d836d5e.
-- 2026-11-26: Doing -> Done. amqp1, s3, gs, az, dns and mcp stdio refuse URL escapes that are not valid UTF-8 with exit 3 naming the part (ADR-1446)
+- 2026-11-26: Doing -> Done. amqp1, s3, gs, az, dns and mcp stdio refuse URL escapes that are not valid UTF-8 with exit 3 naming the part (ADR-1447)
