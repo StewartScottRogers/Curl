@@ -13,7 +13,7 @@ with no .NET runtime to install. Every package is built by the
 
 ## Supported platforms
 
-Current version: **[the latest build](https://github.com/StewartScottRogers/Curl/releases/tag/preview)**, a pre-release rebuilt from `master` on every merge, so these links always give the newest Curl. The newest numbered pre-release is [v0.2.0-preview.1](https://github.com/StewartScottRogers/Curl/releases/tag/v0.2.0-preview.1).
+Current version: **[the latest build](https://github.com/StewartScottRogers/Curl/releases/tag/preview)**, a pre-release rebuilt from `master` on every merge, so these links always give the newest Curl. Numbered releases are listed on the [releases page](https://github.com/StewartScottRogers/Curl/releases).
 
 | Platform | Processor | Package |
 | --- | --- | --- |
