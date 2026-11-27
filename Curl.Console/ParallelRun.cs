@@ -131,22 +131,9 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// <returns><see langword="true" /> when the batch is now complete.</returns>
     internal bool HoldInFirstBatch(Func<Task<bool>> start, Func<TransferResult, Task> abandon)
     {
-        // Each option group hands its dispatch to CloseAtEnd as it ends, so the count tells the groups apart.
-        if (dispatches.Count != optionGroupOfLastHeld)
-        {
-            optionGroupOfLastHeld = dispatches.Count;
-            firstHeldOfLastOptionGroup = heldTransfers.Count;
-        }
-
         heldTransfers.Add((start, abandon));
         return --setupsLeftInFirstBatch == 0;
     }
-
-    /// <summary>The number of option groups that had ended when the last transfer was held.</summary>
-    private int optionGroupOfLastHeld;
-
-    /// <summary>Where, among the held transfers, those of the last held one's option group begin.</summary>
-    private int firstHeldOfLastOptionGroup;
 
     /// <summary>
     /// Ends the first batch and starts its held transfers in order; once one finds the run ended, every
@@ -247,17 +234,10 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// </summary>
     /// <param name="failure">The setup failure.</param>
     /// <returns>A task that completes when the held transfers are reported.</returns>
-    /// <param name="reportsOnlyFirst">Whether, of the last held option group's transfers, only the first is reported,
-    /// every earlier group's held transfer being reported too, as curl 8.22.0 does for a <c>-F</c> file that cannot
-    /// be opened: it abandons the batch while setting up that group's first transfer (STD-123, BL-5812; STD-228,
-    /// BL-6025).</param>
     /// <param name="startsOthersWhenExtraFails">Whether, when the failing transfer is the batch's extra one (past
     /// <c>--parallel-max</c>), the others start and only it is reported, as curl 8.22.0 has started them by then
     /// (STD-169, BL-5817).</param>
-    internal async Task AbandonFirstBatchAsync(
-        TransferResult failure,
-        bool reportsOnlyFirst = false,
-        bool startsOthersWhenExtraFails = false)
+    internal async Task AbandonFirstBatchAsync(TransferResult failure, bool startsOthersWhenExtraFails = false)
     {
         setupsLeftInFirstBatch = 0;
         if (startsOthersWhenExtraFails && heldTransfers.Count - 1 >= maxRunning)
@@ -272,12 +252,7 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
         }
 
         RecordSetupFailure(failure, endsTheRun: true);
-        int reportedCount = reportsOnlyFirst ? firstHeldOfLastOptionGroup + 1 : heldTransfers.Count;
-        foreach ((_, Func<TransferResult, Task> abandon) in heldTransfers.Take(reportedCount))
-        {
-            await abandon(failure).ConfigureAwait(false);
-        }
-
+        await AbandonEachAsync([.. heldTransfers], failure).ConfigureAwait(false);
         heldTransfers.Clear();
     }
 

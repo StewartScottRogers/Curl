@@ -2248,13 +2248,15 @@ internal sealed class CurlCommandRunner(
             failure => ReportSkippedAsync(dispatch, options, transfer, state, failure));
         if (!await UploadFileOpensAsync(transfer.UploadFile).ConfigureAwait(false))
         {
+            stateWhoseSetupAbandonedFirstBatch = state;
             await run.AbandonFirstBatchAsync(CannotOpenUploadFileFailure, startsOthersWhenExtraFails: true).ConfigureAwait(false);
             return true;
         }
 
         if (await FormSetupFailureAsync(options, transfer).ConfigureAwait(false) is { } formFailure)
         {
-            await run.AbandonFirstBatchAsync(formFailure, reportsOnlyFirst: true).ConfigureAwait(false);
+            stateWhoseSetupAbandonedFirstBatch = state;
+            await run.AbandonFirstBatchAsync(formFailure).ConfigureAwait(false);
             return true;
         }
 
@@ -2269,6 +2271,13 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>The fatal setup failure that abandoned a <c>-Z</c> run's first batch, reported as it is.</summary>
     private TransferResult? fatalSetupFailure;
+
+    /// <summary>
+    /// The state of the transfer whose <c>-T</c> or <c>-F</c> file could not be opened while a <c>-Z</c> run's first
+    /// batch was being set up; <see langword="null" /> while none has. curl 8.22.0 prints <c>%{xfer_id}</c> -1 for it
+    /// alone, and each other transfer of the batch keeps its number (measured 2026-11-26, BL-6043).
+    /// </summary>
+    private RunningTransferState? stateWhoseSetupAbandonedFirstBatch;
 
     /// <summary>
     /// Finds the failure curl 8.22.0 meets while setting an <c>rtsp</c> or <c>telnet</c> transfer up, one of its fatal
@@ -2325,9 +2334,10 @@ internal sealed class CurlCommandRunner(
         MultipartFormPartMapping.FromMimeBody(mimePost).Any(part => part.ReadsStandardInput);
 
     /// <summary>
-    /// Sets up the <c>-F</c> form of an option group's last URL in a <c>-Z</c> run's first batch, as curl 8.22.0 sets
+    /// Sets up the <c>-F</c> form of an option group's first URL in a <c>-Z</c> run's first batch, as curl 8.22.0 sets
     /// every handle up before it performs any: a part whose file cannot be opened abandons the batch with exit 26 and
-    /// nothing is sent (STD-123, BL-5441). A form reading standard input is left to the transfer, which must not drain it.
+    /// nothing is sent (STD-123, BL-5441; BL-6043). A form reading standard input is left to the transfer, which must
+    /// not drain it.
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
@@ -2335,7 +2345,7 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult?> FormSetupFailureAsync(CommandLineOptions options, UrlTransfer transfer)
     {
         EasyMimeBody? mimePost = EasyOptionsFromCommandLine.HttpOf(options).MimePost;
-        if (mimePost is null || transfer.UrlIndex != options.Urls.Count - 1 || ReadsStandardInput(mimePost))
+        if (mimePost is null || transfer.UrlIndex != 0 || ReadsStandardInput(mimePost))
         {
             return null;
         }
@@ -3936,7 +3946,7 @@ internal sealed class CurlCommandRunner(
             Scheme = Running.UploadFileCouldNotBeOpened ? null : TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
             Referer = info.Referer ?? options.Referer,
             ConnectionId = connectionId,
-            TransferId = HasNoTransferNumber(result) || Running.UploadFileCouldNotBeOpened ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
+            TransferId = HasNoTransferNumber(result) || LostItsTransferNumberToUnopenedFile ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
             SslVerifyResult = Running.SslVerifyResult,
             ProxySslVerifyResult = Running.ProxySslVerifyResult,
             EarlyDataSent = Running.TlsEarlyDataSent,
@@ -3950,6 +3960,15 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>The <c>%{xfer_id}</c> of what never became a transfer.</summary>
     private const long NoTransferId = -1;
+
+    /// <summary>
+    /// Gets whether the running transfer's <c>%{xfer_id}</c> is <see cref="NoTransferId" /> because its <c>-T</c> or
+    /// <c>-F</c> file could not be opened. A transfer reported only because another's file abandoned a <c>-Z</c> run's
+    /// first batch keeps its number (<see cref="stateWhoseSetupAbandonedFirstBatch" />).
+    /// </summary>
+    private bool LostItsTransferNumberToUnopenedFile =>
+        Running.UploadFileCouldNotBeOpened
+        && (stateWhoseSetupAbandonedFirstBatch is null || ReferenceEquals(Running, stateWhoseSetupAbandonedFirstBatch));
 
     /// <summary>
     /// Tells whether a transfer got as far as a connection of its own: every transfer does
