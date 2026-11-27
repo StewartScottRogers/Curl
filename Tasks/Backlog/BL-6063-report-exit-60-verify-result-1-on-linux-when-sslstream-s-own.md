@@ -18,7 +18,7 @@ On Linux a server certificate that makes OpenSSL answer error 1 during the `SslS
 
 ## Context
 
-Found in BL-6061 (ADR-1445). .NET on Linux builds the chain inside the handshake and throws `CryptographicException` ("... unhandled error code '1'.") before the validation callback, so the failure is caught in `SslStreamTlsProvider`'s handshake and reported as a connect error (exit 35), under `-k` too, where curl goes on. `CertificateChainBuild` already handles the builds Curl makes itself. Read ADR-1442 and ADR-1445; decide what `-k` can do here (routing to the hand-built client is one option).
+Found in BL-6061 (ADR-1446). .NET on Linux builds the chain inside the handshake and throws `CryptographicException` ("... unhandled error code '1'.") before the validation callback, so the failure is caught in `SslStreamTlsProvider`'s handshake and reported as a connect error (exit 35), under `-k` too, where curl goes on. `CertificateChainBuild` already handles the builds Curl makes itself. Read ADR-1442 and ADR-1446; decide what `-k` can do here (routing to the hand-built client is one option).
 
 ## Acceptance criteria
 

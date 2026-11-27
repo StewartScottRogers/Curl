@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins the chain build .NET on Linux cannot finish (ADR-1445): its exception for OpenSSL's error 1
+/// Pins the chain build .NET on Linux cannot finish (ADR-1446): its exception for OpenSSL's error 1
 /// is a refused chain with verify result 1. The exception is thrown here by hand, so every platform runs it.
 /// </summary>
 [TestClass]

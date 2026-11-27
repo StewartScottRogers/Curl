@@ -8,7 +8,7 @@ namespace Curl.Networking;
 /// Builds a certificate chain, and answers for the build .NET on Linux cannot finish: it throws
 /// <see cref="CryptographicException" /> instead of reporting a status when OpenSSL's verification
 /// ends with <c>X509_V_ERR_UNSPECIFIED</c> (1), as for a name constraint that does not decode
-/// (ADR-1445). Such a chain has no elements, and curl reports its verify result as 1.
+/// (ADR-1446). Such a chain has no elements, and curl reports its verify result as 1.
 /// </summary>
 internal static class CertificateChainBuild
 {

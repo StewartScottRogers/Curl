@@ -1571,7 +1571,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         var (chainPolicy, _, _) = verification.ReadTrustAnchors();
         chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
         using var chain = new X509Chain { ChainPolicy = chainPolicy };
-        // As the product builds it: on Linux the build ends with OpenSSL's error 1 for some constraints (ADR-1445).
+        // As the product builds it: on Linux the build ends with OpenSSL's error 1 for some constraints (ADR-1446).
         CertificateChainBuild.Build(chain, leaf);
         return verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, host, []);
     }

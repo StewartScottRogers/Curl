@@ -1,4 +1,4 @@
-# ADR-1445: A chain build that throws for OpenSSL error 1 is verify result 1
+# ADR-1446: A chain build that throws for OpenSSL error 1 is verify result 1
 
 - Status: Accepted
 - Date: 2026-11-26
