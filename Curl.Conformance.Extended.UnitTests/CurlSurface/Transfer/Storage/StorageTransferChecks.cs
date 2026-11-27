@@ -11,7 +11,9 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Storage;
 /// <see cref="StorageTransferClock" /> that moves only when a check advances it. The expected values
 /// come from curl's manual page for curl 8.22.0 ("-v", "-o", "-O", "-w", "--fail", "--fail-with-body",
 /// "-m", "EXIT CODES") and, for a storage service's error status, from ADR-1090 (s3), ADR-1093 (oci),
-/// ADR-1099 (gs) and ADR-1105 (az, abfs, abfss): every status of 300 or more is exit 22.
+/// ADR-1099 (gs) and ADR-1105 (az, abfs, abfss): every status of 300 or more is exit 22. Each class
+/// running them is <c>[DoNotParallelize]</c>, so no other test's handshake disposes a TLS credential
+/// while .NET's credential cache shrinks during one of theirs (BL-6070).
 /// </summary>
 internal static class StorageTransferChecks
 {
@@ -120,7 +122,7 @@ internal static class StorageTransferChecks
     private static Task<CurlRunResult> RunAsync(StorageTransferTarget target, IReferenceServer server, IReadOnlyList<string> arguments, StorageTransferClock? clock = null) =>
         ExtendedConformanceHarness.RunAsync(
             Curl,
-            [ReferenceRoute.Tls(StorageTransferTarget.Port, server, ReferenceCertificate.CreateSelfSigned(target.Host))],
+            [ReferenceRoute.Tls(StorageTransferTarget.Port, server, target.Certificate)],
             ["-sS", "-k", .. target.Credentials, .. arguments],
             timeProvider: clock ?? new StorageTransferClock());
 

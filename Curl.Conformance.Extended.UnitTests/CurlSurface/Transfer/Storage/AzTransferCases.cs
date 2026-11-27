@@ -5,6 +5,7 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Storage;
 
 /// <summary>curl's generic transfer options (BL-4615) for <c>az://</c> against the reference Blob endpoint, reading a public container anonymously; each check is <see cref="StorageTransferChecks" />'s.</summary>
 [TestClass]
+[DoNotParallelize]
 public sealed class AzTransferCases
 {
     private static readonly StorageTransferTarget Target = new(

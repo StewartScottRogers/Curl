@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using Curl.Conformance.Extended.Harness;
 
 namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Storage;
@@ -21,4 +22,11 @@ internal sealed record StorageTransferTarget(
 {
     /// <summary>The port every storage scheme reaches its service on: HTTPS.</summary>
     public const int Port = 443;
+
+    /// <summary>
+    /// The self-signed certificate every check's server presents for <paramref name="Host" />. One per
+    /// target, not one per run: .NET caches a TLS credential per certificate, and shrinking that cache
+    /// as it fills can throw <see cref="ObjectDisposedException" /> inside a handshake (BL-6070).
+    /// </summary>
+    public X509Certificate2 Certificate { get; } = ReferenceCertificate.CreateSelfSigned(Host);
 }

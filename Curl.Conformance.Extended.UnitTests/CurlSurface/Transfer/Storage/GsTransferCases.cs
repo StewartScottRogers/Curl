@@ -5,6 +5,7 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Storage;
 
 /// <summary>curl's generic transfer options (BL-4615) for <c>gs://</c> against the reference Cloud Storage XML API endpoint, anonymously; each check is <see cref="StorageTransferChecks" />'s.</summary>
 [TestClass]
+[DoNotParallelize]
 public sealed class GsTransferCases
 {
     private static readonly StorageTransferTarget Target = new(
