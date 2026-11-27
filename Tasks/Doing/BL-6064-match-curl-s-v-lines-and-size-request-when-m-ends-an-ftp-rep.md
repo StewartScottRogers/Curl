@@ -44,3 +44,4 @@ request size. Measure a `-m` that ends a download part-way before pinning its li
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 6d51bcb6 3dadab5b 1310c14b 3d836d5e.
