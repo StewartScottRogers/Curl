@@ -1504,3 +1504,4 @@ Each option and the specific reason it lost.
 | [1460](ADR-1460-the-http-handler-takes-the-connectors-timed-out-result-else-reports-the-line-itself.md) | The HTTP handler takes the connector's timed-out result, else reports the `-v` line itself (BL-6071) | Accepted | 2026-11-26 |
 | [1461](ADR-1461-a-redialled-connect-holds-back-the-lines-its-first-attempt-reported.md) | A redialled -k connect holds back the lines its first attempt reported (BL-6073) | Accepted | 2026-11-26 |
 | [1462](ADR-1462-a-cancelled-connect-carries-the-resolving-fact-and-a-connection-number-taker.md) | A cancelled connect carries the resolving fact and a connection number taker (BL-6074) | Accepted | 2026-11-26 |
+| [1463](ADR-1463-a-transfer-is-numbered-before-its-doh-url-connections.md) | A transfer is numbered before its `--doh-url` connections (BL-6058) | Accepted | 2026-11-26 |

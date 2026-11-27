@@ -40,11 +40,10 @@ The HTTPS-record query was not measured: no curl on the machine lists `HTTPSRR` 
 - The HTTPS-record query follows the same rules: it goes first (ADR-0727) and the address queries
   reuse its connection.
 - A connection's `-v` number is the `%{conn_id}` it takes when that is past the next DoH number, so a
-  caller that numbers the transfers first gets curl's `#3`. The console numbers a transfer after its
-  DoH look-up, so it prints `#2` there.
+  caller that numbers the transfers first gets curl's `#3`. The console numbers a transfer before its
+  DoH connections (ADR-1463).
 
 ## Consequences
 
 The composition roots do not dispose the resolver yet, so a kept connection stays open until the
-process ends; a follow-up task disposes it. The console's transfer numbering under `--doh-url` is
-another.
+process ends; a follow-up task disposes it.

@@ -65,6 +65,24 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
     internal long TakeConnectionId() => nextConnectionId++;
 
     /// <summary>
+    /// Gets or sets what gives the transfer running in the calling flow its <c>%{conn_id}</c> when it
+    /// holds none, which the curl tool's runner sets; it does nothing by default.
+    /// </summary>
+    internal Action NumberRunningTransfer { get; set; } = static () => { };
+
+    /// <summary>
+    /// Takes the next <c>%{conn_id}</c> for a connection the running transfer's own needs, a
+    /// <c>--doh-url</c> one, once that transfer holds its number (<see cref="NumberRunningTransfer" />):
+    /// curl numbers a connection before it resolves its host (ADR-1463).
+    /// </summary>
+    /// <returns>The sub-transfer connection's number.</returns>
+    internal long TakeSubTransferConnectionId()
+    {
+        NumberRunningTransfer();
+        return TakeConnectionId();
+    }
+
+    /// <summary>
     /// Moves <see cref="SerialTransferStart" /> to now as a serial transfer's attempt starts, after any
     /// <c>--retry</c> wait, so <c>--rate</c> measures from the last attempt's start, as curl 8.21.0's
     /// <c>serial_transfers</c> resets its start on every retry: 503 then 200 with <c>--retry-delay 1</c> and

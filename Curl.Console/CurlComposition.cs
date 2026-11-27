@@ -160,7 +160,22 @@ internal static class CurlComposition
     /// <param name="performer">Takes the run's next <c>%{conn_id}</c> for each DoH connection.</param>
     /// <returns>The transports.</returns>
     internal static CurlTransports CreateNetworkTransports(CommandLineOptions options, ResolverHooks resolverHooks, ConnectionHooks connectionHooks, ConnectionCache runConnections, TlsSessionCache tlsSessions, IDiagnosticLog runLog, DnsCache runDnsCache, TransferPerformer performer) =>
-        CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), resolverHooks.ResolverOver, takeDohConnectionId: performer.TakeConnectionId, extensionDatagramConnector: ExtensionDatagramConnectorOf(connectionHooks));
+        CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), resolverHooks.ResolverOver, takeDohConnectionId: DohConnectionNumbersOf(performer, runConnections), extensionDatagramConnector: ExtensionDatagramConnectorOf(connectionHooks));
+
+    /// <summary>
+    /// Numbers a <c>--doh-url</c> connection after the transfer it resolves for, in both of the run's counts:
+    /// <paramref name="performer" />'s <c>%{conn_id}</c> and <paramref name="runConnections" />' connection
+    /// number, which <c>-v</c> prints and the returned taker gives (ADR-1463).
+    /// </summary>
+    /// <param name="performer">The run's <c>%{conn_id}</c> count.</param>
+    /// <param name="runConnections">The run's connection numbers.</param>
+    /// <returns>The taker of the next DoH connection's number.</returns>
+    private static Func<long> DohConnectionNumbersOf(TransferPerformer performer, ConnectionCache runConnections) =>
+        () =>
+        {
+            performer.TakeSubTransferConnectionId();
+            return runConnections.NumberSubTransferConnection();
+        };
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
@@ -404,6 +419,7 @@ internal static class CurlComposition
     {
         TimeProvider clock = RunClockOf(timeProvider);
         ConnectionCache runConnections = new(clock);
+        TransferPerformer performer = new(clock, EasyErrorText);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         string? dnsServer = HonouredDnsServerOf(honoursDnsServerVariable, environment);
@@ -413,7 +429,7 @@ internal static class CurlComposition
             SharingRunCookies((options, cookies) =>
             {
                 IDnsResolver serverResolver = DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector, clock);
-                IDnsResolver groupResolver = DialingDohResolverOf(options, tcpDialer, serverResolver, clock);
+                IDnsResolver groupResolver = DialingDohResolverOf(options, tcpDialer, serverResolver, clock, DohConnectionNumbersOf(performer, runConnections));
                 return CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(groupResolver), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes, connectionActivators, clock, extensionProcessStarter, BuiltDohResolverOf(groupResolver, serverResolver));
             }),
             RunFileSystemOf(fileSystem),
@@ -439,7 +455,7 @@ internal static class CurlComposition
             parsesAsQuicBuild: parsesAsQuicBuild,
             parsesAsEchBuild: parsesAsEchBuild,
             timeProvider: clock,
-            transferPerformer: new TransferPerformer(clock, EasyErrorText),
+            transferPerformer: performer,
             extendedAttributeWriter: extendedAttributeWriter,
             debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment),
             extensionOptions: extensionOptions);
@@ -490,12 +506,13 @@ internal static class CurlComposition
     /// <param name="tcpDialer">Opens the DoH server connections.</param>
     /// <param name="dnsResolver">The resolver the runner was given.</param>
     /// <param name="clock">The clock the DoH connector's timers run on.</param>
+    /// <param name="takeConnectionId">Takes the number of each DoH connection (<see cref="DohConnectionNumbersOf" />).</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver DialingDohResolverOf(CommandLineOptions options, ITcpDialer tcpDialer, IDnsResolver dnsResolver, TimeProvider clock)
+    internal static IDnsResolver DialingDohResolverOf(CommandLineOptions options, ITcpDialer tcpDialer, IDnsResolver dnsResolver, TimeProvider clock, Func<long> takeConnectionId)
     {
         EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
         return network.DohUrl is { } dohUrl
-            ? CreateDohResolver(dohUrl, CreateDohConnector(EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.TlsOf(options), tcpDialer, clock, dnsResolver), AddressFamilyOf(network), easyErrorText: EasyErrorText)
+            ? CreateDohResolver(dohUrl, CreateDohConnector(EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.TlsOf(options), tcpDialer, clock, dnsResolver), AddressFamilyOf(network), easyErrorText: EasyErrorText, takeConnectionId: takeConnectionId)
             : dnsResolver;
     }
 

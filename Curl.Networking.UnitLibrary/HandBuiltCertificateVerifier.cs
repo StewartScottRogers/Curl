@@ -38,6 +38,12 @@ internal sealed class HandBuiltCertificateVerifier(
     // What SslStream asks of a server certificate's chain: the server authentication usage.
     private static readonly Oid ServerAuthentication = new("1.3.6.1.5.5.7.3.1");
 
+    /// <summary>
+    /// Gets the step that builds the server certificate's chain, the chain's own build by default; a
+    /// test replaces it to stand in for .NET on Linux throwing for OpenSSL's error 1 (ADR-1446, BL-6062).
+    /// </summary>
+    internal Func<X509Chain, X509Certificate2, bool> ChainBuildStep { get; init; } = static (chain, certificate) => chain.Build(certificate);
+
     /// <summary>Gets what the handshake event reports about the certificate once it has been judged.</summary>
     public PeerVerification Observed { get; private set; } = PeerVerification.Unobserved;
 
@@ -142,7 +148,7 @@ internal sealed class HandBuiltCertificateVerifier(
         }
 
         chain.ChainPolicy.ExtraStore.AddRange(sent.Skip(1).ToArray());
-        var errors = CertificateChainBuild.Build(chain, sent[0]) ? SslPolicyErrors.None : SslPolicyErrors.RemoteCertificateChainErrors;
+        var errors = CertificateChainBuild.Build(chain, () => ChainBuildStep(chain, sent[0])) ? SslPolicyErrors.None : SslPolicyErrors.RemoteCertificateChainErrors;
         return MatchesAsCurlDoes(sent[0], SslStreamTlsProvider.VerifiedHostName(targetHost, insecure: false)!)
             ? errors
             : errors | SslPolicyErrors.RemoteCertificateNameMismatch;
