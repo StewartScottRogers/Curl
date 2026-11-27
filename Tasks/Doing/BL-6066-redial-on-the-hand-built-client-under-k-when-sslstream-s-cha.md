@@ -30,3 +30,4 @@ ADR-1452 (BL-6063): `SslStreamTlsProvider` can only report that handshake as exi
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 0c039f9d 23a17329.
