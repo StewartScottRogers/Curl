@@ -55,6 +55,9 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     /// <summary>Gets the pooled connections the attached transfers share under <see cref="CurlLockData.Connect" />.</summary>
     internal ConnectionCache Connections { get; } = new(timeProvider);
 
+    /// <summary>Gets the <c>--doh-url</c> resolvers kept beside <see cref="Connections" />, whose DoH connections the attached transfers share with them (ADR-1454).</summary>
+    internal KeptDohResolver DohResolver { get; } = new();
+
     /// <summary>Gets the HSTS cache the attached transfers share under <see cref="CurlLockData.Hsts" />.</summary>
     internal HstsTransferPolicy Hsts { get; } = new(timeProvider);
 
@@ -85,7 +88,8 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     /// <summary>
     /// <c>curl_share_cleanup</c>: refuses with <see cref="CurlShareCode.InUse" /> while a transfer is attached, without
     /// calling the lock callbacks (upstream test506), else, under the <see cref="CurlLockData.Share" /> lock, starts
-    /// closing the shared connections and frees the handle, so every later call answers <see cref="CurlShareCode.Invalid" />.
+    /// closing the shared connections, the kept <c>--doh-url</c> ones too, and frees the handle, so every later call
+    /// answers <see cref="CurlShareCode.Invalid" />.
     /// </summary>
     /// <returns><see cref="CurlShareCode.Ok" />, or why not.</returns>
     public CurlShareCode Cleanup()
@@ -102,6 +106,7 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
         if (code == CurlShareCode.Ok)
         {
             _ = Connections.DisposeAsync().AsTask();
+            _ = DohResolver.DisposeAsync().AsTask();
         }
 
         return code;
@@ -208,7 +213,10 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
                 tlsSessions,
                 TakeDns(transfer, hostKey, engine.DnsCache),
                 cookies,
-                TakeShared(transfer, CurlLockData.Hsts, Hsts, engine.Hsts));
+                TakeShared(transfer, CurlLockData.Hsts, Hsts, engine.Hsts))
+            {
+                DohResolver = ReferenceEquals(connections, Connections) ? DohResolver : engine.DohResolver,
+            };
         }
     }
 

@@ -6,24 +6,30 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// The <c>--doh-url</c> resolver a library handle keeps from one perform to the next, so a later perform asks the DoH
-/// server over the connections an earlier one opened, as libcurl keeps them in the handle's connection cache
-/// (ADR-1453). It is kept while the options it was built from are unchanged: the TLS options, and the network options
-/// but for the URL and port a perform goes to. Disposing it closes every connection its resolvers kept.
+/// The <c>--doh-url</c> resolvers kept beside one connection cache from perform to perform, so a later perform over
+/// that cache asks the DoH server over the connections an earlier one opened, whichever handle ran it, as libcurl keeps
+/// them in its connection cache (ADR-1453, ADR-1454). There is one resolver for each set of options one was built from:
+/// the TLS options, and the network options but for the URL, the port and the <c>--connect-to</c> mappings a perform
+/// goes to. At most <see cref="MostKept" /> are kept, the one asked for longest ago being closed to make room.
+/// Disposing it closes every connection its resolvers kept; it keeps new ones afterwards.
 /// </summary>
 internal sealed class KeptDohResolver : IAsyncDisposable
 {
+    /// <summary>How many resolvers are kept at once.</summary>
+    internal const int MostKept = 4;
+
     private readonly Lock gate = new();
 
-    // The resolvers other settings have replaced, whose connections are not yet closed.
-    private readonly List<DohDnsResolver> replaced = [];
+    // The one asked for longest ago first.
+    private readonly List<Kept> kept = [];
 
-    private (EasyNetworkOptions Network, EasyTlsOptions Tls, DohDnsResolver Resolver)? kept;
+    // The closing of the resolvers dropped to make room.
+    private Task droppedClosing = Task.CompletedTask;
 
     /// <summary>
     /// Gives the resolver the transports built from <paramref name="network" /> and <paramref name="tls" /> use: the
-    /// kept one when <c>--doh-url</c> and every other setting it was built from are unchanged, else the one
-    /// <paramref name="create" /> builds, which is kept in its place when it is a <see cref="DohDnsResolver" />.
+    /// kept one built from the same <c>--doh-url</c> and other settings, else the one <paramref name="create" />
+    /// builds, which is kept when it is a <see cref="DohDnsResolver" />.
     /// </summary>
     /// <param name="network">The transfer's network options.</param>
     /// <param name="tls">The transfer's TLS options.</param>
@@ -36,61 +42,65 @@ internal sealed class KeptDohResolver : IAsyncDisposable
             return create();
         }
 
-        EasyNetworkOptions settings = network with { Url = null, UrlHandle = null, Port = 0 };
+        // The lists compare by reference in a record, so --resolve's entries are compared one by one.
+        EasyNetworkOptions settings = network with { Url = null, UrlHandle = null, Port = 0, ConnectTo = [], Resolve = [] };
+        string[] resolveEntries = [.. network.Resolve];
         lock (gate)
         {
-            if (kept is { } held && held.Network == settings && held.Tls == tls)
+            int index = kept.FindIndex(held => held.Network == settings && held.Tls == tls && held.ResolveEntries.SequenceEqual(resolveEntries));
+            if (index >= 0)
             {
+                Kept held = kept[index];
+                kept.RemoveAt(index);
+                kept.Add(held);
                 return held.Resolver;
             }
 
             IDnsResolver created = create();
             if (created is DohDnsResolver doh)
             {
-                Release();
-                kept = (settings, tls, doh);
+                kept.Add(new Kept(settings, resolveEntries, tls, doh));
+                DropBeyondMostKept();
             }
 
             return created;
         }
     }
 
-    /// <summary>Closes the connections of the resolvers other settings have replaced, which no transfer asks any more.</summary>
+    /// <summary>Closes the connections the kept resolvers and those dropped to make room hold.</summary>
     /// <returns>A task that completes once they are closed.</returns>
-    internal async ValueTask CloseReplacedAsync()
+    public async ValueTask DisposeAsync()
     {
-        DohDnsResolver[] closing;
+        Kept[] closing;
+        Task dropped;
         lock (gate)
         {
-            closing = [.. replaced];
-            replaced.Clear();
+            closing = [.. kept];
+            kept.Clear();
+            dropped = droppedClosing;
+            droppedClosing = Task.CompletedTask;
         }
 
-        foreach (DohDnsResolver resolver in closing)
+        foreach (Kept held in closing)
         {
-            await resolver.DisposeAsync().ConfigureAwait(false);
+            await held.Resolver.DisposeAsync().ConfigureAwait(false);
         }
+
+        await dropped.ConfigureAwait(false);
     }
 
-    /// <summary>Closes the connections the kept resolver and any it replaced hold.</summary>
-    /// <returns>A task that completes once they are closed.</returns>
-    public ValueTask DisposeAsync()
+    // Starts closing the resolver asked for longest ago once there are too many; the caller holds the gate. A
+    // transfer still asking it is not cut off: a disposed resolver closes each connection as it is done with it.
+    private void DropBeyondMostKept()
     {
-        lock (gate)
+        if (kept.Count > MostKept)
         {
-            Release();
-        }
-
-        return CloseReplacedAsync();
-    }
-
-    // Moves the kept resolver, if there is one, to those to be closed; the caller holds the gate.
-    private void Release()
-    {
-        if (kept is { } held)
-        {
-            replaced.Add(held.Resolver);
-            kept = null;
+            DohDnsResolver oldest = kept[0].Resolver;
+            kept.RemoveAt(0);
+            droppedClosing = Task.WhenAll(droppedClosing, oldest.DisposeAsync().AsTask());
         }
     }
+
+    // A kept resolver and the options it was built from.
+    private sealed record Kept(EasyNetworkOptions Network, string[] ResolveEntries, EasyTlsOptions Tls, DohDnsResolver Resolver);
 }

@@ -82,7 +82,8 @@ internal sealed partial class ManagedEasyTransfer
     /// takes the attached share handle's cookie lock for libcurl's cookie flush and detaches from it, then closes the
     /// connection a connect-only perform left open or upgraded, if any, the handle's WebSocket connection, if any, and the handle's own idle pooled connections
     /// (<see cref="OwnTheConnectionsOpened" />), as libcurl closes the handle's connection cache, FTP's sending <c>QUIT</c>,
-    /// and last the connections its <c>--doh-url</c> resolver kept (ADR-1453).
+    /// and last the <c>--doh-url</c> connections kept in the handle's own cache; those kept in a multi handle's or a
+    /// share handle's cache stay until it is cleaned up (ADR-1454).
     /// </summary>
     /// <returns>A task that completes once they are closed.</returns>
     public async ValueTask DisposeAsync()
@@ -100,7 +101,7 @@ internal sealed partial class ManagedEasyTransfer
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (ToolSettings is not null ? shared.EngineWide : shared).Connections.CloseIdleOwnedByAsync(this).ConfigureAwait(false);
-        await dohResolver.DisposeAsync().ConfigureAwait(false);
+        await shared.DohResolver.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>Writes the cookies of the last HTTP perform to its <c>CURLOPT_COOKIEJAR</c> file, as libcurl does at cleanup (CGR-258, BL-3787); nothing when no perform had a jar.</summary>

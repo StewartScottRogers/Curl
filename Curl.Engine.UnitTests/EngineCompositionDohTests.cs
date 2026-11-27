@@ -3,6 +3,8 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.Multi;
+using Curl.Api.EngineContracts.Share;
 using Curl.Api.Options;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Tls;
@@ -502,25 +504,205 @@ public sealed class EngineCompositionDohTests
     [TestMethod]
     [DataRow("doh url")]
     [DataRow("doh verify peer")]
-    public async Task PerformAsync_AfterADohSettingChanges_ClosesTheReplacedConnectionsAndOpensNewOnes(string setting)
+    [DataRow("resolve")]
+    public async Task PerformAsync_AfterADohSettingChanges_OpensNewConnectionsAndKeepsTheEarlierOnes(string setting)
     {
         DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
         await using IEasyTransfer easy = DialingEngine(dialer).CreateEasy();
-        await PerformThroughDohAsync(easy, "http://example.test:48712/", new EasyNetworkOptions { DohUrl = PlainDohUrl });
-        List<DisposalRecordingConnection> replaced = dialer.DohConnections;
+        EasyNetworkOptions first = new() { DohUrl = PlainDohUrl };
+        EasyTlsOptions firstTls = easy.Options.Tls;
+        await PerformThroughDohAsync(easy, "http://example.test:48712/", first);
         if (setting == "doh verify peer")
         {
-            easy.Options = easy.Options with { Tls = easy.Options.Tls with { DohVerifyPeer = false } };
+            easy.Options = easy.Options with { Tls = firstTls with { DohVerifyPeer = false } };
         }
 
-        EasyNetworkOptions network = setting == "doh url" ? easy.Options.Network with { DohUrl = PlainDohUrl + "?other" } : easy.Options.Network;
+        EasyNetworkOptions changed = setting switch
+        {
+            "doh url" => first with { DohUrl = PlainDohUrl + "?other" },
+            "resolve" => first with { Resolve = ["unused.test:80:192.0.2.1"] },
+            _ => first,
+        };
 
-        await PerformThroughDohAsync(easy, "http://other.test:48712/", network);
+        await PerformThroughDohAsync(easy, "http://other.test:48712/", changed);
 
         Diagnostics.Assert("DoH connections after the second perform", 4, dialer.DohConnections.Count);
         Assert.HasCount(4, dialer.DohConnections);
-        Assert.IsTrue(replaced.All(connection => connection.IsDisposed));
-        Assert.IsFalse(dialer.DohConnections.Except(replaced).Any(connection => connection.IsDisposed));
+        Assert.IsFalse(dialer.DohConnections.Any(connection => connection.IsDisposed));
+
+        easy.Options = easy.Options with { Tls = firstTls };
+        await PerformThroughDohAsync(easy, "http://third.test:48712/", first);
+
+        // The first settings' connections are still there to ask on.
+        Assert.HasCount(4, dialer.DohConnections);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_WithMoreDohSettingsThanAreKept_ClosesTheOneAskedForLongestAgo()
+    {
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        await using IEasyTransfer easy = DialingEngine(dialer).CreateEasy();
+        EasyNetworkOptions OfSetting(int number) => new() { DohUrl = PlainDohUrl + "?" + number };
+        for (int number = 0; number < KeptDohResolver.MostKept; number++)
+        {
+            await PerformThroughDohAsync(easy, $"http://host{number}.test:48712/", OfSetting(number));
+        }
+
+        // Setting 0 is asked for again, so setting 1 is the one to make room for one more.
+        await PerformThroughDohAsync(easy, "http://again.test:48712/", OfSetting(0));
+        await PerformThroughDohAsync(easy, "http://more.test:48712/", OfSetting(KeptDohResolver.MostKept));
+
+        List<DisposalRecordingConnection> opened = dialer.DohConnections;
+        Diagnostics.Assert("DoH connections opened", 2 * (KeptDohResolver.MostKept + 1), opened.Count);
+        Assert.HasCount(2 * (KeptDohResolver.MostKept + 1), opened);
+        CollectionAssert.AreEqual(opened.Skip(2).Take(2).ToArray(), opened.Where(connection => connection.IsDisposed).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ResolverFor_EqualResolveEntriesAndOtherConnectToMappings_GivesTheKeptResolver()
+    {
+        await using KeptDohResolver keeper = new();
+        EasyNetworkOptions network = new() { DohUrl = PlainDohUrl, Resolve = ["a.test:80:192.0.2.1"], ConnectTo = ["::b.test:"] };
+        Func<IDnsResolver> create = () => EngineComposition.CreateDohResolver(PlainDohUrl, new ScriptedConnector([]), AddressFamily.Unspecified, readEnvironmentVariable: _ => null);
+        IDnsResolver kept = keeper.ResolverFor(network, new EasyTlsOptions(), create);
+
+        IDnsResolver again = keeper.ResolverFor(network with { Resolve = ["a.test:80:192.0.2.1"], ConnectTo = ["::c.test:"] }, new EasyTlsOptions(), create);
+
+        Diagnostics.Assert("kept resolver given again", true, ReferenceEquals(kept, again));
+        Assert.AreSame(kept, again);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ByASecondHandleInTheSameMulti_OpensNoNewDohConnection()
+    {
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        ManagedCurlEngine engine = DialingEngine(dialer);
+        await using IMultiTransfer multi = engine.CreateMulti();
+        await using IEasyTransfer first = engine.CreateEasy();
+        await using IEasyTransfer second = engine.CreateEasy();
+        await PerformInMultiThroughDohAsync(multi, first, "http://example.test:48712/");
+        List<DisposalRecordingConnection> openedByTheFirst = dialer.DohConnections;
+
+        await PerformInMultiThroughDohAsync(multi, second, "http://other.test:48712/");
+
+        Diagnostics.Assert("DoH connections after the second handle's perform", 2, dialer.DohConnections.Count);
+        Assert.HasCount(2, openedByTheFirst);
+        CollectionAssert.AreEqual(openedByTheFirst, dialer.DohConnections);
+        Assert.IsTrue(openedByTheFirst.All(connection => connection.Requests == 2));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ByASecondHandleSharingConnections_OpensNoNewDohConnection()
+    {
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        ManagedCurlEngine engine = DialingEngine(dialer);
+        IShareHandle share = ShareOfConnections(engine);
+        await using IEasyTransfer first = SharingEasy(engine, share);
+        await using IEasyTransfer second = SharingEasy(engine, share);
+        await PerformThroughDohAsync(first, "http://example.test:48712/", new EasyNetworkOptions { DohUrl = PlainDohUrl });
+        List<DisposalRecordingConnection> openedByTheFirst = dialer.DohConnections;
+
+        await PerformThroughDohAsync(second, "http://other.test:48712/", new EasyNetworkOptions { DohUrl = PlainDohUrl });
+
+        Diagnostics.Assert("DoH connections after the second handle's perform", 2, dialer.DohConnections.Count);
+        Assert.HasCount(2, openedByTheFirst);
+        CollectionAssert.AreEqual(openedByTheFirst, dialer.DohConnections);
+        Assert.IsTrue(openedByTheFirst.All(connection => connection.Requests == 2));
+    }
+
+    [TestMethod]
+    [DataRow("dispose")]
+    [DataRow("clear connections")]
+    public async Task Multi_CleanedUpOrToldToClearConnections_ClosesTheDohConnectionsItsHandlesKept(string ending)
+    {
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        ManagedCurlEngine engine = DialingEngine(dialer);
+        IMultiTransfer multi = engine.CreateMulti();
+        IEasyTransfer easy = engine.CreateEasy();
+        await PerformInMultiThroughDohAsync(multi, easy, "http://example.test:48712/");
+        await easy.DisposeAsync();
+        int closedBefore = dialer.DohConnections.Count(connection => connection.IsDisposed);
+
+        if (ending == "dispose")
+        {
+            await multi.DisposeAsync();
+        }
+        else
+        {
+            // These connections close without waiting, so they are closed when the setter returns.
+            multi.Options = multi.Options with { NetworkChanged = CurlNetworkChange.ClearConnections };
+        }
+
+        Diagnostics.Assert("closed by the easy handle's cleanup", 0, closedBefore);
+        Assert.AreEqual(0, closedBefore);
+        Assert.HasCount(2, dialer.DohConnections);
+        Assert.IsTrue(dialer.DohConnections.All(connection => connection.IsDisposed));
+        await multi.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task Cleanup_OfAShareHandle_ClosesTheDohConnectionsItsHandlesKept()
+    {
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        ManagedCurlEngine engine = DialingEngine(dialer);
+        IShareHandle share = ShareOfConnections(engine);
+        IEasyTransfer easy = SharingEasy(engine, share);
+        await PerformThroughDohAsync(easy, "http://example.test:48712/", new EasyNetworkOptions { DohUrl = PlainDohUrl });
+        await easy.DisposeAsync();
+        int closedBefore = dialer.DohConnections.Count(connection => connection.IsDisposed);
+
+        CurlShareCode code = share.Cleanup();
+
+        Diagnostics.Assert("closed by the handle's cleanup", 0, closedBefore);
+        Assert.AreEqual(0, closedBefore);
+        Assert.AreEqual(CurlShareCode.Ok, code);
+        Assert.HasCount(2, dialer.DohConnections);
+        Assert.IsTrue(dialer.DohConnections.All(connection => connection.IsDisposed));
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfTheEngine_ClosesTheKeptDohConnections()
+    {
+        DohRecordingDialer dialer = new(AAnswer) { OtherPortReply = EmptyWebResponse };
+        ManagedCurlEngine engine = DialingEngine(dialer);
+        IEasyTransfer easy = engine.CreateEasy();
+        await PerformThroughDohAsync(easy, "http://example.test:48712/", new EasyNetworkOptions { DohUrl = PlainDohUrl });
+
+        await engine.DisposeAsync();
+
+        Assert.HasCount(2, dialer.DohConnections);
+        Assert.IsTrue(dialer.DohConnections.All(connection => connection.IsDisposed));
+    }
+
+    private static IShareHandle ShareOfConnections(ManagedCurlEngine engine)
+    {
+        IShareHandle share = engine.CreateShare();
+        Assert.AreEqual(CurlShareCode.Ok, share.Share(CurlLockData.Connect));
+        return share;
+    }
+
+    private static IEasyTransfer SharingEasy(ManagedCurlEngine engine, IShareHandle share)
+    {
+        IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = easy.Options with { Behaviour = easy.Options.Behaviour with { Share = share } };
+        return easy;
+    }
+
+    // Adds the handle to the multi handle and performs until its one transfer is done, which must have succeeded.
+    private async Task PerformInMultiThroughDohAsync(IMultiTransfer multi, IEasyTransfer easy, string url)
+    {
+        easy.Options = easy.Options with { Network = new EasyNetworkOptions { DohUrl = PlainDohUrl, Url = url } };
+        Assert.AreEqual(CurlMultiCode.Ok, multi.Add(easy));
+        CurlMultiMessage? message;
+        do
+        {
+            await multi.PerformAsync(TestContext.CancellationToken);
+            await Task.Yield();
+        }
+        while (!multi.TryReadInfo(out message, out _));
+
+        Diagnostics.Act("multi perform", $"{url} -> {message.Result} {easy.ErrorText}");
+        Assert.AreEqual(CurlCode.Ok, message.Result);
     }
 
     [TestMethod]

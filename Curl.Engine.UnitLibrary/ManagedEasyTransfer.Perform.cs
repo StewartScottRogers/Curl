@@ -45,22 +45,12 @@ internal sealed partial class ManagedEasyTransfer
         ConnectOnly.PerformRunning = true;
         try
         {
-            return await PerformClosingReplacedDohResolversAsync(cancellationToken).ConfigureAwait(false);
+            return await PerformRunningAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             ConnectOnly.PerformRunning = false;
         }
-    }
-
-    // However the perform ends, its transfers are then over, so a --doh-url resolver that changed settings replaced
-    // closes its connections before the perform's outcome, a cancellation included, reaches the caller.
-    private async ValueTask<CurlCode> PerformClosingReplacedDohResolversAsync(CancellationToken cancellationToken)
-    {
-        Task<CurlCode> performed = PerformRunningAsync(cancellationToken).AsTask();
-        await ((Task)performed).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        await dohResolver.CloseReplacedAsync().ConfigureAwait(false);
-        return await performed.ConfigureAwait(false);
     }
 
     private async ValueTask<CurlCode> PerformRunningAsync(CancellationToken cancellationToken)
