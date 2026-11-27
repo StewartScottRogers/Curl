@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-6006]
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpContentDecoder.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpContentCodingDecoder.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpDeflateFaultFinder.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Curl.Original.Protocol.Http.UnitTests/HttpContentCodingDecoderTests.cs, Curl.Original.Protocol.Http.UnitTests/HttpContentDecoderTests.cs, Curl.Original.Protocol.Http.UnitTests/HttpDeflateFaultFinderTests.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpContentDecoder.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpContentCodingDecoder.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpDeflateFaultFinder.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Curl.Original.Protocol.Http.UnitTests/HttpContentCodingDecoderTests.cs, Curl.Original.Protocol.Http.UnitTests/HttpContentDecoderTests.cs, Curl.Original.Protocol.Http.UnitTests/HttpDeflateFaultFinderTests.cs, Curl.Original.Protocol.Http.UnitTests/Cgr071Tests.cs, Curl.Original.Protocol.Http.UnitTests/CorruptDeflateMessageTests.cs, Curl.Original.Protocol.Http.UnitTests/CorruptZLibDeflateOutputTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6018 — Fix fitness finding STD-208: corrupt raw or chunked deflate gives the generic message and leaves different partial output (PARTLY FIXED)
 
@@ -39,9 +39,9 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the first repro prints `invalid distance too far back`, exits 61, and creates no `o.txt`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first repro prints `invalid distance too far back`, exits 61, and creates no `o.txt`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -65,9 +65,30 @@ First claim (2026-11-26), code reading only: nothing edited, nothing measured, f
 - Real curl here: `C:\Windows\System32\curl.exe` is 8.23.0 (Schannel, zlib 1.3.2, no brotli listed);
   Git for Windows `curl.exe` is 8.21.0.
 
+Second claim (2026-11-26), done (ADR-1444):
+
+- New `HttpDeflateFaultFinder` walks the first 64 KiB of deflate data as zlib's inflate does (stored,
+  fixed, dynamic blocks; inftrees.c's code checks; distances against bytes decoded) and names zlib's
+  text for the first fault; it replaces `FirstBlockFault`. Seven zlib texts added to
+  `HttpTransferMessages`. After bytes are handed out a zlib `deflate` body is walked after its header
+  (curl does not restart as raw then), so the chunked repro also names `invalid distance too far back`.
+- `HoldsDecoded` now holds every piece of a `deflate` body, zlib or raw, until that piece decodes.
+- `touches` widened to `Cgr071Tests.cs`, `CorruptDeflateMessageTests.cs` and
+  `CorruptZLibDeflateOutputTests.cs`: four of their tests pinned the generic text for in-block faults
+  where zlib (so curl) names them; no task in Doing on origin/work/dark-factory named them.
+- Measured: a PowerShell loopback server sending raw deflate of "The quick brown fox..." with
+  `GARBAGE!GARBAGE!` after byte 10 as `Content-Encoding: deflate`; real curl 8.23.0
+  (`C:\Windows\System32\curl.exe`) and Curl both exit 61 with
+  `Error while processing content unencoding: invalid distance too far back` and create no `o.txt`.
+- Tests: `HttpDeflateFaultFinderTests` (every fault zlib names, and clean and truncated streams), and two in `HttpContentCodingDecoderTests` for the
+  two repros. Build clean, all fast tests green; `Measure-CodeQuality.ps1 -Library
+  Curl.Original.Protocol.Http.UnitLibrary` 0 failing members. Tests are byte-level only, so
+  platform-neutral.
+
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: f10cf772 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Backlog. Waits on BL-6006, which holds Curl.Original.Protocol.Http.UnitTests where this fix's unit test belongs
 - 2026-11-26: Backlog -> Doing. Criteria at claim: f10cf772 69116afe 3d836d5e.
+- 2026-11-26: Doing -> Done. Corrupt raw or chunked deflate now exits 61 with zlib's own text (invalid distance too far back) and writes nothing a failing read decoded, as curl does
