@@ -33,3 +33,4 @@ escapes undecoded. Not reproduced yet: confirm each by a unit test first. Use `U
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 11d35580 3d836d5e.
