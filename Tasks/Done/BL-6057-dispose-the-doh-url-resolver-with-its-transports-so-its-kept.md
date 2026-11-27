@@ -32,7 +32,7 @@ ADR-1441 (BL-6051): `DohDnsResolver` keeps its DoH connections for later queries
 - Tests: `EngineCompositionDohTests` (`DisposeAsync_*`, `PerformAsync_WithADohUrl_ClosesTheConnectionsTheDohResolverKept`) and `CurlCommandRunnerDialingDohTests`.
 - Checks: build with 0 warnings; the whole fast test run passed (exit 0). It found `PerformAsync` over the complexity gate, so the disposal moved to `PerformDisposingTransportsAsync`; the rebuild was clean and the Engine quality run, which reruns the test projects that reach the engine, passed at 100% line and branch with 0 failing members. `Curl.Console` was 100% with 0 failing members in the first quality run and did not change after it.
 - The new tests are platform-neutral (in-memory dialer, plain `http` DoH URL).
-- Follow-up: BL-6062, reuse a library handle's DoH connections across performs.
+- Follow-up: BL-6065, reuse a library handle's DoH connections across performs.
 
 ## Log
 

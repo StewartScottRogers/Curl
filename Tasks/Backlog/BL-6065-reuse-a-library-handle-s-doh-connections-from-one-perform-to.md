@@ -1,5 +1,5 @@
 ---
-id: BL-6062
+id: BL-6065
 title: Reuse a library handle's DoH connections from one perform to the next
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6062 — Reuse a library handle's DoH connections from one perform to the next
+# BL-6065 — Reuse a library handle's DoH connections from one perform to the next
 
 ## Goal
 
