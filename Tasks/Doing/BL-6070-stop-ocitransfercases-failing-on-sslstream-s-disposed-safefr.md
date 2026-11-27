@@ -30,3 +30,4 @@ Found during BL-6068's full fast-test run on Windows: `OciTransferCases.Verbose_
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 970d4d38 3d836d5e.
