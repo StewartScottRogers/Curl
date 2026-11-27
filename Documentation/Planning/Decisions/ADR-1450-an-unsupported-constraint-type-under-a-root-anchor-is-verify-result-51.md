@@ -1,4 +1,4 @@
-# ADR-1448: An unsupported constraint type under a root anchor is verify result 51 (BL-6059)
+# ADR-1450: An unsupported constraint type under a root anchor is verify result 51 (BL-6059)
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Amends ADR-1383 and ADR-1442.
 

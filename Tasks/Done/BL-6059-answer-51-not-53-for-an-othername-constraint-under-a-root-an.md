@@ -28,7 +28,7 @@ Found in BL-6047 (ADR-1442). curl 8.18.0 with OpenSSL 3.5.5 answers 51 with the 
 
 ## Notes
 
-- ADR-1448: `KeepFirstNameConstraintRefusal` replaces a lone `HasNotSupportedNameConstraint` only when
+- ADR-1450: `KeepFirstNameConstraintRefusal` replaces a lone `HasNotSupportedNameConstraint` only when
   `FindViolation`'s first refusal is the unsupported constraint type (51). A subtree violation the
   chain engine did not flag still leaves the engine's flag (53), as the existing test pinned (renamed
   `KeepFirstNameConstraintRefusal_UnsupportedFlaggedAndASubtreeViolationFound_TrustsTheChainEngine`).
