@@ -65,7 +65,7 @@ First claim (2026-11-26), code reading only: nothing edited, nothing measured, f
 - Real curl here: `C:\Windows\System32\curl.exe` is 8.23.0 (Schannel, zlib 1.3.2, no brotli listed);
   Git for Windows `curl.exe` is 8.21.0.
 
-Second claim (2026-11-26), done (ADR-1444):
+Second claim (2026-11-26), done (ADR-1449):
 
 - New `HttpDeflateFaultFinder` walks the first 64 KiB of deflate data as zlib's inflate does (stored,
   fixed, dynamic blocks; inftrees.c's code checks; distances against bytes decoded) and names zlib's

@@ -1,4 +1,4 @@
-# ADR-1444 — Corrupt deflate data is named with zlib's own text
+# ADR-1449 — Corrupt deflate data is named with zlib's own text
 
 - **Status:** Accepted
 - **Date:** 2026-11-26
