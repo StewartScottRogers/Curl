@@ -130,7 +130,7 @@ public static class UploadTransferUrl
     }
 
     // The host of an s3 or gs URL is a bucket name, so it is written as typed: CurlUrl.Host would turn an
-    // all-digit or hex name into a dotted quad, and the upload would go to another bucket (ADR-1425).
+    // all-digit or hex name into a dotted quad, and the upload would go to another bucket (ADR-1445).
     private static string HostToWrite(CurlUrl url)
     {
         string name = BucketNameAsTyped(url);

@@ -43,7 +43,7 @@ The finding, verbatim:
 
 ## Notes
 
-- Cause: `UploadTransferUrl` (Curl.Cli) rewrote a `-T` URL with `CurlUrl.Host`, so the handler never saw the typed bucket. The fix is there, not in `S3ProtocolHandler.cs`; `touches` changed to match. No other task in Doing on origin/work/dark-factory named those files. `gs://` uploads had the same cause and are fixed too (ADR-1425).
+- Cause: `UploadTransferUrl` (Curl.Cli) rewrote a `-T` URL with `CurlUrl.Host`, so the handler never saw the typed bucket. The fix is there, not in `S3ProtocolHandler.cs`; `touches` changed to match. No other task in Doing on origin/work/dark-factory named those files. `gs://` uploads had the same cause and are fixed too (ADR-1445).
 - Acceptance check run against chrislusf/seaweedfs:4.54: `-T` to `s3://12345678/k`, `s3://0x10/k`, `s3://127.1/k` and `s3://12345678/` each returned 200 and downloaded byte-identical.
 - `%{url_effective}` still prints the dotted quad: it is normalised separately, for downloads as for uploads, and does not affect where the request goes.
 - The pinning test is in `Curl.Cli.UnitTests`, the fixed library's tests (ADR-0482). Tests are pure string work, so platform-neutral.

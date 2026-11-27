@@ -1,4 +1,4 @@
-# ADR-1425: An upload keeps an s3 or gs bucket name as typed
+# ADR-1445: An upload keeps an s3 or gs bucket name as typed
 
 - Status: Accepted
 - Date: 2026-11-26

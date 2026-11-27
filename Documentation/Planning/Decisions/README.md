@@ -1486,4 +1486,4 @@ Each option and the specific reason it lost.
 | [1442](ADR-1442-the-openssl-build-checks-other-names-against-name-constraints-as-openssl-does.md) | The OpenSSL build checks otherNames against name constraints as OpenSSL does (BL-6047) | Accepted | 2026-11-26 |
 | [1443](ADR-1443-nuget-org-packages-are-published-with-trusted-publishing.md) | Every numbered tag publishes its packages to nuget.org with Trusted Publishing, as Surl does (BL-2393) | Accepted | 2026-11-26 |
 | [1444](ADR-1444-transfers-behind-a-fatally-failed-z-telnet-session.md) | -Z reports the transfers behind a fatally failed telnet session as curl does (BL-6035) | Accepted | 2026-11-26 |
-| [1425](ADR-1425-an-upload-keeps-an-s3-or-gs-bucket-name-as-typed.md) | An upload keeps an s3 or gs bucket name as typed (BL-6031) | Accepted | 2026-11-26 |
+| [1445](ADR-1445-an-upload-keeps-an-s3-or-gs-bucket-name-as-typed.md) | An upload keeps an s3 or gs bucket name as typed (BL-6031) | Accepted | 2026-11-26 |
