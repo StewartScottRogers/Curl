@@ -1,5 +1,5 @@
 ---
-id: BL-6074
+id: BL-6075
 title: Stop InProcessCurl_ConnectionReuseCase_Passes timing out after 20 seconds in a loaded test run
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6074 — Stop InProcessCurl_ConnectionReuseCase_Passes timing out after 20 seconds in a loaded test run
+# BL-6075 — Stop InProcessCurl_ConnectionReuseCase_Passes timing out after 20 seconds in a loaded test run
 
 ## Goal
 

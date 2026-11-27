@@ -45,7 +45,7 @@ output for a chain whose name constraint does not decode (ADR-1446) before pinni
 - Gates: `dotnet build` 0 warnings; Networking unit tests 4987 passed, 33 skipped;
   `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 0 failing members. The
   whole-solution fast run had 5 failures, all `InProcessCurl_ConnectionReuseCase_Passes` timing
-  out at 20 s under load; the 20 cases passed alone. Filed BL-6074.
+  out at 20 s under load; the 20 cases passed alone. Filed BL-6075.
 
 ## Log
 
