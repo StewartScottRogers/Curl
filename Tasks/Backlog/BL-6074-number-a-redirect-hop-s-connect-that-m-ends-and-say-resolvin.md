@@ -1,5 +1,5 @@
 ---
-id: BL-6073
+id: BL-6074
 title: Number a redirect hop's connect that -m ends, and say Resolving timed out when -m ends its resolve
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6073 — Number a redirect hop's connect that -m ends, and say Resolving timed out when -m ends its resolve
+# BL-6074 — Number a redirect hop's connect that -m ends, and say Resolving timed out when -m ends its resolve
 
 ## Goal
 
