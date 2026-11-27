@@ -3,9 +3,10 @@ using System.Xml.Linq;
 namespace Curl.Api;
 
 /// <summary>
-/// Pins what each Surly.* package's csproj says on nuget.org (BL-5708): a title, an icon, a licence
-/// expression, a project URL, a first description sentence that says managed reimplementation with no
-/// native libcurl, the differentiating tags, and a packed README that opens with the same statement.
+/// Pins what each Surly.* package's csproj says on nuget.org (BL-5708): a title, an icon, a packed
+/// licence file (nuget.org refuses the licence expression "curl"), a project URL, a first description
+/// sentence that says managed reimplementation with no native libcurl, the differentiating tags, and a
+/// packed README that opens with the same statement.
 /// </summary>
 [TestClass]
 public sealed class SurlyPackageMetadataTests
@@ -18,8 +19,13 @@ public sealed class SurlyPackageMetadataTests
     private static XElement Properties(string projectName) =>
         new("Properties", XDocument.Load(PackagingPath(projectName + ".csproj")).Root!.Elements("PropertyGroup").Elements());
 
+    private static bool Packs(string projectName, string fileName) =>
+        XDocument.Load(PackagingPath(projectName + ".csproj")).Descendants("None").Any(item =>
+            ((string?)item.Attribute("Include") ?? "").EndsWith(fileName, StringComparison.Ordinal)
+            && (string?)item.Attribute("Pack") == "true");
+
     [TestMethod]
-    public void EachProject_HasTitleIconLicenseExpressionAndProjectUrl()
+    public void EachProject_HasTitleIconLicenseFileAndProjectUrl()
     {
         foreach (string name in ProjectNames)
         {
@@ -27,8 +33,8 @@ public sealed class SurlyPackageMetadataTests
 
             Assert.IsTrue(((string?)properties.Element("Title") ?? "").StartsWith("Surly ", StringComparison.Ordinal), name);
             Assert.AreEqual("SurlyIcon.png", (string?)properties.Element("PackageIcon"), name);
-            Assert.AreEqual("curl", (string?)properties.Element("PackageLicenseExpression"), name);
-            Assert.IsNull(properties.Element("PackageLicenseFile"), name);
+            Assert.AreEqual("LICENSE.txt", (string?)properties.Element("PackageLicenseFile"), name);
+            Assert.IsNull(properties.Element("PackageLicenseExpression"), name);
             Assert.AreEqual("https://github.com/StewartScottRogers/Curl", (string?)properties.Element("PackageProjectUrl"), name);
             Assert.AreEqual("git", (string?)properties.Element("RepositoryType"), name);
             Assert.IsFalse(string.IsNullOrWhiteSpace((string?)properties.Element("Copyright")), name);
@@ -40,13 +46,16 @@ public sealed class SurlyPackageMetadataTests
     {
         foreach (string name in ProjectNames)
         {
-            XDocument project = XDocument.Load(PackagingPath(name + ".csproj"));
+            Assert.IsTrue(Packs(name, "SurlyIcon.png"), name);
+        }
+    }
 
-            Assert.IsTrue(
-                project.Descendants("None").Any(item =>
-                    ((string?)item.Attribute("Include") ?? "").EndsWith("SurlyIcon.png", StringComparison.Ordinal)
-                    && (string?)item.Attribute("Pack") == "true"),
-                name);
+    [TestMethod]
+    public void EachProject_PacksTheSharedLicenseFile()
+    {
+        foreach (string name in ProjectNames)
+        {
+            Assert.IsTrue(Packs(name, "LICENSE.txt"), name);
         }
     }
 
