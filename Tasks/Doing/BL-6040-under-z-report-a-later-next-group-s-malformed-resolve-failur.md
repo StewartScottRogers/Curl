@@ -33,3 +33,4 @@ Real curl 8.22.0 Schannel wrote stdout `[49]`, newline, `hello`; Curl wrote `hel
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: c97b4777 e9fa31d3 3d836d5e.
