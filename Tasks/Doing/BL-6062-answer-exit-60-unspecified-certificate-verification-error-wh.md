@@ -30,3 +30,4 @@ Found by BL-6060 (CI run 45917093887, Ubuntu): .NET's `X509Chain.Build` throws `
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 09ddef69 773a4772.
