@@ -95,23 +95,22 @@ internal sealed class HttpTransferDeadline : IDisposable
     internal long OperationElapsedMilliseconds => (long)timeProvider.GetElapsedTime(operationStartedAt).TotalMilliseconds;
 
     /// <summary>
-    /// Connects through <paramref name="connector" />, ending the connect with exit 28 and
-    /// curl's <c>Connection timed out after N milliseconds</c> when the connect timeout or
-    /// <c>-m</c> passes first.
+    /// Connects through <paramref name="connector" />, ending the connect with exit 28 when the
+    /// connect timeout or <c>-m</c> passes first. A connector that returns its own exit 28 result
+    /// has reported it, so that result is returned; otherwise the failure is curl's
+    /// <c>Connection timed out after N milliseconds</c>, N counted from the start of this request,
+    /// also reported once on the target's events as a <c>-v</c> line (ADR-1459).
     /// </summary>
     /// <param name="connector">The connector to open the connection with.</param>
     /// <param name="target">What to connect to.</param>
     /// <param name="abandoned">
     /// Cancels this connect alone, when a racing connect has won (ADR-0144 section 4); the
-    /// connect then ends as the exit 28 failure, which the race discards.
+    /// connect then ends as the exit 28 failure, which the race discards, and no line is reported.
     /// </param>
     /// <returns>The connector's result, or the exit 28 failure.</returns>
     /// <exception cref="OperationCanceledException">The transfer was cancelled.</exception>
     internal ValueTask<ConnectResult> ConnectAsync(IConnector connector, ConnectTarget target, CancellationToken abandoned = default) =>
-        WithinConnectTimeoutAsync(
-            token => connector.ConnectAsync(target, token),
-            (message, timings) => ConnectResult.Failed(CurlExitCode.OperationTimedOut, message, timings),
-            abandoned);
+        WithinConnectTimeoutAsync(token => connector.ConnectAsync(target, token), target.Events, abandoned);
 
     /// <summary>
     /// Connects over QUIC through <paramref name="connector" />
@@ -135,12 +134,12 @@ internal sealed class HttpTransferDeadline : IDisposable
         CancellationToken abandoned = default) =>
         WithinConnectTimeoutAsync(
             token => connector.ConnectMultiplexedSessionAsync(target, openSession, token),
-            (message, timings) => ConnectResult.Failed(CurlExitCode.OperationTimedOut, message, timings),
+            target.Events,
             abandoned);
 
     private async ValueTask<ConnectResult> WithinConnectTimeoutAsync(
         Func<CancellationToken, ValueTask<ConnectResult>> connectAsync,
-        Func<string, ConnectTimings?, ConnectResult> timedOut,
+        ITransferEvents events,
         CancellationToken abandoned)
     {
         using CancellationTokenSource connectElapsed = new(connectTimeout, timeProvider);
@@ -158,35 +157,50 @@ internal sealed class HttpTransferDeadline : IDisposable
         catch (OperationCanceledException) when (EndedByLimit)
         {
             _ = DisposeLateConnectionAsync(connecting);
-            ConnectTimings? timings = await TimingsTheEndedConnectKeptAsync(connecting).ConfigureAwait(false);
-            return timedOut(HttpTransferMessages.ConnectionTimedOut(ElapsedMilliseconds), timings);
+            (ConnectResult? timedOutByConnector, ConnectTimings? timings) = await WhatTheEndedConnectLeftAsync(connecting).ConfigureAwait(false);
+            return timedOutByConnector ?? TimedOut(timings, events, abandoned.IsCancellationRequested);
         }
     }
 
+    // The exit 28 failure for a connect the connector did not report. An abandoned connect lost a race, so it gets no -v line.
+    private ConnectResult TimedOut(ConnectTimings? timings, ITransferEvents events, bool isAbandoned)
+    {
+        string message = HttpTransferMessages.ConnectionTimedOut(ElapsedMilliseconds);
+        if (!isAbandoned)
+        {
+            events.ReportInfo(message);
+        }
+
+        return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message, timings);
+    }
+
     /// <summary>
-    /// The timings the connector took before the limit ended its connect, so the failure still reports the name lookup it did (STD-145).
-    /// A connector that honours its token finishes within <see cref="ConnectorUnwindGrace" />; one that does not leaves none.
+    /// What the connect the limit ended left behind: the connector's own exit 28 result, whose message it has already
+    /// reported, so the <c>-v</c> line and <c>curl: (28)</c> carry one N (ADR-1459); else the timings it took before
+    /// the limit, so the failure still reports the name lookup it did (STD-145).
+    /// A connector that honours its token finishes within <see cref="ConnectorUnwindGrace" />; one that does not leaves nothing.
     /// </summary>
-    private static async ValueTask<ConnectTimings?> TimingsTheEndedConnectKeptAsync(Task<ConnectResult> connecting)
+    private static async ValueTask<(ConnectResult? TimedOutByConnector, ConnectTimings? Timings)> WhatTheEndedConnectLeftAsync(Task<ConnectResult> connecting)
     {
         // Real time on purpose: the limit has passed on the transfer's clock already, and this only waits for the connector's cancellation to unwind.
         await Task.WhenAny(connecting, Task.Delay(ConnectorUnwindGrace, TimeProvider.System)).ConfigureAwait(false);
         if (!connecting.IsCompleted)
         {
-            return null;
+            return default;
         }
 
         try
         {
-            return (await connecting.ConfigureAwait(false)).Timings;
+            ConnectResult ended = await connecting.ConfigureAwait(false);
+            return (ended.ExitCode == CurlExitCode.OperationTimedOut ? ended : null, ended.Timings);
         }
         catch (OperationCanceledException canceled)
         {
-            return canceled.Data[ConnectTimings.CarriedOnCancellationKey] as ConnectTimings;
+            return (null, canceled.Data[ConnectTimings.CarriedOnCancellationKey] as ConnectTimings);
         }
         catch (Exception)
         {
-            return null;
+            return default;
         }
     }
 
