@@ -32,7 +32,7 @@ Seen in BL-6015 on 2026-11-26 with a linux-x64 self-contained publish of Curl.Co
 - `touches` gained `Curl.Networking.UnitLibrary/CLAUDE.md`, whose sentence on cancellations the change made untrue; no task in Doing named it.
 - Verified in WSL Ubuntu with a linux-x64 self-contained publish (before the N-never-below-the-limit step, which the unit tests pin): `-sSv -m 3 http://192.0.2.20:1/` printed the line three runs of three, exit 28, at 2855, 3009 and 2961 ms; `-m 0.3`, `--connect-timeout 1` and `dict://` with `-m 1` printed it too.
 - Gates: `dotnet build` 0 warnings, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 0 failing members.
-- Filed BL-6066 (HTTP's own N, and redirect hops) and BL-6067 (QUIC dial and UDP tunnel).
+- Filed BL-6071 (HTTP's own N, and redirect hops) and BL-6072 (QUIC dial and UDP tunnel).
 
 ## Log
 

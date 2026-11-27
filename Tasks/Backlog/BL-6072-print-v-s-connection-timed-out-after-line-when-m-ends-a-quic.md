@@ -1,5 +1,5 @@
 ---
-id: BL-6067
+id: BL-6072
 title: Print -v's Connection timed out after line when -m ends a QUIC dial or a UDP proxy tunnel on Linux
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6067 — Print -v's Connection timed out after line when -m ends a QUIC dial or a UDP proxy tunnel on Linux
+# BL-6072 — Print -v's Connection timed out after line when -m ends a QUIC dial or a UDP proxy tunnel on Linux
 
 ## Goal
 

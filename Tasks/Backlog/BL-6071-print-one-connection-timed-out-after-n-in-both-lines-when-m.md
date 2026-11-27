@@ -1,5 +1,5 @@
 ---
-id: BL-6066
+id: BL-6071
 title: Print one Connection timed out after N in both lines when -m ends an HTTP connect, redirect hops included
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6066 — Print one Connection timed out after N in both lines when -m ends an HTTP connect, redirect hops included
+# BL-6071 — Print one Connection timed out after N in both lines when -m ends an HTTP connect, redirect hops included
 
 ## Goal
 
