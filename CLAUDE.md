@@ -91,9 +91,10 @@ the Surly book pins Curl to a numbered release, because `preview` changes under 
 the Surly book reported reach `master` and CI passed there, an interactive session tags the next
 pre-release, `v<major>.<minor>.<patch>-preview.<n>` (n one past the last), at that `master` commit.
 It pushes the tag, and `release.yml` builds the numbered release with the same assets as `preview`.
-The session then messages the `surly-*` session with the tag and commit, and reports it afterwards.
-Every other numbered tag or release, any version without `-preview`, and any nuget.org push still
-needs Stewart first.
+It also pushes the tag's nine packages to nuget.org through Trusted Publishing, as Surl does
+(Stewart, 2026-11-26: "do it the same way", every tag included; ADR-1443). The session then
+messages the `surly-*` session with the tag and commit, and reports it afterwards. Every other
+numbered tag or release, and any version without `-preview`, still needs Stewart first.
 
 A second standing exception (Stewart, 2026-09-27): at the end of every dark factory
 shift, `RunDarkFactory.ps1` merges its branch into `master` through a pull request, but

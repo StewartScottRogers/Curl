@@ -1,6 +1,7 @@
 # Publishes the native-AOT `curl` binary for every supported platform, and the Curl.Mcp
-# NuGet packages (BL-2485; they stay off nuget.org until the port is complete), each runtime's
-# holding a native-AOT Curl.Mcp packed on its own OS (BL-2486).
+# NuGet packages (BL-2485), each runtime's holding a native-AOT Curl.Mcp packed on its own OS
+# (BL-2486). A numbered tag's release job also pushes all nine packages to nuget.org through
+# trusted publishing, as Surl's release.yml does (ADR-1443, BL-2393); the rolling preview never does.
 #
 # resources.json and ai-help.md (BL-3147) are made by the describe job, for the dry run too.
 #
@@ -9,7 +10,8 @@
 #
 #   * Pushing a tag `v*` (e.g. v0.1.0) builds all six curl packages and the seven Curl.Mcp
 #     `.nupkg` files, stamped with the tag's version, and attaches them, with a SHA256SUMS
-#     file covering all of them, to a GitHub release of that name. A tag with a hyphen
+#     file covering all of them, to a GitHub release of that name, and pushes the nine
+#     `.nupkg` files to nuget.org. A tag with a hyphen
 #     (v0.1.0-preview.1) makes a pre-release. Numbered tags and releases need Stewart's
 #     say-so (CLAUDE.md), so this workflow never creates a numbered tag itself.
 #   * Every push to master (each shift-end merge, audit or gap merge) rebuilds the rolling
@@ -342,6 +344,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write   # nuget.org trusted publishing exchanges this token for a short-lived key
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -363,3 +366,29 @@ jobs:
           flags=(--generate-notes --title "$GITHUB_REF_NAME")
           [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" "${flags[@]}"
+
+      # Pushes every package of a numbered tag to nuget.org (Stewart, 2026-11-26: "do it the same
+      # way" as Surl; ADR-1443, BL-2393). Trusted publishing: the nuget.org account StewartScottRogers
+      # holds a policy for this repository's release.yml, and NuGet/login trades the job's OIDC token
+      # for a key that lasts one hour, so no secret is stored. The rolling preview never reaches
+      # nuget.org. --skip-duplicate lets a rerun of a tag's release job succeed once the packages are up.
+      - name: Log in to nuget.org
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: StewartScottRogers
+
+      - name: Push the packages to nuget.org
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: dist
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          shopt -s nullglob
+          packages=(*".$version.nupkg")
+          if [ ${#packages[@]} -ne 9 ]; then echo "::error::expected 9 packages at $version, found ${#packages[@]}: ${packages[*]}"; exit 1; fi
+          for package in "${packages[@]}"; do
+            dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done

@@ -1,25 +1,27 @@
-# ADR-1443: nuget.org packages are published with Trusted Publishing, by a hand-run, approval-gated workflow
+# ADR-1443: Every numbered tag publishes its packages to nuget.org with Trusted Publishing, as Surl does
 
 - Status: Accepted
 - Date: 2026-11-26
-- Asked for by Stewart (2026-11-26: "I want to use Trusted Publishing"); the workflow's shape decided by Claude under Stewart's delegation (BL-2393)
+- Asked for by Stewart (2026-11-26: "I want to use Trusted Publishing", then "look in the Surl repository and do it the same way", choosing that every tag publishes, preview tags included) (BL-2393)
 
 ## Context
 
-BL-2393 publishes Curl's packages to nuget.org: `Surly.Curl.Api`, `Surly.Libcurl`, `Surly.Curl.Mcp` and its six per-platform packages. Until now the plan was for Stewart to paste a long-lived nuget.org API key into a terminal for each push. nuget.org's Trusted Publishing removes that key. A GitHub Actions job presents its OIDC token, `NuGet/login` exchanges it for an API key that lives one hour, and the key works only for the workflow that a nuget.org trust policy names. A nuget.org push cannot be undone (a version can only be unlisted), and Stewart holds every push until the port is complete.
+BL-2393 publishes Curl's packages to nuget.org: `Surly.Curl.Api`, `Surly.Libcurl`, `Surly.Curl.Mcp` and its six per-platform packages. Until 2026-11-26 they stayed off nuget.org until the port was complete, and the plan was for Stewart to paste a long-lived API key for each push.
+
+Surl publishes through nuget.org's Trusted Publishing (Surl BL-1795): its `release.yml` release job, on a `v*` tag, runs `NuGet/login@v1` as user `StewartScottRogers`, which exchanges the job's OIDC token for an API key that lasts one hour. It then pushes with `--skip-duplicate`. A nuget.org trust policy on Stewart's account names Surl's repository and `release.yml`.
 
 ## Decision
 
-`.github/workflows/nuget-publish.yml` publishes one numbered release, and nothing else:
+Curl does the same in its own `release.yml`. On a `v*` tag, after creating the GitHub release, the release job (`id-token: write`):
+- logs in with `NuGet/login@v1` as user `StewartScottRogers`;
+- checks that the release has exactly nine `.nupkg` files at the tag's version;
+- pushes each to nuget.org with `--skip-duplicate`.
 
-- It runs only by hand (`workflow_dispatch`, input `tag`), never on a push or a tag. The rolling `preview` and any non-numbered tag are refused.
-- Its job runs in the GitHub environment `nuget`, whose required reviewer is Stewart. No push starts without his approval in GitHub.
-- It publishes the `.nupkg` files `release.yml` attached to that tag, the ones CI built. Before pushing, it checks each file against the release's `SHA256SUMS` and checks that it carries the tag's version. It builds nothing itself.
-- It gets its key from `NuGet/login@v1` (permission `id-token: write`), with the nuget.org profile name in the repository variable `NUGET_USER`. It pushes with `--skip-duplicate`, so a rerun after a partial push finishes the job.
+The rolling `preview` (pushes to `master`) never reaches nuget.org. Pre-release tags publish too, including the `v<x.y.z>-preview.<n>` tags an interactive session cuts for the Surly book under Stewart's standing approval. This lifts the earlier hold, "no nuget.org push until the port is complete".
 
 ## Consequences
 
 - No nuget.org API key exists in the repository, its secrets, a log or a terminal.
-- Stewart sets up three things once: on nuget.org, the `Surly.` prefix reservation and a trust policy (owner `StewartScottRogers`, repository `Curl`, workflow `nuget-publish.yml`, environment `nuget`); in GitHub, the `nuget` environment with himself as required reviewer; and the `NUGET_USER` variable.
-- The workflow runs only from the default branch, so it can be used once it reaches `master`.
-- The hold stands: no run of it is made until Stewart lifts the nuget.org hold (BL-2393).
+- Stewart sets up two things on nuget.org, once: the `Surly.` prefix reservation, and a Trusted Publishing policy for owner `StewartScottRogers`, repository `Curl`, workflow `release.yml` (no environment).
+- Until that policy exists, a tag's release job fails at the login step after the GitHub release is created. The fix is to add the policy and rerun the job; `--skip-duplicate` makes the rerun safe.
+- A version on nuget.org cannot be deleted, only unlisted, so every tag is a lasting public release.
