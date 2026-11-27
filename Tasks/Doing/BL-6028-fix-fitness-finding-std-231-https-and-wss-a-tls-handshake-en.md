@@ -78,3 +78,4 @@ Plan:
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 45a3dc74 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019 in Doing; waits on BL-6019 (plan and measurements under Notes)
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 45a3dc74 69116afe 3d836d5e.
