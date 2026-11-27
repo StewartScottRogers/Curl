@@ -33,3 +33,4 @@ output for a chain whose name constraint does not decode (ADR-1446) before pinni
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 2c09db2b 3d555037.
