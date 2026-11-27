@@ -1,5 +1,5 @@
 ---
-id: BL-6066
+id: BL-6067
 title: Share a library handle's kept DoH connections through its multi and share handles
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6066 — Share a library handle's kept DoH connections through its multi and share handles
+# BL-6067 — Share a library handle's kept DoH connections through its multi and share handles
 
 ## Goal
 
