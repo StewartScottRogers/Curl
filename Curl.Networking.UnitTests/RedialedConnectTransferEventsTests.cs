@@ -5,7 +5,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Drives <see cref="RedialedConnectTransferEvents" />, which holds back what a connect run again
-/// for the hand-built client repeats (ADR-1460, BL-6073).
+/// for the hand-built client repeats (ADR-1461, BL-6073).
 /// </summary>
 [TestClass]
 public sealed class RedialedConnectTransferEventsTests

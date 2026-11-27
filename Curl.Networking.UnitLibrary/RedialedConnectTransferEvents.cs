@@ -6,7 +6,7 @@ namespace Curl.Networking;
 /// The events of a <see cref="TcpConnector" /> connect run again for the hand-built client
 /// (ADR-1459): everything the first attempt already reported, up to the trust of the handshake that
 /// asked for the redial, is held back, so <c>-v</c> shows one connection's lines, as curl writes
-/// them (ADR-1460).
+/// them (ADR-1461).
 /// </summary>
 /// <remarks>
 /// The <see cref="ReportTlsTrust" /> of the handshake that asked for the redial, the one after

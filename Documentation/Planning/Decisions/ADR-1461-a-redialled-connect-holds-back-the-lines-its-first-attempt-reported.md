@@ -1,4 +1,4 @@
-# ADR-1460: A redialled connect holds back what its first attempt reported
+# ADR-1461: A redialled connect holds back what its first attempt reported
 
 - Status: Accepted
 - Date: 2026-11-26

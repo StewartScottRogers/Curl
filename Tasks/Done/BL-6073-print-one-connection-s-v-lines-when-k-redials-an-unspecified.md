@@ -37,7 +37,7 @@ output for a chain whose name constraint does not decode (ADR-1446) before pinni
 - The ADR-1446 chain itself was not measured: the recorder cannot serve a name constraint that does
   not decode, and the Windows curl first on the path is Schannel only. OpenSSL answers error 1 as
   the result of verifying the one handshake, so curl opens no second connection for it.
-- Fix (ADR-1460): `RedialedConnectTransferEvents` holds back what the redialled connect repeats, up
+- Fix (ADR-1461): `RedialedConnectTransferEvents` holds back what the redialled connect repeats, up
   to the redialled handshake's trust; a redial ending before it writes its held lines.
 - `touches` widened (no other task in Doing names them) with `RedialedConnectTransferEvents.cs` and
   its tests, `HandBuiltRedialRequiredException.cs` (now says whose handshake asked),
@@ -51,4 +51,4 @@ output for a chain whose name constraint does not decode (ADR-1446) before pinni
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 2c09db2b 3d555037.
-- 2026-11-26: Doing -> Done. A redialled -k connect shows one connection's -v lines (ADR-1460)
+- 2026-11-26: Doing -> Done. A redialled -k connect shows one connection's -v lines (ADR-1461)

@@ -30,7 +30,7 @@ where OpenSSL curl goes on with verify result 1. The hand-built client builds th
   has neither option.
 
 The whole connect is repeated, not only the dial, so a tunnel is opened again the same way it was
-opened the first time. The lines the first attempt reported are not shown again (ADR-1460,
+opened the first time. The lines the first attempt reported are not shown again (ADR-1461,
 BL-6073).
 
 Rejected: running every `-k` handshake on the hand-built client, as ADR-1452 rejects.

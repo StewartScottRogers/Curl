@@ -1502,4 +1502,4 @@ Each option and the specific reason it lost.
 | [1458](ADR-1458-kept-doh-url-resolvers-belong-to-the-connection-cache.md) | Kept --doh-url resolvers belong to the connection cache, so a multi or share handle's transfers share them (BL-6075) | Accepted | 2026-11-26 |
 | [1459](ADR-1459-under-k-an-sslstream-chain-build-that-throws-is-redialled-on-the-hand-built-client.md) | Under -k an SslStream chain build that throws for OpenSSL error 1 is redialled on the hand-built client (BL-6066) | Accepted | 2026-11-26 |
 | [1460](ADR-1460-the-http-handler-takes-the-connectors-timed-out-result-else-reports-the-line-itself.md) | The HTTP handler takes the connector's timed-out result, else reports the `-v` line itself (BL-6071) | Accepted | 2026-11-26 |
-| [1460](ADR-1460-a-redialled-connect-holds-back-the-lines-its-first-attempt-reported.md) | A redialled -k connect holds back the lines its first attempt reported (BL-6073) | Accepted | 2026-11-26 |
+| [1461](ADR-1461-a-redialled-connect-holds-back-the-lines-its-first-attempt-reported.md) | A redialled -k connect holds back the lines its first attempt reported (BL-6073) | Accepted | 2026-11-26 |
