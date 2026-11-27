@@ -4034,6 +4034,8 @@ internal sealed class CurlCommandRunner(
     /// <c>closing connection #N</c> (<see cref="AsyncResolveTeardownTraceEvents" />, BL-1157).
     /// Under <c>--trace-config read</c> a finished transfer's <c>[READ] client_reset, clear readers</c>
     /// comes before its connection's last line (<see cref="ClientReaderResetTraceEvents" />, BL-1159).
+    /// A transfer whose host is resolved over <c>--doh-url</c> takes its <c>%{conn_id}</c> before the first
+    /// DoH connection takes one (<see cref="TransferPerformer.NumberRunningTransfer" />, ADR-1463).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
@@ -4042,6 +4044,7 @@ internal sealed class CurlCommandRunner(
     {
         RunningTransferState state = Running;
         Func<long> takeConnectionId = ConnectionIdTakerFor(state);
+        transferPerformer.NumberRunningTransfer = () => ConnectionIdTakerFor(Running)();
         ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
         ITransferEvents events = WithTraceLineEvents(options, output, takeConnectionId);
         ITransferEvents recorded = options.WriteOut is null

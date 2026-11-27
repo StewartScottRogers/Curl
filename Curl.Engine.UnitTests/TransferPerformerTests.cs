@@ -347,6 +347,29 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public void TakeSubTransferConnectionId_NumbersTheRunningTransferFirst()
+    {
+        TransferPerformer performer = new(clock, EasyErrorText);
+        long? transferId = null;
+        performer.NumberRunningTransfer = () => transferId ??= performer.TakeConnectionId();
+
+        long first = performer.TakeSubTransferConnectionId();
+        long second = performer.TakeSubTransferConnectionId();
+
+        Assert.AreEqual(0L, transferId);
+        Assert.AreEqual(1, first);
+        Assert.AreEqual(2, second);
+    }
+
+    [TestMethod]
+    public void TakeSubTransferConnectionId_WithNoRunningTransferToNumber_TakesTheNextId()
+    {
+        TransferPerformer performer = new(clock, EasyErrorText);
+
+        Assert.AreEqual(0, performer.TakeSubTransferConnectionId());
+    }
+
+    [TestMethod]
     public void TakeNextAttemptIds_AttemptWithoutConnection_TakesNewIds()
     {
         TransferPerformer performer = new(clock, EasyErrorText);
