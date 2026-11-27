@@ -27,8 +27,16 @@ public sealed partial class TcpConnector
     private async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken) =>
         (await ResolveNotingCacheAsync(host, port, target, cancellationToken).ConfigureAwait(false)).Resolution;
 
-    /// <summary>Marks a cancellation that arrived while a host name was being resolved (CGR-284).</summary>
-    private sealed class CanceledWhileResolvingException(CancellationToken cancellationToken) : OperationCanceledException(cancellationToken);
+    /// <summary>
+    /// Marks a cancellation that arrived while a host name was being resolved (CGR-284), also under
+    /// <see cref="ConnectCancellationKeys.ArrivedWhileResolving" /> for a caller that ended the connect itself.
+    /// </summary>
+    private sealed class CanceledWhileResolvingException : OperationCanceledException
+    {
+        public CanceledWhileResolvingException(CancellationToken cancellationToken)
+            : base(cancellationToken) =>
+            Data[ConnectCancellationKeys.ArrivedWhileResolving] = true;
+    }
 
     // Resolves as ResolveWithFailureReasonAsync does, and says whether the DNS cache answered.
     private async ValueTask<(DnsResolution Resolution, bool FromCache)> ResolveNotingCacheAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken)

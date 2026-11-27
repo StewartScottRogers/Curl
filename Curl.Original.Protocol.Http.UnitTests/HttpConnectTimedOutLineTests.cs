@@ -100,6 +100,88 @@ public sealed class HttpConnectTimedOutLineTests
         Assert.IsEmpty(events.Info);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_MaxTimeCancelsAHopsConnectOfferingANumber_ClosesTheConnectionOfThatNumber()
+    {
+        // curl -svSL -m 3 after a 302 answered late: the hop's connect ends "closing connection #1" (measured, BL-6071).
+        var canceled = new OperationCanceledException();
+        int taken = 0;
+        canceled.Data[ConnectCancellationKeys.ConnectionNumberTaker] = (Func<long>)(() =>
+        {
+            taken++;
+            return 1;
+        });
+
+        (TransferResult result, RecordingTransferEvents events) = await HopEndedByMaxTimeAsync(canceled);
+
+        Diagnostics.Assert("information lines", "closing connection #1", string.Join(" | ", events.Info));
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "Connection timed out after 1000 milliseconds", "closing connection #1" }, events.Info.ToArray());
+        Assert.AreEqual(1, taken);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MaxTimeCancelsAHopsResolve_SaysResolvingTimedOut()
+    {
+        // curl 8.22.0 -svSL -m 2 after a 302 answered 1.5 s late, to a name whose DoH server is silent (measured, BL-6074):
+        // "* Resolving timed out after 426 milliseconds", "* closing connection #1",
+        // "curl: (28) Resolving timed out after 426 milliseconds".
+        var canceled = new OperationCanceledException();
+        canceled.Data[ConnectCancellationKeys.ArrivedWhileResolving] = true;
+        canceled.Data[ConnectCancellationKeys.ConnectionNumberTaker] = (Func<long>)(() => 1);
+
+        (TransferResult result, RecordingTransferEvents events) = await HopEndedByMaxTimeAsync(canceled);
+
+        Diagnostics.Assert("error message", "Resolving timed out after 1000 milliseconds", result.ErrorMessage);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Resolving timed out after 1000 milliseconds", result.ErrorMessage);
+        CollectionAssert.AreEqual(
+            new[] { "Resolving timed out after 1000 milliseconds", "closing connection #1" }, events.Info.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AbandonedConnectOfferingANumber_TakesNone()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        LateConnector connector = new();
+        TransferContext context = ContextWith(time, new RecordingTransferEvents());
+        using HttpTransferDeadline deadline = new(context);
+        using CancellationTokenSource abandoned = new();
+        var canceled = new OperationCanceledException();
+        int taken = 0;
+        canceled.Data[ConnectCancellationKeys.ConnectionNumberTaker] = (Func<long>)(() => ++taken);
+
+        Task<ConnectResult> connecting = deadline
+            .ConnectAsync(connector, new ConnectTarget("192.0.2.20", 1, false), abandoned.Token)
+            .AsTask();
+        await connector.Started;
+        await abandoned.CancelAsync();
+        connector.Fail(canceled);
+        ConnectResult result = await connecting;
+
+        Diagnostics.Assert("numbers taken", 0, taken);
+        Assert.AreEqual(0, taken);
+        Assert.AreEqual(0, result.ConnectionNumber);
+    }
+
+    // A redirect hop's connect: -m 3 started 2 s before the request, and passes 1 s into the connect.
+    private static async Task<(TransferResult Result, RecordingTransferEvents Events)> HopEndedByMaxTimeAsync(
+        OperationCanceledException canceled)
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        long operationStarted = time.GetTimestamp();
+        time.Advance(TimeSpan.FromSeconds(2));
+        RecordingTransferEvents events = new();
+        LateConnector connector = new();
+
+        Task<TransferResult> transfer = TransferAsync(connector, time, events, operationStarted);
+        await connector.Started;
+        time.Advance(TimeSpan.FromSeconds(1));
+        connector.Fail(canceled);
+        return (await transfer, events);
+    }
+
     private static bool IsTimedOutLine(string line) => line.StartsWith("Connection timed out", StringComparison.Ordinal);
 
     private static Task<TransferResult> TransferAsync(

@@ -1,3 +1,4 @@
+using System.Collections;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Http;
@@ -98,8 +99,11 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// Connects through <paramref name="connector" />, ending the connect with exit 28 when the
     /// connect timeout or <c>-m</c> passes first. A connector that returns its own exit 28 result
     /// has reported it, so that result is returned; otherwise the failure is curl's
-    /// <c>Connection timed out after N milliseconds</c>, N counted from the start of this request,
-    /// also reported once on the target's events as a <c>-v</c> line (ADR-1460).
+    /// <c>Connection timed out after N milliseconds</c>, or <c>Resolving timed out after N
+    /// milliseconds</c> when the connector says the name was still being resolved, N counted from
+    /// the start of this request, also reported once on the target's events as a <c>-v</c> line,
+    /// with the connection number the connector offers (<see cref="ConnectCancellationKeys" />,
+    /// ADR-1460, ADR-1461).
     /// </summary>
     /// <param name="connector">The connector to open the connection with.</param>
     /// <param name="target">What to connect to.</param>
@@ -157,30 +161,40 @@ internal sealed class HttpTransferDeadline : IDisposable
         catch (OperationCanceledException) when (EndedByLimit)
         {
             _ = DisposeLateConnectionAsync(connecting);
-            (ConnectResult? timedOutByConnector, ConnectTimings? timings) = await WhatTheEndedConnectLeftAsync(connecting).ConfigureAwait(false);
-            return timedOutByConnector ?? TimedOut(timings, events, abandoned.IsCancellationRequested);
+            (ConnectResult? timedOutByConnector, ConnectTimings? timings, IDictionary? carried) =
+                await WhatTheEndedConnectLeftAsync(connecting).ConfigureAwait(false);
+            return timedOutByConnector ?? TimedOut(timings, carried, events, abandoned.IsCancellationRequested);
         }
     }
 
-    // The exit 28 failure for a connect the connector did not report. An abandoned connect lost a race, so it gets no -v line.
-    private ConnectResult TimedOut(ConnectTimings? timings, ITransferEvents events, bool isAbandoned)
+    // The exit 28 failure for a connect the connector did not report. An abandoned connect lost a race, so it gets
+    // no -v line and takes no connection number.
+    private ConnectResult TimedOut(ConnectTimings? timings, IDictionary? carried, ITransferEvents events, bool isAbandoned)
     {
-        string message = HttpTransferMessages.ConnectionTimedOut(ElapsedMilliseconds);
+        string message = carried?[ConnectCancellationKeys.ArrivedWhileResolving] is true
+            ? HttpTransferMessages.ResolvingTimedOut(ElapsedMilliseconds)
+            : HttpTransferMessages.ConnectionTimedOut(ElapsedMilliseconds);
+        long connectionNumber = 0;
         if (!isAbandoned)
         {
             events.ReportInfo(message);
+            connectionNumber = TakeConnectionNumber(carried);
         }
 
-        return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message, timings);
+        return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message, timings, connectionNumber);
     }
+
+    private static long TakeConnectionNumber(IDictionary? carried) =>
+        carried?[ConnectCancellationKeys.ConnectionNumberTaker] is Func<long> take ? take() : 0;
 
     /// <summary>
     /// What the connect the limit ended left behind: the connector's own exit 28 result, whose message it has already
     /// reported, so the <c>-v</c> line and <c>curl: (28)</c> carry one N (ADR-1460); else the timings it took before
-    /// the limit, so the failure still reports the name lookup it did (STD-145).
+    /// the limit, so the failure still reports the name lookup it did (STD-145), and what its cancellation carried
+    /// under <see cref="ConnectCancellationKeys" />.
     /// A connector that honours its token finishes within <see cref="ConnectorUnwindGrace" />; one that does not leaves nothing.
     /// </summary>
-    private static async ValueTask<(ConnectResult? TimedOutByConnector, ConnectTimings? Timings)> WhatTheEndedConnectLeftAsync(Task<ConnectResult> connecting)
+    private static async ValueTask<(ConnectResult? TimedOutByConnector, ConnectTimings? Timings, IDictionary? Carried)> WhatTheEndedConnectLeftAsync(Task<ConnectResult> connecting)
     {
         // Real time on purpose: the limit has passed on the transfer's clock already, and this only waits for the connector's cancellation to unwind.
         await Task.WhenAny(connecting, Task.Delay(ConnectorUnwindGrace, TimeProvider.System)).ConfigureAwait(false);
@@ -192,11 +206,11 @@ internal sealed class HttpTransferDeadline : IDisposable
         try
         {
             ConnectResult ended = await connecting.ConfigureAwait(false);
-            return (ended.ExitCode == CurlExitCode.OperationTimedOut ? ended : null, ended.Timings);
+            return (ended.ExitCode == CurlExitCode.OperationTimedOut ? ended : null, ended.Timings, null);
         }
         catch (OperationCanceledException canceled)
         {
-            return (null, canceled.Data[ConnectTimings.CarriedOnCancellationKey] as ConnectTimings);
+            return (null, canceled.Data[ConnectTimings.CarriedOnCancellationKey] as ConnectTimings, canceled.Data);
         }
         catch (Exception)
         {

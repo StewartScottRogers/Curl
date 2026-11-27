@@ -710,6 +710,14 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"Connection timed out after {elapsedMilliseconds} milliseconds");
 
     /// <summary>
+    /// Formats the exit 28 message for a name resolve that a time limit ended (measured, BL-6074).
+    /// </summary>
+    /// <param name="elapsedMilliseconds">Milliseconds since this request started.</param>
+    /// <returns>The message, such as <c>Resolving timed out after 426 milliseconds</c>.</returns>
+    internal static string ResolvingTimedOut(long elapsedMilliseconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"Resolving timed out after {elapsedMilliseconds} milliseconds");
+
+    /// <summary>
     /// Formats the exit 28 message for a transfer <c>-m</c> ended after it connected
     /// (measured, BL-174 Notes).
     /// </summary>
