@@ -44,7 +44,7 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
         }
         catch (GrpcClientException failure)
         {
-            return TransferResult.Failure(failure.ExitCode, failure.Message);
+            return TransferResult.Failure(failure.ExitCode, failure.Message) with { Report = failure.Report };
         }
         catch (GrpcWireException failure)
         {

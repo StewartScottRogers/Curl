@@ -59,6 +59,23 @@ public sealed class GrpcProtocolHandlerTests
         Assert.AreEqual(0, report.DownloadSize);
         Assert.AreEqual("application/grpc", report.ContentType);
         Assert.AreEqual("HTTP/2 200 \r\n".Length + "content-type: application/grpc\r\n".Length + "grpc-status: 0\r\n".Length + 2, report.HeaderSize);
+        CollectionAssert.AreEqual(
+            new[] { KeyValuePair.Create("content-type", "application/grpc"), KeyValuePair.Create("grpc-status", "0") },
+            report.ResponseHeaders.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReflectionRefusedWithAnHttpStatus_ReportsTheRefusalsStatusAndHeaders()
+    {
+        byte[] reply = Reflection.ReflectionFixture.Server(Reflection.ReflectionFixture.Headers(1, true, ":status", "401", "dpop-nonce", "n-1"));
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream() };
+
+        TransferResult result = await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(new ScriptedConnection(reply), null))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("The server did not answer gRPC server reflection (grpc-status 16 (UNAUTHENTICATED): HTTP status 401); give the method's .proto file with --grpc-proto", result.ErrorMessage);
+        Assert.AreEqual(401, result.Report!.ResponseCode);
+        CollectionAssert.AreEqual(new[] { KeyValuePair.Create("dpop-nonce", "n-1") }, result.Report.ResponseHeaders.ToArray());
     }
 
     [TestMethod]
@@ -567,6 +584,56 @@ public sealed class GrpcProtocolHandlerTests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DpopReflectionRefusedWithANewNonce_RetriesOnceWithTheNonceInBothProofs_Rfc9449Section9()
+    {
+        string directory = Directory.CreateTempSubdirectory("grpc-dpop-").FullName;
+        try
+        {
+            string keyFile = Path.Combine(directory, "key.pem");
+            using (var key = ECDsa.Create(ECCurve.NamedCurves.nistP256))
+            {
+                await File.WriteAllTextAsync(keyFile, key.ExportECPrivateKeyPem());
+            }
+
+            ITransferHook dpop = DpopExtension.HookFor(new ExtensionOptionValues(new Dictionary<string, string> { [DpopExtension.Option.Name] = keyFile }))!;
+            var refused = new ScriptedConnection(Reflection.ReflectionFixture.Server(
+                Reflection.ReflectionFixture.Headers(1, true, ":status", "401", "dpop-nonce", "n-1")));
+            var accepted = new ScriptedConnection(Reflection.ReflectionFixture.Server(
+                Reflection.ReflectionFixture.Headers(1, false, GrpcServerReply.OkHeaders),
+                Reflection.ReflectionFixture.Message(1, Reflection.ReflectionFixture.FilesResponse(Reflection.ReflectionFixture.HelloWorldFile)),
+                Reflection.ReflectionFixture.Trailers(1, 0),
+                Reflection.ReflectionFixture.Headers(3, false, GrpcServerReply.OkHeaders),
+                Reflection.ReflectionFixture.Message(3, ReplyHi),
+                Reflection.ReflectionFixture.Trailers(3, 0)));
+            var handler = new GrpcProtocolHandler(new QueuedConnector(refused, accepted));
+            var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), Http = new Curl.Protocol.Abstractions.HttpRequestOptions() };
+
+            TransferResult result = await dpop.ExecuteAsync(context, handler.ExecuteAsync);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+            List<HeaderField> first = (await SentHeaderBlocksAsync(refused.Sent)).Single();
+            Assert.IsFalse(ClaimsOf(first.Single(static field => field.Name == "dpop").Value).TryGetProperty("nonce", out _));
+            List<List<HeaderField>> retry = await SentHeaderBlocksAsync(accepted.Sent);
+            CollectionAssert.AreEqual(
+                new[] { "n-1", "n-1" },
+                retry.Select(static headers => ClaimsOf(headers.Single(static field => field.Name == "dpop").Value).GetProperty("nonce").GetString()).ToArray());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    /// <summary>A connector that gives one connection per connect, in the order given.</summary>
+    private sealed class QueuedConnector(params IConnection[] connections) : IConnector
+    {
+        private readonly Queue<IConnection> waiting = new(connections);
+
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Connected(waiting.Dequeue(), null));
     }
 
     /// <summary>Gives the header block of each request sent, in order, decoded with the connection's one HPACK table.</summary>

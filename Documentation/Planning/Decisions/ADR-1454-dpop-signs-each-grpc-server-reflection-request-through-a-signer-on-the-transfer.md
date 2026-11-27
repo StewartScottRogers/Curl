@@ -32,4 +32,4 @@ own protocol contract, which no curl handler would read.
 
 - A server that checks `htu` and `jti` accepts the reflection request and the call.
 - A reflection request refused for a missing `DPoP-Nonce` is still not retried: the reflection failure reports no
-  response headers to the hook. Filed as a follow-up task.
+  response headers to the hook. Filed as a follow-up task, done by ADR-1455.
