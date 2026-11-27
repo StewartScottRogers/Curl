@@ -91,19 +91,62 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsEmpty(events.VerifyResults);
     }
 
+    [TestMethod]
+    public async Task AsksForRedial_AfterOpenSslError1UnderInsecure_RunsThatHostOnTheHandBuiltClientWithTheSameSettings()
+    {
+        var failure = new CryptographicException(UnspecifiedBuildMessage);
+        var provider = ThrowingProvider(new TlsClientOptions(Insecure: true), OpenSslBuild, failure);
+        var events = new RecordingTransferEvents();
+        ITlsProviderWithHandBuiltRedial redialing = provider;
+        Assert.AreSame(provider, redialing.ProviderFor(CertificateHost));
+
+        var result = await AuthenticateThrowingAsync(provider, events);
+
+        Diagnostics.Assert("asks for a redial", true, redialing.AsksForRedial(result));
+        Assert.IsTrue(redialing.AsksForRedial(result));
+        Assert.IsFalse(redialing.AsksForRedial(ConnectResult.Failed(CurlExitCode.SslConnectError, result.ErrorMessage!)));
+        var handBuilt = Assert.IsInstanceOfType<HandBuiltTlsProvider>(redialing.ProviderFor(CertificateHost));
+        Assert.IsTrue(handBuilt.Options.Insecure);
+        Assert.AreSame(provider, redialing.ProviderFor("another.example"));
+        var systemStoreOnly = (ITlsProviderWithHandBuiltRedial)provider.WithSystemStoreOnlyTrust();
+        Assert.IsInstanceOfType<HandBuiltTlsProvider>(systemStoreOnly.ProviderFor(CertificateHost));
+        Assert.IsEmpty(events.Handshakes);
+    }
+
+    [TestMethod]
+    public async Task AsksForRedial_AfterOpenSslError1WithoutInsecure_IsFalseAndKeepsTheProvider()
+    {
+        var failure = new CryptographicException(UnspecifiedBuildMessage);
+        var provider = ThrowingProvider(new TlsClientOptions(), OpenSslBuild, failure);
+        ITlsProviderWithHandBuiltRedial redialing = provider;
+
+        var result = await AuthenticateThrowingAsync(provider, new RecordingTransferEvents());
+
+        Diagnostics.Assert("asks for a redial", false, redialing.AsksForRedial(result));
+        Assert.IsFalse(redialing.AsksForRedial(result));
+        Assert.AreSame(provider, redialing.ProviderFor(CertificateHost));
+    }
+
     private async Task<ConnectResult> ThrowingHandshakeAsync(
         TlsClientOptions options,
         bool matchesSchannelBuild,
         Exception failure,
-        RecordingTransferEvents events)
+        RecordingTransferEvents events) =>
+        await AuthenticateThrowingAsync(ThrowingProvider(options, matchesSchannelBuild, failure), events);
+
+    private SslStreamTlsProvider ThrowingProvider(TlsClientOptions options, bool matchesSchannelBuild, Exception failure)
     {
         ArrangeOptions(options);
         Diagnostics.Arrange("handshake throws", failure.Message);
-        var (client, _) = InMemoryDuplexStream.CreatePair();
-        var provider = new SslStreamTlsProvider(options, matchesSchannelBuild)
+        return new SslStreamTlsProvider(options, matchesSchannelBuild)
         {
             AuthenticateSslStreamAsClientAsync = (_, _, _) => Task.FromException(failure),
         };
+    }
+
+    private async Task<ConnectResult> AuthenticateThrowingAsync(SslStreamTlsProvider provider, RecordingTransferEvents events)
+    {
+        var (client, _) = InMemoryDuplexStream.CreatePair();
 
         var result = await provider.AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);

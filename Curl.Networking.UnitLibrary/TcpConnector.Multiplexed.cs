@@ -32,7 +32,7 @@ public sealed partial class TcpConnector
 
         if (UdpTunnelProxyOf(target) is { } proxy)
         {
-            return await ConnectMultiplexedThroughProxyAsync(target, proxy, quicDialer, cancellationToken).ConfigureAwait(false);
+            return await ConnectMultiplexedThroughProxyRedialingByHandAsync(target, proxy, quicDialer, cancellationToken).ConfigureAwait(false);
         }
 
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);

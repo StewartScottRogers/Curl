@@ -130,13 +130,33 @@ public sealed partial class TcpConnector
                 ? target.ApplicationProtocols ?? httpOverTls
                 : [];
 
+    // A provider that cannot finish a handshake itself runs the next one with the host on the
+    // hand-built client: its failed handshake unwinds the connect, which dials again (ADR-1453).
+    private static async ValueTask<ConnectResult> AuthenticateAsync(
+        ITlsProvider provider,
+        IConnection plaintext,
+        string host,
+        ConnectTarget target,
+        bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
+        CancellationToken cancellationToken)
+    {
+        if (provider is not ITlsProviderWithHandBuiltRedial redialing)
+        {
+            return await AuthenticateOnceAsync(provider, plaintext, host, target, isProxy, applicationProtocols, cancellationToken).ConfigureAwait(false);
+        }
+
+        var secured = await AuthenticateOnceAsync(redialing.ProviderFor(host), plaintext, host, target, isProxy, applicationProtocols, cancellationToken).ConfigureAwait(false);
+        return redialing.AsksForRedial(secured) ? throw new HandBuiltRedialRequiredException() : secured;
+    }
+
     // A provider that can report its handshake reports its trust and handshake on the
     // target's events, marked as the proxy's when it is with an HTTPS proxy (BL-404, BL-452),
     // and offers the target's application protocols through ALPN (BL-490).
     // Either way the handshake's outcome goes to the diagnostic log (BL-920): the events are
     // wrapped to catch the reported handshake only when info is enabled, so with the log off the
     // provider receives the target's own events.
-    private static async ValueTask<ConnectResult> AuthenticateAsync(
+    private static async ValueTask<ConnectResult> AuthenticateOnceAsync(
         ITlsProvider provider,
         IConnection plaintext,
         string host,
