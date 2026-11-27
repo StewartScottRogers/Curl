@@ -57,7 +57,7 @@ public sealed class CurlCommandRunnerParallelTelnetTests
         Assert.AreEqual("[0]\nhello\n[0]\n", StandardOutputText);
     }
 
-    // Each expectation below was measured on curl 8.22.0 (Schannel, Windows) on 2026-11-26 (BL-6035, ADR-1428).
+    // Each expectation below was measured on curl 8.22.0 (Schannel, Windows) on 2026-11-26 (BL-6035, ADR-1444).
     [TestMethod]
     [DataRow("1", 1, "[43 000 0]\n[43 000 0]\n", "43 43", 0)]
     [DataRow("1", 2, "[43 000 0]\n[43 000 0]\n", "43 43", 0)]

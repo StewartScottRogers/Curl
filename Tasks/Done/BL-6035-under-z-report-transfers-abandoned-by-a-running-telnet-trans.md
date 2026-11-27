@@ -37,7 +37,7 @@ command `-sS -m 5 -Z [--parallel-max 1] -w "[%{exitcode}]\n" telnet://... -t NEW
 
 ## Notes
 
-- Measured curl 8.22.0 Schannel on Windows, 2026-11-26, stdout and stderr captured apart, with a scratch loopback telnet and HTTP server (Record-CurlExchange serves one protocol at a time). The table and the rules are in ADR-1428.
+- Measured curl 8.22.0 Schannel on Windows, 2026-11-26, stdout and stderr captured apart, with a scratch loopback telnet and HTTP server (Record-CurlExchange serves one protocol at a time). The table and the rules are in ADR-1444.
 - Curl, run through the same script after `dotnet build Curl.Console`, gave the same stdout, stderr and exit code as curl in all seven rows.
 - `Curl.Console/CLAUDE.md` added to `touches` (its `-Z` paragraph describes this behaviour); no task in Doing named it.
 - Fast tests passed; `Measure-CodeQuality.ps1 -Library Curl.Console`: 100% line and branch, 0 failing members.

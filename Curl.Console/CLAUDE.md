@@ -259,7 +259,7 @@ carries on with the glob's exit code (CGR-170, ADR-0954). A `telnet` transfer ho
 start until its session ends, as curl runs the whole session inside one call of its loop (ADR-1420);
 when that session fails fatally in the first batch, a lone transfer waiting within `--parallel-max` is
 performed and reported as exit 42, two or more are reported as 42 unstarted, those past the limit get
-the session's code, and nothing past the batch starts (ADR-1428). Each transfer also writes standard output through a
+the session's code, and nothing past the batch starts (ADR-1444). Each transfer also writes standard output through a
 `StandardOutputFailureDeferringStream` of its own (`RunningTransferState.StandardOutput`), so a write
 failure ends only the transfer whose write failed with exit 23, and the others' bodies and `-w` text
 still reach standard output (BL-773). Without `-Z` nothing changes: every transfer shares the run's one.

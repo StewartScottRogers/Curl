@@ -180,7 +180,7 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
     /// <summary>
     /// Gets the fatal failure a <c>telnet</c> session ended with, after which every other transfer is reported
-    /// as aborted (BL-6035, ADR-1428); <see langword="null" /> while none has.
+    /// as aborted (BL-6035, ADR-1444); <see langword="null" /> while none has.
     /// </summary>
     internal TransferResult? FatalSessionFailure { get; private set; }
 
@@ -202,7 +202,7 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// Ends the run at a <c>telnet</c> session of the first batch that failed fatally, as curl 8.22.0 does: a lone
     /// transfer waiting within <c>--parallel-max</c> is started and reported as aborted once it ends, two or more
     /// are reported as aborted without starting, and those past the limit are reported with the session's
-    /// failure (BL-6035, ADR-1428).
+    /// failure (BL-6035, ADR-1444).
     /// </summary>
     /// <param name="waiting">The held transfers behind the session.</param>
     /// <param name="placesWithinMax">How many of them curl would have had running beside the session; negative

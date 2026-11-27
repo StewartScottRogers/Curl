@@ -1485,4 +1485,4 @@ Each option and the specific reason it lost.
 | [1441](ADR-1441-doh-url-keeps-its-connections-for-later-queries.md) | --doh-url keeps its connections for later queries (BL-6051) | Accepted | 2026-11-26 |
 | [1442](ADR-1442-the-openssl-build-checks-other-names-against-name-constraints-as-openssl-does.md) | The OpenSSL build checks otherNames against name constraints as OpenSSL does (BL-6047) | Accepted | 2026-11-26 |
 | [1443](ADR-1443-nuget-org-packages-are-published-with-trusted-publishing.md) | Every numbered tag publishes its packages to nuget.org with Trusted Publishing, as Surl does (BL-2393) | Accepted | 2026-11-26 |
-| [1428](ADR-1428-transfers-behind-a-fatally-failed-z-telnet-session.md) | -Z reports the transfers behind a fatally failed telnet session as curl does (BL-6035) | Accepted | 2026-11-26 |
+| [1444](ADR-1444-transfers-behind-a-fatally-failed-z-telnet-session.md) | -Z reports the transfers behind a fatally failed telnet session as curl does (BL-6035) | Accepted | 2026-11-26 |

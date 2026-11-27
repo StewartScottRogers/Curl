@@ -1,4 +1,4 @@
-# ADR-1428: What -Z reports for the transfers behind a telnet session that fails fatally
+# ADR-1444: What -Z reports for the transfers behind a telnet session that fails fatally
 
 - Status: Accepted
 - Date: 2026-11-26
