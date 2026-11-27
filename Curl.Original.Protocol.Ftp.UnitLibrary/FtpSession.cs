@@ -172,6 +172,9 @@ internal sealed class FtpSession(
     /// <summary>The key the engine reads a cancelled transfer's report from, spelled as <c>EndPointReportingProtocolHandler.ReportDataKey</c> spells it.</summary>
     private const string CancelledReportDataKey = "Curl.Engine.TransferReport";
 
+    /// <summary>The key the engine reads a cancelled transfer's closing <c>-v</c> line from, spelled as <c>TransferPerformer.CancelledClosingLineDataKey</c> spells it.</summary>
+    private const string CancelledClosingLineDataKey = "Curl.Engine.ClosingConnectionLine";
+
     /// <summary>The parser a wildcard download's <c>LIST</c> reply goes to instead of the output; <see langword="null" /> otherwise.</summary>
     private FtpFileListParser? listParser;
 
@@ -2230,7 +2233,18 @@ internal sealed class FtpSession(
             DiagnosticLog = context.DiagnosticLog,
             TcpIoTrace = protectData ? null : FtpTcpIoTraces.Data,
         };
-        ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        ConnectResult connected;
+        try
+        {
+            connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException cancelled)
+        {
+            // -m passing here closes the control connection: the engine writes this -v line after the timeout's (BL-6053).
+            cancelled.Data[CancelledClosingLineDataKey] = FtpTransferMessages.ClosingConnection(controlName.Number);
+            throw;
+        }
+
         dataConnection = connected.Connection;
         if (dataConnection is null)
         {

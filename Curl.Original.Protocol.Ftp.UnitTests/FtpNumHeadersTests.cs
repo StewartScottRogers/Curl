@@ -165,6 +165,7 @@ public sealed class FtpNumHeadersTests
         Assert.AreEqual(227, report.ResponseCode);
         Assert.AreEqual(6, NumHeaders(report));
         Assert.AreEqual("/", report.FtpEntryPath);
+        Assert.AreEqual("closing connection #0", cancelled.Data["Curl.Engine.ClosingConnectionLine"]);
     }
 
     /// <summary>A data connector whose dial ends as a cancelled one does.</summary>
