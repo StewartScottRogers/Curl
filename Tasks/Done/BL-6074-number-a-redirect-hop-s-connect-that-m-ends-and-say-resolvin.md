@@ -28,7 +28,7 @@ Found in BL-6071 (ADR-1460). `curl -svSL -m 3` following a 302, answered after 1
 
 ## Notes
 
-- Plan (ADR-1461): `TcpConnector` marks a cancellation that arrived during a resolve, `PoolingConnector` offers a
+- Plan (ADR-1462): `TcpConnector` marks a cancellation that arrived during a resolve, `PoolingConnector` offers a
   connection-number taker on a cancelled TCP connect (both under the new `ConnectCancellationKeys`), and
   `HttpTransferDeadline` uses them for the message and `closing connection #N`, taking no number for an abandoned connect.
 - `touches` widened with the four files named above; the only other task in Doing (BL-6073) names none of them.

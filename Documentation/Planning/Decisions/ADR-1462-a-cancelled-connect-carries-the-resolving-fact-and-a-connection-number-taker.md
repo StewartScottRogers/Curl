@@ -1,4 +1,4 @@
-# ADR-1461 — A cancelled connect carries the resolving fact and a connection number taker
+# ADR-1462 — A cancelled connect carries the resolving fact and a connection number taker
 
 - **Status:** Accepted
 - **Date:** 2026-11-26

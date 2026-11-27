@@ -103,7 +103,7 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// milliseconds</c> when the connector says the name was still being resolved, N counted from
     /// the start of this request, also reported once on the target's events as a <c>-v</c> line,
     /// with the connection number the connector offers (<see cref="ConnectCancellationKeys" />,
-    /// ADR-1460, ADR-1461).
+    /// ADR-1460, ADR-1462).
     /// </summary>
     /// <param name="connector">The connector to open the connection with.</param>
     /// <param name="target">What to connect to.</param>
