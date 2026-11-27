@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System.Security.Cryptography;
 
 using Curl.Networking.Fakes;
@@ -38,6 +39,86 @@ public sealed partial class TcpConnectorTests
         Assert.IsFalse(handshake.Failed);
         Assert.AreEqual(1L, handshake.CertificateVerifyResult);
         CollectionAssert.AreEqual(new[] { (1L, false) }, events.VerifyResults);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ARedialledDirectConnectUnderInsecure_ReportsEachLineBeforeTheHandshakeOnce()
+    {
+        var events = new RecordingTransferEvents();
+        var handBuilt = HandBuiltRouteReportingVerifyResult1();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback), FakeDialer(), ThrowingChainProvider(insecure: true, handBuilt), new ManualTimeProvider());
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Host example.com:443 was resolved.",
+                "IPv6: (none)",
+                "IPv4: 127.0.0.1",
+                "  Trying 127.0.0.1:443...",
+            },
+            events.Info);
+        Assert.HasCount(2, events.TlsEvents);
+        Assert.IsInstanceOfType<TlsTrustEvent>(events.TlsEvents[0]);
+        Assert.IsInstanceOfType<TlsHandshakeEvent>(events.TlsEvents[1]);
+        Assert.HasCount(1, events.Opened);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ARedialThatCannotDial_ReportsTheLinesOfTheFailedDial()
+    {
+        var events = new RecordingTransferEvents();
+        var dials = 0;
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = _ => ++dials == 1 ? new FakeConnection() : throw new SocketException((int)SocketError.ConnectionRefused),
+        };
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback), dialer, ThrowingChainProvider(insecure: true, HandBuiltRouteReportingVerifyResult1()), new ManualTimeProvider());
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 443, UseTls: true) { Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(2, events.Info.Count(line => line == "  Trying 127.0.0.1:443..."));
+        Assert.AreEqual(result.ErrorMessage, events.Info[^1]);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AProxysAndThenTheOriginsHandshakeRedialled_ReportsEachHandshakesTrustOnce()
+    {
+        var events = new RecordingTransferEvents();
+        // The tunnel is opened twice over the proxy's secured connection, by the second and third attempts.
+        var proxyHandBuilt = HandBuiltRouteReportingVerifyResult1(
+            new ScriptedConnection("HTTP/1.1 200 OK\r\n\r\nHTTP/1.1 200 OK\r\n\r\n"u8.ToArray()));
+        var originHandBuilt = HandBuiltRouteReportingVerifyResult1();
+        var dialer = FakeDialer();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback),
+            dialer,
+            ThrowingChainProvider(insecure: true, originHandBuilt),
+            new ManualTimeProvider(),
+            proxyTlsProvider: ThrowingChainProvider(insecure: true, proxyHandBuilt));
+        var target = new ConnectTarget("example.com", 443, UseTls: true)
+        {
+            Proxy = new ProxyEndpoint(ProxyKind.Https, "proxy.example", 443, null),
+            Events = events,
+        };
+
+        var result = await ConnectLoggedAsync(connector, target);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.HasCount(3, dialer.DialedEndPoints);
+        Assert.AreEqual(2, events.TlsEvents.OfType<TlsTrustEvent>().Count());
+        CollectionAssert.AreEqual(new[] { true, true }, proxyHandBuilt.ReceivedIsProxy);
+        Assert.AreEqual(1, originHandBuilt.HandshakeCount);
+        Assert.AreEqual(1, events.Info.Count(line => line == "  Trying 127.0.0.1:443..."));
+        Assert.AreEqual(1, events.Transcript.Count(line => line.StartsWith("> CONNECT ", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -166,9 +247,11 @@ public sealed partial class TcpConnectorTests
                 Task.FromException(new CryptographicException(UnspecifiedChainMessage)),
         };
 
-    private static FakeTlsProvider HandBuiltRouteReportingVerifyResult1() => new()
+    private static FakeTlsProvider HandBuiltRouteReportingVerifyResult1(IConnection? secured = null) => new()
     {
         Route = TlsClientRoute.HandBuilt,
+        ReportsTrust = true,
+        ConnectionToReturn = secured,
         HandshakeToReport = new TlsHandshakeEvent
         {
             ProtocolVersion = System.Security.Authentication.SslProtocols.Tls13,

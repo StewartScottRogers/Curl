@@ -18,13 +18,47 @@ public sealed partial class TcpConnector
         {
             return await ConnectWithinTimeoutAsync(target, destination, started, connectLimit, cancellationToken).ConfigureAwait(false);
         }
-        catch (HandBuiltRedialRequiredException)
+        catch (HandBuiltRedialRequiredException redial)
         {
-            var left = Math.Max(0, (connectLimit - timeProvider.GetElapsedTime(started)).Ticks);
-            using var timeout = new CancellationTokenSource(TimeSpan.FromTicks(left), timeProvider);
-            using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
-            return await ConnectRedialingByHandAsync(target, destination, started, connectLimit, limited.Token).ConfigureAwait(false);
+            return await RedialByHandAsync(target, destination, started, connectLimit, redial.IsProxy, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    // The connect run again, its events showing only what the attempts before it did not report.
+    // Each redial wraps the target's own events, so a second one (the origin's, after the proxy's)
+    // holds back up to its own handshake.
+    private async ValueTask<ConnectResult> RedialByHandAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        TimeSpan connectLimit,
+        bool redialedIsProxy,
+        CancellationToken cancellationToken)
+    {
+        var left = Math.Max(0, (connectLimit - timeProvider.GetElapsedTime(started)).Ticks);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromTicks(left), timeProvider);
+        using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        var events = RedialedEventsOf(target, redialedIsProxy);
+        try
+        {
+            return await ConnectWithinTimeoutAsync(target with { Events = events }, destination, started, connectLimit, limited.Token).ConfigureAwait(false);
+        }
+        catch (HandBuiltRedialRequiredException redial)
+        {
+            return await RedialByHandAsync(target, destination, started, connectLimit, redial.IsProxy, limited.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            events.ReportHeldLines();
+        }
+    }
+
+    // An origin reached through an HTTPS proxy handshakes after the proxy, so the proxy's trust is
+    // held back too before the origin's.
+    private RedialedConnectTransferEvents RedialedEventsOf(ConnectTarget target, bool redialedIsProxy)
+    {
+        var followsTheProxysHandshake = !redialedIsProxy && UnixSocket is null && target.Proxy?.Kind == ProxyKind.Https;
+        return new RedialedConnectTransferEvents(target.Events, followsTheProxysHandshake ? 1 : 0);
     }
 
     // The same for a QUIC connect through an HTTPS proxy, whose handshake is the one over TCP; the
@@ -39,9 +73,17 @@ public sealed partial class TcpConnector
         {
             return await ConnectMultiplexedThroughProxyAsync(target, proxy, dialer, cancellationToken).ConfigureAwait(false);
         }
-        catch (HandBuiltRedialRequiredException)
+        catch (HandBuiltRedialRequiredException redial)
         {
-            return await ConnectMultiplexedThroughProxyAsync(target, proxy, dialer, cancellationToken).ConfigureAwait(false);
+            var events = RedialedEventsOf(target, redial.IsProxy);
+            try
+            {
+                return await ConnectMultiplexedThroughProxyAsync(target with { Events = events }, proxy, dialer, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                events.ReportHeldLines();
+            }
         }
     }
 }

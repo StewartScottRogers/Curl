@@ -16,6 +16,12 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
     public FakeConnection SecuredConnection { get; } = new() { IsSecure = true };
 
     /// <summary>
+    /// Gets the connection a successful handshake returns in place of
+    /// <see cref="SecuredConnection" />; <see langword="null" /> returns that.
+    /// </summary>
+    public IConnection? ConnectionToReturn { get; init; }
+
+    /// <summary>
     /// Gets or sets the failed result every handshake returns instead of
     /// <see cref="SecuredConnection" />; <see langword="null" /> means the handshake succeeds.
     /// </summary>
@@ -38,6 +44,12 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
     /// providers do; <see langword="null" /> reports none.
     /// </summary>
     public TlsHandshakeEvent? HandshakeToReport { get; init; }
+
+    /// <summary>
+    /// Gets whether the four-argument handshake first reports its trust, without verification, as
+    /// the real providers do before every handshake.
+    /// </summary>
+    public bool ReportsTrust { get; init; }
 
     /// <summary>
     /// Gets or sets the timings a successful handshake reports; <see langword="null" />
@@ -85,6 +97,11 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
         CancellationToken cancellationToken)
     {
         ReceivedEvents = events;
+        if (ReportsTrust)
+        {
+            events.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false });
+        }
+
         if (HandshakeToReport is { } handshake && FailureToReturn is null)
         {
             events.ReportTlsHandshake(handshake);
@@ -111,7 +128,7 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
         ReceivedTargetHost = targetHost;
 
         return ValueTask.FromResult(FailureToReturn ?? ConnectResult.Connected(
-            SecuredConnection,
+            ConnectionToReturn ?? SecuredConnection,
             TimingsToReturn,
             peerCertificates: PeerCertificatesToReturn,
             applicationProtocol: ApplicationProtocolToReturn));

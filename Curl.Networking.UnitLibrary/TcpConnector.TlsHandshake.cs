@@ -147,7 +147,7 @@ public sealed partial class TcpConnector
         }
 
         var secured = await AuthenticateOnceAsync(redialing.ProviderFor(host), plaintext, host, target, isProxy, applicationProtocols, cancellationToken).ConfigureAwait(false);
-        return redialing.AsksForRedial(secured) ? throw new HandBuiltRedialRequiredException() : secured;
+        return redialing.AsksForRedial(secured) ? throw new HandBuiltRedialRequiredException(isProxy) : secured;
     }
 
     // A provider that can report its handshake reports its trust and handshake on the
