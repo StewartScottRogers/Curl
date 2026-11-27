@@ -1,5 +1,5 @@
 ---
-id: BL-6067
+id: BL-6073
 title: Print one connection's -v lines when -k redials an unspecified-chain handshake on the hand-built client
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6067 — Print one connection's -v lines when -k redials an unspecified-chain handshake on the hand-built client
+# BL-6073 — Print one connection's -v lines when -k redials an unspecified-chain handshake on the hand-built client
 
 ## Goal
 

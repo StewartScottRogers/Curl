@@ -30,7 +30,7 @@ ADR-1452 (BL-6063): `SslStreamTlsProvider` can only report that handshake as exi
 - ADR-1453 records the design: SslStreamTlsProvider marks the failed -k result (ITlsProviderWithHandBuiltRedial), TcpConnector unwinds, dials again and handshakes with that host on HandBuiltTlsProvider.
 - touches widened to the other TcpConnector partials, the two new types and the library CLAUDE.md; no task in Doing named them (BL-6039 holds only TcpConnector.ConnectTimeout.cs, which is unchanged). TcpConnector.cs itself needed no change.
 - The test over fakes replaces the SslStream handshake step and stands a fake in for the hand-built client, so it runs on every platform; on Linux the real hand-built client reports verify result 1 through CertificateChainBuild (ADR-1446).
-- curl -v output was not measured and no new line is pinned. A redialled connect writes the pre-handshake -v lines twice: filed as BL-6067.
+- curl -v output was not measured and no new line is pinned. A redialled connect writes the pre-handshake -v lines twice: filed as BL-6073.
 - Build clean, all fast tests green; Measure-CodeQuality for Curl.Networking.UnitLibrary: line 100, branch 100, 0 failing.
 
 ## Log
