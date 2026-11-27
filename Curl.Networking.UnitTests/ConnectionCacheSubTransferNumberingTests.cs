@@ -53,6 +53,26 @@ public sealed class ConnectionCacheSubTransferNumberingTests
         Assert.AreEqual(1, subTransferNumber);
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_ACancelledConnectThatNumberedASubTransferConnection_OffersTheNumberBeforeIt()
+    {
+        await using ConnectionCache cache = new(TimeProvider.System);
+        long subTransferNumber = -1;
+        SubTransferNumberingConnector inner = new(() =>
+        {
+            subTransferNumber = cache.NumberSubTransferConnection();
+            throw new OperationCanceledException();
+        });
+        await using PoolingConnector pool = new(inner, cache, configuration: string.Empty);
+
+        OperationCanceledException canceled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await pool.ConnectAsync(new ConnectTarget("host.example", 80, UseTls: false), CancellationToken.None));
+        var take = (Func<long>)canceled.Data[ConnectCancellationKeys.ConnectionNumberTaker]!;
+
+        Assert.AreEqual(0, take());
+        Assert.AreEqual(1, subTransferNumber);
+    }
+
     private sealed class SubTransferNumberingConnector(Action resolve) : IConnector
     {
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)

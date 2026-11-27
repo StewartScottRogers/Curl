@@ -611,7 +611,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         catch (Exception exception)
         {
             Decide(negotiation);
-            OfferNumberToCanceledConnect(exception, isQuic);
+            OfferNumberToCanceledConnect(exception, isQuic, numbering);
             throw;
         }
 
@@ -662,12 +662,13 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     }
 
     // A cancelled TCP connect may be a time limit's, which curl numbers like any failed connect; only the caller
-    // knows whether it reports it, so it is handed the means to take the number (BL-6074). QUIC as in OpenAsync.
-    private void OfferNumberToCanceledConnect(Exception failure, bool isQuic)
+    // knows whether it reports it, so it is handed the means to take the number (BL-6074), the one a --doh-url
+    // look-up reserved for this connect when there is one (BL-6076). QUIC as in OpenAsync.
+    private void OfferNumberToCanceledConnect(Exception failure, bool isQuic, ConnectionNumberReservation numbering)
     {
         if (failure is OperationCanceledException && !isQuic)
         {
-            failure.Data[ConnectCancellationKeys.ConnectionNumberTaker] = (Func<long>)_cache.NumberNextConnection;
+            failure.Data[ConnectCancellationKeys.ConnectionNumberTaker] = (Func<long>)(() => _cache.NumberOpened(numbering));
         }
     }
 
