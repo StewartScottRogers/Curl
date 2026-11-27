@@ -29,3 +29,4 @@ Found in BL-6061 (ADR-1446). .NET on Linux builds the chain inside the handshake
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 809eaa5e.
