@@ -1,5 +1,5 @@
 ---
-id: BL-6062
+id: BL-6063
 title: Report exit 60 verify result 1 on Linux when SslStream's own chain build throws for OpenSSL error 1
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6062 — Report exit 60 verify result 1 on Linux when SslStream's own chain build throws for OpenSSL error 1
+# BL-6063 — Report exit 60 verify result 1 on Linux when SslStream's own chain build throws for OpenSSL error 1
 
 ## Goal
 
