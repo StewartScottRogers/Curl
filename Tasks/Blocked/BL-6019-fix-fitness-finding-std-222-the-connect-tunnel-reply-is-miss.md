@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.ProxyConnect.cs, Curl.Networking.UnitLibrary/TcpConnector.cs]
+touches: [Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.ProxyConnect.cs, Curl.Networking.UnitLibrary/TcpConnector.HttpProxyTunnel.cs]
 requirement: none
 created: 2026-11-26
 completed:

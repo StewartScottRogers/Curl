@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorTimedOutLineTests.cs]
+touches: [Curl.Networking.UnitLibrary/TcpConnector.ConnectTimeout.cs, Curl.Networking.UnitTests/TcpConnectorTimedOutLineTests.cs]
 requirement: none
 created: 2026-11-26
 completed:

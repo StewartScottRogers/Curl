@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-6019]
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.Connecting.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerProxyConnectFailTests.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultProxyAuthenticationTests.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/NumberedConnectFailure.cs, Curl.Networking.UnitLibrary/ConnectTunnelVerboseLines.cs, Curl.Networking.UnitTests/TcpConnectorProxyAuthProblemTests.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.Connecting.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerProxyConnectFailTests.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultProxyAuthenticationTests.cs, Curl.Networking.UnitLibrary/TcpConnector.ProxyChallenge.cs, Curl.Networking.UnitLibrary/TcpConnector.ProxyTunnelFailure.cs, Curl.Networking.UnitLibrary/NumberedConnectFailure.cs, Curl.Networking.UnitLibrary/ConnectTunnelVerboseLines.cs, Curl.Networking.UnitTests/TcpConnectorProxyAuthProblemTests.cs]
 requirement: none
 created: 2026-11-26
 completed:
