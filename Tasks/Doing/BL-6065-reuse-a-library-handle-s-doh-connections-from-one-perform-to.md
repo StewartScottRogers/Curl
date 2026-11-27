@@ -31,3 +31,4 @@ ADR-1448 (BL-6057): each perform of `ManagedEasyTransfer` builds new transports,
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: b2981b10 428483f8 3d836d5e.
