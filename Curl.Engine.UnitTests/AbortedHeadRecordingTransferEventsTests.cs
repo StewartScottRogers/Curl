@@ -20,7 +20,7 @@ public sealed class AbortedHeadRecordingTransferEventsTests
     {
         AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);
         events.ReportConnectionOpened(Opened);
-        events.ReportRequestHeader(new byte[62]);
+        events.ReportRequestHeader(Encoding.ASCII.GetBytes("GET /x HTTP/1.1\r\nHost: h\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"));
         events.ReportResponseHeader(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\n"));
         events.ReportResponseHeader(new byte[59]);
 
@@ -28,7 +28,7 @@ public sealed class AbortedHeadRecordingTransferEventsTests
 
         Assert.AreEqual(200, report.ResponseCode);
         Assert.AreEqual(76, report.HeaderSize);
-        Assert.AreEqual(62, report.RequestSize);
+        Assert.AreEqual(66, report.RequestSize);
         Assert.AreEqual(1, report.ConnectionCount);
     }
 
@@ -43,6 +43,31 @@ public sealed class AbortedHeadRecordingTransferEventsTests
         TransferReport report = events.ReportOn(new TransferResult(CurlExitCode.OperationTimedOut, 0))!.Report!;
 
         Assert.AreEqual(37, report.HeaderSize);
+    }
+
+    [TestMethod]
+    [DataRow("USER anonymous\r\n")]
+    [DataRow("RETR f.txt\r\n")]
+    [DataRow("SIZE f.txt")]
+    public void ReportOn_AnFtpCommand_CountsNoRequestSize(string command)
+    {
+        AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);
+        events.ReportConnectionOpened(Opened);
+        events.ReportRequestHeader(Encoding.ASCII.GetBytes(command));
+
+        Assert.AreEqual(0, events.ReportOn(new TransferResult(CurlExitCode.OperationTimedOut, 0))!.Report!.RequestSize);
+    }
+
+    [TestMethod]
+    [DataRow("GET / HTTP/1.1\r\nHost: h\r\n\r\n")]
+    [DataRow("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\n\r\n")]
+    [DataRow("GET / HTTP/2")]
+    public void ReportOn_AnHttpOrRtspRequestHead_CountsItsBytes(string head)
+    {
+        AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);
+        events.ReportRequestHeader(Encoding.ASCII.GetBytes(head));
+
+        Assert.AreEqual(head.Length, events.ReportOn(new TransferResult(CurlExitCode.OperationTimedOut, 0))!.Report!.RequestSize);
     }
 
     [TestMethod]
