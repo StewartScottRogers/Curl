@@ -225,6 +225,8 @@ internal static class TlsFailureMessages
         [OpenSslVerifyResult.PermittedSubtreeViolation] = "permitted subtree violation",
         [OpenSslVerifyResult.ExcludedSubtreeViolation] = "excluded subtree violation",
         [OpenSslVerifyResult.UnsupportedNameSyntax] = "unsupported or invalid name syntax",
+        [OpenSslVerifyResult.UnsupportedConstraintType] = "unsupported name constraint type",
+        [OpenSslVerifyResult.Unspecified] = "unspecified certificate verification error",
         [OpenSslVerifyResult.InvalidCaCertificate] = "invalid CA certificate",
     }.ToFrozenDictionary();
 

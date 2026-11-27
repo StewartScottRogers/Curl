@@ -1223,15 +1223,6 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(CertificateNameConstraints.Excluded, FindViolationOfAlternativeNames(constraints, alternativeNames));
     }
 
-    [TestMethod]
-    public void FindViolation_OpenSslBuildExcludedOtherName_IsLeftToTheChainEngine()
-    {
-        var constraints = Constraints(excludedName: OtherName(UserPrincipalName, Text("evil.test")));
-        var alternativeNames = DnsAnd(OtherName(UserPrincipalName, Text("user@evil.test")));
-
-        Assert.AreEqual(0, FindViolationOfAlternativeNames(constraints, alternativeNames, matchesSchannelBuild: false));
-    }
-
     // CryptoAPI, measured with X509Chain (BL-6046): an rfc822Name constraint starting '@' matches the end of the name.
     [TestMethod]
     [DataRow("@evil.test", "u@evil.test", true)]
@@ -1279,6 +1270,200 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
     private static int FindViolationOfPermittedEmail(string constraint, string email, bool matchesSchannelBuild) =>
         FindViolationOfAlternativeNames(Constraints(permittedName: GeneralName(1, constraint)), DnsAnd(GeneralName(1, email)), matchesSchannelBuild);
+
+    private const string SmtpUtf8Mailbox = "1.3.6.1.5.5.7.8.9";
+
+    private static byte[] Mailbox(string address) => OtherName(SmtpUtf8Mailbox, Text(address));
+
+    // The OpenSSL build's otherName rows below were measured with curl 8.18.0 and OpenSSL 3.5.5 (BL-6047, ADR-1441).
+    [TestMethod]
+    [DataRow(UserPrincipalName, "user@evil.test")]
+    [DataRow(UserPrincipalName, "user@good.test")]
+    [DataRow(OtherTypeId, "evil.test")]
+    public void FindViolation_OpenSslBuildOtherNameUnderAConstraintOfItsTypeId_IsAnUnsupportedConstraintType(string typeId, string name)
+    {
+        var constraintName = OtherName(typeId, Text("evil.test"));
+        var alternativeNames = DnsAnd(OtherName(typeId, Text(name)));
+
+        var excluded = FindViolationOfAlternativeNames(Constraints(excludedName: constraintName), alternativeNames, false);
+        var permitted = FindViolationOfAlternativeNames(Constraints(permittedName: constraintName), alternativeNames, false);
+
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedConstraintType, excluded);
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedConstraintType, permitted);
+    }
+
+    [TestMethod]
+    [DataRow(UserPrincipalName, OtherTypeId)]
+    [DataRow(UserPrincipalName, SmtpUtf8Mailbox)]
+    [DataRow(SmtpUtf8Mailbox, UserPrincipalName)]
+    [DataRow(SmtpUtf8Mailbox, SmtpUtf8Mailbox)]
+    public void FindViolation_OpenSslBuildOtherNameNoOtherNameConstraintAppliesTo_IsNotConstrained(string constraintTypeId, string typeId)
+    {
+        var constraintName = OtherName(constraintTypeId, Text("good.test"));
+        var alternativeNames = DnsAnd(OtherName(typeId, Text("user@evil.test")));
+
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(Constraints(excludedName: constraintName), alternativeNames, false));
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(Constraints(permittedName: constraintName), alternativeNames, false));
+    }
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildSmtpUtf8ConstraintBesideAnRfc822Name_IsNotConstrained()
+    {
+        var constraintName = Mailbox("evil.test");
+        var alternativeNames = DnsAnd(GeneralName(1, "user@good.test"));
+
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(Constraints(excludedName: constraintName), alternativeNames, false));
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(Constraints(permittedName: constraintName), alternativeNames, false));
+    }
+
+    [TestMethod]
+    [DataRow("evil.test", "user@evil.test", true)]
+    [DataRow("evil.test", "USER@EVIL.TEST", true)]
+    [DataRow("evil.test", "a@b@evil.test", true)]
+    [DataRow("evil.test", "@evil.test", true)]
+    [DataRow("evil.test", "user@a.evil.test", false)]
+    [DataRow(".evil.test", "user@evil.test", false)]
+    [DataRow(".evil.test", "user@a.evil.test", false)]
+    [DataRow(".evil.test", "user@a..evil.test", true)]
+    [DataRow(".evil.test", "@..EVIL.test", true)]
+    [DataRow(".evil.test", "..evil.test@", false)]
+    [DataRow(".", "user@evil..", true)]
+    [DataRow("@evil.test", "user@evil.test", false)]
+    [DataRow("user@evil.test", "user@evil.test", false)]
+    [DataRow("", "user@evil.test", false)]
+    [DataRow("", "user@", true)]
+    [DataRow("xn--bcher-kva.test", "user@bücher.test", true)]
+    [DataRow("xn--bcher-kva.test", "user@BüCHER.test", true)]
+    [DataRow("xn--bcher-kva.test", "user@bÜcher.test", false)]
+    [DataRow("xn--bcher-kva.test", "user@xn--bcher-kva.test", false)]
+    [DataRow("XN--bcher-kva.test", "user@bücher.test", false)]
+    [DataRow("XN--bcher-kva.test", "user@xn--bcher-kva.test", true)]
+    [DataRow(".xn--bcher-kva.test", "user@a..bücher.test", true)]
+    [DataRow("xn--.test", "user@.test", true)]
+    [DataRow("xn--abc-.test", "user@abc.test", true)]
+    public void FindViolation_OpenSslBuildSmtpUtf8MailboxUnderAnRfc822NameConstraint_FollowsTheConstraint(string constraint, string mailbox, bool within)
+    {
+        var constraintName = GeneralName(1, constraint);
+        var alternativeNames = DnsAnd(Mailbox(mailbox));
+
+        var excluded = FindViolationOfAlternativeNames(Constraints(excludedName: constraintName), alternativeNames, false);
+        var permitted = FindViolationOfAlternativeNames(Constraints(permittedName: constraintName), alternativeNames, false);
+
+        Assert.AreEqual(within ? CertificateNameConstraints.Excluded : 0, excluded);
+        Assert.AreEqual(within ? 0 : CertificateNameConstraints.NotPermitted, permitted);
+    }
+
+    [TestMethod]
+    [DataRow("evil.test", "evil.test")]
+    [DataRow(".evil.test", "..evil.test")]
+    [DataRow("a\0b", "user@evil.test")]
+    public void FindViolation_OpenSslBuildSmtpUtf8MailboxItCannotCompare_IsUnsupportedNameSyntax(string constraint, string mailbox) =>
+        AssertEitherSubtreeAnswers(constraint, Mailbox(mailbox), CertificateNameConstraints.UnsupportedNameSyntax);
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildSmtpUtf8MailboxThatIsNoUtf8String_IsUnsupportedNameSyntax() =>
+        AssertEitherSubtreeAnswers("evil.test", OtherName(SmtpUtf8Mailbox, Integer()), CertificateNameConstraints.UnsupportedNameSyntax);
+
+    [TestMethod]
+    [DataRow("xn--!!.test", 0)]
+    [DataRow(".xn--!!.test", 0)]
+    [DataRow("", 256)]
+    [DataRow(".", 254)]
+    public void FindViolation_OpenSslBuildSmtpUtf8MailboxUnderAConstraintThatDoesNotDecode_IsUnspecified(string start, int more) =>
+        AssertEitherSubtreeAnswers(start + new string('a', more), Mailbox("user@evil.test"), CertificateNameConstraints.UnspecifiedError);
+
+    [TestMethod]
+    [DataRow("", 255)]
+    [DataRow(".", 253)]
+    public void FindViolation_OpenSslBuildSmtpUtf8MailboxUnderTheLongestConstraint_IsCompared(string start, int more)
+    {
+        var constraints = Constraints(permittedName: GeneralName(1, start + new string('a', more)));
+
+        var violation = FindViolationOfAlternativeNames(constraints, DnsAnd(Mailbox("user@evil.test")), false);
+
+        Assert.AreEqual(CertificateNameConstraints.NotPermitted, violation);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void VerifyPeer_OpenSslBuildLeafUpnUnderTheAnchorsUpnConstraint_IsUnsupportedConstraintType(bool excluded)
+    {
+        var name = OtherName(UserPrincipalName, Text("evil.test"));
+        var failure = Verify(
+            excluded ? Constraints(excludedName: name) : Constraints(permittedName: name), Host, true,
+            alternativeNames: DnsAnd(OtherName(UserPrincipalName, Text("user@good.test"))), matchesSchannelBuild: false);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: unsupported name constraint type (51)", failure?.Message);
+    }
+
+    [TestMethod]
+    [DataRow(true, "evil.test", "user@evil.test", "excluded subtree violation (48)")]
+    [DataRow(false, "good.test", "user@evil.test", "permitted subtree violation (47)")]
+    [DataRow(false, "evil.test", "evil.test", "unsupported or invalid name syntax (53)")]
+    [DataRow(false, "xn--!!", "user@evil.test", "unspecified certificate verification error (1)")]
+    public void VerifyPeer_OpenSslBuildSmtpUtf8MailboxUnderTheAnchorsRfc822NameConstraint_IsTheVerifyResult(
+        bool excluded, string constraint, string mailbox, string result)
+    {
+        var name = GeneralName(1, constraint);
+        var failure = Verify(
+            excluded ? Constraints(excludedName: name) : Constraints(permittedName: name), Host, true,
+            alternativeNames: DnsAnd(Mailbox(mailbox)), matchesSchannelBuild: false);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual($"SSL certificate OpenSSL verify result: {result}", failure?.Message);
+    }
+
+    [TestMethod]
+    [DataRow(true, CertificateNameConstraints.UnsupportedConstraintType)]
+    [DataRow(false, CertificateNameConstraints.Excluded)]
+    public void FindViolation_OpenSslBuildUpnAndAnExcludedDnsName_AnswersForTheFirstAlternativeName(bool upnFirst, int expected)
+    {
+        var constraints = Constraints(excluded: "bad.test", permittedName: OtherName(UserPrincipalName, Text("x")));
+        var upn = OtherName(UserPrincipalName, Text("x"));
+        var dnsName = GeneralName(2, "bad.test");
+
+        var violation = FindViolationOfAlternativeNames(
+            constraints, upnFirst ? AlternativeNames(upn, dnsName) : AlternativeNames(dnsName, upn), false);
+
+        Assert.AreEqual(expected, violation);
+    }
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildUpnThatIsNoStringUnderItsConstraint_IsAnUnsupportedConstraintType()
+    {
+        var upn = OtherName(UserPrincipalName, Integer());
+
+        var violation = FindViolationOfAlternativeNames(Constraints(excludedName: upn), DnsAnd(upn), false);
+
+        Assert.AreEqual(CertificateNameConstraints.UnsupportedConstraintType, violation);
+    }
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildRfc822NameUnderAUpnConstraint_IsNotConstrained()
+    {
+        var constraints = Constraints(permittedName: OtherName(UserPrincipalName, Text("evil.test")));
+
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(constraints, DnsAnd(GeneralName(1, "user@evil.test")), false));
+    }
+
+    [TestMethod]
+    public void FindViolation_OpenSslBuildSmtpUtf8MailboxUnderADnsConstraintOnly_IsNotChecked()
+    {
+        var constraints = Constraints(permitted: Host);
+
+        Assert.AreEqual(0, FindViolationOfAlternativeNames(constraints, DnsAnd(OtherName(SmtpUtf8Mailbox, Integer())), false));
+    }
+
+    private static void AssertEitherSubtreeAnswers(string constraint, byte[] otherName, int expected)
+    {
+        var constraintName = GeneralName(1, constraint);
+        var alternativeNames = DnsAnd(otherName);
+
+        Assert.AreEqual(expected, FindViolationOfAlternativeNames(Constraints(excludedName: constraintName), alternativeNames, false));
+        Assert.AreEqual(expected, FindViolationOfAlternativeNames(Constraints(permittedName: constraintName), alternativeNames, false));
+    }
 
     private static int FindViolationOfAlternativeNames(byte[] constraints, byte[] alternativeNames, bool matchesSchannelBuild = true) =>
         FindViolationOfSubject(new X500DistinguishedName($"CN={Host}"), constraints, matchesSchannelBuild, alternativeNames);

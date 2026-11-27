@@ -17,9 +17,21 @@ internal static class CertificateNameConstraints
     /// Schannel's <c>CERT_TRUST_HAS_NOT_SUPPORTED_NAME_CONSTRAINT</c>: the Schannel build's refusal of an
     /// otherName under a permitted subtree whose value is not a character string (BL-6011), and the OpenSSL
     /// build's refusal of a subject CN holding a NUL, or of a subject emailAddress that is not an IA5String
-    /// (<c>X509_V_ERR_UNSUPPORTED_NAME_SYNTAX</c>).
+    /// (<c>X509_V_ERR_UNSUPPORTED_NAME_SYNTAX</c>), and of a SmtpUTF8Mailbox it cannot compare (BL-6047).
     /// </summary>
     internal const int UnsupportedNameSyntax = 0x1000;
+
+    /// <summary>
+    /// The OpenSSL build's refusal of an otherName under a constraint of its type-id
+    /// (<c>X509_V_ERR_UNSUPPORTED_CONSTRAINT_TYPE</c>, BL-6047); a bit no <see cref="X509ChainStatusFlags" /> value uses.
+    /// </summary>
+    internal const int UnsupportedConstraintType = 0x2000_0000;
+
+    /// <summary>
+    /// The OpenSSL build's refusal of a SmtpUTF8Mailbox under an rfc822Name constraint it cannot decode
+    /// (<c>X509_V_ERR_UNSPECIFIED</c>, BL-6047); a bit no <see cref="X509ChainStatusFlags" /> value uses.
+    /// </summary>
+    internal const int UnspecifiedError = 0x4000_0000;
 
     /// <summary>Schannel's <c>CERT_TRUST_HAS_NOT_PERMITTED_NAME_CONSTRAINT</c>.</summary>
     internal const int NotPermitted = 0x4000;
@@ -56,11 +68,8 @@ internal static class CertificateNameConstraints
     // The name kinds whose constraint is a primitive string or octet string.
     private static readonly Asn1Tag[] OctetNameTags = [DnsNameTag, IpAddressTag, EmailTag, UriTag];
 
-    // Every name kind the OpenSSL build checks constraints for.
-    private static readonly Asn1Tag[] OpenSslConstrainedNameTags = [DirectoryNameTag, .. OctetNameTags];
-
-    // Every kind of subtree read; the OpenSSL build lists no otherName for one to apply to.
-    private static readonly Asn1Tag[] ReadSubtreeTags = [OtherNameTag, .. OpenSslConstrainedNameTags];
+    // Every kind of subtree read, and of alternative name the OpenSSL build checks constraints for.
+    private static readonly Asn1Tag[] ConstrainedNameTags = [OtherNameTag, DirectoryNameTag, .. OctetNameTags];
 
     // The alternative names the Schannel build takes in extension order: its DNS names and addresses are listed apart.
     private static readonly Asn1Tag[] SchannelAlternativeNameTags = [OtherNameTag, DirectoryNameTag, EmailTag, UriTag];
@@ -72,7 +81,9 @@ internal static class CertificateNameConstraints
     /// certificates from the top of the chain down, a self-issued one only when it is the server's own, each
     /// against the CAs above it from the top down, and takes the names one at a time, each against the
     /// permitted then the excluded subtrees: the subject, its emailAddresses, then the alternative names in
-    /// the order the certificate holds them, and last, for the server certificate, its subject CNs.
+    /// the order the certificate holds them, and last, for the server certificate, its subject CNs. The
+    /// OpenSSL build checks a SmtpUTF8Mailbox otherName against the rfc822Name subtrees, and refuses any
+    /// other otherName that a subtree of its type-id applies to.
     /// </summary>
     /// <param name="chain">The chain built for the server certificate, leaf first.</param>
     /// <param name="matchesSchannelBuild">
@@ -81,8 +92,8 @@ internal static class CertificateNameConstraints
     /// Both builds read the subject CNs and emailAddresses of multi-valued relative names too.
     /// </param>
     /// <returns>
-    /// <see cref="NotPermitted" />, <see cref="Excluded" />, <see cref="UnsupportedNameSyntax" />, or 0
-    /// when no constraint is broken.
+    /// <see cref="NotPermitted" />, <see cref="Excluded" />, <see cref="UnsupportedNameSyntax" />,
+    /// <see cref="UnsupportedConstraintType" />, <see cref="UnspecifiedError" />, or 0 when no constraint is broken.
     /// </returns>
     internal static int FindViolation(X509Chain chain, bool matchesSchannelBuild = false)
     {
@@ -149,13 +160,21 @@ internal static class CertificateNameConstraints
 
     private static readonly EmailMatcher OpenSslEmailMatcher = EmailMatches;
 
+    // How a build checks a group of names against one authority's subtrees.
+    private delegate int NamesCheck(
+        List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names);
+
+    private static readonly NamesCheck SchannelNamesCheck = FindSchannelViolation;
+
+    private static readonly NamesCheck OpenSslNamesCheck = FindOpenSslViolationOfNames;
+
     // A certificate's names in the groups checked one after another (all of them at once in the Schannel build,
-    // one name each in the OpenSSL build), the build's rfc822Name comparison, the subject CNs the OpenSSL build
+    // one name each in the OpenSSL build), the build's check of a group, the subject CNs the OpenSSL build
     // checks after the names, one by one, and whether the names stop short at a subject emailAddress the OpenSSL
     // build refuses to check.
     private sealed record CheckedNames(
         List<List<(Asn1Tag Tag, byte[] Value)>> CheckedTogether,
-        EmailMatcher MatchesEmail,
+        NamesCheck Check,
         List<string> OpenSslCommonNames,
         bool StopsAtUnsupportedEmailAddress = false);
 
@@ -164,7 +183,7 @@ internal static class CertificateNameConstraints
     {
         var dnsNames = ListDnsNames(leaf);
         return new CheckedNames(
-            [ListSchannelNames(leaf, dnsNames.Count > 0 ? dnsNames : ListEveryCommonName(leaf))], SchannelEmailMatcher, []);
+            [ListSchannelNames(leaf, dnsNames.Count > 0 ? dnsNames : ListEveryCommonName(leaf))], SchannelNamesCheck, []);
     }
 
     private static List<string> ListDnsNames(X509Certificate2 certificate) =>
@@ -183,10 +202,10 @@ internal static class CertificateNameConstraints
         var emailAddresses = encodedEmailAddresses.TakeWhile(IsIa5String).SelectMany(value => DecodeCharacterString(value)).ToList();
         var subjectNames = ListSubjectNames(certificate, emailAddresses);
         return emailAddresses.Count < encodedEmailAddresses.Count
-            ? new CheckedNames(CheckOneByOne(subjectNames), OpenSslEmailMatcher, [], StopsAtUnsupportedEmailAddress: true)
+            ? new CheckedNames(CheckOneByOne(subjectNames), OpenSslNamesCheck, [], StopsAtUnsupportedEmailAddress: true)
             : new CheckedNames(
-                CheckOneByOne(subjectNames.Concat(ListAlternativeNames(certificate, OpenSslConstrainedNameTags))),
-                OpenSslEmailMatcher,
+                CheckOneByOne(subjectNames.Concat(ListAlternativeNames(certificate, ConstrainedNameTags))),
+                OpenSslNamesCheck,
                 checksCommonNames ? ListEveryCommonName(certificate) : []);
     }
 
@@ -261,10 +280,15 @@ internal static class CertificateNameConstraints
     // The type-id of an otherName and its value's text, null when the value is not a character string.
     private static (string TypeId, string? Text) ReadOtherName(byte[] encoded)
     {
+        var (typeId, value) = ReadEncodedOtherName(encoded);
+        return (typeId, DecodeCharacterString(value).SingleOrDefault());
+    }
+
+    private static (string TypeId, byte[] Value) ReadEncodedOtherName(byte[] encoded)
+    {
         var otherName = new AsnReader(encoded, AsnEncodingRules.DER).ReadSequence(OtherNameTag);
         var typeId = otherName.ReadObjectIdentifier();
-        var value = otherName.ReadSequence(OtherNameTag).ReadEncodedValue();
-        return (typeId, DecodeCharacterString(value.Span).SingleOrDefault());
+        return (typeId, otherName.ReadSequence(OtherNameTag).ReadEncodedValue().ToArray());
     }
 
     // OpenSSL's NAME_CONSTRAINTS_check_CN takes the CNs in order and stops at the first it refuses. It
@@ -276,7 +300,7 @@ internal static class CertificateNameConstraints
             .Select(commonName => commonName.TrimEnd('\0'))
             .Select(commonName =>
                 commonName.Contains('\0') ? UnsupportedNameSyntax
-                : LooksLikeHostName(commonName) ? FindViolation(permitted, excluded, [DnsName(commonName)], OpenSslEmailMatcher)
+                : LooksLikeHostName(commonName) ? FindOpenSslNameViolation(permitted, excluded, DnsName(commonName))
                 : 0)
             .FirstOrDefault(violation => violation != 0);
 
@@ -362,7 +386,7 @@ internal static class CertificateNameConstraints
         }
 
         var violation = names.CheckedTogether
-            .Select(together => FindViolation(permitted, excluded, together, names.MatchesEmail))
+            .Select(together => names.Check(permitted, excluded, together))
             .FirstOrDefault(found => found != 0);
         return violation != 0 ? violation
             : names.StopsAtUnsupportedEmailAddress ? UnsupportedNameSyntax
@@ -370,15 +394,53 @@ internal static class CertificateNameConstraints
     }
 
     // An excluded name outranks an otherName whose permitted subtree cannot be compared, as in CryptoAPI (BL-6011).
-    private static int FindViolation(
-        List<(Asn1Tag Tag, byte[] Value)> permitted,
-        List<(Asn1Tag Tag, byte[] Value)> excluded,
-        List<(Asn1Tag Tag, byte[] Value)> names,
-        EmailMatcher matchesEmail)
+    private static int FindSchannelViolation(
+        List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names)
     {
-        var permittedViolation = FindPermittedViolation(permitted, names, matchesEmail);
-        return permittedViolation != NotPermitted && BreaksExcluded(excluded, names, matchesEmail) ? Excluded : permittedViolation;
+        var permittedViolation = FindPermittedViolation(permitted, names);
+        return permittedViolation != NotPermitted && BreaksExcluded(excluded, names) ? Excluded : permittedViolation;
     }
+
+    private static int FindOpenSslViolationOfNames(
+        List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names) =>
+        names.Select(name => FindOpenSslNameViolation(permitted, excluded, name)).FirstOrDefault(violation => violation != 0);
+
+    // OpenSSL's nc_match takes the subtrees that apply to a name in order, the permitted ones first: the first
+    // that matches it, or cannot be compared with it, decides (BL-6047).
+    private static int FindOpenSslNameViolation(
+        List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> excluded, (Asn1Tag Tag, byte[] Value) name)
+    {
+        var permittedAnswers = CompareForOpenSsl(permitted, name);
+        var violation = FindDecidingAnswer(permittedAnswers) ?? (permittedAnswers.Any() ? NotPermitted : 0);
+        if (violation != 0)
+        {
+            return violation;
+        }
+
+        var excludedAnswer = FindDecidingAnswer(CompareForOpenSsl(excluded, name));
+        return excludedAnswer == 0 ? Excluded : excludedAnswer ?? 0;
+    }
+
+    // The first answer that is not "outside this subtree": 0 for a match, otherwise why it cannot be compared.
+    private static int? FindDecidingAnswer(IEnumerable<int> answers) =>
+        answers.Where(answer => answer != NotPermitted).Select(answer => (int?)answer).FirstOrDefault();
+
+    // The answer of each subtree that applies to a name, each compared as it is asked for. A SmtpUTF8Mailbox
+    // otherName is an email address to OpenSSL, so the rfc822Name subtrees apply to it and no otherName subtree does.
+    private static IEnumerable<int> CompareForOpenSsl(List<(Asn1Tag Tag, byte[] Value)> subtrees, (Asn1Tag Tag, byte[] Value) name) =>
+        IsSmtpUtf8Mailbox(name)
+            ? subtrees.Where(subtree => subtree.Tag == EmailTag)
+                .Select(subtree => OpenSslSmtpUtf8Mailbox.Compare(subtree.Value, ReadEncodedOtherName(name.Value).Value))
+            : subtrees.Where(subtree => IsSameKind(subtree, name)).Select(subtree => CompareForOpenSsl(subtree, name));
+
+    // OpenSSL can compare no other otherName with a subtree of its type-id (BL-6047).
+    private static int CompareForOpenSsl((Asn1Tag Tag, byte[] Value) subtree, (Asn1Tag Tag, byte[] Value) name) =>
+        name.Tag == OtherNameTag ? UnsupportedConstraintType
+        : IsWithin(name, subtree, OpenSslEmailMatcher) ? 0
+        : NotPermitted;
+
+    private static bool IsSmtpUtf8Mailbox((Asn1Tag Tag, byte[] Value) name) =>
+        name.Tag == OtherNameTag && ReadEncodedOtherName(name.Value).TypeId == OpenSslSmtpUtf8Mailbox.TypeId;
 
     private static List<(Asn1Tag Tag, byte[] Value)> ReadSubtrees(AsnReader subtrees)
     {
@@ -387,7 +449,7 @@ internal static class CertificateNameConstraints
         {
             var subtree = subtrees.ReadSequence();
             var tag = subtree.PeekTag();
-            if (ReadSubtreeTags.Contains(tag))
+            if (ConstrainedNameTags.Contains(tag))
             {
                 read.Add((tag, ReadNameValue(subtree, tag)));
             }
@@ -396,14 +458,12 @@ internal static class CertificateNameConstraints
         return read;
     }
 
-    private static int FindPermittedViolation(
-        List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> names, EmailMatcher matchesEmail) =>
-        names.Select(name => FindPermittedViolation(permitted, name, matchesEmail)).FirstOrDefault(violation => violation != 0);
+    private static int FindPermittedViolation(List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> names) =>
+        names.Select(name => FindPermittedViolation(permitted, name)).FirstOrDefault(violation => violation != 0);
 
     // A name is permitted when no subtree is of its kind or one matches it. CryptoAPI takes an otherName's
     // subtrees in order and stops, unsupported, at one whose value is not a character string (BL-6011).
-    private static int FindPermittedViolation(
-        List<(Asn1Tag Tag, byte[] Value)> permitted, (Asn1Tag Tag, byte[] Value) name, EmailMatcher matchesEmail)
+    private static int FindPermittedViolation(List<(Asn1Tag Tag, byte[] Value)> permitted, (Asn1Tag Tag, byte[] Value) name)
     {
         // Permitted address subtrees of only the other family leave this name not permitted (BL-5433).
         var ofItsKind = permitted.Where(subtree => IsSameKind(subtree, name)).ToList();
@@ -412,7 +472,7 @@ internal static class CertificateNameConstraints
             return 0;
         }
 
-        var deciding = ofItsKind.FirstOrDefault(subtree => IsOtherNameWithoutText(subtree) || IsWithin(name, subtree, matchesEmail));
+        var deciding = ofItsKind.FirstOrDefault(subtree => IsOtherNameWithoutText(subtree) || IsWithin(name, subtree, SchannelEmailMatcher));
         return deciding.Value is null ? NotPermitted : IsOtherNameWithoutText(deciding) ? UnsupportedNameSyntax : 0;
     }
 
@@ -429,9 +489,8 @@ internal static class CertificateNameConstraints
         && (subtree.Tag != IpAddressTag || subtree.Value.Length == name.Value.Length * 2)
         && Matches(subtree.Tag, subtree.Value, name.Value, matchesEmail);
 
-    private static bool BreaksExcluded(
-        List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names, EmailMatcher matchesEmail) =>
-        names.Any(name => excluded.Any(subtree => IsWithin(name, subtree, matchesEmail)));
+    private static bool BreaksExcluded(List<(Asn1Tag Tag, byte[] Value)> excluded, List<(Asn1Tag Tag, byte[] Value)> names) =>
+        names.Any(name => excluded.Any(subtree => IsWithin(name, subtree, SchannelEmailMatcher)));
 
     private static bool Matches(Asn1Tag tag, byte[] constraint, byte[] name, EmailMatcher matchesEmail) =>
         tag == OtherNameTag ? OtherNameMatches(constraint, name)
