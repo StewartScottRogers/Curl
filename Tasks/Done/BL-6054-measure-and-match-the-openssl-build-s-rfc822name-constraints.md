@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameConstraints.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-26
 ---
 # BL-6054 — Measure and match the OpenSSL build's rfc822Name constraints starting with @, empty, and with a differently cased local part
 
@@ -22,13 +22,20 @@ Found in BL-6046 (ADR-1437), which changed the Schannel build only. `Certificate
 
 ## Acceptance criteria
 
-- [ ] An ADR records OpenSSL's measured answers for excluded and permitted rfc822Name constraints `@evil.test`, empty, and `u@evil.test` against `u@evil.test` and `U@evil.test`.
-- [ ] Unit tests in `Curl.Networking.UnitTests` pin the OpenSSL build's answers to match them, and the Schannel build's answers are unchanged.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An ADR records OpenSSL's measured answers for excluded and permitted rfc822Name constraints `@evil.test`, empty, and `u@evil.test` against `u@evil.test` and `U@evil.test`.
+- [x] Unit tests in `Curl.Networking.UnitTests` pin the OpenSSL build's answers to match them, and the Schannel build's answers are unchanged.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured with `openssl verify` 3.5.7 (Git for Windows); table and decision in ADR-1448.
+- Also matched, from the same measurement: an rfc822Name with no `@` under an rfc822Name constraint is
+  unsupported name syntax (verify result 53), and the host is what follows the last `@` of each side.
+- The Schannel build is unchanged; its existing tests pass unchanged. The empty-constraint tests stay
+  excluded on macOS, as before. Quality: Curl.Networking.UnitLibrary 100% line and branch, 0 failing.
 
 ## Log
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 86611341 4c860425 3d836d5e.
+- 2026-11-26: Doing -> Done. The OpenSSL build matches rfc822Name constraints as OpenSSL's nc_email does (ADR-1448).
