@@ -2534,7 +2534,10 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one transfer of a <c>-Z</c> run once its host is free (<see cref="ParallelHostQueue" />:
-    /// <c>--parallel-max-host</c> and <c>--parallel-immediate</c>), counting it at the host until it ends.
+    /// <c>--parallel-max-host</c> and <c>--parallel-immediate</c>), counting it at the host until it ends. One with a
+    /// malformed <c>--resolve</c> entry neither waits for the host nor counts there, as curl 8.22.0 fails it before it
+    /// looks for a connection; its end still frees the transfers waiting for a host's first to end (BL-6040,
+    /// measured with <c>Record-CurlExchange.ps1</c> on 2026-11-26).
     /// </summary>
     /// <param name="run">The run.</param>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
@@ -2550,7 +2553,8 @@ internal sealed class CurlCommandRunner(
         CancellationToken abortToken)
     {
         string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
-        if (await WaitForHostWithinMaxTimeAsync(run, options, url, abortToken).ConfigureAwait(false) is { } timedOut)
+        bool failsBeforeItsHost = ResolveParseErrorOf(options) is not null;
+        if (!failsBeforeItsHost && await WaitForHostWithinMaxTimeAsync(run, options, url, abortToken).ConfigureAwait(false) is { } timedOut)
         {
             return (timedOut, transfer.Url, url);
         }
@@ -2567,7 +2571,24 @@ internal sealed class CurlCommandRunner(
         }
         finally
         {
-            run.Hosts.Leave(url, connectionStayedOpen);
+            LeaveHost(run.Hosts, url, failsBeforeItsHost, connectionStayedOpen);
+        }
+    }
+
+    /// <summary>Tells the <c>-Z</c> host queue that a transfer has ended, whether or not it ever counted at its host.</summary>
+    /// <param name="hosts">The run's host queue.</param>
+    /// <param name="url">The transfer's URL, with its scheme.</param>
+    /// <param name="failedBeforeItsHost">Whether it never waited for or counted at its host.</param>
+    /// <param name="connectionStayedOpen">Whether its connection was kept for reuse.</param>
+    private static void LeaveHost(ParallelHostQueue hosts, string url, bool failedBeforeItsHost, bool connectionStayedOpen)
+    {
+        if (failedBeforeItsHost)
+        {
+            hosts.EndWithoutHost();
+        }
+        else
+        {
+            hosts.Leave(url, connectionStayedOpen);
         }
     }
 
@@ -3843,7 +3864,7 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private static TransferResult? MalformedResolveFailure(CommandLineOptions options, ITransferEvents events)
     {
-        if (ResolveOverrides.Parse(EasyOptionsFromCommandLine.NetworkOf(options).Resolve).ParseError is not { } parseError)
+        if (ResolveParseErrorOf(options) is not { } parseError)
         {
             return null;
         }
@@ -3851,6 +3872,10 @@ internal sealed class CurlCommandRunner(
         events.ReportInfo(parseError);
         return TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, parseError);
     }
+
+    /// <summary>curl's message for the first malformed <c>--resolve</c> entry, or <see langword="null" /> when every entry parses.</summary>
+    private static string? ResolveParseErrorOf(CommandLineOptions options) =>
+        ResolveOverrides.Parse(EasyOptionsFromCommandLine.NetworkOf(options).Resolve).ParseError;
 
     /// <summary>
     /// Whether curl refuses the URL it was given when <c>-G</c> / <c>--url-query</c> has a query to append: its tool parses the URL
