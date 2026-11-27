@@ -1,5 +1,5 @@
 ---
-id: BL-6064
+id: BL-6066
 title: Redial on the hand-built client under -k when SslStream's chain build throws for OpenSSL error 1
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6064 — Redial on the hand-built client under -k when SslStream's chain build throws for OpenSSL error 1
+# BL-6066 — Redial on the hand-built client under -k when SslStream's chain build throws for OpenSSL error 1
 
 ## Goal
 

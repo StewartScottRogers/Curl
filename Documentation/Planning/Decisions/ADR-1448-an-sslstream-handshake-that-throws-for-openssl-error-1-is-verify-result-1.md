@@ -27,13 +27,13 @@ The handshake then looked like a connect error, exit 35. OpenSSL curl reports th
 
 Matching curl under `-k` needs a second connection whose handshake runs on the hand-built client,
 which builds the chain through `CertificateChainBuild` and goes on under `-k`. The dialling belongs
-to the connector, not the provider, so it is its own task (BL-6064).
+to the connector, not the provider, so it is its own task (BL-6066).
 
 Rejected: running every `-k` handshake of the OpenSSL build on the hand-built client. It would
 change the bytes of every `-k` transfer (ADR-0140) for a certificate fault that is very rare.
 
 ## Consequences
 
-- Until BL-6064 is done, `-k` against such a server ends with exit 35 where curl succeeds.
+- Until BL-6066 is done, `-k` against such a server ends with exit 35 where curl succeeds.
 - A chain that both mismatches the host and ends with error 1 is reported as error 1, as ADR-1446
   has it.

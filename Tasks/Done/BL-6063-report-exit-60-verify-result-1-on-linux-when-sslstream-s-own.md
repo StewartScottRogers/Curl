@@ -26,7 +26,7 @@ Found in BL-6061 (ADR-1446). .NET on Linux builds the chain inside the handshake
 
 ## Notes
 
-- Decision (ADR-1448): the OpenSSL build answers exit 60 with verify result 1; under `-k` the exit 35 connect error stands and only the verify result is added, since the handshake is already over. Completing it needs a second dial on the hand-built client: BL-6064.
+- Decision (ADR-1448): the OpenSSL build answers exit 60 with verify result 1; under `-k` the exit 35 connect error stands and only the verify result is added, since the handshake is already over. Completing it needs a second dial on the hand-built client: BL-6066.
 - The throw is matched bare or as an inner exception, because which form `SslStream` on Linux raises was not observed here (lanes run on Windows).
 - `touches` widened to `CertificateChainBuild.cs` (so .NET's message is matched in one place), `TlsFailureMessages.cs` (where every exit 60 message lives) and the library's `CLAUDE.md`; no other task in Doing named them.
 - Tests are platform-neutral (the handshake step is replaced). `dotnet build` clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
@@ -35,4 +35,4 @@ Found in BL-6061 (ADR-1446). .NET on Linux builds the chain inside the handshake
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 809eaa5e.
-- 2026-11-26: Doing -> Done. The OpenSSL build reports SslStream's own chain build throwing for OpenSSL error 1 as exit 60 with verify result 1 (ADR-1448); -k is filed as BL-6064.
+- 2026-11-26: Doing -> Done. The OpenSSL build reports SslStream's own chain build throwing for OpenSSL error 1 as exit 60 with verify result 1 (ADR-1448); -k is filed as BL-6066.
