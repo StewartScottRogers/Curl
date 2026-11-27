@@ -39,7 +39,7 @@ neither. Start at `TransferPerformer.FinishedByWatchdogAsync` and `FtpSession.Ru
   the latest connection, so a proxy's CONNECT reply still counts and no FTP, IMAP, POP3 or SMTP reply line does.
 - `-v`: `FtpSession.DialDataAsync` puts `closing connection #N` on the cancellation
   (`Curl.Engine.ClosingConnectionLine`), and `TransferPerformer` writes the watchdog's message and that line when a
-  watchdog (`-m` or `-Y`/`-y`) ended it. Only the data dial is marked; the reply waits are BL-6062.
+  watchdog (`-m` or `-Y`/`-y`) ended it. Only the data dial is marked; the reply waits are BL-6064.
 - Tests: `FtpDataConnectMaxTimeTests` (both lines and `size_header` 0, end to end),
   `AbortedHeadRecordingTransferEventsTests`, `FtpNumHeadersTests`.
 - Verified 2026-11-26: the Debug `curl.exe` prints the same two lines and `size_header` 0 as curl 8.22.0; build 0

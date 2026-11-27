@@ -1,5 +1,5 @@
 ---
-id: BL-6062
+id: BL-6064
 title: Match curl's -v lines and size_request when -m ends an FTP reply wait
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-26
 completed:
 ---
-# BL-6062 — Match curl's -v lines and size_request when -m ends an FTP reply wait
+# BL-6064 — Match curl's -v lines and size_request when -m ends an FTP reply wait
 
 ## Goal
 
