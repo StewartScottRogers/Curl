@@ -119,7 +119,7 @@ internal static class OpenSslVerifyResult
 
         if (chain is null || chain.ChainElements.Count == 0)
         {
-            return null;
+            return CertificateChainBuild.EndedAsUnspecified(chain) ? Unspecified : null;
         }
 
         var status = StatusOf(chain);

@@ -1487,3 +1487,4 @@ Each option and the specific reason it lost.
 | [1443](ADR-1443-nuget-org-packages-are-published-with-trusted-publishing.md) | Every numbered tag publishes its packages to nuget.org with Trusted Publishing, as Surl does (BL-2393) | Accepted | 2026-11-26 |
 | [1444](ADR-1444-transfers-behind-a-fatally-failed-z-telnet-session.md) | -Z reports the transfers behind a fatally failed telnet session as curl does (BL-6035) | Accepted | 2026-11-26 |
 | [1445](ADR-1445-an-upload-keeps-an-s3-or-gs-bucket-name-as-typed.md) | An upload keeps an s3 or gs bucket name as typed (BL-6031) | Accepted | 2026-11-26 |
+| [1445](ADR-1445-a-chain-build-that-throws-for-openssl-error-1-is-verify-result-1.md) | A chain build that .NET ends with an exception for OpenSSL error 1 is a refused chain with verify result 1 (BL-6061) | Accepted | 2026-11-26 |

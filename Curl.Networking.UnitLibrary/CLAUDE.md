@@ -49,7 +49,10 @@ cut to the signature schemes and groups the client can honour, and the options c
 captures the first record and rebuilds it from the profile. Both providers judge the server's certificate with
 `ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
 exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which
-builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert` through
+builds the chain and the `SslPolicyErrors` `SslStream` would. Every chain build this project makes
+itself goes through `CertificateChainBuild`: .NET on Linux throws for OpenSSL's error 1 (a name
+constraint that does not decode), which it answers as a refused, empty chain whose verify result is
+1 (ADR-1445, BL-6061); `SslStream`'s own build inside a handshake does not go through it. Both load `--cert` through
 `ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
 `--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included,
 except in the Schannel build with `--cacert`, which judges the pin first (ADR-0504, BL-2270):

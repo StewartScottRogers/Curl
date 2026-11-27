@@ -439,7 +439,8 @@ internal static class TlsFailureMessages
     /// </remarks>
     public static string OpenSslPeerFailedVerification(SslPolicyErrors errors, X509Chain? chain, string targetHost)
     {
-        if (!errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch))
+        // A chain whose build ended with error 1 holds no certificate to name a mismatch from.
+        if (!errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch) || CertificateChainBuild.EndedAsUnspecified(chain))
         {
             return $"SSL certificate OpenSSL verify result: {OpenSslVerifyError(chain)}";
         }
@@ -920,13 +921,16 @@ internal static class TlsFailureMessages
         $"failed setting TLS 1.3 cipher suite: {tls13Ciphers}";
 
     // OpenSSL reports a failed trust before a failed validity period.
-    private static string OpenSslVerifyError(X509Chain? chain)
-    {
-        if (chain is null || chain.ChainElements.Count == 0)
-        {
-            return "unable to get local issuer certificate (20)";
-        }
+    private static string OpenSslVerifyError(X509Chain? chain) =>
+        chain is { ChainElements.Count: > 0 } ? OpenSslBuiltChainError(chain) : OpenSslEmptyChainError(chain);
 
+    private static string OpenSslEmptyChainError(X509Chain? chain) =>
+        CertificateChainBuild.EndedAsUnspecified(chain)
+            ? "unspecified certificate verification error (1)"
+            : "unable to get local issuer certificate (20)";
+
+    private static string OpenSslBuiltChainError(X509Chain chain)
+    {
         var status = OpenSslVerifyResult.StatusOf(chain);
         if (RefusesPurposeOfATrustedChain(status, chain))
         {

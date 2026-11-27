@@ -575,7 +575,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CertificateRevocationListFile? revocationLists)
     {
         using var chain = new X509Chain { ChainPolicy = chainPolicy };
-        var errors = chain.Build(X509CertificateLoader.LoadCertificate(remote.GetRawCertData()))
+        var errors = CertificateChainBuild.Build(chain, X509CertificateLoader.LoadCertificate(remote.GetRawCertData()))
             ? SslPolicyErrors.None
             : SslPolicyErrors.RemoteCertificateChainErrors;
         var peerCertificates = ListPeerCertificates(remote, chain);

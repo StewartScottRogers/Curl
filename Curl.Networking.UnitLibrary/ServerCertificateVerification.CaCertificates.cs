@@ -205,7 +205,7 @@ internal sealed partial class ServerCertificateVerification
             anchoredChain.ChainPolicy.ExtraStore.Add(element.Certificate);
         }
 
-        built = anchoredChain.Build(chain.ChainElements[0].Certificate);
+        built = CertificateChainBuild.Build(anchoredChain, chain.ChainElements[0].Certificate);
         return anchoredChain;
     }
 
