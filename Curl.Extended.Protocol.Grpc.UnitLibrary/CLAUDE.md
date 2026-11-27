@@ -46,7 +46,7 @@ stream or connection.
   declares, then the method's types from the files. The stream sends the call's headers, signed for its own `POST` and
   URL by any signer a hook put on the transfer (`SignedHeadersFor`, ADR-1454), so `--dpop` gives it a proof of its own.
   A request answered with a status instead of a reply fails carrying that response's report, its HTTP status and
-  headers (ADR-1455), from which `--dpop` takes a new `DPoP-Nonce` and retries the transfer once.
+  headers (ADR-1456), from which `--dpop` takes a new `DPoP-Nonce` and retries the transfer once.
 - `ServerReflectionStream` is the bidirectional `ServerReflectionInfo` stream: one request, one
   response, then it ends its half and reads the trailers. `ServerReflectionRequest` writes the
   requests and `ServerReflectionResponse` reads the replies.

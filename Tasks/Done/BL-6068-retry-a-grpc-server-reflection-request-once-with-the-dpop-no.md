@@ -28,7 +28,7 @@ Found in BL-6055 (ADR-1454). `ServerReflectionStream.ExchangeAsync` fails a refu
 ## Notes
 
 - Added to `touches`: `Client/GrpcHttp2Call.cs` (its `ResponseReader` builds the report, which held no response headers, so neither the reflection request nor the call could give the hook a nonce), `Client/GrpcClientException.cs` (carries the refusal's report) and the library's `CLAUDE.md`. No other task in Doing on `origin/work/dark-factory` named them.
-- ADR-1455 records the decision: a gRPC response's report carries its Response-Headers, so a refused call is retried too and `-w %{header_json}` shows them. `DpopTransferHook` needed no change.
+- ADR-1456 records the decision: a gRPC response's report carries its Response-Headers, so a refused call is retried too and `-w %{header_json}` shows them. `DpopTransferHook` needed no change.
 - Test: `ExecuteAsync_DpopReflectionRefusedWithANewNonce_RetriesOnceWithTheNonceInBothProofs_Rfc9449Section9`.
 - Checks: `dotnet build` 0 warnings; `Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.Grpc.UnitLibrary` 0 failing members; gRPC tests 243 passed. The full fast run had one failure, `OciTransferCases.Verbose_Download_TellsTheConnectionAndTlsOnStandardErrorOnly` (`ObjectDisposedException` inside .NET's TLS credential cache, in a project this task does not change); its class passed 6 of 6 alone. Filed as BL-6069.
 

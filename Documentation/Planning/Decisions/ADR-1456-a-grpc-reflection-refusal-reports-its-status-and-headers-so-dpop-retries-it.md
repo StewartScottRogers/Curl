@@ -1,4 +1,4 @@
-# ADR-1455: A refused gRPC server reflection request reports its status and headers, so `--dpop` retries it
+# ADR-1456: A refused gRPC server reflection request reports its status and headers, so `--dpop` retries it
 
 - Status: Accepted. Decided by Claude under Stewart's delegation.
 - Date: 2026-11-26
