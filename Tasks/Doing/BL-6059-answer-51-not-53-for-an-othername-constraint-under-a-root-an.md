@@ -31,3 +31,4 @@ Found in BL-6047 (ADR-1442). curl 8.18.0 with OpenSSL 3.5.5 answers 51 with the 
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 7a8f7aaa d5b44798 3d836d5e.
