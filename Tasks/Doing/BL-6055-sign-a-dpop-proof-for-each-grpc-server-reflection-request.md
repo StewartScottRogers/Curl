@@ -34,3 +34,4 @@ a proof per request.
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: f38156b0 3d836d5e.
