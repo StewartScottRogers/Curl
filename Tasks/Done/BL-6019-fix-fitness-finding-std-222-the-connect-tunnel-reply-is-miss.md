@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.ProxyConnect.cs, Curl.Networking.UnitLibrary/TcpConnector.HttpProxyTunnel.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-27
 ---
 # BL-6019 — Fix fitness finding STD-222: the CONNECT tunnel reply is missing from %{size_header} and %{num_headers} for FTP, FTPS, SFTP, SCP and DICT
 
@@ -39,14 +39,21 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] the SFTP repro prints `200|000|1|62|1`; the vsftpd FTP repro prints `200|226|2|124|1`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the SFTP repro prints `200|000|1|62|1`; the vsftpd FTP repro prints `200|226|2|124|1`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
+- 2026-11-27 (lane 2): the fix is commit 4ead99cc63 (fix(engine): count a CONNECT reply in size_header and num_headers for every protocol), already on this branch; the earlier run's stash held only the task file, so nothing was carried over and no code changed in this run.
+- Checked end to end: a PowerShell loopback CONNECT proxy sending gost's 62-byte reply (`HTTP/1.1 200 Connection established` plus one `Proxy-Agent` line) and `curl -sS -m 5 -x http://127.0.0.1:25481 -p -o NUL -w "%{http_connect}|%{response_code}|%{num_connects}|%{size_header}|%{num_headers}\n" dict://127.0.0.1:2628/x` prints `200|000|1|62|1`, REF's line.
+- The SFTP (one tunnel, 62/1) and vsftpd FTP (two tunnels, 124/1) answers are pinned by `Curl.Engine.UnitTests/Std222Tests.cs` (ReportOn_OneTunnelAndNoHeadersOfItsOwn_CountsTheReply, ReportOn_TwoTunnelsAndTheFtpStandInHeader_CountsTheLastReplyAlone); no Docker vsftpd or atmoz/sftp target is available to a lane, so those two repros were not rerun live. The change is platform-neutral, so the Linux side of the finding is met by the same code.
+- `dotnet build` clean (0 errors) and the fast tests green (no failures) on 2026-11-27.
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: d90091a4 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Blocked. Blocked at shift start instead of refusing the shift: BL-6019 is in Doing and held by no lane, no parked branch factory/BL-6019-lane-* exists, and lane branches factory/lane-1, factory/lane-12 have commits beyond the shift branch, or git could not say; which one is its work cannot be told. Kept: factory/lane-1 is kept as factory/BL-6019-lane-12-20261126-174800; factory/lane-12 is kept as factory/BL-6019-lane-12-20261126-174800. Claude (an interactive session) finds the task's work among these, moves it to Backlog naming it, or Backlog with no work.
+- 2026-11-27: Blocked -> Backlog. Unblocked 2026-11-27: factory/lane-1 and factory/lane-12 hold nothing beyond the shift branch, and its fix 4ead99cc63 (count a CONNECT reply in size_header and num_headers) landed 2026-11-26. A lane checks the criteria against that commit, finishes what is missing, and closes it; six tasks wait on it.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: d90091a4 69116afe 3d836d5e.
+- 2026-11-27: Doing -> Done. Fix 4ead99cc63 verified: DICT through a loopback CONNECT proxy prints 200|000|1|62|1; Std222Tests pin SFTP 62/1 and FTP 124/1; build clean, fast tests green

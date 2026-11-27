@@ -42,3 +42,4 @@ produces `TransferCompleteStandInHeader`. What is left is dead:
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 4b036c2d 2613a0f7 1a6b2dbc 3d836d5e.

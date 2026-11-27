@@ -1,6 +1,7 @@
 # Publishes the native-AOT `curl` binary for every supported platform, and the Curl.Mcp
 # NuGet packages (BL-2485), each runtime's holding a native-AOT Curl.Mcp packed on its own OS
-# (BL-2486). A numbered tag's release job also pushes all nine packages to nuget.org through
+# (BL-2486). The Surly.Curl packages (BL-6078, ADR-1464) pack the same way, holding curl itself.
+# A numbered tag's release job also pushes all 16 packages to nuget.org through
 # trusted publishing, as Surl's release.yml does (ADR-1443, BL-2393); the rolling preview never does.
 #
 # resources.json and ai-help.md (BL-3147) are made by the describe job, for the dry run too.
@@ -8,10 +9,10 @@
 # Surly.Curl.Api.<version>.nupkg and Surly.Libcurl.<version>.nupkg (BL-3146) are packed once each, platform-neutral,
 # and listed in SHA256SUMS beside the others (the checksum step covers every *.nupkg).
 #
-#   * Pushing a tag `v*` (e.g. v0.1.0) builds all six curl packages and the seven Curl.Mcp
-#     `.nupkg` files, stamped with the tag's version, and attaches them, with a SHA256SUMS
-#     file covering all of them, to a GitHub release of that name, and pushes the nine
-#     `.nupkg` files to nuget.org. A tag with a hyphen
+#   * Pushing a tag `v*` (e.g. v0.1.0) builds all six curl archives and the 16 `.nupkg` files
+#     (seven Surly.Curl, seven Surly.Curl.Mcp, Surly.Curl.Api and Surly.Libcurl), stamped with
+#     the tag's version, and attaches them, with a SHA256SUMS file covering all of them, to a
+#     GitHub release of that name, and pushes the 16 `.nupkg` files to nuget.org. A tag with a hyphen
 #     (v0.1.0-preview.1) makes a pre-release. Numbered tags and releases need Stewart's
 #     say-so (CLAUDE.md), so this workflow never creates a numbered tag itself.
 #   * Every push to master (each shift-end merge, audit or gap merge) rebuilds the rolling
@@ -251,6 +252,104 @@ jobs:
           path: curl-mcp-packages/*.nupkg
           if-no-files-found: error
 
+  # Curl.Console packs as the .NET tool Surly.Curl, command `curl` (BL-6078, ADR-1464), in the
+  # shape of pack-mcp: a plain `dotnet pack` makes the tool package that points at the six runtime
+  # packages, and `dotnet pack -r <rid>`, on a runner of that OS, makes each native-AOT one.
+  pack-tool:
+    name: Pack Surly.Curl ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: any,         runner: ubuntu-latest }
+          - { rid: win-x64,     runner: windows-latest }
+          - { rid: win-arm64,   runner: windows-11-arm }
+          - { rid: linux-x64,   runner: ubuntu-22.04 }
+          - { rid: linux-arm64, runner: ubuntu-22.04-arm }
+          - { rid: osx-x64,     runner: macos-latest }
+          - { rid: osx-arm64,   runner: macos-latest }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      RID: ${{ matrix.rid }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Work out the version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/heads/master ]]; then
+            echo "VERSION=0.2.0-rolling.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          fi
+
+      # The AOT linker finds MSVC through vswhere, which must be on PATH (Curl.Console.csproj).
+      - name: Put vswhere on PATH
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer" >> "$GITHUB_PATH"
+
+      - name: Install the native toolchain
+        if: runner.os == 'Linux' && matrix.rid != 'any'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Pack the tool package
+        if: matrix.rid == 'any'
+        shell: bash
+        run: dotnet pack Curl.Console -c Release -p:PublishAot=true -p:Version="$VERSION" -o curl-tool-packages
+
+      - name: Pack the runtime package
+        if: matrix.rid != 'any'
+        shell: bash
+        run: dotnet pack Curl.Console -c Release -r "$RID" -p:PublishAot=true -p:Version="$VERSION" -o curl-tool-packages
+
+      # Every package names its runtime's settings; the tool package names the command `curl`; a
+      # runtime package carries its native binary, never curl.dll, and (where the runner can run
+      # it) that binary answers --version with no .NET runtime to be found.
+      - name: Check the package
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $files = @(Get-ChildItem curl-tool-packages -Filter '*.nupkg')
+          $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
+          $name = if ($env:RID -eq 'any') { "Surly.Curl.$env:VERSION.nupkg" } else { "Surly.Curl.$env:RID.$env:VERSION.nupkg" }
+          if ($files.Count -ne 1 -or $files[0].Name -ne $name) { throw "expected only $name" }
+          $zip = [IO.Compression.ZipFile]::OpenRead($files[0].FullName)
+          try {
+            $entry = $zip.Entries | Where-Object { $_.FullName -eq "tools/any/$env:RID/DotnetToolSettings.xml" }
+            if (-not $entry) { throw "$name has no tools/any/$env:RID/DotnetToolSettings.xml" }
+            $reader = [IO.StreamReader]::new($entry.Open())
+            try { [xml]$settings = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            if ($settings.DotNetCliTool.Commands.Command.Name -cne 'curl') { throw "$name does not name the command curl" }
+            if ($env:RID -eq 'any') { return }
+            $binary = if ($env:RID -like 'win-*') { 'curl.exe' } else { 'curl' }
+            $entry = $zip.Entries | Where-Object { $_.FullName -eq "tools/any/$env:RID/$binary" }
+            if (-not $entry) { throw "$name has no native tools/any/$env:RID/$binary" }
+            if ($zip.Entries | Where-Object { $_.FullName -eq "tools/any/$env:RID/curl.dll" }) { throw "$name holds curl.dll: it was not published native AOT" }
+            $native = Join-Path $env:RUNNER_TEMP $binary
+            [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $native, $true)
+          }
+          finally { $zip.Dispose() }
+          if ($env:RID -eq 'osx-x64') { return }
+          if (-not $IsWindows) { chmod +x $native }
+          $env:DOTNET_ROOT = Join-Path $env:RUNNER_TEMP 'no-dotnet-runtime'
+          $answer = & $native --version
+          $answer | Write-Host
+          if ($LASTEXITCODE -ne 0 -or "$answer" -notlike 'curl *') { throw "$binary did not answer --version" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: curl-tool-${{ matrix.rid }}
+          path: curl-tool-packages/*.nupkg
+          if-no-files-found: error
+
   # Curl.Api and Libcurl are plain managed libraries, so each packs once as a platform-neutral
   # .nupkg that bundles the Curl libraries it references (BL-3146). No AOT, no runtime packages.
   pack-libraries:
@@ -293,7 +392,7 @@ jobs:
   # The format of resources.json is documented in .github/release/New-ResourcesJson.ps1.
   describe:
     name: Describe the release files
-    needs: [publish, pack-mcp, pack-libraries]
+    needs: [publish, pack-mcp, pack-tool, pack-libraries]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -395,7 +494,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           shopt -s nullglob
           packages=(*".$version.nupkg")
-          if [ ${#packages[@]} -ne 9 ]; then echo "::error::expected 9 packages at $version, found ${#packages[@]}: ${packages[*]}"; exit 1; fi
+          if [ ${#packages[@]} -ne 16 ]; then echo "::error::expected 16 packages at $version, found ${#packages[@]}: ${packages[*]}"; exit 1; fi
           for package in "${packages[@]}"; do
             dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
           done

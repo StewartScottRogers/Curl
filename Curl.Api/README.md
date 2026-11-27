@@ -390,6 +390,6 @@ cyclomatic complexity at most 10 per method and a CRAP score at most 30. Its tes
 no I/O) and `Curl.Engine.UnitLibrary` (the engine it sends through); `Curl.Api` is not itself a
 `Curl.<Area>.UnitLibrary`, but a naming exception like [`Curl.Console`](../Curl.Console/README.md) and [`Libcurl`](../Libcurl/README.md), the libcurl-faithful programming interface over the same engine. Terms are those of the [Glossary](../Documentation/Wiki/Glossary.md).
 
-## Use the package from the preview release
+## Get the package
 
-Download `Surly.Curl.Api.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Surly.Curl.Api --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.
+Numbered releases are on nuget.org: `dotnet add package Surly.Curl.Api --prerelease` adds the package from there. The rolling `preview` release never reaches nuget.org. To use it, download `Surly.Curl.Api.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Surly.Curl.Api --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else.

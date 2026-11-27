@@ -13,7 +13,7 @@ with no .NET runtime to install. Every package is built by the
 
 ## Supported platforms
 
-Current version: **[the latest build](https://github.com/StewartScottRogers/Curl/releases/tag/preview)**, a pre-release rebuilt from `master` on every merge, so these links always give the newest Curl. The newest numbered pre-release is [v0.2.0-preview.1](https://github.com/StewartScottRogers/Curl/releases/tag/v0.2.0-preview.1).
+Current version: **[the latest build](https://github.com/StewartScottRogers/Curl/releases/tag/preview)**, a pre-release rebuilt from `master` on every merge, so these links always give the newest Curl. Numbered releases are listed on the [releases page](https://github.com/StewartScottRogers/Curl/releases).
 
 | Platform | Processor | Package |
 | --- | --- | --- |
@@ -28,11 +28,35 @@ Checksums: [SHA256SUMS](https://github.com/StewartScottRogers/Curl/releases/down
 Older versions are on the [releases page](https://github.com/StewartScottRogers/Curl/releases).
 Linux packages are built on Ubuntu 22.04 and need glibc 2.35 or newer (Ubuntu 22.04, Debian 12 and later). Alpine and other musl-based distributions are not supported yet. Windows and macOS versions follow the [.NET 10 supported OS list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md).
 
+## From nuget.org: curl as a .NET tool
+
+With the .NET 10 SDK you can run the same native `curl` from nuget.org, as the tool package
+`Surly.Curl`. It is published by each numbered release's tag from the first one made after
+2026-11-27; the rolling `preview` never reaches nuget.org. To run it without installing it,
+naming the version:
+
+```sh
+dnx Surly.Curl@<version> --yes -- <curl arguments>
+```
+
+In PowerShell write the separator as `'--'`: PowerShell takes a bare `--` for itself, and `dnx`
+then reads curl's options as its own.
+
+Or install it as the command `curl`:
+
+```sh
+dotnet tool install -g Surly.Curl --prerelease
+```
+
+A global install can shadow the system curl on PATH, depending on the order of the directories in
+PATH; `dnx` installs nothing on PATH. The tool package picks the native package for your platform
+(the six in the table above). See [Curl.Console/README.md](Curl.Console/README.md).
+
 ## Curl.Api: .NET client for new code
 
 Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
 
-Curl.Api is the async, `HttpClient`-shaped client ([Curl.Api/README.md](Curl.Api/README.md)). Its `Surly.Curl.Api.<version>.nupkg` is attached to each release, at the release's version, and **is not on nuget.org**: download it from the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) into a folder and use the folder as a package source. The package is platform-neutral, so there is one file for every platform.
+Curl.Api is the async, `HttpClient`-shaped client ([Curl.Api/README.md](Curl.Api/README.md)). Its `Surly.Curl.Api.<version>.nupkg` is attached to each release, at the release's version; numbered releases also push it to nuget.org. To use the rolling `preview` build, which never reaches nuget.org, download it from the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) into a folder and use the folder as a package source. The package is platform-neutral, so there is one file for every platform.
 
 ```sh
 dotnet add package Surly.Curl.Api --prerelease --source ./folder-with-the-nupkg
@@ -48,7 +72,7 @@ Verify the download first against the release's `SHA256SUMS` (the same file cove
 
 Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
 
-Libcurl is the libcurl API shaped for C#: `CurlGlobal.Init()`, `CurlEasy` with `SetOption` and `Perform` ([Libcurl/README.md](Libcurl/README.md)). Its `Surly.Libcurl.<version>.nupkg` is attached to each release, is platform-neutral, and **is not on nuget.org**; use it from a folder the same way.
+Libcurl is the libcurl API shaped for C#: `CurlGlobal.Init()`, `CurlEasy` with `SetOption` and `Perform` ([Libcurl/README.md](Libcurl/README.md)). Its `Surly.Libcurl.<version>.nupkg` is attached to each release and is platform-neutral; numbered releases also push it to nuget.org. Use a rolling `preview` build from a folder the same way.
 
 ```sh
 dotnet add package Surly.Libcurl --prerelease --source ./folder-with-the-nupkg
@@ -59,8 +83,9 @@ Verify it against `SHA256SUMS` with the same commands as for Curl.Api above, on 
 
 Curl.Mcp runs Curl for AI agents over the Model Context Protocol (standard input and
 output). Its seven NuGet packages are attached to each release, at the release's version.
-**They are not on nuget.org yet**; that waits until the port is complete, so install from
-a folder. See [Curl.Mcp/README.md](Curl.Mcp/README.md) for the tools it offers.
+Numbered releases also push them to nuget.org, from where `dnx Surly.Curl.Mcp@<version>` runs
+the server; the rolling `preview` never reaches nuget.org. See
+[Curl.Mcp/README.md](Curl.Mcp/README.md) for the tools it offers.
 
 | Package | What it is |
 | --- | --- |
@@ -177,7 +202,7 @@ files that an agent can start from:
 `resources.json` is UTF-8 JSON with `schema` (1), `name`, `version`, `commit`, `release` (the
 release page URL) and `resources`, one entry per file with `name`, `kind`, `platform`, `file`,
 `url`, `sha256`, `size` (bytes), `use` (one line on how to run or reference it) and `docs`.
-`kind` is `cli` (a curl archive), `mcp-server` (a Curl.Mcp package), `dotnet-library` (Curl.Api
-or Libcurl), `checksums` (`SHA256SUMS`) or `ai-help`; `platform` is a runtime identifier from
+`kind` is `cli` (a curl archive), `dotnet-tool` (a Surly.Curl package), `mcp-server` (a Curl.Mcp
+package), `dotnet-library` (Curl.Api or Libcurl), `checksums` (`SHA256SUMS`) or `ai-help`; `platform` is a runtime identifier from
 the table above or `any`. The generator, `.github/release/New-ResourcesJson.ps1`, documents the
 same fields.

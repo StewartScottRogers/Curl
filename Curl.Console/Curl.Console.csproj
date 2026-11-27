@@ -37,6 +37,44 @@
   </PropertyGroup>
 
   <!--
+    Packed as a .NET tool, the shape of Curl.Mcp's package (BL-6078, ADR-1464): `dnx Surly.Curl`
+    runs it, and `dotnet tool install -g Surly.Curl` puts `curl` on PATH. One package per runtime
+    identifier holds the native-AOT curl, so the tool needs no .NET runtime of its own to run it.
+    AOT cannot cross-compile between operating systems, so a plain `dotnet pack` makes only the
+    tool package, and each runtime package needs `dotnet pack -r <rid>` on its own OS, as
+    release.yml's pack-tool job does.
+  -->
+  <PropertyGroup>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>curl</ToolCommandName>
+    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-arm64;osx-x64</RuntimeIdentifiers>
+    <PackageId>Surly.Curl</PackageId>
+    <Version>0.2.0</Version>
+    <Authors>Stewart Scott Rogers</Authors>
+    <Description>A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, behaves like curl 8.22.0. The curl command-line tool as a .NET tool: the same options, exit codes and output bytes as curl, run with dnx or installed as the command curl.</Description>
+    <PackageTags>curl; cli; command-line; tool; http; managed; reimplementation; no-native; aot</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Title>Surly Curl command-line tool</Title>
+    <!-- The curl licence text itself: nuget.org refuses the SPDX expression "curl" (not OSI or FSF approved). -->
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageIcon>SurlyIcon.png</PackageIcon>
+    <Copyright>Copyright (c) 2026, Stewart Scott Rogers, and many contributors.</Copyright>
+    <PackageProjectUrl>https://github.com/StewartScottRogers/Curl</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/StewartScottRogers/Curl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <!-- A runtime package carries the native binary alone: no symbols or XML documentation to download. -->
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <PublishDocumentationFiles>false</PublishDocumentationFiles>
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="..\LICENSE.txt" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="..\SurlyIcon.png" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+
+  <!--
     ILC links the runtime's COM calls (CoCreateGuid, CoInitializeEx, CoWaitForMultipleHandles
     and four more) against ole32.lib, and ole32.dll statically imports user32 and gdi32, which
     load gdi32full, win32u and imm32 too: about 1.1 MB of working set real curl.exe never maps.

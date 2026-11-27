@@ -40,15 +40,21 @@ library and tests.
 
 ## Download and use
 
-Every resource is a file of the rolling [`preview` release](https://github.com/StewartScottRogers/Curl/releases/tag/preview), listed with its URL and SHA-256 in [`resources.json`](https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json). Verify any download against the release's [`SHA256SUMS`](https://github.com/StewartScottRogers/Curl/releases/download/preview/SHA256SUMS). Nothing is on nuget.org yet; the NuGet packages install from a folder. [DOWNLOAD.md](DOWNLOAD.md) has the commands.
+Every resource is a file of the rolling [`preview` release](https://github.com/StewartScottRogers/Curl/releases/tag/preview), listed with its URL and SHA-256 in [`resources.json`](https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json). Verify any download against the release's [`SHA256SUMS`](https://github.com/StewartScottRogers/Curl/releases/download/preview/SHA256SUMS). Numbered releases also publish the NuGet packages to nuget.org; the rolling `preview` never reaches nuget.org, so its packages install from a folder. [DOWNLOAD.md](DOWNLOAD.md) has the commands.
+
+With the .NET 10 SDK you can also run the native `curl` from nuget.org, as the tool package `Surly.Curl`, which numbered releases publish from the first one made after 2026-11-27 (in PowerShell write the `--` as `'--'`):
+
+```sh
+dnx Surly.Curl@<version> --yes -- <curl arguments>
+```
 
 `Libcurl` is for porting C or libcurl code to .NET: the libcurl API one call for one call; `Curl.Api` is for new .NET work: an async, HttpClient-shaped client.
 
 | Resource | What it is | Download | Use |
 | --- | --- | --- | --- |
 | `curl` / `curl.exe` | The drop-in command-line tool, one native executable per platform | [Windows x64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-win-x64.zip), [Windows Arm64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-win-arm64.zip), [Linux x64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-linux-x64.tar.gz), [Linux Arm64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-linux-arm64.tar.gz), [macOS Apple silicon](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-osx-arm64.tar.gz), [macOS Intel](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-osx-x64.tar.gz), or the one-line installer below | Extract and run `curl --version` |
-| [`Curl.Api`](Curl.Api) | New .NET work: an async, HttpClient-shaped client | `Surly.Curl.Api` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Surly.Curl.Api --prerelease` from a folder source ([DOWNLOAD.md](DOWNLOAD.md#curlapi-net-client-for-new-code)) |
-| [`Libcurl`](Libcurl) | Porting C or libcurl code to .NET: the libcurl API one call for one call | `Surly.Libcurl` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Surly.Libcurl --prerelease` from a folder source ([DOWNLOAD.md](DOWNLOAD.md#libcurl-libcurl-api-for-porting-c-code)) |
+| [`Curl.Api`](Curl.Api) | New .NET work: an async, HttpClient-shaped client | `Surly.Curl.Api` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Surly.Curl.Api --prerelease`: from nuget.org for a numbered release, from a folder source for the `preview` build ([DOWNLOAD.md](DOWNLOAD.md#curlapi-net-client-for-new-code)) |
+| [`Libcurl`](Libcurl) | Porting C or libcurl code to .NET: the libcurl API one call for one call | `Surly.Libcurl` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Surly.Libcurl --prerelease`: from nuget.org for a numbered release, from a folder source for the `preview` build ([DOWNLOAD.md](DOWNLOAD.md#libcurl-libcurl-api-for-porting-c-code)) |
 | [`Curl.Mcp`](Curl.Mcp) | MCP server for AI agents | Seven `.nupkg` files on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | [MCP setup](https://stewartscottrogers.github.io/Curl/mcp/), [DOWNLOAD.md](DOWNLOAD.md#curlmcp-mcp-server-for-ai-agents) |
 
 Which to use:
