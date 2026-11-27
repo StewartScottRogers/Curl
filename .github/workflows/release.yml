@@ -363,13 +363,20 @@ jobs:
               --notes "The latest build of master, ${GITHUB_SHA:0:9}, made $(date -u +%Y-%m-%dT%H:%MZ), version 0.2.0-rolling.${GITHUB_RUN_NUMBER}. It is rebuilt on every merge to master; numbered releases are kept separately."
             exit 0
           fi
+          # A rerun of a tag's job (say, after the nuget.org push failed) finds its release made
+          # already: it keeps that release and goes on to the push rather than failing here.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME exists already; kept as it is."
+            exit 0
+          fi
           flags=(--generate-notes --title "$GITHUB_REF_NAME")
           [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" "${flags[@]}"
 
       # Pushes every package of a numbered tag to nuget.org (Stewart, 2026-11-26: "do it the same
-      # way" as Surl; ADR-1443, BL-2393). Trusted publishing: the nuget.org account StewartScottRogers
-      # holds a policy for this repository's release.yml, and NuGet/login trades the job's OIDC token
+      # way" as Surl; ADR-1443, BL-2393). Trusted publishing: the nuget.org account StewartRogers86
+      # (not the GitHub name StewartScottRogers) created a policy for this repository's release.yml,
+      # and NuGet/login, given that policy creator's nuget.org name, trades the job's OIDC token
       # for a key that lasts one hour, so no secret is stored. The rolling preview never reaches
       # nuget.org. --skip-duplicate lets a rerun of a tag's release job succeed once the packages are up.
       - name: Log in to nuget.org
@@ -377,7 +384,7 @@ jobs:
         id: nuget-login
         uses: NuGet/login@v1
         with:
-          user: StewartScottRogers
+          user: StewartRogers86
 
       - name: Push the packages to nuget.org
         if: startsWith(github.ref, 'refs/tags/v')

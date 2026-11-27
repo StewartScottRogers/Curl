@@ -13,7 +13,7 @@ Surl publishes through nuget.org's Trusted Publishing (Surl BL-1795): its `relea
 ## Decision
 
 Curl does the same in its own `release.yml`. On a `v*` tag, after creating the GitHub release, the release job (`id-token: write`):
-- logs in with `NuGet/login@v1` as user `StewartScottRogers`;
+- logs in with `NuGet/login@v1` as user `StewartRogers86`, Stewart's nuget.org profile name and the creator of the policy (not his GitHub name, `StewartScottRogers`);
 - checks that the release has exactly nine `.nupkg` files at the tag's version;
 - pushes each to nuget.org with `--skip-duplicate`.
 
@@ -24,4 +24,5 @@ The rolling `preview` (pushes to `master`) never reaches nuget.org. Pre-release 
 - No nuget.org API key exists in the repository, its secrets, a log or a terminal.
 - Stewart sets up two things on nuget.org, once: the `Surly.` prefix reservation, and a Trusted Publishing policy for owner `StewartScottRogers`, repository `Curl`, workflow `release.yml` (no environment).
 - Until that policy exists, a tag's release job fails at the login step after the GitHub release is created. The fix is to add the policy and rerun the job; `--skip-duplicate` makes the rerun safe.
+- The login's `user` must be the nuget.org name of whoever created the policy. `v0.4.0-preview.3` logged in as the GitHub name `StewartScottRogers` and got HTTP 401, "No matching trust policy owned by user 'StewartScottRogers'", four times, although the policy (nuget.org account `StewartRogers86`, repository Curl #1389059297, `release.yml`) was active. A tag runs the workflow of its own commit, so `v0.4.0-preview.4` is the first tag that can publish.
 - A version on nuget.org cannot be deleted, only unlisted, so every tag is a lasting public release.
