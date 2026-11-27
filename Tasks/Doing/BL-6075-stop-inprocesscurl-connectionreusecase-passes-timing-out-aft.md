@@ -34,3 +34,4 @@ limit `UpstreamCaseRunner` is given.
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: 095f8b5c 32f92ed9.
