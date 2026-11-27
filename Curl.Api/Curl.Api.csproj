@@ -14,7 +14,8 @@
     <PackageTags>curl; http; client; async; managed; reimplementation; no-native; aot</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Title>Surly Curl for .NET (managed)</Title>
-    <PackageLicenseExpression>curl</PackageLicenseExpression>
+    <!-- The curl licence text itself: nuget.org refuses the SPDX expression "curl" (not OSI or FSF approved). -->
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <PackageIcon>SurlyIcon.png</PackageIcon>
     <Copyright>Copyright (c) 2026, Stewart Scott Rogers, and many contributors.</Copyright>
     <PackageProjectUrl>https://github.com/StewartScottRogers/Curl</PackageProjectUrl>
@@ -25,6 +26,7 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="..\LICENSE.txt" Pack="true" PackagePath="/" Visible="false" />
     <None Include="..\SurlyIcon.png" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>
 
