@@ -31,7 +31,7 @@ a proof per request.
 
 ## Notes
 
-- Design (ADR-1444): `RequestHeadersSigner` in `Curl.Extension.Abstractions/Transfer`; `--dpop` puts one on the
+- Design (ADR-1454): `RequestHeadersSigner` in `Curl.Extension.Abstractions/Transfer`; `--dpop` puts one on the
   transfer and the gRPC handler asks `SignedHeadersFor` for the reflection stream. It is found through
   `IWrappingTransferContext`, since hooks listed after `--dpop`'s wrap the context again.
 - `touches` widened (no other task in Doing named any of them on origin/work/dark-factory):
@@ -48,4 +48,4 @@ a proof per request.
 
 - 2026-11-26: Created.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: f38156b0 3d836d5e.
-- 2026-11-26: Doing -> Done. Each gRPC server reflection request carries a DPoP proof naming its own POST and URL, with its own jti (ADR-1444)
+- 2026-11-26: Doing -> Done. Each gRPC server reflection request carries a DPoP proof naming its own POST and URL, with its own jti (ADR-1454)

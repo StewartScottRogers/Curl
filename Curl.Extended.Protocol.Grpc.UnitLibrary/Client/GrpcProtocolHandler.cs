@@ -178,7 +178,7 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
 
     /// <summary>
     /// Gives the server reflection stream's header values: the call's, with what a hook signed for the call, such as a
-    /// <c>--dpop</c> proof, signed anew for the reflection stream's own HTTP <c>POST</c> and URL (ADR-1444).
+    /// <c>--dpop</c> proof, signed anew for the reflection stream's own HTTP <c>POST</c> and URL (ADR-1454).
     /// </summary>
     private static GrpcRequestHeaderValues SignedForReflection(ITransferContext context, GrpcRequestHeaderValues call)
     {

@@ -44,7 +44,7 @@ stream or connection.
   (`GrpcHttp2Session`, whose HPACK encoder and decoder the call on stream 3 shares): one
   `file_containing_symbol` for the service, one `file_by_filename` per dependency no file yet
   declares, then the method's types from the files. The stream sends the call's headers, signed for its own `POST` and
-  URL by any signer a hook put on the transfer (`SignedHeadersFor`, ADR-1444), so `--dpop` gives it a proof of its own.
+  URL by any signer a hook put on the transfer (`SignedHeadersFor`, ADR-1454), so `--dpop` gives it a proof of its own.
 - `ServerReflectionStream` is the bidirectional `ServerReflectionInfo` stream: one request, one
   response, then it ends its half and reads the trailers. `ServerReflectionRequest` writes the
   requests and `ServerReflectionResponse` reads the replies.

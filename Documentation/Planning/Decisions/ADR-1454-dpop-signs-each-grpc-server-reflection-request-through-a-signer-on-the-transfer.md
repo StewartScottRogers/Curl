@@ -1,4 +1,4 @@
-# ADR-1444: `--dpop` signs each gRPC server reflection request through a signer on the transfer
+# ADR-1454: `--dpop` signs each gRPC server reflection request through a signer on the transfer
 
 - Status: Accepted. Decided by Claude under Stewart's delegation.
 - Date: 2026-11-26

@@ -14,7 +14,7 @@ namespace Curl.Extension.Dpop;
 /// then, so only the one kept is written. The hook runs inside every hook that sends several requests or changes a
 /// request's method or URL (ADR-1426, ADR-1439), so each request is signed on its own; a <c>grpc</c> or <c>grpcs</c>
 /// call's proof names the HTTP <c>POST</c> that carries it. A handler that makes further requests of its own, as the gRPC
-/// one does for server reflection, signs each through the signer the hook puts on the transfer (ADR-1444): a proof naming
+/// one does for server reflection, signs each through the signer the hook puts on the transfer (ADR-1454): a proof naming
 /// that request replaces the transfer's. A transfer that is not HTTP runs as it would without the hook.
 /// </summary>
 /// <param name="keyFile">The PEM file of the private key.</param>

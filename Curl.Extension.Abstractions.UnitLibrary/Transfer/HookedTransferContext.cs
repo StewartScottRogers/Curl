@@ -5,7 +5,7 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// transfer's own context, but with the hooks' request headers after curl's and the response body
 /// written through the hooks' streams (ADR-1007); also the context a hook's
 /// <see cref="TransferContextOutputs.WithOutputs" /> gives, with the response written where the hook chose (ADR-1019),
-/// and the one <see cref="TransferContextRequestSigning.WithRequestSigner" /> gives (ADR-1444).
+/// and the one <see cref="TransferContextRequestSigning.WithRequestSigner" /> gives (ADR-1454).
 /// </summary>
 /// <param name="inner">The transfer's own context.</param>
 /// <param name="output">Where the handler writes the response body: the outermost hook's stream.</param>

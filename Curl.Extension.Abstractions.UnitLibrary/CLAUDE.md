@@ -31,7 +31,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   hooks to the others as `TransferHookServices.DpopKeySource`, so a token one of them fetches is bound to the key
   (ADR-1367).
 - `Transfer/RequestHeadersSigner` signs a request a handler makes besides the transfer's own, such as a gRPC server
-  reflection request (ADR-1444). A hook puts one on the transfer with `context.WithRequestSigner(signer)` and the handler
+  reflection request (ADR-1454). A hook puts one on the transfer with `context.WithRequestSigner(signer)` and the handler
   asks `context.SignedHeadersFor(method, url, headers)` (`TransferContextRequestSigning`), which finds it through every
   context that implements `IWrappingTransferContext`; a hook listed after `--dpop`'s that wraps a context implements it.
 - `Connection/IConnectionHook` supplies the connector (and optionally the datagram connector) a

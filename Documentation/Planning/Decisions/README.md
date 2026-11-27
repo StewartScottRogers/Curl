@@ -1495,4 +1495,4 @@ Each option and the specific reason it lost.
 | [1451](ADR-1451-the-openssl-build-matches-rfc822name-constraints-as-openssls-nc-email-does.md) | The OpenSSL build matches rfc822Name constraints as OpenSSL's `nc_email` does (BL-6054) | Accepted | 2026-11-26 |
 | [1452](ADR-1452-an-sslstream-handshake-that-throws-for-openssl-error-1-is-verify-result-1.md) | An SslStream handshake that throws for OpenSSL error 1 is exit 60 with verify result 1; under -k it stays exit 35 until a redial (BL-6063) | Accepted | 2026-11-26 |
 | [1453](ADR-1453-a-library-handle-keeps-its-doh-url-resolver-from-perform-to-perform.md) | A library handle keeps its --doh-url resolver from perform to perform (BL-6065) | Accepted | 2026-11-26 |
-| [1444](ADR-1444-dpop-signs-each-grpc-server-reflection-request-through-a-signer-on-the-transfer.md) | `--dpop` signs each gRPC server reflection request through a signer on the transfer (BL-6055) | Accepted | 2026-11-26 |
+| [1454](ADR-1454-dpop-signs-each-grpc-server-reflection-request-through-a-signer-on-the-transfer.md) | `--dpop` signs each gRPC server reflection request through a signer on the transfer (BL-6055) | Accepted | 2026-11-26 |

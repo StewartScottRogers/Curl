@@ -18,7 +18,7 @@ With `--dpop`, a gRPC server reflection request refused with a 401 and a new `DP
 
 ## Context
 
-Found in BL-6055 (ADR-1444). `ServerReflectionStream.ExchangeAsync` fails a refused reflection request with a `GrpcClientException` whose result carries no `TransferReport`, so `DpopTransferHook` never reads the `DPoP-Nonce` response header (RFC 9449 §9) and cannot retry. The refusal's HTTP status and response headers have to reach the hook in the result's report.
+Found in BL-6055 (ADR-1454). `ServerReflectionStream.ExchangeAsync` fails a refused reflection request with a `GrpcClientException` whose result carries no `TransferReport`, so `DpopTransferHook` never reads the `DPoP-Nonce` response header (RFC 9449 §9) and cannot retry. The refusal's HTTP status and response headers have to reach the hook in the result's report.
 
 ## Acceptance criteria
 
