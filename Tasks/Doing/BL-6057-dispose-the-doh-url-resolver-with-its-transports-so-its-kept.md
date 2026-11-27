@@ -30,3 +30,4 @@ ADR-1441 (BL-6051): `DohDnsResolver` keeps its DoH connections for later queries
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: c382bbb3 3d836d5e.
