@@ -1369,8 +1369,17 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     [DataRow(".xn--!!.test", 0)]
     [DataRow("", 256)]
     [DataRow(".", 254)]
-    public void FindViolation_OpenSslBuildSmtpUtf8MailboxUnderAConstraintThatDoesNotDecode_IsUnspecified(string start, int more) =>
-        AssertEitherSubtreeAnswers(start + new string('a', more), Mailbox("user@evil.test"), CertificateNameConstraints.UnspecifiedError);
+    public void FindViolation_OpenSslBuildSmtpUtf8MailboxUnderAConstraintThatDoesNotDecode_IsUnspecified(string start, int more)
+    {
+        var constraintName = GeneralName(1, start + new string('a', more));
+        var alternativeNames = DnsAnd(Mailbox("user@evil.test"));
+
+        var excluded = FindViolationWithoutChainBuild(Constraints(excludedName: constraintName), alternativeNames);
+        var permitted = FindViolationWithoutChainBuild(Constraints(permittedName: constraintName), alternativeNames);
+
+        Assert.AreEqual(CertificateNameConstraints.UnspecifiedError, excluded);
+        Assert.AreEqual(CertificateNameConstraints.UnspecifiedError, permitted);
+    }
 
     [TestMethod]
     [DataRow("", 255)]
@@ -1467,6 +1476,17 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
     private static int FindViolationOfAlternativeNames(byte[] constraints, byte[] alternativeNames, bool matchesSchannelBuild = true) =>
         FindViolationOfSubject(new X500DistinguishedName($"CN={Host}"), constraints, matchesSchannelBuild, alternativeNames);
+
+    // The OpenSSL build's check of the certificates themselves, with no platform chain build: .NET on Linux
+    // throws from X509Chain.Build where OpenSSL's answer is X509_V_ERR_UNSPECIFIED.
+    private static int FindViolationWithoutChainBuild(byte[] constraints, byte[] alternativeNames)
+    {
+        using var root = CreateAuthority("CN=Unbuilt Chain Root", null, null);
+        using var intermediate = CreateAuthority("CN=Unbuilt Chain Intermediate", root, constraints);
+        using var leaf = CreateLeaf(intermediate, Host, false, false, false, alternativeNames: alternativeNames);
+
+        return CertificateNameConstraints.FindViolationAmong([leaf, intermediate, root], matchesSchannelBuild: false);
+    }
 
     private static byte[] Text(string value)
     {

@@ -95,16 +95,22 @@ internal static class CertificateNameConstraints
     /// <see cref="NotPermitted" />, <see cref="Excluded" />, <see cref="UnsupportedNameSyntax" />,
     /// <see cref="UnsupportedConstraintType" />, <see cref="UnspecifiedError" />, or 0 when no constraint is broken.
     /// </returns>
-    internal static int FindViolation(X509Chain chain, bool matchesSchannelBuild = false)
-    {
-        if (chain.ChainElements.Count < 2)
-        {
-            return 0;
-        }
+    internal static int FindViolation(X509Chain chain, bool matchesSchannelBuild = false) =>
+        chain.ChainElements.Count < 2
+            ? 0
+            : FindViolationAmong(OpenSslVerifyResult.CertificatesOf(chain)[..CountThroughAnchor(chain)], matchesSchannelBuild);
 
+    /// <summary>
+    /// Finds the first name constraint broken among certificates already in chain order, as
+    /// <see cref="FindViolation(X509Chain, bool)" /> does for the chain's certificates through the anchor.
+    /// </summary>
+    /// <param name="certificates">The server certificate first, then each issuer up to the anchor.</param>
+    /// <param name="matchesSchannelBuild">Whether to check as curl's Schannel build does, else as its OpenSSL build.</param>
+    /// <returns>What <see cref="FindViolation(X509Chain, bool)" /> returns.</returns>
+    internal static int FindViolationAmong(X509Certificate2[] certificates, bool matchesSchannelBuild)
+    {
         try
         {
-            var certificates = OpenSslVerifyResult.CertificatesOf(chain)[..CountThroughAnchor(chain)];
             return matchesSchannelBuild
                 ? FindViolationAgainst(certificates.Skip(1), () => ReadSchannelNames(certificates[0]))
                 : FindOpenSslViolation(certificates);
