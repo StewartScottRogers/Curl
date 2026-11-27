@@ -1,5 +1,36 @@
 # Curl.Console
 
+A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, and it behaves like curl 8.22.0. Run its `curl` command from nuget.org with `dnx Surly.Curl@<version> --yes -- <curl arguments>`.
+
+## Run it from nuget.org
+
+All it needs is the .NET 10 SDK. To run it without installing it:
+
+```sh
+dnx Surly.Curl@<version> --yes -- <curl arguments>
+dnx Surly.Curl@<version> --yes -- -sS https://example.com/
+```
+
+In PowerShell write the separator as `'--'`: PowerShell takes a bare `--` for itself, and `dnx`
+then reads curl's options as its own.
+
+To install it as the command `curl`:
+
+```sh
+dotnet tool install -g Surly.Curl --prerelease
+curl --version
+```
+
+A global install can shadow the system curl on PATH: which `curl` runs then depends on the order
+of the directories in PATH (on Windows, `curl.exe` in `System32` normally comes first).
+`dotnet tool uninstall -g Surly.Curl` removes it. `dnx` installs nothing on PATH.
+
+`Surly.Curl` is a .NET tool whose per-platform packages (`win-x64`, `win-arm64`, `linux-x64`,
+`linux-arm64`, `osx-x64`, `osx-arm64`) each hold the native ahead-of-time `curl`; .NET picks the
+one for your machine. Linux needs glibc 2.35 or newer.
+
+## About the project
+
 `Curl.Console` is the `curl` executable: a drop-in replacement for the `curl` command-line tool,
 written in C# on .NET 10. It takes the same options and gives the same exit codes and output bytes
 as curl, so a script cannot tell which binary it started. Its assembly name is `curl`, so the
@@ -22,6 +53,11 @@ Native ahead-of-time is the shipping configuration (`PublishAot` is on by defaul
 `vswhere.exe` on `PATH`; a machine that cannot link native code publishes with
 `-p:PublishAot=false`. `dotnet build` and `dotnet test` are unaffected by `PublishAot`.
 `curl --ai-help` prints help in Markdown for AI agents.
+
+`dotnet pack Curl.Console -c Release -o <folder>` makes the `Surly.Curl` tool package, and
+`dotnet pack Curl.Console -c Release -r <rid> -o <folder>`, run on that runtime's operating
+system, makes its native package; the [Release workflow](../.github/workflows/release.yml) packs
+all seven (ADR-1464).
 
 ## How the source files group
 

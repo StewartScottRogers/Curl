@@ -18,6 +18,8 @@
     <None Include="..\Curl.Api\Curl.Api.csproj" Link="SurlyPackaging\Curl.Api.csproj" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Libcurl\Libcurl.csproj" Link="SurlyPackaging\Libcurl.csproj" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Curl.Mcp\Curl.Mcp.csproj" Link="SurlyPackaging\Curl.Mcp.csproj" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Curl.Console\Curl.Console.csproj" Link="SurlyPackaging\Curl.Console.csproj" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Curl.Console\README.md" Link="SurlyPackaging\Curl.Console.README.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Curl.Api\README.md" Link="SurlyPackaging\Curl.Api.README.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Libcurl\README.md" Link="SurlyPackaging\Libcurl.README.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Curl.Mcp\README.md" Link="SurlyPackaging\Curl.Mcp.README.md" CopyToOutputDirectory="PreserveNewest" />

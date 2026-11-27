@@ -11,7 +11,7 @@ namespace Curl.Api;
 [TestClass]
 public sealed class SurlyPackageMetadataTests
 {
-    private static readonly string[] ProjectNames = ["Curl.Api", "Libcurl", "Curl.Mcp"];
+    private static readonly string[] ProjectNames = ["Curl.Api", "Libcurl", "Curl.Mcp", "Curl.Console"];
 
     private static string PackagingPath(string fileName) =>
         Path.Combine(AppContext.BaseDirectory, "SurlyPackaging", fileName);
@@ -85,6 +85,28 @@ public sealed class SurlyPackageMetadataTests
                 CollectionAssert.Contains(tags, tag, name);
             }
         }
+    }
+
+    [TestMethod]
+    public void ConsoleProject_PacksSurlyCurlAsTheCurlToolForSixRuntimes()
+    {
+        XElement properties = Properties("Curl.Console");
+
+        Assert.AreEqual("Surly.Curl", (string?)properties.Element("PackageId"));
+        Assert.AreEqual("true", (string?)properties.Element("PackAsTool"));
+        Assert.AreEqual("curl", (string?)properties.Element("ToolCommandName"));
+        Assert.AreEqual("true", (string?)properties.Element("PublishAot"));
+        Assert.AreEqual("win-x64;win-arm64;linux-x64;linux-arm64;osx-arm64;osx-x64", (string?)properties.Element("RuntimeIdentifiers"));
+    }
+
+    [TestMethod]
+    public void ConsolePackedReadme_SaysHowToRunItWithDnxAndThatAGlobalInstallCanShadowTheSystemCurl()
+    {
+        string readme = File.ReadAllText(PackagingPath("Curl.Console.README.md"));
+
+        StringAssert.Contains(readme, "dnx Surly.Curl@<version> --yes -- <curl arguments>");
+        StringAssert.Contains(readme, "dotnet tool install -g Surly.Curl --prerelease");
+        StringAssert.Contains(readme, "shadow the system curl on PATH");
     }
 
     [TestMethod]
