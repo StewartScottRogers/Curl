@@ -38,3 +38,4 @@ code, not run). The connector is not told the fail mode, so the likely seam is a
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: f472d574 b40ab58a 966999ad 2ff1f16e.
