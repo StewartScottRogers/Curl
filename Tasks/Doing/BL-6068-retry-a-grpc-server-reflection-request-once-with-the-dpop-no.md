@@ -30,3 +30,4 @@ Found in BL-6055 (ADR-1454). `ServerReflectionStream.ExchangeAsync` fails a refu
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: c4ff3700 3d836d5e.
