@@ -31,3 +31,4 @@ Found in BL-6039 (ADR-1457). With a linux-x64 publish in WSL, `curl -sSv -m 3 ht
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-26: Backlog -> Doing. Criteria at claim: ef3bad98 b19c3c7d 3d836d5e.
