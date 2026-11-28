@@ -50,3 +50,4 @@ Split from BL-6033. Depends on BL-6093 because both change
 ## Log
 
 - 2026-11-28: Created.
+- 2026-11-28: Backlog -> Doing. Criteria at claim: 93495ac0 57a4eb97 d08bff81 3d836d5e.
