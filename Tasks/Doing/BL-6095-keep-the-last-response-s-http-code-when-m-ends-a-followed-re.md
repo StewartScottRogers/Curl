@@ -31,3 +31,4 @@ Seen while measuring BL-6092 (2026-11-28). A loopback server answers a 302 to a 
 ## Log
 
 - 2026-11-28: Created.
+- 2026-11-28: Backlog -> Doing. Criteria at claim: 251413b1 dde3d256 3d836d5e.
