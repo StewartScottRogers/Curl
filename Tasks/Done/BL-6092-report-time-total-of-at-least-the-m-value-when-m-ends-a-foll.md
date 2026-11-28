@@ -32,10 +32,10 @@ Follow-up of BL-6082 (ADR-1470, Consequences). `RedirectFollower` measures the m
 - Fixed in `RedirectFollower` (ADR-1472): a followed hop that ends with exit 28 counts the merged timings from the context's `OperationStarted`. `EndPointReportingProtocolHandler.cs` was not needed.
 - Added `Curl.Core.UnitLibrary/CLAUDE.md` to `touches`: one clause so its description of the merged timings stays true; no task in Doing names it.
 - `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary`: 0 failing members. `dotnet build` 0 warnings; fast tests passed.
-- Seen while measuring, filed as BL-6093: Curl prints `%{http_code}` `000` where curl prints `302` in the same repro.
+- Seen while measuring, filed as BL-6095: Curl prints `%{http_code}` `000` where curl prints `302` in the same repro.
 
 ## Log
 
 - 2026-11-28: Created.
 - 2026-11-28: Backlog -> Doing. Criteria at claim: b1be4df0 8a7549dc 3d836d5e.
-- 2026-11-28: Doing -> Done. A followed redirect hop that -m ends counts the merged time_total from -m's start (ADR-1472); follow-up BL-6093 filed for http_code.
+- 2026-11-28: Doing -> Done. A followed redirect hop that -m ends counts the merged time_total from -m's start (ADR-1472); follow-up BL-6095 filed for http_code.

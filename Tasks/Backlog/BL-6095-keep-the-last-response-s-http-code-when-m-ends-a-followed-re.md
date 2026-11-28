@@ -1,5 +1,5 @@
 ---
-id: BL-6093
+id: BL-6095
 title: Keep the last response's %{http_code} when -m ends a followed redirect hop that got no response
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-28
 completed:
 ---
-# BL-6093 — Keep the last response's %{http_code} when -m ends a followed redirect hop that got no response
+# BL-6095 — Keep the last response's %{http_code} when -m ends a followed redirect hop that got no response
 
 ## Goal
 
