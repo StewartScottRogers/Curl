@@ -1,5 +1,5 @@
 ---
-id: BL-6084
+id: BL-6089
 title: Exit 22 under -f when a proxy refuses the CONNECT of a telnet, dict or gopher tunnel
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-27
 completed:
 ---
-# BL-6084 — Exit 22 under -f when a proxy refuses the CONNECT of a telnet, dict or gopher tunnel
+# BL-6089 — Exit 22 under -f when a proxy refuses the CONNECT of a telnet, dict or gopher tunnel
 
 ## Goal
 

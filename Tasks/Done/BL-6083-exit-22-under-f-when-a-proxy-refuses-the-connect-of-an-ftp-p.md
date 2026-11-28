@@ -41,7 +41,7 @@ Other protocols that tunnel through a proxy were not measured: measure them and 
 - Data tunnel, measured with a throwaway PowerShell proxy: a refused `EPSV` data CONNECT falls back to `PASV` (exit 13 when that fails too), `-f` or not; a refused `PASV` data CONNECT ends exit 22 under `-f`, exit 7 without. Curl matches both exit codes and error lines.
 - All control-connection cases (`403`, `407`, `407` with `-U`, `--fail-with-body`, no `-f`) match reference curl line for line.
 - `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Ftp.UnitLibrary`: 0 failing members. `dotnet build` clean, fast tests green.
-- Filed: BL-6084, BL-6085, BL-6086 (other protocols answer exit 7 under `-f`), BL-6087 (ldap ignores the proxy), BL-6088 (data connection `-v` lines through a proxy). `smb` could not be compared: the reference build has it disabled.
+- Filed: BL-6089, BL-6085, BL-6086 (other protocols answer exit 7 under `-f`), BL-6087 (ldap ignores the proxy), BL-6088 (data connection `-v` lines through a proxy). `smb` could not be compared: the reference build has it disabled.
 
 ## Log
 
