@@ -17,5 +17,5 @@ internal static class NumberedConnectFailure
     public static ConnectResult Of(ConnectResult failure, long connectionNumber) =>
         failure.IsConnectionRefused
             ? ConnectResult.Refused(failure.ErrorMessage!, failure.Timings, connectionNumber)
-            : ConnectResult.Failed(failure.ExitCode, failure.ErrorMessage!, failure.Timings, connectionNumber, failure.ProxyConnectResponseCode, failure.LastSocketError, failure.ProxyError, failure.ConnectReplyHeadersStored, failure.ProxyConnectHeaderBytes).WithProxyAuthenticationProblem(failure.IsProxyAuthenticationProblem).WithTcpConnectedBeforeFailure(failure.IsTcpConnectedBeforeFailure);
+            : ConnectResult.Failed(failure.ExitCode, failure.ErrorMessage!, failure.Timings, connectionNumber, failure.ProxyConnectResponseCode, failure.LastSocketError, failure.ProxyError, failure.ConnectReplyHeadersStored, failure.ProxyConnectHeaderBytes).WithProxyAuthenticationProblem(failure.IsProxyAuthenticationProblem).WithTcpConnectedBeforeFailure(failure.IsTcpConnectedBeforeFailure).WithEndPointsBeforeFailure(failure.LocalEndPointBeforeFailure, failure.RemoteEndPointBeforeFailure);
 }

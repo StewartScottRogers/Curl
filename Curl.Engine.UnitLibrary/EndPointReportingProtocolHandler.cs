@@ -47,6 +47,7 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     {
         recorder.Clear(context.Http?.RedirectsFollowed > 0);
         recorder.TransferClock = context.TimeProvider;
+        recorder.ReportsEndPointsOfFailedConnects = IsExtendedScheme(context);
         long started = context.TimeProvider.GetTimestamp();
         long uploadStart = UploadPosition(context);
         TransferResult result;
@@ -72,6 +73,10 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         result = recorder.ReportOn(result, handlerCountsConnections: result.Report is not null && CountsItsConnections(context));
         return StampTimingsAndUploadSize(result, context, started, UploadedBy(context, UploadPosition(context) - uploadStart, result.IsSuccess));
     }
+
+    // A scheme curl itself does not serve is an extension's, which reports the end points of a TLS handshake -m ended (EXT-097, ADR-1475).
+    private static bool IsExtendedScheme(ITransferContext context) =>
+        !ManagedCurlVersion.Protocols.Contains(context.Url.Scheme, StringComparer.OrdinalIgnoreCase);
 
     // Only the HTTP handler counts its connections on its report; every other scheme's are counted by the recorder.
     private static bool CountsItsConnections(ITransferContext context) => context.Url.Scheme is "http" or "https";

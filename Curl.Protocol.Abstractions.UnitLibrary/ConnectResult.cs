@@ -99,6 +99,46 @@ public sealed class ConnectResult
     }
 
     /// <summary>
+    /// Gets the local end point of the TCP connection a failed connect had open when it failed, as a TLS
+    /// handshake <c>-m</c> or the connect limit ended has; <see langword="null" /> when none was open or it is not known (EXT-097).
+    /// </summary>
+    public IPEndPoint? LocalEndPointBeforeFailure { get; private set; }
+
+    /// <summary>
+    /// Gets the peer of the TCP connection a failed connect had open when it failed, which an extended
+    /// protocol reports as <c>%{remote_ip}</c> and <c>%{remote_port}</c>; <see langword="null" /> when none was open or it is not known (EXT-097).
+    /// </summary>
+    public IPEndPoint? RemoteEndPointBeforeFailure { get; private set; }
+
+    /// <summary>
+    /// Returns a copy of this result with <see cref="LocalEndPointBeforeFailure" /> and
+    /// <see cref="RemoteEndPointBeforeFailure" /> set, every other property as it is.
+    /// </summary>
+    /// <param name="local">The local end point of the TCP connection open when the connect failed.</param>
+    /// <param name="remote">The peer of the TCP connection open when the connect failed.</param>
+    /// <returns>The copy.</returns>
+    public ConnectResult WithEndPointsBeforeFailure(IPEndPoint? local, IPEndPoint? remote)
+    {
+        var copy = (ConnectResult)MemberwiseClone();
+        copy.LocalEndPointBeforeFailure = local;
+        copy.RemoteEndPointBeforeFailure = remote;
+        return copy;
+    }
+
+    /// <summary>
+    /// Gets the failed result an <see cref="OperationCanceledException" /> that ended a TLS handshake
+    /// carries under <see cref="TcpConnectedOnCancellationKey" />, holding the open connection's end points;
+    /// <see langword="null" /> when it carries none (EXT-097).
+    /// </summary>
+    /// <param name="canceled">The cancellation that ended the connect.</param>
+    /// <returns>The carried result.</returns>
+    public static ConnectResult? CarriedBy(OperationCanceledException canceled)
+    {
+        ArgumentNullException.ThrowIfNull(canceled);
+        return canceled.Data[TcpConnectedOnCancellationKey] as ConnectResult;
+    }
+
+    /// <summary>
     /// Returns a copy of this result with <see cref="IsProxyAuthenticationProblem" /> set to
     /// <paramref name="isProxyAuthenticationProblem" />, every other property as it is.
     /// </summary>
