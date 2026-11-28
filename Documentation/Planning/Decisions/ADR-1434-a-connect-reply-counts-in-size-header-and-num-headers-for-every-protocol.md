@@ -37,3 +37,12 @@ The FTP stand-in is shared as `TransferReport.TransferCompleteStandInHeader` so 
 recognise it. A line with a colon in an FTP reply that arrives after a second tunnel opened
 would restart curl's count; Curl adds it to the tunnel's lines instead. No measured server
 sends one.
+
+## Amendment, 2026-11-27: the FTP stand-in is removed (BL-6056)
+
+BL-6020 (STD-223) measured that curl 8.22.0 counts no stand-in line for FTP:
+`%{num_headers}` is the reply lines holding a colon plus the `-I` lines, so the FTP handler
+reports no stand-in. The decision's last bullet and the first consequence above no longer
+hold: `TransferReport.TransferCompleteStandInHeader` and the engine's removal of it are gone,
+and the engine leaves a report's pseudo headers as the handler reported them. The rest of the
+decision stands.

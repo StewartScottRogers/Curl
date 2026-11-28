@@ -30,7 +30,7 @@ public sealed partial class TcpConnector
     private static ConnectResult WithTimingsWhenFailedWithout(ConnectResult result, ConnectTimings timings) =>
         result.Connection is not null || result.Timings is not null
             ? result
-            : ConnectResult.Failed(result.ExitCode, result.ErrorMessage!, timings, result.ConnectionNumber, result.ProxyConnectResponseCode, result.LastSocketError, result.ProxyError, result.ConnectReplyHeadersStored, result.ProxyConnectHeaderBytes);
+            : ConnectResult.Failed(result.ExitCode, result.ErrorMessage!, timings, result.ConnectionNumber, result.ProxyConnectResponseCode, result.LastSocketError, result.ProxyError, result.ConnectReplyHeadersStored, result.ProxyConnectHeaderBytes).WithProxyAuthenticationProblem(result.IsProxyAuthenticationProblem);
 
     /// <summary>
     /// Awaits <paramref name="dial" />; a cancellation, such as the connect limit passing after

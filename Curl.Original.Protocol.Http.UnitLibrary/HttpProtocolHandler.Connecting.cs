@@ -221,12 +221,19 @@ public sealed partial class HttpProtocolHandler
         bool failsOnConnectStatus = plan.Options.Fail == HttpFailMode.Fail && connect.ProxyConnectResponseCode >= 400;
         return TransferResult.Failure(
             failsOnConnectStatus ? CurlExitCode.HttpReturnedError : connect.ExitCode,
-            failsOnConnectStatus ? HttpTransferMessages.RequestedUrlReturnedError(connect.ProxyConnectResponseCode) : connect.ErrorMessage!) with
+            failsOnConnectStatus ? FailedConnectStatusMessage(connect) : connect.ErrorMessage!) with
         {
             Report = FailedConnectReport(plan, connect),
             IsConnectionRefused = connect.IsConnectionRefused,
         };
     }
+
+    // The exit 22 text of a refused CONNECT under -f: curl's generic text when the 407 drew its
+    // authproblem, which ends the transfer without a failf, else the status (STD-227, ADR-1465).
+    private static string FailedConnectStatusMessage(ConnectResult connect) =>
+        connect.IsProxyAuthenticationProblem
+            ? HttpTransferMessages.HttpResponseCodeSaidError
+            : HttpTransferMessages.RequestedUrlReturnedError(connect.ProxyConnectResponseCode);
 
     /// <summary>
     /// Reports a connect that failed: whether it went to a forward proxy, and the transfer's

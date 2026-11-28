@@ -102,6 +102,34 @@ public interface ITlsProvider
         AuthenticateAsClientAsync(plaintext, targetHost, events, cancellationToken);
 
     /// <summary>
+    /// Performs the client handshake as
+    /// <see cref="AuthenticateAsClientAsync(IConnection, string, ITransferEvents, CancellationToken)" /> does,
+    /// offering to resume the session of an earlier handshake with <paramref name="targetHost" />
+    /// on <paramref name="sessionSource" />, as curl resumes the FTP control connection's session
+    /// on a data connection (vsftpd's <c>require_ssl_reuse</c> refuses a full handshake there).
+    /// </summary>
+    /// <remarks>
+    /// By default <paramref name="sessionSource" /> is ignored and the handshake is the
+    /// four-argument overload's, so any resumption is the provider's TLS stack's own.
+    /// </remarks>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="sessionSource">The connection whose session to resume; only its address is read, and it stays the caller's.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the handshake is reported.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>
+    /// The same result
+    /// <see cref="AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> returns.
+    /// </returns>
+    ValueTask<ConnectResult> AuthenticateAsClientResumingSessionOfAsync(
+        IConnection plaintext,
+        IConnection sessionSource,
+        string targetHost,
+        ITransferEvents events,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, events, cancellationToken);
+
+    /// <summary>
     /// Verifies a server certificate chain for <paramref name="targetHost" /> with the
     /// transfer's trust settings (<c>-k</c>, <c>--cacert</c>, <c>--capath</c>,
     /// <c>--crlfile</c>, <c>--pinnedpubkey</c>) without opening a TLS stream, so a protocol

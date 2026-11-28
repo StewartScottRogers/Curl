@@ -4,7 +4,7 @@ title: wss and ftp: a failed or timed-out TCP connect reports %{time_total} 0; c
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-6028]
+depends-on: [BL-6081, BL-6082]
 touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerConnectFailureTimingTests.cs]
 requirement: none
 created: 2026-11-26

@@ -61,6 +61,6 @@ internal sealed partial class ConnectionEndPointRecorder
     {
         RememberResponseCode(result);
         TransferResult withEndPoints = WithEndPoints(WithProxyConnect(WithConnectFailure(result)));
-        return WithEarlierHop(handlerCountsConnections ? withEndPoints : WithConnectionCount(withEndPoints));
+        return WithEarlierHop(WithConnectionCount(withEndPoints, handlerCountsConnections));
     }
 }

@@ -19,7 +19,8 @@ public sealed partial class HttpProtocolHandler
     /// when it has one. Either is pooled under <c>https</c> for an <c>https</c> URL and
     /// <c>http</c> otherwise, so a forward proxy connection serves every origin behind it, and
     /// carries the transfer's events for the connector to report through (ADR-0050) and its
-    /// diagnostic log for the connector's own lines (ADR-0222).
+    /// diagnostic log for the connector's own lines (ADR-0222). Under <c>-f</c> it sets
+    /// <see cref="ConnectTarget.FailsOnHttpErrorStatus" />, for the lines of a refused CONNECT.
     /// </summary>
     private static ConnectTarget TargetOf(HttpRequestPlan plan)
     {
@@ -32,7 +33,13 @@ public sealed partial class HttpProtocolHandler
                 AltSvcRoute = plan.Options.AltSvcRoute,
                 ApplicationProtocols = plan.DowngradedToHttp11 ? Http11ApplicationProtocols : AltSvcApplicationProtocols.Of(plan.Options.AltSvcRoute),
             };
-        return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events, DiagnosticLog = plan.Context.DiagnosticLog };
+        return target with
+        {
+            PoolScheme = urlTarget.UseTls ? "https" : "http",
+            Events = plan.Context.Events,
+            DiagnosticLog = plan.Context.DiagnosticLog,
+            FailsOnHttpErrorStatus = plan.Options.Fail == HttpFailMode.Fail,
+        };
     }
 
     /// <summary>

@@ -231,6 +231,22 @@ internal static class ConnectTunnelVerboseLines
             && HttpProxyTunnel.HasToken(text[name.Length..].TrimEnd('\r', '\n'), "chunked");
     }
 
+    /// <summary>
+    /// Whether a reply draws the <c>&lt;scheme&gt; authentication problem, ignoring.</c> line
+    /// <see cref="ReportReplyHead(ITransferEvents, ReadOnlySpan{byte}, int, string?, bool)" />
+    /// writes: a <c>407</c> to a CONNECT that sent <paramref name="authorization" /> with a
+    /// scheme curl gives up on, whose <c>Proxy-Authenticate</c> offers that scheme (curl's
+    /// <c>authproblem</c>, STD-227).
+    /// </summary>
+    /// <param name="statusCode">The reply's status code.</param>
+    /// <param name="proxyAuthenticate">The reply's <c>Proxy-Authenticate</c> values.</param>
+    /// <param name="authorization">The <c>Proxy-Authorization</c> value the CONNECT sent, or <see langword="null" />.</param>
+    /// <returns><see langword="true" /> when the problem line is drawn.</returns>
+    internal static bool DrawsAuthenticationProblem(int statusCode, IReadOnlyList<string> proxyAuthenticate, string? authorization) =>
+        statusCode == 407
+            && RefusedScheme(authorization, DigestStaleChallenge.IsOfferedIn(proxyAuthenticate)) is { } scheme
+            && proxyAuthenticate.Any(value => value.Split(',').Any(challenge => Offers(challenge.Trim(), scheme)));
+
     private static void ReportProblemLines(ITransferEvents events, string line, string scheme)
     {
         var colon = line.IndexOf(':', StringComparison.Ordinal);

@@ -22,7 +22,18 @@ public sealed partial class TcpConnector
             return OpenedInPlaintext(dialed, target, timings, proxyConnectResponseCode);
         }
 
-        var secured = await AuthenticateTracingRecordsAsync(dialed, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
+        ConnectResult secured;
+        try
+        {
+            secured = await AuthenticateTracingRecordsAsync(dialed, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException canceled)
+        {
+            // The TCP connection was open when the handshake was cancelled, which curl counts in %{num_connects} (STD-231).
+            canceled.Data[ConnectResult.TcpConnectedOnCancellationKey] = true;
+            throw;
+        }
+
         if (secured.Connection is not { } securedConnection)
         {
             return secured;

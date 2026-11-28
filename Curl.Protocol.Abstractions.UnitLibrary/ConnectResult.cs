@@ -63,6 +63,55 @@ public sealed class ConnectResult
     public int ProxyConnectResponseCode { get; private init; }
 
     /// <summary>
+    /// Gets whether a failed connect's last CONNECT reply was a <c>407</c> whose challenge
+    /// offers the Basic or Digest scheme the CONNECT already sent, which curl gives up on with
+    /// <c>&lt;scheme&gt; authentication problem, ignoring.</c> (curl's <c>authproblem</c>), so
+    /// that under <c>-f</c> curl ends with exit 22 and only the generic text
+    /// <c>HTTP response code said error</c> (measured, STD-227, ADR-1465).
+    /// </summary>
+    public bool IsProxyAuthenticationProblem { get; private set; }
+
+    /// <summary>
+    /// The key in an <see cref="OperationCanceledException" />'s <see cref="Exception.Data" /> whose
+    /// presence says the TCP connection was open when the cancellation ended the connect, during the TLS
+    /// handshake, which curl 8.22.0 still counts in <c>%{num_connects}</c> (measured, STD-231).
+    /// </summary>
+    public const string TcpConnectedOnCancellationKey = "Curl.ConnectResult.TcpConnected";
+
+    /// <summary>
+    /// Gets whether a failed connect had its TCP connection open when it failed, as a TLS handshake
+    /// the connect limit ended has, which curl 8.22.0 still counts in <c>%{num_connects}</c>
+    /// (measured, STD-231); <see langword="false" /> for a success and for a connect that never connected.
+    /// </summary>
+    public bool IsTcpConnectedBeforeFailure { get; private set; }
+
+    /// <summary>
+    /// Returns a copy of this result with <see cref="IsTcpConnectedBeforeFailure" /> set to
+    /// <paramref name="isTcpConnectedBeforeFailure" />, every other property as it is.
+    /// </summary>
+    /// <param name="isTcpConnectedBeforeFailure">Whether the TCP connection was open when the connect failed.</param>
+    /// <returns>The copy.</returns>
+    public ConnectResult WithTcpConnectedBeforeFailure(bool isTcpConnectedBeforeFailure)
+    {
+        var copy = (ConnectResult)MemberwiseClone();
+        copy.IsTcpConnectedBeforeFailure = isTcpConnectedBeforeFailure;
+        return copy;
+    }
+
+    /// <summary>
+    /// Returns a copy of this result with <see cref="IsProxyAuthenticationProblem" /> set to
+    /// <paramref name="isProxyAuthenticationProblem" />, every other property as it is.
+    /// </summary>
+    /// <param name="isProxyAuthenticationProblem">Whether the refused CONNECT drew curl's <c>authproblem</c>.</param>
+    /// <returns>The copy.</returns>
+    public ConnectResult WithProxyAuthenticationProblem(bool isProxyAuthenticationProblem)
+    {
+        var copy = (ConnectResult)MemberwiseClone();
+        copy.IsProxyAuthenticationProblem = isProxyAuthenticationProblem;
+        return copy;
+    }
+
+    /// <summary>
     /// Gets the DER encoding of every certificate the server sent in the TLS handshake,
     /// its own certificate first and the rest in the order sent, the source of
     /// <c>%{certs}</c> and <c>%{num_certs}</c> (ADR-0054); empty for a connection without
