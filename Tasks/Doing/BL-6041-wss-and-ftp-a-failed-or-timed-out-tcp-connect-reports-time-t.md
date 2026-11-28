@@ -40,3 +40,4 @@ leaves such a result unstamped (BL-5421 says why for the cases it measured; keep
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-28: Backlog -> Doing. Criteria at claim: 41fd4ecd 31332653 3d836d5e.
