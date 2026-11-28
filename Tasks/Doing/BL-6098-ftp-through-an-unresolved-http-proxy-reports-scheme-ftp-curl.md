@@ -36,3 +36,4 @@ test file in `touches` anew if the fix lands elsewhere.
 ## Log
 
 - 2026-11-28: Created.
+- 2026-11-28: Backlog -> Doing. Criteria at claim: e71714e0 31332653 d08bff81 3d836d5e.
