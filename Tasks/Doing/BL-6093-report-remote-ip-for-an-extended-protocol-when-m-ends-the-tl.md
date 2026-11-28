@@ -54,3 +54,4 @@ State at the split (2026-11-28): the Abstractions, Networking and Engine fast te
 ## Log
 
 - 2026-11-28: Created.
+- 2026-11-28: Backlog -> Doing. Criteria at claim: b7e30a4b 1e075fb4 bd94fc68 27921f7d 3d836d5e.
