@@ -16,14 +16,31 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
     /// Connects as the wrapped connector does and records the connection it opened; a connect that
     /// succeeds after an earlier address failed also records that address's last socket error, and
     /// a failed connect records its last socket error and proxy error (BL-2374, BL-3328); either records the proxy
-    /// CONNECT reply, the source of <c>%{http_connect}</c> and of the tunnel's part of <c>%{size_header}</c> and <c>%{num_headers}</c> (BL-5893, BL-6019).
+    /// CONNECT reply, the source of <c>%{http_connect}</c> and of the tunnel's part of <c>%{size_header}</c> and <c>%{num_headers}</c> (BL-5893, BL-6019);
+    /// a connect that failed, or was cancelled, after its TCP connection opened is counted for <c>%{num_connects}</c> (STD-231).
     /// </summary>
     /// <param name="target">Where to connect.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
     /// <returns>The connect's result, unchanged.</returns>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
-        ConnectResult connect = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        ConnectResult connect;
+        try
+        {
+            connect = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException canceled) when (canceled.Data.Contains(ConnectResult.TcpConnectedOnCancellationKey))
+        {
+            // -m ended a TLS handshake over an open TCP connection, which curl counts in %{num_connects} (STD-231).
+            recorder.RecordFailedAfterOpening();
+            throw;
+        }
+
+        if (connect.IsTcpConnectedBeforeFailure)
+        {
+            recorder.RecordFailedAfterOpening();
+        }
+
         recorder.RecordProxyConnect(connect);
         if (connect.Connection is { } connection)
         {

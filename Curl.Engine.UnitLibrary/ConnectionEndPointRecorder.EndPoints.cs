@@ -17,6 +17,18 @@ internal sealed partial class ConnectionEndPointRecorder
     /// </summary>
     private int connectionsOpened;
 
+    /// <summary>
+    /// The number of connects that failed with their TCP connection open, as a TLS handshake the connect
+    /// limit or <c>-m</c> ended, which curl 8.22.0 counts in a failed transfer's <c>%{num_connects}</c> (STD-231).
+    /// </summary>
+    private int connectionsFailedAfterOpening;
+
+    /// <summary>
+    /// Records a connect that failed after its TCP connection opened, which a failed transfer counts in
+    /// <c>%{num_connects}</c> though no end point is reported, as curl 8.22.0 does (measured, STD-231).
+    /// </summary>
+    internal void RecordFailedAfterOpening() => connectionsFailedAfterOpening++;
+
     /// <summary>Gets the connect timings of the transfer's first connection, or <see langword="null" /> when none was given.</summary>
     internal ConnectTimings? FirstConnectTimings { get; private set; }
 
@@ -131,6 +143,7 @@ internal sealed partial class ConnectionEndPointRecorder
     private void ClearEndPoints()
     {
         connectionsOpened = 0;
+        connectionsFailedAfterOpening = 0;
         connectionRecorded = false;
         FirstConnectTimings = null;
         localEndPoint = null;
@@ -164,12 +177,24 @@ internal sealed partial class ConnectionEndPointRecorder
     /// but HTTP's leaves it: curl 8.22.0 prints 1 for an smtp, dict, gopher, ws, rtsp or sftp
     /// transfer, 2 for an ftp download and 1 after a refused ws upgrade (CGR-107, BL-3961).
     /// </summary>
+    /// <remarks>
+    /// A failed transfer also counts each connect that failed after its TCP connection opened, even when the
+    /// handler counts its own connections, giving a result without a report one (STD-231).
+    /// </remarks>
     /// <param name="result">The result with the recorded end points on its report.</param>
-    /// <returns><paramref name="result" /> with the count on its report, or itself when nothing was recorded or the handler counted.</returns>
-    private TransferResult WithConnectionCount(TransferResult result) =>
-        connectionsOpened == 0 || result.Report!.ConnectionCount > 0
-            ? result
-            : result with { Report = result.Report with { ConnectionCount = connectionsOpened } };
+    /// <param name="handlerCountsConnections">Whether the handler counted the connections it opened itself.</param>
+    /// <returns><paramref name="result" /> with the count on its report, or itself when nothing was counted or the handler's report counted some.</returns>
+    private TransferResult WithConnectionCount(TransferResult result, bool handlerCountsConnections)
+    {
+        int count = (handlerCountsConnections ? 0 : connectionsOpened) + (result.IsSuccess ? 0 : connectionsFailedAfterOpening);
+        if (count == 0)
+        {
+            return result;
+        }
+
+        TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
+        return report.ConnectionCount > 0 ? result : result with { Report = report with { ConnectionCount = count } };
+    }
 
     /// <summary>
     /// Returns the text curl 8.21.0 prints as <c>%{remote_ip}</c> for a connection through

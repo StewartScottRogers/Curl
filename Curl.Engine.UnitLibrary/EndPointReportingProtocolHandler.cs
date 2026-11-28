@@ -90,8 +90,12 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
             return result;
         }
 
-        return result with { Report = TimedReport(report, result.IsSuccess, context, started, UploadSizeOf(report, result.IsSuccess, uploaded)) };
+        return result with { Report = TimedReport(report, result.IsSuccess, context, TimedFrom(result, context, started), UploadSizeOf(report, result.IsSuccess, uploaded)) };
     }
+
+    // -m counts from its watchdog's start, before the handler's, so a timed-out first hop's total counts from there and is not under -m's value, as curl's is not (STD-231). A later hop's counts from its own start, as the redirect follower measures the whole from the first hop's.
+    private static long TimedFrom(TransferResult result, ITransferContext context, long started) =>
+        result.ExitCode == CurlExitCode.OperationTimedOut && context.Http?.RedirectsFollowed is not > 0 ? context.OperationStarted ?? started : started;
 
     // The report with its timings and upload size, and a UDP channel's local end when the scheme reports one (BL-5493).
     private TransferReport TimedReport(TransferReport report, bool succeeded, ITransferContext context, long started, long uploadSize)

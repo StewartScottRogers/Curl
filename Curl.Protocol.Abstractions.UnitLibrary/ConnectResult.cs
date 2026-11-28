@@ -72,6 +72,33 @@ public sealed class ConnectResult
     public bool IsProxyAuthenticationProblem { get; private set; }
 
     /// <summary>
+    /// The key in an <see cref="OperationCanceledException" />'s <see cref="Exception.Data" /> whose
+    /// presence says the TCP connection was open when the cancellation ended the connect, during the TLS
+    /// handshake, which curl 8.22.0 still counts in <c>%{num_connects}</c> (measured, STD-231).
+    /// </summary>
+    public const string TcpConnectedOnCancellationKey = "Curl.ConnectResult.TcpConnected";
+
+    /// <summary>
+    /// Gets whether a failed connect had its TCP connection open when it failed, as a TLS handshake
+    /// the connect limit ended has, which curl 8.22.0 still counts in <c>%{num_connects}</c>
+    /// (measured, STD-231); <see langword="false" /> for a success and for a connect that never connected.
+    /// </summary>
+    public bool IsTcpConnectedBeforeFailure { get; private set; }
+
+    /// <summary>
+    /// Returns a copy of this result with <see cref="IsTcpConnectedBeforeFailure" /> set to
+    /// <paramref name="isTcpConnectedBeforeFailure" />, every other property as it is.
+    /// </summary>
+    /// <param name="isTcpConnectedBeforeFailure">Whether the TCP connection was open when the connect failed.</param>
+    /// <returns>The copy.</returns>
+    public ConnectResult WithTcpConnectedBeforeFailure(bool isTcpConnectedBeforeFailure)
+    {
+        var copy = (ConnectResult)MemberwiseClone();
+        copy.IsTcpConnectedBeforeFailure = isTcpConnectedBeforeFailure;
+        return copy;
+    }
+
+    /// <summary>
     /// Returns a copy of this result with <see cref="IsProxyAuthenticationProblem" /> set to
     /// <paramref name="isProxyAuthenticationProblem" />, every other property as it is.
     /// </summary>
