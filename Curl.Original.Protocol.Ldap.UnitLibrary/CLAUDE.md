@@ -15,7 +15,11 @@ so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
 
 Proxy (BL-6087): curl's own connection is tunnelled through `ITransferContext.Proxy`
-when it is set, and WinLDAP's own second connection goes straight to the host. A connect
+when it is set, and WinLDAP's own second connection goes straight to the host. With a proxy
+every WinLDAP transfer, `ldaps` with `-u` included, binds and searches on that second
+connection; when it cannot be opened the transfer writes the lines before the bind and exits
+38 (`Server Down` over `ldaps`, else `Unavailable` for an unresolved host and `Timeout`
+otherwise; BL-6091, ADR-1470). A connect
 of curl's own that fails writes `closing connection #N`; under `-f` (not
 `--fail-with-body`) a proxy that refuses the CONNECT with 400 or above makes it exit 22
 (`The requested URL returned error: N`, or `HTTP response code said error` after a `407`

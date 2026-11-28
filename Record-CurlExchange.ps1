@@ -393,6 +393,12 @@
       send <b>    send the bytes <b>, with the same backslash escapes as Response
       pause <N>   wait N milliseconds before the next step, so a reply can be split
                   across segments with a gap between them (BL-1434)
+      tls         handshake TLS 1.2 on the connection with the -Tls throwaway
+                  certificate and run the later steps inside it, as a proxy does after
+                  accepting a CONNECT for ldaps:// (BL-6091); a failed handshake ends
+                  the session. The read before it must be a counted one (read <N>):
+                  a bare read leaves a read waiting on the plain connection, which would
+                  take the first TLS bytes, so the step refuses to run after one
       close       close the connection and end the session
       reset       reset the connection (RST, not FIN) and end the session, so curl's
                   next receive or send fails with an I/O error (BL-845)
@@ -2027,6 +2033,20 @@ $serveScriptedSession = {
             } elseif ($step.Kind -eq 'pause') {
                 Start-Sleep -Milliseconds $step.Milliseconds
                 [void] $Transcript.Append("= paused $($step.Milliseconds) ms`r`n")
+            } elseif ($step.Kind -eq 'tls') {
+                if ($null -ne $reader.Pending -or $unconsumed.Count -gt 0) {
+                    [void] $Transcript.Append("= tls refused: use read <N> before it, so no plain read is pending; session ended`r`n")
+                    $ended = $true
+                    break
+                }
+                try {
+                    $stream = Wrap-Tls -Stream $stream
+                    [void] $Transcript.Append("= TLS handshake completed`r`n")
+                } catch {
+                    [void] $Transcript.Append("= TLS handshake failed: $($_.Exception.GetBaseException().Message)`r`n")
+                    $ended = $true
+                    break
+                }
             } elseif ($step.Kind -eq 'reset') {
                 # Close(0) on the socket sends RST alone; TcpClient.Close shuts down first, sending FIN.
                 $client.Client.Close(0)
@@ -2067,6 +2087,8 @@ function ConvertFrom-ExchangeScript {
             $steps.Add(@{ Kind = 'send'; Bytes = [byte[]] (ConvertFrom-EscapedResponse -Text $argument); Text = $text })
         } elseif ($verb -ceq 'pause' -and $argument -match '^\d+$') {
             $steps.Add(@{ Kind = 'pause'; Milliseconds = [int] $argument; Text = $text })
+        } elseif ($verb -ceq 'tls' -and $argument -eq '') {
+            $steps.Add(@{ Kind = 'tls'; Text = $text })
         } elseif ($verb -ceq 'close' -and $argument -eq '') {
             $steps.Add(@{ Kind = 'close'; Text = $text })
         } elseif ($verb -ceq 'reset' -and $argument -eq '') {
@@ -2247,7 +2269,7 @@ $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
-$tlsCertificate = if ($Tls -or $Http3StalledOrigin -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $DohPort.Count -gt 0) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
+$tlsCertificate = if ($Tls -or $Script -or $Http3StalledOrigin -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $DohPort.Count -gt 0) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
 if ($null -ne $tlsCertificate) {
     $publicKeyInfo = Get-SubjectPublicKeyInfo -Certificate $tlsCertificate
     $publicKeySha256 = [System.Convert]::ToBase64String([System.Security.Cryptography.SHA256]::Create().ComputeHash($publicKeyInfo))

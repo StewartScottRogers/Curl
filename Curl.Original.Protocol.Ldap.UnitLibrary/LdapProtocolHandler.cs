@@ -25,6 +25,13 @@ namespace Curl.Original.Protocol.Ldap;
 /// <c>-f</c> a proxy that refused the CONNECT with 400 or above makes it exit 22.
 /// </para>
 /// <para>
+/// With a proxy the WinLDAP dialect always binds and searches on a second connection of its own,
+/// straight to the host, <c>ldaps</c> with <c>-u</c> included; when that connection cannot be
+/// opened it writes the lines it would have written before the bind and ends with exit 38, the
+/// bind's <c>Server Down</c> over <c>ldaps</c>, otherwise <c>Unavailable</c> for a host that
+/// does not resolve and <c>Timeout</c> for any other failure (BL-6091, ADR-1470).
+/// </para>
+/// <para>
 /// The URL is read as the build reads it (<see cref="WinLdapUrlReader" />,
 /// <see cref="OpenLdapUrlReader" />): the OpenLDAP build refuses a bad URL with exit 3 before it
 /// connects, the Windows build after connecting and before it sends a byte. Once bound, the
@@ -183,12 +190,13 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         return result;
     }
 
-    // Over ldaps with -u WinLDAP checks the certificate against the Windows store itself, so -k
-    // does not help (BL-5285); curl's own handshake is that connection, so a handshake it refuses
-    // is curl's own failure (exit 60, SEC_E_UNTRUSTED_ROOT), not the bind's Server Down (BL-5461).
+    // Over ldaps with -u and no proxy WinLDAP checks the certificate against the Windows store
+    // itself, so -k does not help (BL-5285); curl's own handshake is that connection, so a
+    // handshake it refuses is curl's own failure (exit 60, SEC_E_UNTRUSTED_ROOT), not the bind's
+    // Server Down (BL-5461). Through a proxy curl's own handshake obeys -k (measured, BL-6091).
     private async ValueTask<(ConnectResult Connect, TransferResult? Failure)> ConnectAsync(ConnectTarget target, ITransferContext context)
     {
-        bool winLdapChecksCertificate = dialect == LdapDialect.WinLdap && target.UseTls && context.Credentials is not null;
+        bool winLdapChecksCertificate = dialect == LdapDialect.WinLdap && target.UseTls && !SearchesBesideCurlsConnection(target, context);
         ConnectResult connect = await connector.ConnectAsync(winLdapChecksCertificate ? target with { TrustsSystemStoreOnly = true } : target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not null)
         {
@@ -226,24 +234,32 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     private static bool FailsOnProxyStatus(ITransferContext context) => context.Http?.Fail == HttpFailMode.Fail;
 
     /// <summary>
-    /// Binds and searches on <paramref name="connection" />, curl's own connection, or, for the WinLDAP
-    /// dialect over plaintext <c>ldap://</c> (with or without <c>-u</c>) or without credentials, on a
-    /// second connection WinLDAP opens beside it.
+    /// Binds and searches on <paramref name="connection" />, curl's own connection, or, when
+    /// <see cref="SearchesBesideCurlsConnection" /> says so, on a second connection WinLDAP opens
+    /// beside it.
     /// </summary>
     private ValueTask<TransferResult> SearchAsync(IConnection connection, ConnectTarget target, ITransferContext context) =>
-        dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls)
+        SearchesBesideCurlsConnection(target, context)
             ? SearchBesideEmptyConnectionAsync(connection, target, context)
             : SearchOnAsync(connection, context);
+
+    /// <summary>
+    /// Whether the bind and search go on a second connection of WinLDAP's own: for the WinLDAP
+    /// dialect over plaintext <c>ldap://</c>, without credentials, or through a proxy.
+    /// </summary>
+    private bool SearchesBesideCurlsConnection(ConnectTarget target, ITransferContext context) =>
+        dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls || target.Proxy is not null);
 
     /// <summary>The failure a connect that opened no connection ends the transfer with.</summary>
     private static TransferResult ConnectFailure(ConnectResult connect) =>
         new(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
 
     /// <summary>
-    /// The WinLDAP dialect's bind over plaintext <c>ldap://</c> (with or without <c>-u</c>) or as the logged-on user: curl's own connection,
+    /// The WinLDAP dialect's bind over plaintext <c>ldap://</c> (with or without <c>-u</c>), as the
+    /// logged-on user or through a proxy: curl's own connection,
     /// <paramref name="curlConnection" />, stays open and carries no bytes while WinLDAP opens a
     /// second connection to <paramref name="target" /> for the binds and the search, as curl
-    /// 8.22.0's Schannel build does for every plaintext <c>ldap://</c> transfer and without <c>-u</c> (CGR-234, BL-3999, ADR-0978).
+    /// 8.22.0's Schannel build does (CGR-234, BL-3999, ADR-0978, ADR-1470).
     /// </summary>
     private async ValueTask<TransferResult> SearchBesideEmptyConnectionAsync(IConnection curlConnection, ConnectTarget target, ITransferContext context)
     {
@@ -252,7 +268,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             ConnectResult winLdap = await connector.ConnectAsync(WinLdapTargetOf(target), context.CancellationToken).ConfigureAwait(false);
             return winLdap.Connection is { } connection
                 ? await SearchOnAsync(connection, context).ConfigureAwait(false)
-                : WinLdapConnectFailure(winLdap, target);
+                : WinLdapConnectFailure(winLdap, target, context);
         }
     }
 
@@ -260,10 +276,30 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// The failure WinLDAP's own connection ends the transfer with when it opens no connection: over
     /// <c>ldaps</c> WinLDAP reports its failed handshake, such as a server the Windows store does not
     /// trust whatever <c>--cacert</c> says, as the bind's <c>Server Down</c> (exit 38), as curl 8.22.0
-    /// does (CGR-289, BL-4056, ADR-0994); a plaintext connect failure is reported as curl's own.
+    /// does (CGR-289, BL-4056, ADR-0994); without a proxy a plaintext connect failure is reported
+    /// as curl's own. Through a proxy the lines before the bind are written first, a URL or
+    /// <c>--ssl-reqd</c> refusal among them ending the transfer, and a plaintext failure is the
+    /// bind's too (measured, BL-6091).
     /// </summary>
-    private static TransferResult WinLdapConnectFailure(ConnectResult connect, ConnectTarget target) =>
-        target.UseTls ? LdapBind.WinLdapBindFailed(WinLdapResultText.ServerDown) : ConnectFailure(connect);
+    private TransferResult WinLdapConnectFailure(ConnectResult connect, ConnectTarget target, ITransferContext context)
+    {
+        if (target.Proxy is null)
+        {
+            return target.UseTls ? LdapBind.WinLdapBindFailed(WinLdapResultText.ServerDown) : ConnectFailure(connect);
+        }
+
+        return ReadSearch(context).Failure ?? LdapBind.WinLdapBindFailed(ProxiedConnectResultCode(connect, target));
+    }
+
+    /// <summary>
+    /// WinLDAP's result code when its own connection, beside a proxied one, cannot be opened:
+    /// <c>Server Down</c> over <c>ldaps</c>, otherwise <c>Unavailable</c> when the host does not
+    /// resolve and <c>Timeout</c> for any other failure.
+    /// </summary>
+    private static int ProxiedConnectResultCode(ConnectResult connect, ConnectTarget target) =>
+        target.UseTls ? WinLdapResultText.ServerDown
+        : connect.ExitCode == CurlExitCode.CouldntResolveHost ? WinLdapResultText.Unavailable
+        : WinLdapResultText.Timeout;
 
     /// <summary>
     /// The target of WinLDAP's own connection: for <c>ldaps</c> the handshake sends the machine name
@@ -275,35 +311,43 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         (target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target)
             with
         { Events = NoTransferEvents.Instance, Proxy = null, FailsOnHttpErrorStatus = false };
+
     /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
-    /// <remarks>The WinLDAP dialect first names the library and the URL, and once the URL is read, the kind of connection.</remarks>
     private async ValueTask<TransferResult> SearchOnAsync(IConnection connection, ITransferContext context)
     {
         await using (connection.ConfigureAwait(false))
         {
-            if (dialect == LdapDialect.WinLdap)
-            {
-                context.Events.ReportInfo(LdapVerboseLines.WinLdapVendor);
-                context.Events.ReportInfo(LdapVerboseLines.Url(context.Url));
-            }
-
-            LdapUrlReading reading = dialect == LdapDialect.OpenLdap ? OpenLdapUrlReader.Read(context.Url) : WinLdapUrlReader.Read(context.Url);
-            if (reading.Search is not { } search)
-            {
-                return reading.Failure!;
-            }
-
-            if (dialect == LdapDialect.WinLdap)
-            {
-                context.Events.ReportInfo(LdapVerboseLines.Establishing(context.Url.Scheme == TlsScheme));
-                if (StartsTls(context))
-                {
-                    return TransferResult.Failure(CurlExitCode.NotBuiltIn, ExplicitTlsNotSupported);
-                }
-            }
-
-            return await BindAndSearchAsync(connection, context, search).ConfigureAwait(false);
+            (LdapSearchParameters? search, TransferResult? refused) = ReadSearch(context);
+            return search is null ? refused! : await BindAndSearchAsync(connection, context, search).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// The search the URL asks for, or the failure that ends the transfer before the bind; exactly
+    /// one of the two is not <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// The WinLDAP dialect first names the library and the URL, and once the URL is read, the kind
+    /// of connection, then refuses <c>--ssl-reqd</c> on <c>ldap</c>.
+    /// </remarks>
+    private (LdapSearchParameters? Search, TransferResult? Failure) ReadSearch(ITransferContext context)
+    {
+        if (dialect == LdapDialect.WinLdap)
+        {
+            context.Events.ReportInfo(LdapVerboseLines.WinLdapVendor);
+            context.Events.ReportInfo(LdapVerboseLines.Url(context.Url));
+        }
+
+        LdapUrlReading reading = dialect == LdapDialect.OpenLdap ? OpenLdapUrlReader.Read(context.Url) : WinLdapUrlReader.Read(context.Url);
+        if (reading.Search is null || dialect != LdapDialect.WinLdap)
+        {
+            return (reading.Search, reading.Failure);
+        }
+
+        context.Events.ReportInfo(LdapVerboseLines.Establishing(context.Url.Scheme == TlsScheme));
+        return StartsTls(context)
+            ? (null, TransferResult.Failure(CurlExitCode.NotBuiltIn, ExplicitTlsNotSupported))
+            : (reading.Search, null);
     }
 
     /// <summary>

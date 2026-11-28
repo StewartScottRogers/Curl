@@ -1,3 +1,4 @@
+using System.Net;
 using Curl.Original.Protocol.Ldap.Fakes;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -67,27 +68,102 @@ public sealed class LdapProtocolHandlerProxyConnectFailTests
         Assert.IsFalse(connector.Targets[1].FailsOnHttpErrorStatus);
     }
 
-    private static TransferContext ContextOf(HttpRequestOptions? http, ITransferEvents events) =>
+    // Recorded with Record-CurlExchange.ps1 -CurlArgs -sS,-v,-x,http://127.0.0.1:P,<url> and a
+    // 200 reply to the CONNECT, adding -Script with a tls step for ldaps (-k, with and without -u).
+    [TestMethod]
+    [DataRow("ldap://example.test/", false, CurlExitCode.CouldntResolveHost, "cleartext", "Unavailable")]
+    [DataRow("ldap://example.test/", true, CurlExitCode.CouldntResolveHost, "cleartext", "Unavailable")]
+    [DataRow("ldap://127.0.0.1:1/", false, CurlExitCode.CouldntConnect, "cleartext", "Timeout")]
+    [DataRow("ldaps://example.test/", false, CurlExitCode.CouldntResolveHost, "encrypted", "Server Down")]
+    [DataRow("ldaps://example.test/", true, CurlExitCode.CouldntResolveHost, "encrypted", "Server Down")]
+    public async Task ExecuteAsync_WinLdapOwnConnectionFailsBesideAProxiedOne_EndsExit38WithTheLinesBeforeTheBind(
+        string url, bool withCredentials, CurlExitCode connectFailure, string kind, string resultText)
+    {
+        var events = new RecordingTransferEvents();
+        var connector = new FirstConnectOnlyConnector(connectFailure);
+        NetworkCredential? credentials = withCredentials ? new NetworkCredential("u", "p") : null;
+
+        TransferResult result = await new LdapProtocolHandler(connector, LdapDialect.WinLdap)
+            .ExecuteAsync(ContextOf(null, events, url, credentials));
+
+        string message = "LDAP local: bind via ldap_win_bind " + resultText;
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, message), result);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "LDAP local: LDAP Vendor = Microsoft Corporation. ; LDAP Version = 510",
+                "LDAP local: " + url,
+                $"LDAP local: trying to establish {kind} connection",
+                message,
+                "shutting down connection #0",
+            },
+            events.Lines);
+        Assert.HasCount(2, connector.Targets);
+        Assert.IsFalse(connector.Targets[0].TrustsSystemStoreOnly);
+        Assert.IsNull(connector.Targets[1].Proxy);
+        Assert.IsEmpty(connector.First.Sent);
+        Assert.IsTrue(connector.First.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow("ldap://example.test/x????", TransportSecurityLevel.None, CurlExitCode.UrlMalformat, "Bad LDAP URL: Invalid Syntax")]
+    [DataRow("ldap://example.test/", TransportSecurityLevel.Required, CurlExitCode.NotBuiltIn, "LDAP local: explicit TLS not supported")]
+    public async Task ExecuteAsync_WinLdapOwnConnectionFailsBesideAProxiedOne_KeepsARefusalMadeBeforeTheBind(
+        string url, TransportSecurityLevel sslLevel, CurlExitCode expectedExitCode, string expectedMessage)
+    {
+        var connector = new FirstConnectOnlyConnector(CurlExitCode.CouldntResolveHost);
+
+        TransferResult result = await new LdapProtocolHandler(connector, LdapDialect.WinLdap)
+            .ExecuteAsync(ContextOf(null, new RecordingTransferEvents(), url, null, sslLevel));
+
+        Assert.AreEqual(TransferResult.Failure(expectedExitCode, expectedMessage), result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WinLdapOwnConnectionFailsWithoutAProxy_KeepsTheConnectorsFailure()
+    {
+        var events = new RecordingTransferEvents();
+        var connector = new FirstConnectOnlyConnector(CurlExitCode.CouldntResolveHost);
+        var context = new TransferContext { Url = CurlUrl.Parse("ldap://example.test/"), Output = new MemoryStream(), Events = events };
+
+        TransferResult result = await new LdapProtocolHandler(connector, LdapDialect.WinLdap).ExecuteAsync(context);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntResolveHost, FirstConnectOnlyConnector.Failure), result);
+        CollectionAssert.AreEqual(new[] { FirstConnectOnlyConnector.Failure, "shutting down connection #0" }, events.Lines);
+    }
+
+    private static TransferContext ContextOf(
+        HttpRequestOptions? http,
+        ITransferEvents events,
+        string url = "ldap://example.test/",
+        NetworkCredential? credentials = null,
+        TransportSecurityLevel sslLevel = TransportSecurityLevel.None) =>
         new()
         {
-            Url = CurlUrl.Parse("ldap://example.test/"),
+            Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
             Events = events,
             Http = http,
             Proxy = Proxy,
+            Credentials = credentials,
+            SslLevel = sslLevel,
         };
 
     /// <summary>An <see cref="IConnector" /> that opens its first connection, fails every later one and records every target.</summary>
-    private sealed class FirstConnectOnlyConnector : IConnector
+    private sealed class FirstConnectOnlyConnector(CurlExitCode laterExitCode = CurlExitCode.CouldntResolveHost) : IConnector
     {
+        public const string Failure = "the second connect failed";
+
+        public ScriptedConnection First { get; } = new();
+
         public List<ConnectTarget> Targets { get; } = [];
 
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
         {
             Targets.Add(target);
             return ValueTask.FromResult(Targets.Count == 1
-                ? ConnectResult.Connected(new ScriptedConnection())
-                : ConnectResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: example.test"));
+                ? ConnectResult.Connected(First)
+                : ConnectResult.Failed(laterExitCode, Failure));
         }
     }
 }
