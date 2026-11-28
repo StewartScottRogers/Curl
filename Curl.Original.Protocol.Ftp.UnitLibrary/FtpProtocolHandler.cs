@@ -306,10 +306,9 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         ConnectResult connected = await ConnectControlAsync(target, FtpKeptConnection.LoginKeyOf(context), context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
-            var failed = new TransferResult(connected.ExitCode, 0, connected.ErrorMessage)
-            {
-                IsConnectionRefused = connected.IsConnectionRefused,
-            };
+            // curl 8.22.0 closes every control connection it could not open (measured, BL-6083).
+            context.Events.ReportInfo(FtpTransferMessages.ClosingConnection(connected.ConnectionNumber));
+            TransferResult failed = FailedConnectResult(context, connected, connected.ErrorMessage!);
             new FtpDiagnosticLog(context.DiagnosticLog).Failed(failed);
             return new FtpConnectOnlyOutcome(failed, null);
         }
@@ -333,7 +332,35 @@ public sealed class FtpProtocolHandler : IProtocolHandler
             DiagnosticLog = context.DiagnosticLog,
             TcpIoTrace = FtpTcpIoTraces.ForControl(implicitTls, FtpTlsRequirements.Of(context)),
             PoolScheme = url.Scheme,
+            FailsOnHttpErrorStatus = FailsOnProxyStatus(context),
         };
+    }
+
+    /// <summary>
+    /// Whether <c>-f</c> fails the transfer when a proxy refuses a connection's CONNECT, as
+    /// <see cref="ConnectTarget.FailsOnHttpErrorStatus" /> tells the connector;
+    /// <c>--fail-with-body</c> does not.
+    /// </summary>
+    internal static bool FailsOnProxyStatus(ITransferContext context) => context.Http?.Fail == HttpFailMode.Fail;
+
+    /// <summary>
+    /// The result of a control or data connect that failed: under <c>-f</c>, exit 22 when a proxy
+    /// refused the CONNECT with 400 or above, naming the status, or curl's generic text when the
+    /// <c>407</c> drew its authentication problem; otherwise the connector's exit code with
+    /// <paramref name="connectorMessage" />, as curl 8.22.0 does (measured, BL-6083).
+    /// </summary>
+    internal static TransferResult FailedConnectResult(ITransferContext context, ConnectResult connected, string connectorMessage)
+    {
+        int status = connected.ProxyConnectResponseCode;
+        if (FailsOnProxyStatus(context) && status >= 400)
+        {
+            string message = connected.IsProxyAuthenticationProblem
+                ? FtpTransferMessages.HttpResponseCodeSaidError
+                : FtpTransferMessages.RequestedUrlReturnedError(status);
+            return TransferResult.Failure(CurlExitCode.HttpReturnedError, message);
+        }
+
+        return new TransferResult(connected.ExitCode, 0, connectorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
     }
 
     /// <summary>

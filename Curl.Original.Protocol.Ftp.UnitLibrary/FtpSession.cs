@@ -2236,12 +2236,13 @@ internal sealed class FtpSession(
             Events = new FtpDataConnectEvents(context.Events, failure, controlName.Host, trace),
             DiagnosticLog = context.DiagnosticLog,
             TcpIoTrace = protectData ? null : FtpTcpIoTraces.Data,
+            FailsOnHttpErrorStatus = FtpProtocolHandler.FailsOnProxyStatus(context),
         };
         ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         dataConnection = connected.Connection;
         if (dataConnection is null)
         {
-            return new TransferResult(connected.ExitCode, 0, failure.Rewrite(connected.ErrorMessage!)) { IsConnectionRefused = connected.IsConnectionRefused };
+            return FtpProtocolHandler.FailedConnectResult(context, connected, failure.Rewrite(connected.ErrorMessage!));
         }
 
         log.PassiveDataConnected(host, port);
