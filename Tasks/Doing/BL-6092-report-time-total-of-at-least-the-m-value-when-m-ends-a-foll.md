@@ -31,3 +31,4 @@ Follow-up of BL-6082 (ADR-1470, Consequences). `RedirectFollower` measures the m
 ## Log
 
 - 2026-11-28: Created.
+- 2026-11-28: Backlog -> Doing. Criteria at claim: b1be4df0 8a7549dc 3d836d5e.
