@@ -27,7 +27,7 @@ Measured during BL-6087 (`Record-CurlExchange.ps1 -sS -v -x http://127.0.0.1:P <
 
 ## Notes
 
-- Measured curl 8.22.0 `ldaps://example.test/ -k` through a proxy that handshakes TLS in the tunnel, with and without `-u`: curl's handshake completes, then `bind via ldap_win_bind Server Down`, exit 38, no byte in the tunnel. So a proxied WinLDAP transfer now always searches on its own direct connection, `ldaps -u` included, and curl's own handshake obeys `-k` (ADR-1470).
+- Measured curl 8.22.0 `ldaps://example.test/ -k` through a proxy that handshakes TLS in the tunnel, with and without `-u`: curl's handshake completes, then `bind via ldap_win_bind Server Down`, exit 38, no byte in the tunnel. So a proxied WinLDAP transfer now always searches on its own direct connection, `ldaps -u` included, and curl's own handshake obeys `-k` (ADR-1471).
 - Curl ends a refused direct connect with `Timeout` at once; curl takes about 480 s. No output depends on the wait.
 - A connect failure other than an unresolved host (any plaintext one) ends `Timeout`.
 - Touches widened: the library's CLAUDE.md, and Record-CurlExchange.ps1, which gained a `-Script` step `tls` to take the ldaps measurement. No task in Doing named either.
@@ -37,4 +37,4 @@ Measured during BL-6087 (`Record-CurlExchange.ps1 -sS -v -x http://127.0.0.1:P <
 
 - 2026-11-27: Created.
 - 2026-11-27: Backlog -> Doing. Criteria at claim: a116a983 81487ec7.
-- 2026-11-28: Doing -> Done. A proxied WinLDAP transfer ends as curl 8.22.0 does when WinLDAP's own connection fails (ADR-1470).
+- 2026-11-28: Doing -> Done. A proxied WinLDAP transfer ends as curl 8.22.0 does when WinLDAP's own connection fails (ADR-1471).

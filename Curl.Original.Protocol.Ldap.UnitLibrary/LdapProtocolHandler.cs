@@ -29,7 +29,7 @@ namespace Curl.Original.Protocol.Ldap;
 /// straight to the host, <c>ldaps</c> with <c>-u</c> included; when that connection cannot be
 /// opened it writes the lines it would have written before the bind and ends with exit 38, the
 /// bind's <c>Server Down</c> over <c>ldaps</c>, otherwise <c>Unavailable</c> for a host that
-/// does not resolve and <c>Timeout</c> for any other failure (BL-6091, ADR-1470).
+/// does not resolve and <c>Timeout</c> for any other failure (BL-6091, ADR-1471).
 /// </para>
 /// <para>
 /// The URL is read as the build reads it (<see cref="WinLdapUrlReader" />,
@@ -259,7 +259,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// logged-on user or through a proxy: curl's own connection,
     /// <paramref name="curlConnection" />, stays open and carries no bytes while WinLDAP opens a
     /// second connection to <paramref name="target" /> for the binds and the search, as curl
-    /// 8.22.0's Schannel build does (CGR-234, BL-3999, ADR-0978, ADR-1470).
+    /// 8.22.0's Schannel build does (CGR-234, BL-3999, ADR-0978, ADR-1471).
     /// </summary>
     private async ValueTask<TransferResult> SearchBesideEmptyConnectionAsync(IConnection curlConnection, ConnectTarget target, ITransferContext context)
     {

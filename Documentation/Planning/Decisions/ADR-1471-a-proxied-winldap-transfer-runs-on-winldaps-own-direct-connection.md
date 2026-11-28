@@ -1,4 +1,4 @@
-# ADR-1470: A proxied WinLDAP transfer runs on WinLDAP's own direct connection
+# ADR-1471: A proxied WinLDAP transfer runs on WinLDAP's own direct connection
 
 - Status: Accepted
 - Date: 2026-11-28
