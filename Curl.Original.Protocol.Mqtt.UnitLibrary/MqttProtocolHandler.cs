@@ -138,7 +138,28 @@ public sealed class MqttProtocolHandler : IProtocolHandler
             Proxy = context.Proxy,
             Events = context.Events,
             DiagnosticLog = context.DiagnosticLog,
+            FailsOnHttpErrorStatus = FailsOnProxyStatus(context),
         };
+    }
+
+    // Whether -f fails the transfer when a proxy refuses the CONNECT; --fail-with-body does not.
+    private static bool FailsOnProxyStatus(ITransferContext context) => context.Http?.Fail == HttpFailMode.Fail;
+
+    // The result of a connect that failed: under -f, exit 22 when a proxy refused the CONNECT with
+    // 400 or above, naming the status, or curl's generic text when the 407 drew its authentication
+    // problem; otherwise the connector's own failure (measured against curl 8.22.0, BL-6086).
+    private static TransferResult FailedConnectResult(ITransferContext context, ConnectResult connected)
+    {
+        int status = connected.ProxyConnectResponseCode;
+        if (FailsOnProxyStatus(context) && status >= 400)
+        {
+            string message = connected.IsProxyAuthenticationProblem
+                ? MqttTransferMessages.HttpResponseCodeSaidError
+                : MqttTransferMessages.RequestedUrlReturnedError(status);
+            return TransferResult.Failure(CurlExitCode.HttpReturnedError, message);
+        }
+
+        return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
     }
 
     /// <summary>
@@ -168,7 +189,9 @@ public sealed class MqttProtocolHandler : IProtocolHandler
             .ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
-            return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
+            // curl 8.22.0 closes every connection it could not open (measured, BL-6086).
+            context.Events.ReportInfo(MqttTransferMessages.ClosingConnection(connected.ConnectionNumber));
+            return FailedConnectResult(context, connected);
         }
 
         context.Progress.ReportTransferStarted();

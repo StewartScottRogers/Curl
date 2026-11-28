@@ -17,6 +17,12 @@ and disposes that connection itself. A transfer proxy (`ITransferContext.Proxy`)
 proxy code. The client identifier's random eight characters
 come from a constructor parameter, so tests fix them.
 
+A failed connect writes `closing connection #N` and ends with the connector's own failure,
+except under `-f` (not `--fail-with-body`) when a proxy refused the CONNECT with 400 or
+above: exit 22, `The requested URL returned error: <status>`, or `HTTP response code said
+error` after a `407`'s authentication problem. `ConnectTarget.FailsOnHttpErrorStatus` tells
+the connector which `-v` line to write (measured against curl 8.22.0, BL-6086).
+
 Curl's own diagnostic log (`--log-level`, ADR-0222, BL-928): `MqttDiagnosticLog` writes
 component `mqtt` from `ITransferContext.DiagnosticLog` - the failure that ends a transfer
 as `error` with its `CurlExitCode`, a packet the session passes over (a body taken as the

@@ -140,6 +140,28 @@ public sealed class RtspProtocolHandler(
             ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
             : null;
 
+    // Whether -f fails the transfer when a proxy refuses the CONNECT; --fail-with-body does not.
+    private static bool FailsOnProxyStatus(ITransferContext context) => context.Http?.Fail == HttpFailMode.Fail;
+
+    // The result of a connect that failed: under -f, exit 22 when a proxy refused the CONNECT with
+    // 400 or above, naming the status, or curl's generic text when the 407 drew its authentication
+    // problem; otherwise the connector's own failure (measured against curl 8.22.0, BL-6086).
+    private static TransferResult FailedConnectResult(ITransferContext context, ConnectResult connect)
+    {
+        int status = connect.ProxyConnectResponseCode;
+        if (FailsOnProxyStatus(context) && status >= LowestErrorStatusCode)
+        {
+            string message = connect.IsProxyAuthenticationProblem ? "HTTP response code said error" : RequestedUrlReturnedError(status);
+            return TransferResult.Failure(CurlExitCode.HttpReturnedError, message);
+        }
+
+        return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+    }
+
+    // The exit 22 message for a status -f refuses, the proxy's or the server's.
+    private static string RequestedUrlReturnedError(int statusCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {statusCode}");
+
     // Connects and makes the transfer's one request; ExecuteAsync logs how it ended.
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(ITransferContext context)
     {
@@ -155,12 +177,16 @@ public sealed class RtspProtocolHandler(
             Events = context.Events,
             PoolScheme = Schemes[0],
             DiagnosticLog = context.DiagnosticLog,
+            FailsOnHttpErrorStatus = FailsOnProxyStatus(context),
         };
         long started = context.TimeProvider.GetTimestamp();
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            // curl 8.22.0 closes every connection it could not open (measured, BL-6086).
+            TransferResult failed = FailedConnectResult(context, connect);
+            context.Events.ReportInfo(RtspVerboseLines.Dropped(failed, connect.ConnectionNumber));
+            return failed;
         }
 
         long connectEnded = context.TimeProvider.GetTimestamp();
@@ -484,10 +510,7 @@ public sealed class RtspProtocolHandler(
         }
 
         TransferResult? refused = options.Fail != HttpFailMode.None && head.StatusCode >= LowestErrorStatusCode
-            ? Fail(
-                events,
-                CurlExitCode.HttpReturnedError,
-                string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {head.StatusCode}"))
+            ? Fail(events, CurlExitCode.HttpReturnedError, RequestedUrlReturnedError(head.StatusCode))
             : SizeFailure(head.ContentLength, maxFileSize, events);
         events.ReportResponseHeader(endLine);
         if (refused is not null)

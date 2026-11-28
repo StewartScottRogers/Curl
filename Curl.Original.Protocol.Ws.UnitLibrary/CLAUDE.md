@@ -14,6 +14,12 @@ else horizontal. Referencing another protocol library is a build break, and
 constructor and asks it for one connection per transfer; it never takes an
 `IConnection` there.
 
+A failed connect writes `closing connection #N` and ends with the connector's own failure,
+except under `-f` (not `--fail-with-body`) when a proxy refused the CONNECT with 400 or
+above: exit 22, `The requested URL returned error: <status>`, or `HTTP response code said
+error` after a `407`'s authentication problem. `ConnectTarget.FailsOnHttpErrorStatus` tells
+the connector which `-v` line to write (measured against curl 8.22.0, BL-6086).
+
 libcurl's WebSocket API (ADR-0607, BL-2471): `WsProtocolHandler.ConnectAndUpgradeOnlyAsync`
 runs the same upgrade as `ExecuteAsync` but stops after the `101`, returning a
 `WsUpgradeOutcome` with the open connection (the caller owns it) and the bytes after the head;
