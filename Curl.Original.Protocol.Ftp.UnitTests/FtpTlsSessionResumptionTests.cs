@@ -60,7 +60,16 @@ public sealed class FtpTlsSessionResumptionTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ExplicitTlsListingFromAServerRequiringSessionReuse_WritesTheListing()
+    [OSCondition(OperatingSystems.Windows)]
+    public Task ExecuteAsync_ExplicitTlsListingFromAServerRequiringSessionReuse_WritesTheListing() =>
+        AssertListingOverResumedSessionWritesAsync("hello.txt\r\n");
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public Task ExecuteAsync_ExplicitTlsListingFromAServerRequiringSessionReuseOffWindows_WritesTheListingWithLfEndings() =>
+        AssertListingOverResumedSessionWritesAsync("hello.txt\n");
+
+    private static async Task AssertListingOverResumedSessionWritesAsync(string expectedOutput)
     {
         var plaintextControl = ScriptedConnection.FromReplies("220 ready\r\n234 Proceed\r\n");
         var securedControl = ScriptedConnection.FromReplies(
@@ -72,7 +81,7 @@ public sealed class FtpTlsSessionResumptionTests
         TransferResult result = await Handler(plaintextControl, tls).ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
-        Assert.AreEqual("hello.txt\r\n", Encoding.Latin1.GetString(output.ToArray()));
+        Assert.AreEqual(expectedOutput, Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreSame(securedControl, tls.SessionSources[1]);
     }
 
