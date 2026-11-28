@@ -38,3 +38,4 @@ Other protocols that tunnel through a proxy were not measured: measure them and 
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: f42e3136 88a33e86 a8c89593.
