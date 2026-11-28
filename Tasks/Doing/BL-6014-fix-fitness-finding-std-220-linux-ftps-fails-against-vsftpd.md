@@ -52,3 +52,4 @@ The finding, verbatim:
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 3281bfb3 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 0; see Z:\repos\Curl.logs\BL-6014-20261126-083150-L7.jsonl (Lane 7 could not integrate its code: quality gates missed by 1 member(s) of files it changed: HandBuiltTlsProvider.AuthenticateWithAsync (async) (Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs: complexity). The code is on branch factory/BL-6014-lane-7-20261126-083150; start with git cherry-pick --no-commit factory/BL-6014-lane-7-20261126-083150 and fix it.)
 - 2026-11-27: Blocked -> Backlog. Requeued 2026-11-27: start from parked branch factory/BL-6014-lane-7-20261126-083150 and cover the HandBuiltTlsProvider.AuthenticateWithAsync gate miss; measure two libraries only.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 790078a1 09ba4965 3d836d5e.
