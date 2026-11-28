@@ -30,3 +30,4 @@ Measured during BL-6087 (`Record-CurlExchange.ps1 -sS -v -x http://127.0.0.1:P <
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: a116a983 81487ec7.
