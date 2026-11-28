@@ -8,7 +8,7 @@ depends-on: [BL-6019]
 touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Networking.UnitLibrary/TcpConnector.ConnectTimeout.cs, Curl.Networking.UnitLibrary/TcpConnector.TlsHandshake.cs, Curl.Networking.UnitLibrary/NumberedConnectFailure.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Engine.UnitTests/Ext097Tests.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerTests.cs, Curl.Networking.UnitTests/TcpConnectorStd231Tests.cs, Curl.Networking.UnitTests/TcpConnectorTests.FailureTimings.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultStd231Tests.cs, Documentation/Planning/Decisions/ADR-1475-an-extended-protocol-reports-the-peer-of-a-tls-handshake-m-ends.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-11-28
-completed:
+completed: 2026-11-28
 ---
 # BL-6093 — Report remote_ip for an extended protocol when -m ends the TLS handshake (EXT-097, part 1)
 
@@ -36,11 +36,11 @@ other lanes were building: run it in the background, narrowed with `-Library`.
 
 ## Acceptance criteria
 
-- [ ] The amqps repro prints `t` at least 2, `ip=127.0.0.1:28950` and `nc=1`.
-- [ ] The same command against `https://127.0.0.1:28950/` still prints an empty `ip` with port -1.
-- [ ] Focused unit tests in `Curl.Engine.UnitTests`, `Curl.Networking.UnitTests` and `Curl.Protocol.Abstractions.UnitTests` pin the corrected behaviour (ADR-0482).
-- [ ] `Measure-CodeQuality.ps1` reports no member of `Curl.Engine.UnitLibrary`, `Curl.Networking.UnitLibrary` or `Curl.Protocol.Abstractions.UnitLibrary` outside a gate among those this task changes or adds.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The amqps repro prints `t` at least 2, `ip=127.0.0.1:28950` and `nc=1`.
+- [x] The same command against `https://127.0.0.1:28950/` still prints an empty `ip` with port -1.
+- [x] Focused unit tests in `Curl.Engine.UnitTests`, `Curl.Networking.UnitTests` and `Curl.Protocol.Abstractions.UnitTests` pin the corrected behaviour (ADR-0482).
+- [x] `Measure-CodeQuality.ps1` reports no member of `Curl.Engine.UnitLibrary`, `Curl.Networking.UnitLibrary` or `Curl.Protocol.Abstractions.UnitLibrary` outside a gate among those this task changes or adds.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -51,7 +51,16 @@ State at the split (2026-11-28): the Abstractions, Networking and Engine fast te
 (1648, 5029 and 3276 tests); amqps, mqtt5s and grpcs gave
 `[28 t=2.02 ip=127.0.0.1:28950 nc=1]`, as did `--connect-timeout 1`.
 
+Finished 2026-11-28. Build clean, the whole fast suite passed once. Repro: amqps
+`t=2.07 ip=127.0.0.1:28950 nc=1`, mqtt5s the same, `--connect-timeout 1` amqps
+`t=1.06` with the same end point, https `ip=:-1 nc=1`. Quality: coverage collected from the
+Engine, Networking and Protocol.Abstractions unit test projects only, then scored with
+`Measure-CodeQuality.ps1 -SkipTestRun -Library`; no member this task changes or adds is
+listed. The members it does list are untouched by this task (the narrowed coverage leaves
+out the other test projects that reach these libraries).
+
 ## Log
 
 - 2026-11-28: Created.
 - 2026-11-28: Backlog -> Doing. Criteria at claim: b7e30a4b 1e075fb4 bd94fc68 27921f7d 3d836d5e.
+- 2026-11-28: Doing -> Done. Extended protocols report the peer of a TLS handshake -m ends; build and fast tests green
