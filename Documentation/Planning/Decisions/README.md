@@ -1509,3 +1509,4 @@ Each option and the specific reason it lost.
 | [1465](ADR-1465-under-f-a-connect-407-curl-gives-up-on-prints-the-generic-exit-22-text.md) | Under -f a CONNECT 407 curl gives up on prints the generic exit 22 text (BL-6024) | Accepted | 2026-11-27 |
 | [1466](ADR-1466-sasl-digest-md5-challenges-are-read-as-directives-as-each-platforms-curl-reads-them.md) | SASL DIGEST-MD5 challenges are read as key=value directives, quoted values included, as each platforms curl reads them; amends ADR-0139 (BL-5881) | Accepted | 2026-11-24 |
 | [1467](ADR-1467-the-connect-target-tells-the-connector-that-f-fails-on-a-refused-connects-status.md) | The connect target tells the connector that -f fails on a refused CONNECT's status (BL-6049) | Accepted | 2026-11-27 |
+| [1466](ADR-1466-ftp-data-connections-resume-the-control-connections-tls-session.md) | FTP data connections resume the control connection's TLS session (BL-6014) | Accepted | 2026-11-26 |

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
@@ -53,6 +54,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     string? IHandshakeReportingTlsProvider.RouteReason => TlsClientRouting.Reason(_options);
 
     private readonly TlsClientOptions _options;
+
+    // The stream of the last completed handshake with each host and port, whose session an FTP
+    // data connection resumes.
+    private readonly ConcurrentDictionary<string, Stream> _sessionSources = new(StringComparer.Ordinal);
 
     private readonly bool _matchesSchannelBuild;
 
@@ -289,6 +294,33 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CancellationToken cancellationToken) =>
         AuthenticateWithAsync(_verification.ForHandshake(diagnosticLog, cancellationToken, isProxy), plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
 
+    /// <summary>
+    /// Performs the handshake as the overload with events does, offering the session of this
+    /// provider's last completed handshake with <paramref name="targetHost" /> on
+    /// <paramref name="sessionSource" />'s port: its newest TLS 1.3 ticket, or its TLS 1.2
+    /// session, in which case only the versions below TLS 1.3 are offered. Sessions this
+    /// handshake receives are kept in the run's cache under that port, as curl keys an FTP data
+    /// connection's session by the control connection's. With no such handshake, or none that
+    /// left a session, it offers the cache's session for that port; under
+    /// <c>--no-sessionid</c> it offers none.
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="sessionSource">The connection whose session to resume; only its address is read.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The same result the overload with events returns.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientResumingSessionOfAsync(
+        IConnection plaintext,
+        IConnection sessionSource,
+        string targetHost,
+        ITransferEvents events,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(sessionSource);
+        return AuthenticateWithAsync(_verification, plaintext, targetHost, events, isProxy: false, [], cancellationToken, sessionSource);
+    }
+
     private async ValueTask<ConnectResult> AuthenticateWithAsync(
         ServerCertificateVerification verification,
         IConnection plaintext,
@@ -296,7 +328,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ITransferEvents events,
         bool isProxy,
         IReadOnlyList<string> applicationProtocols,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IConnection? sessionSource = null)
     {
         ArgumentNullException.ThrowIfNull(events);
         ArgumentNullException.ThrowIfNull(plaintext);
@@ -311,12 +344,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return await FailBeforeHandshakeAsync(plaintext, preparationFailure!, alertRecord, cancellationToken).ConfigureAwait(false);
         }
 
-        var peerKey = SessionPeerKey(targetHost, plaintext.RemoteEndPoint);
-        var session = OfferedSession(peerKey);
-        ReportReusedSession(events, session);
+        var (peerKey, session, tls12Session) = SessionsToOffer(plaintext, targetHost, sessionSource);
+        ReportReusedSession(events, session, tls12Session);
         var messageTrace = _matchesSchannelBuild ? null : new HandBuiltHandshakeMessageTrace(events, OfferedWireVersion);
         TlsHandshakeMessageObserver? observer = messageTrace is null ? null : (direction, contentType, _, message) => messageTrace.Observe(direction, contentType, message);
-        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session, HandshakeMessageObserver = observer } };
+        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session, Tls12ResumptionSession = tls12Session, HandshakeMessageObserver = observer } };
         var handshakeStarted = _timeProvider.GetTimestamp();
         var handshakeRun = new HandshakeRun(plaintext, targetHost, events, isProxy, prepared, offeredApplicationProtocols, peerKey) { MessageTrace = messageTrace };
         if (EarlyDataApplicationProtocol(session, offeredApplicationProtocols) is { } earlyDataProtocol)
@@ -351,6 +383,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         }
 
         KeepReceivedSessions(run.PeerKey, handshake.Stream!);
+        RememberSessionSource(run.TargetHost, run.Plaintext.RemoteEndPoint, handshake.Stream!);
         run.Events.ReportTlsHandshake(DescribeHandshake(handshake, run.Prepared.Verifier, run.OfferedApplicationProtocols) with
         {
             IsProxy = run.IsProxy,
@@ -386,13 +419,49 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     // The OpenSSL build's line for a session it offers (openssl.c, after SSL_set_session; BL-1142),
     // with the session's ALPN protocol or '-', as measured; the Schannel build prints none.
-    private void ReportReusedSession(ITransferEvents events, TlsSessionRecord? session)
+    private void ReportReusedSession(ITransferEvents events, TlsSessionRecord? session, Tls12Session? tls12Session)
     {
-        if (session is not null && !_matchesSchannelBuild)
+        if (!_matchesSchannelBuild && (session is not null || tls12Session is not null))
         {
-            events.ReportInfo($"SSL reusing session with ALPN '{session.ApplicationProtocol ?? "-"}'");
+            events.ReportInfo($"SSL reusing session with ALPN '{session?.ApplicationProtocol ?? "-"}'");
         }
     }
+
+    // Remembers a completed handshake so a later one, an FTP data connection's, can resume it;
+    // nothing is remembered under --no-sessionid.
+    private void RememberSessionSource(string targetHost, EndPoint? remoteEndPoint, Stream stream)
+    {
+        if (!_options.NoSessionId)
+        {
+            _sessionSources[SessionSourceKey(targetHost, remoteEndPoint)] = stream;
+        }
+    }
+
+    // The session cache key and the session to offer: the session source's TLS 1.2 session, else
+    // its newest TLS 1.3 ticket, else the cache's session for the source's (or this) peer.
+    private (string? PeerKey, TlsSessionRecord? Session, Tls12Session? Tls12Session) SessionsToOffer(
+        IConnection plaintext,
+        string targetHost,
+        IConnection? sessionSource)
+    {
+        var peerKey = SessionPeerKey(targetHost, (sessionSource ?? plaintext).RemoteEndPoint);
+        var source = SessionSourceStream(targetHost, sessionSource);
+        var tls12Session = Tls12SessionOf(source);
+        var session = tls12Session is null ? NewestSessionOf(source) ?? OfferedSession(peerKey) : null;
+        return (peerKey, session, tls12Session);
+    }
+
+    private Stream? SessionSourceStream(string targetHost, IConnection? sessionSource) =>
+        sessionSource is null ? null : _sessionSources.GetValueOrDefault(SessionSourceKey(targetHost, sessionSource.RemoteEndPoint));
+
+    private static string SessionSourceKey(string targetHost, EndPoint? remoteEndPoint) =>
+        string.Create(CultureInfo.InvariantCulture, $"{targetHost}:{PortOf(remoteEndPoint)}");
+
+    private static TlsSessionRecord? NewestSessionOf(Stream? stream) =>
+        stream is Tls13ClientStream tls13 ? tls13.Handshake.ReceivedSessions.LastOrDefault() : null;
+
+    private static Tls12Session? Tls12SessionOf(Stream? stream) =>
+        stream is Tls12ClientStream tls12 ? tls12.Handshake.Session : null;
 
     // --tls-earlydata (BL-1105): the ALPN protocol of a resumed TLS 1.3 session that allows
     // early data, when the connection offers it, as curl's Curl_on_session_reuse decides; else null.
@@ -789,6 +858,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // raises the minimum to TLS 1.3, as curl's OpenSSL build does (ADR-0359, BL-1950).
         var runsTls13 = OffersTls13;
         var runsTls12 = OffersBelowTls13 && settings.EchConfigs is null && settings.OffersSuiteFor(IsTls12Suite);
+        // A TLS 1.2 session is offered by the TLS 1.2 client alone: the combined hello carries none.
+        runsTls13 &= settings.Tls12ResumptionSession is null;
         return runsTls13 && runsTls12 ? await HandshakeTls13OrTls12Async(transport, settings, verifier, earlyData, cancellationToken).ConfigureAwait(false)
             : runsTls13 ? await HandshakeTls13Async(transport, settings, verifier, earlyData, cancellationToken).ConfigureAwait(false)
             : await HandshakeTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false);
@@ -892,6 +963,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // --ssl-sessions: the session the TLS 1.3 ClientHello offers to resume, if any.
         internal TlsSessionRecord? ResumptionSession { get; init; }
 
+        internal Tls12Session? Tls12ResumptionSession { get; init; }
+
         // --ech: the configurations the TLS 1.3 ClientHello seals its inner hello for, if any.
         internal EchConfigList? EchConfigs { get; init; }
 
@@ -964,6 +1037,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // minimum starts at TLS 1.2, curl's default minimum since 8.10.0 (ADR-0205).
         internal Tls12ClientSettings ToTls12(TlsClientOptions options) => new()
         {
+            SessionToResume = Tls12ResumptionSession,
             ServerName = ServerName,
             MinimumVersion = Tls12Minimum(options),
             MaximumVersion = Tls12Maximum(options),
