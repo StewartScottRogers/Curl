@@ -39,14 +39,17 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] against the Dovecot container, `curl -sS -u alice:pass imap://127.0.0.1:36243/` prints `* LIST (\HasNoChildren) "/" INBOX` and exits 0 on Windows and Linux; the same for `pop3://127.0.0.1:36211/` and `--login-options AUTH=DIGEST-MD5`; `-u alice:wrong` exits 67.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [ ] Given Dovecot's exact challenge, `realm="",nonce="<n>",qop="auth",charset="utf-8",algorithm="md5-sess"`, `SaslDigestMd5` answers it (it does not drop the connection), on both the SSPI path (`NonceSspiAccepts`) and the managed path (`AnswerAsCurl`). Unit tests in `Curl.Authentication.UnitTests` pin it with `algorithm` and `charset` both quoted and bare, as RFC 2831 permits either.
+- [ ] An IMAP and a POP3 protocol test with a test-double server that sends that challenge log in with DIGEST-MD5 and exit 0. With a server that refuses the response, they exit 67.
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-11-27, requeue after two timeouts (120 min plus 30 min of overtime): do not run Docker or Dovecot. A lane cannot, and the criteria above no longer ask for it. The fix is in parsing. `ValueAfter(text, "algorithm=", ',', …)` at `SaslDigestMd5.cs` lines 45 and 107 returns `"md5-sess"` with its quotes, so it never equals `md5-sess`. Read `algorithm` (and `charset`) as either a quoted or a bare value, for example with the existing `QuotedValueAfter` first, falling back to the bare form. Then pin both forms with unit tests. The original live check against Dovecot is left to the next outside fitness review.
 
 ## Log
 
 - 2026-11-24: Created from fitness review 2026-11-24T1358.
 - 2026-11-24: Backlog -> Doing. Criteria at claim: b956eeec 69116afe 3d836d5e.
 - 2026-11-24: Doing -> Blocked. Stewart: dark factory timed out after 120 min and again after 30 min of overtime; see Z:\repos\Curl.logs\BL-5881-20261124-120053-L13.jsonl
+- 2026-11-27: Blocked -> Backlog. Requeued 2026-11-27 with unit-test criteria and the parsing fix named; no Docker.

@@ -36,14 +36,19 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] in WSL, the Linux build's `curl -sS --ssl-reqd -k -u test:test ftp://127.0.0.1:25221/hello.txt` prints `hello from vsftpd` and exits 0, and the vsftpd log has no "No SSL session reuse" line.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [ ] An FTPS data connection offers the control connection's TLS session for resumption, on both TLS providers (`HandBuiltTlsProvider` on Linux and macOS, `SslStreamTlsProvider` on Windows). Unit tests with a test-double TLS server that refuses a data connection that does not resume (as vsftpd's `require_ssl_reuse=YES` does) pin it: download, upload and listing succeed.
+- [ ] `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`, and the same for `Curl.Original.Protocol.Ftp.UnitLibrary`, report no member outside a gate.
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-11-27, requeue: the fix is already written. Branch `factory/BL-6014-lane-7-20261126-083150` (commit 35108cdf9b, "resume the control connection's TLS session on data connections") adds session resumption across `ITlsProvider`, both providers and `FtpSession`, with tests and an ADR. Start from it: rebase or cherry-pick it onto the shift branch, don't redo it.
+- It was not pushed because the integration's quality check found a member outside a gate in `HandBuiltTlsProvider.AuthenticateWithAsync`, most likely a branch the new resumption code adds without a test. The lane ran the whole `Measure-CodeQuality.ps1` and stopped at 45 minutes, so it never saw which branch. Measure only the two libraries, with `-Library` as in the criteria, cover the missing branch (or split the method below the complexity gate), then integrate.
+- No Docker or vsftpd. The live check against vsftpd is left to the next outside fitness review.
 
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 3281bfb3 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 0; see Z:\repos\Curl.logs\BL-6014-20261126-083150-L7.jsonl (Lane 7 could not integrate its code: quality gates missed by 1 member(s) of files it changed: HandBuiltTlsProvider.AuthenticateWithAsync (async) (Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs: complexity). The code is on branch factory/BL-6014-lane-7-20261126-083150; start with git cherry-pick --no-commit factory/BL-6014-lane-7-20261126-083150 and fix it.)
+- 2026-11-27: Blocked -> Backlog. Requeued 2026-11-27: start from parked branch factory/BL-6014-lane-7-20261126-083150 and cover the HandBuiltTlsProvider.AuthenticateWithAsync gate miss; measure two libraries only.
