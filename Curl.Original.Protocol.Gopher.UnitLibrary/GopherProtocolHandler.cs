@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Gopher;
@@ -128,7 +129,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             .ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
-            return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
+            return FailedConnectResult(context, connected);
         }
 
         context.Progress.ReportTransferStarted();
@@ -141,6 +142,30 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
         ReportConnectionEnd(context.Events, result, connected.ConnectionNumber);
         return StampTimings(result, context.TimeProvider, started, connected.Timings, requestStarted);
+    }
+
+    // Whether -f fails the transfer when a proxy refuses the CONNECT; --fail-with-body does not.
+    private static bool FailsOnProxyStatus(ITransferContext context) => context.Http?.Fail == HttpFailMode.Fail;
+
+    /// <summary>
+    /// Ends a transfer whose connect failed, reporting <c>closing connection #N</c>: under
+    /// <c>-f</c>, exit 22 when a proxy refused the CONNECT with 400 or above, naming the status,
+    /// or curl's generic text when the <c>407</c> drew its authentication problem; otherwise the
+    /// connector's own failure, as curl 8.22.0 does (measured, BL-6089).
+    /// </summary>
+    private static TransferResult FailedConnectResult(ITransferContext context, ConnectResult connected)
+    {
+        context.Events.ReportInfo(GopherTransferMessages.ClosingConnection(connected.ConnectionNumber));
+        int status = connected.ProxyConnectResponseCode;
+        if (FailsOnProxyStatus(context) && status >= 400)
+        {
+            string message = connected.IsProxyAuthenticationProblem
+                ? "HTTP response code said error"
+                : string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {status}");
+            return TransferResult.Failure(CurlExitCode.HttpReturnedError, message);
+        }
+
+        return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
     }
 
     // Adds the timings behind %{time_*} and %{speed_download} to the report the transfer made (BL-5390).
@@ -261,6 +286,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             Proxy = context.Proxy,
             Events = context.Events,
             DiagnosticLog = context.DiagnosticLog,
+            FailsOnHttpErrorStatus = FailsOnProxyStatus(context),
         };
     }
 

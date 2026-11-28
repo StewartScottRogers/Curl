@@ -125,7 +125,7 @@ public sealed class DictProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ConnectFails_ReportsNothing()
+    public async Task ExecuteAsync_ConnectFails_ReportsOnlyTheClosingConnectionLine()
     {
         TranscriptTransferEvents events = new();
         Diagnostics.Arrange("connect result", "Failed(CouldntConnect, \"refused\")");
@@ -135,8 +135,8 @@ public sealed class DictProtocolHandlerTransferEventsTests
         Diagnostics.Act("result", DiagnosticText.Result(result));
         Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
 
-        Diagnostics.Assert("transcript line count", 0, events.Transcript.Count);
-        Assert.IsEmpty(events.Transcript);
+        Diagnostics.Assert("transcript line count", 1, events.Transcript.Count);
+        Assert.AreEqual("* closing connection #0", events.Transcript.Single());
     }
 
     private static RecordingConnector Connector(IConnection connection, long connectionNumber) =>

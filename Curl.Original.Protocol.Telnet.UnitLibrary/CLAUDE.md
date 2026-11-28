@@ -18,6 +18,12 @@ stream with no network. A transfer proxy (`ITransferContext.Proxy`) goes into th
 `ConnectTarget`, and the connector tunnels through it (ADR-0056); the handler holds no
 proxy code.
 
+A failed connect reports `closing connection #N`. Under `-f` (not `--fail-with-body`)
+the connect target sets `ConnectTarget.FailsOnHttpErrorStatus`, and a proxy that refuses
+the CONNECT with 400 or above makes it exit 22 (`The requested URL returned error: N`, or
+`HTTP response code said error` after a `407` authentication problem), as curl 8.22.0
+does (BL-6089).
+
 ## Layout
 
 - `TelnetProtocolHandler` runs the session: sends `ITransferContext.Upload` (each

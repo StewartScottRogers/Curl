@@ -29,6 +29,12 @@ component `gopher` from `ITransferContext.DiagnosticLog` - the failure that ends
 as `error` with its `CurlExitCode`, and the selector sent and the transfer's end (bytes
 and milliseconds) as `info`; the connect target carries the log on.
 
+A failed connect (BL-6089) reports `closing connection #N`. Under `-f` (not
+`--fail-with-body`) the connect target sets `ConnectTarget.FailsOnHttpErrorStatus`, and a
+proxy that refuses the CONNECT with 400 or above makes it exit 22 (`The requested URL
+returned error: N`, or `HTTP response code said error` after a `407` authentication
+problem), as curl 8.22.0 does.
+
 `-v` and `--trace` (BL-934): after connecting, the handler reports each read to
 `ITransferContext.Events` as data received, the server's close as a zero-byte block, and
 never the selector (curl does not trace it); then `shutting down connection #N`, or for a

@@ -281,7 +281,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_GophersHandshakeFails_ReturnsTheConnectorsExit35UnchangedAndReportsNothing()
+    public async Task ExecuteAsync_GophersHandshakeFails_ReturnsTheConnectorsExit35UnchangedAndReportsOnlyTheClosingConnectionLine()
     {
         const string Message = "schannel: failed to receive handshake, SSL/TLS connection failed";
         FakeConnector connector = new(ConnectResult.Failed(CurlExitCode.SslConnectError, Message));
@@ -298,7 +298,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Assert("result", new TransferResult(CurlExitCode.SslConnectError, 0, Message), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.SslConnectError, 0, Message), result with { Report = null });
         Assert.IsTrue(connector.Targets.Single().UseTls);
-        Assert.IsEmpty(events.Transcript);
+        Assert.AreEqual("* closing connection #0", events.Transcript.Single());
         Assert.IsEmpty(progress.Reports);
         Assert.AreEqual(0, output.Length);
     }
