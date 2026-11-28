@@ -1507,3 +1507,4 @@ Each option and the specific reason it lost.
 | [1463](ADR-1463-a-transfer-is-numbered-before-its-doh-url-connections.md) | A transfer is numbered before its `--doh-url` connections (BL-6058) | Accepted | 2026-11-26 |
 | [1464](ADR-1464-the-curl-program-is-published-to-nuget-org-as-the-tool-surly-curl.md) | The curl program is published to nuget.org as the .NET tool `Surly.Curl` (command `curl`), native AOT per platform (BL-6078) | Accepted | 2026-11-27 |
 | [1465](ADR-1465-under-f-a-connect-407-curl-gives-up-on-prints-the-generic-exit-22-text.md) | Under -f a CONNECT 407 curl gives up on prints the generic exit 22 text (BL-6024) | Accepted | 2026-11-27 |
+| [1466](ADR-1466-sasl-digest-md5-challenges-are-read-as-directives-as-each-platforms-curl-reads-them.md) | SASL DIGEST-MD5 challenges are read as key=value directives, quoted values included, as each platforms curl reads them; amends ADR-0139 (BL-5881) | Accepted | 2026-11-24 |

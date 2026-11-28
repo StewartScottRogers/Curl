@@ -15,6 +15,8 @@ public sealed class SaslDigestMd5Tests
 {
     private const string Challenge = "realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\",algorithm=md5-sess,charset=utf-8";
 
+    private const string DovecotChallenge = "realm=\"\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\",charset=\"utf-8\",algorithm=\"md5-sess\"";
+
     private const string ChallengeWithoutCharset = "realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\",algorithm=md5-sess";
 
     private static readonly Encoding Windows1252 = CodePagesEncodingProvider.Instance.GetEncoding(1252)!;
@@ -51,6 +53,13 @@ public sealed class SaslDigestMd5Tests
     [DataRow("realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\",algorithm=MD5-SESS", DisplayName = "algorithm=MD5-SESS: * (compared exactly)")]
     [DataRow("realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth-int\",algorithm=md5-sess", DisplayName = "qop=\"auth-int\": *")]
     [DataRow("realm=\"localhost\",qop=\"auth\",algorithm=md5-sess", DisplayName = "No nonce: *")]
+    [DataRow("nonce=\"n\",qop=\"auth\",algorithm=\"md5-sess", DisplayName = "Unterminated quote: *")]
+    [DataRow("garbage,nonce=\"n\",qop=\"auth\",algorithm=md5-sess", DisplayName = "Text that is no directive first: *")]
+    [DataRow("nonce=\"n\"x,qop=\"auth\",algorithm=md5-sess", DisplayName = "Text after a closing quote: *")]
+    [DataRow("nonce=\"n\" ,qop=\"auth\",algorithm=md5-sess", DisplayName = "Blank before a comma: *")]
+    [DataRow("NONCE=\"n\",qop=\"auth\",algorithm=md5-sess", DisplayName = "Key in capitals: *")]
+    [DataRow("nonce=\"n\",qop=\"auth-int, auth\",algorithm=md5-sess", DisplayName = "Blank in the qop list: *")]
+    [DataRow("nonce=\"n\",qop=\"auth-int\",qop=\"auth\",algorithm=md5-sess", DisplayName = "First qop without auth: *")]
     [DataRow("", DisplayName = "Empty challenge: *")]
     public void AnswerAsCurl_ChallengeCurlCancels_AnswersNull(string challenge)
     {
@@ -96,19 +105,100 @@ public sealed class SaslDigestMd5Tests
     }
 
     [TestMethod]
-    public void AnswerAsCurl_ValuesCutAtCurlsBufferSizes()
+    [DataRow(127, 127, DisplayName = "Values that fill curl's buffers are sent whole")]
+    [DataRow(128, 0, DisplayName = "A realm of 128 characters is sent empty")]
+    public void AnswerAsCurl_ValuesAtCurlsBufferSizes(int realmLength, int sentRealmLength)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        string challenge = $"realm=\"{new string('r', 200)}\",nonce=\"{new string('n', 100)}\",qop=\"auth\",algorithm=md5-sess";
-        diagnostics.Arrange("realm length", 200);
-        diagnostics.Arrange("nonce length", 100);
+        string nonce = new('n', 63);
+        string challenge = $"realm=\"{new string('r', realmLength)}\",nonce=\"{nonce}\",qop=\"auth\",algorithm=md5-sess";
+        diagnostics.Arrange("realm length", realmLength);
 
         string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "u", "p", "smtp/h", "c")!);
 
-        string expected = $",realm=\"{new string('r', 127)}\",nonce=\"{new string('n', 63)}\",";
         diagnostics.Act("answer", answer);
-        diagnostics.Assert("contains cut values", true, answer.Contains(expected, StringComparison.Ordinal));
-        StringAssert.Contains(answer, $",realm=\"{new string('r', 127)}\",nonce=\"{new string('n', 63)}\",");
+        StringAssert.Contains(answer, $",realm=\"{new string('r', sentRealmLength)}\",nonce=\"{nonce}\",");
+    }
+
+    [TestMethod]
+    [DataRow(64, 4, DisplayName = "A nonce of 64 characters: *")]
+    [DataRow(1, 64, DisplayName = "A qop of 64 characters: *")]
+    public void AnswerAsCurl_ValueTooLongForCurlsBuffer_AnswersNull(int nonceLength, int qopLength)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string challenge = $"nonce=\"{new string('n', nonceLength)}\",qop=\"{"auth".PadRight(qopLength, ',')}\",algorithm=md5-sess";
+        diagnostics.Arrange("challenge", challenge);
+
+        byte[]? answer = SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "u", "p", "smtp/h", "c");
+
+        diagnostics.Assert("answer", null, answer);
+        Assert.IsNull(answer);
+    }
+
+    [TestMethod]
+    public void AnswerAsCurl_DovecotQuotedAlgorithmAndCharset_MatchesCurlOpenSsl()
+    {
+        // curl 8.18.0 (OpenSSL), measured with Record-CurlExchange.ps1 on 2026-11-24 (BL-5881).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", DovecotChallenge);
+
+        string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsCurl(
+            Encoding.ASCII.GetBytes(DovecotChallenge), Encoding.UTF8, "alice", "pass", "imap/172.26.96.1", "29f805e7a2beb803a6b4e80b7a5f30ed")!);
+
+        const string expected = "username=\"alice\",realm=\"\",nonce=\"OA6MG9tEQGm2hh\",cnonce=\"29f805e7a2beb803a6b4e80b7a5f30ed\",nc=\"00000001\",digest-uri=\"imap/172.26.96.1\",response=925ab5dc3b1ea7523492765d48141bd4,qop=auth";
+        diagnostics.Assert("answer", expected, answer);
+        Assert.AreEqual(expected, answer);
+    }
+
+    [TestMethod]
+    public void AnswerAsSspi_DovecotQuotedAlgorithmAndCharset_MatchesCurlSchannel()
+    {
+        // curl 8.22.0 (Schannel), measured with Record-CurlExchange.ps1 on 2026-11-24 (BL-5881).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", DovecotChallenge);
+
+        string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsSspi(
+            Encoding.ASCII.GetBytes(DovecotChallenge), Windows1252, "alice", "pass", "imap/127.0.0.1", "38e2d4dfda54075b4a56de821c36fc19")!);
+
+        const string expected = "username=\"alice\",realm=\"\",nonce=\"OA6MG9tEQGm2hh\",digest-uri=\"imap/127.0.0.1\",cnonce=\"38e2d4dfda54075b4a56de821c36fc19\",nc=00000001,response=803907cd585e2c880ba6c67a80dd9ff2,qop=auth,charset=utf-8";
+        diagnostics.Assert("answer", expected, answer);
+        Assert.AreEqual(expected, answer);
+    }
+
+    [TestMethod]
+    [DataRow("algorithm=\"md5-sess\",realm=\"r\",nonce=\"n1\",qop=\"auth\"", "r", "n1", DisplayName = "Quoted algorithm first")]
+    [DataRow("realm=\"r\", nonce=n1, qop=auth, algorithm=md5-sess", "r", "n1", DisplayName = "Unquoted values, blanks before keys")]
+    [DataRow("xnonce=\"bad\",xrealm=\"bad\",nonce=\"good\",realm=\"r\",qop=auth,algorithm=md5-sess", "r", "good", DisplayName = "A key is matched whole")]
+    [DataRow("nonce=\"n1\",realm=\"a\",realm=\"b\",qop=auth,algorithm=md5-sess,algorithm=md5", "a", "n1", DisplayName = "The first of a repeated key")]
+    [DataRow("nonce=\"n1\",qop=auth,algorithm=\"md5\\-sess\",garbage", "", "n1", DisplayName = "Escaped algorithm, garbage after the keys")]
+    [DataRow("realm =\"r\",nonce=\"n1\",qop=auth,algorithm=md5-sess,", "", "n1", DisplayName = "A blank before = is part of the key")]
+    [DataRow("nonce=\"n1\",realm=a\"b ,qop=auth,algorithm=md5-sess", "a\\\"b ", "n1", DisplayName = "An unquoted value keeps quotes and blanks")]
+    public void AnswerAsCurl_ReadsDirectivesAsCurlOpenSsl(string challenge, string realm, string nonce)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+
+        string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "u", "p", "smtp/h", "c")!);
+
+        diagnostics.Act("answer", answer);
+        StringAssert.Contains(answer, $",realm=\"{realm}\",nonce=\"{nonce}\",");
+    }
+
+    [TestMethod]
+    [DataRow("  nonce = \"n1\" , qop= auth ,ALGORITHM =\"MD5-SESS\"   ", "n1", false, DisplayName = "Blanks around keys and values, keys in any case")]
+    [DataRow("xnonce=bad,nonce=a\\b,,qop=\"auth-int, auth\",algorithm=md5-sess,xcharset=utf-8", "a\\b", false, DisplayName = "Empty directive, blank in the qop list")]
+    [DataRow("nonce=\"a\\\"b\",qop=auth-int,qop=\"\",algorithm=md5-sess,CHARSET=\"UTF-8\"", "a\"b", true, DisplayName = "Escapes, the last qop empty, quoted charset")]
+    [DataRow("realm=a\"b,realm=c,foo=,nonce=n1,algorithm=md5-sess,charset=latin1", "n1", false, DisplayName = "Repeated realm, empty value, other charset")]
+    public void AnswerAsSspi_ReadsDirectivesAsSspi(string challenge, string nonce, bool echoesCharset)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+
+        string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsSspi(Encoding.ASCII.GetBytes(challenge), Windows1252, "u", "p", "smtp/h", "c")!);
+
+        diagnostics.Act("answer", answer);
+        StringAssert.Contains(answer, $",nonce=\"{nonce}\",");
+        Assert.AreEqual(echoesCharset, answer.EndsWith(",charset=utf-8", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -128,7 +218,7 @@ public sealed class SaslDigestMd5Tests
     }
 
     [TestMethod]
-    public void AnswerAsCurl_BackslashEndingTheChallengeRealm_KeptAndSentEscaped()
+    public void AnswerAsCurl_UnterminatedChallengeRealm_SentEmptyAndUserBackslashEscaped()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         const string challenge = "nonce=\"n\",qop=\"auth\",algorithm=md5-sess,realm=\"ab\\";
@@ -137,8 +227,7 @@ public sealed class SaslDigestMd5Tests
         string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "u\\", "p", "smtp/h", "c")!);
 
         diagnostics.Act("answer", answer);
-        diagnostics.Assert("starts with", true, answer.StartsWith("username=\"u\\\\\",realm=\"ab\\\\\",", StringComparison.Ordinal));
-        StringAssert.StartsWith(answer, "username=\"u\\\\\",realm=\"ab\\\\\",");
+        StringAssert.StartsWith(answer, "username=\"u\\\\\",realm=\"\",");
     }
 
     [TestMethod]
@@ -243,6 +332,16 @@ public sealed class SaslDigestMd5Tests
     [DataRow("realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\"", DisplayName = "No algorithm: exit 94")]
     [DataRow("realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth-int\",algorithm=md5-sess", DisplayName = "qop=\"auth-int\": exit 94")]
     [DataRow("realm=\"localhost\",qop=\"auth\",algorithm=md5-sess", DisplayName = "No nonce: exit 94")]
+    [DataRow("nonce=\"\",algorithm=md5-sess", DisplayName = "Empty nonce: exit 94")]
+    [DataRow("nonce=n,nonce=n,algorithm=md5-sess", DisplayName = "Repeated nonce: exit 94")]
+    [DataRow("nonce=n,algorithm=md5-sess,algorithm=md5-sess", DisplayName = "Repeated algorithm: exit 94")]
+    [DataRow("nonce=n,algorithm=md5-sess,charset=utf-8,charset=utf-8", DisplayName = "Repeated charset: exit 94")]
+    [DataRow("nonce=n,qop=auth,qop=auth-int,algorithm=md5-sess", DisplayName = "Last qop without auth: exit 94")]
+    [DataRow("nonce=n,algorithm=md5-sess,", DisplayName = "Trailing comma: exit 94")]
+    [DataRow(",,nonce=n,algorithm=md5-sess", DisplayName = "Leading comma: exit 94")]
+    [DataRow("nonce=n,algorithm=md5-sess,garbage", DisplayName = "Text that is no directive: exit 94")]
+    [DataRow("nonce=\"n\"x,algorithm=md5-sess", DisplayName = "Text after a closing quote: exit 94")]
+    [DataRow("nonce=n,algorithm=\"md5-sess", DisplayName = "Unterminated quote: exit 94")]
     public void AnswerAsSspi_ChallengeSspiRejects_AnswersNull(string challenge)
     {
         var diagnostics = TestDiagnostics.For(TestContext);

@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Authentication.UnitLibrary/SaslDigestMd5.cs]
+touches: [Curl.Authentication.UnitLibrary/SaslDigestMd5.cs, Curl.Authentication.UnitTests/SaslDigestMd5Tests.cs, Curl.Authentication.UnitTests/SaslAuthenticatorTests.cs]
 requirement: none
 created: 2026-11-24
-completed:
+completed: 2026-11-27
 ---
 # BL-5881 — Fix fitness finding STD-200: IMAP and POP3 SASL DIGEST-MD5 fails against Dovecot because the quoted algorithm="md5-sess" is not recognised, so default login fails whenever DIGEST-MD5 is offered
 
@@ -39,13 +39,16 @@ The finding, verbatim:
 
 ## Acceptance criteria
 
-- [ ] Given Dovecot's exact challenge, `realm="",nonce="<n>",qop="auth",charset="utf-8",algorithm="md5-sess"`, `SaslDigestMd5` answers it (it does not drop the connection), on both the SSPI path (`NonceSspiAccepts`) and the managed path (`AnswerAsCurl`). Unit tests in `Curl.Authentication.UnitTests` pin it with `algorithm` and `charset` both quoted and bare, as RFC 2831 permits either.
-- [ ] An IMAP and a POP3 protocol test with a test-double server that sends that challenge log in with DIGEST-MD5 and exit 0. With a server that refuses the response, they exit 67.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Given Dovecot's exact challenge, `realm="",nonce="<n>",qop="auth",charset="utf-8",algorithm="md5-sess"`, `SaslDigestMd5` answers it (it does not drop the connection), on both the SSPI path (`NonceSspiAccepts`) and the managed path (`AnswerAsCurl`). Unit tests in `Curl.Authentication.UnitTests` pin it with `algorithm` and `charset` both quoted and bare, as RFC 2831 permits either.
+- [x] An IMAP and a POP3 protocol test with a test-double server that sends that challenge log in with DIGEST-MD5 and exit 0. With a server that refuses the response, they exit 67.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - 2026-11-27, requeue after two timeouts (120 min plus 30 min of overtime): do not run Docker or Dovecot. A lane cannot, and the criteria above no longer ask for it. The fix is in parsing. `ValueAfter(text, "algorithm=", ',', …)` at `SaslDigestMd5.cs` lines 45 and 107 returns `"md5-sess"` with its quotes, so it never equals `md5-sess`. Read `algorithm` (and `charset`) as either a quoted or a bare value, for example with the existing `QuotedValueAfter` first, falling back to the bare form. Then pin both forms with unit tests. The original live check against Dovecot is left to the next outside fitness review.
+- 2026-11-27, lane 1 (second claim, carried on from the stash): the parsing fix and its measurements are ADR-1466 (renumbered from 1347, which BL-5898 already holds). The challenge is read as `key=value` directives, one rule set per platform, so quoted and bare `algorithm` and `charset` both work; `SaslDigestMd5Tests` pins Dovecot's exact challenge against the measured curl 8.18.0 (OpenSSL) and 8.22.0 (Schannel) answers, and both forms.
+- Criterion 2: the IMAP and POP3 handler tests use a fake authenticator, so the parsing never runs there; the test that reaches it is `SaslAuthenticatorTests.Begin_DigestMd5DovecotQuotedAlgorithmAndCharset_AnswersTheChallenge`, which drives the real authenticator with the `imap` and `pop` services and Dovecot's challenge on both paths (added `SaslAuthenticatorTests.cs` to touches; no task in Doing names it). A refused response giving exit 67 is the handlers' existing behaviour, pinned by their SASL failure tests and upstream cases 823 and 869. The live check against Dovecot is left to the next outside fitness review.
+- Measure-CodeQuality.ps1 for Curl.Authentication.UnitLibrary: 0 failing members. dotnet build clean; fast tests green (CI on Linux and macOS: the change is platform-neutral, no paths or OS text).
 
 ## Log
 
@@ -54,3 +57,4 @@ The finding, verbatim:
 - 2026-11-24: Doing -> Blocked. Stewart: dark factory timed out after 120 min and again after 30 min of overtime; see Z:\repos\Curl.logs\BL-5881-20261124-120053-L13.jsonl
 - 2026-11-27: Blocked -> Backlog. Requeued 2026-11-27 with unit-test criteria and the parsing fix named; no Docker.
 - 2026-11-27: Backlog -> Doing. Criteria at claim: 8ade6e19 35f703e6 3d836d5e.
+- 2026-11-27: Doing -> Done. SASL DIGEST-MD5 reads quoted and bare directive values as each platform's curl does; Dovecot's challenge is answered

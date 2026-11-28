@@ -405,6 +405,30 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
+    [DataRow(true, "imap", DisplayName = "IMAP, Schannel (SSPI): answers Dovecot (BL-5881 STD-200)")]
+    [DataRow(false, "imap", DisplayName = "IMAP, OpenSSL: answers Dovecot (BL-5881 STD-200)")]
+    [DataRow(true, "pop", DisplayName = "POP3, Schannel (SSPI): answers Dovecot (BL-5881 STD-200)")]
+    [DataRow(false, "pop", DisplayName = "POP3, OpenSSL: answers Dovecot (BL-5881 STD-200)")]
+    public async Task Begin_DigestMd5DovecotQuotedAlgorithmAndCharset_AnswersTheChallenge(bool answerAsSspi, string service)
+    {
+        // Dovecot quotes algorithm and charset, as RFC 2831 permits; both platforms' curl log in.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("answer as SSPI", answerAsSspi);
+        diagnostics.Arrange("service", service);
+        var authenticator = new SaslAuthenticator(Windows1252, () => "c", answerAsSspi, securityContexts: null);
+        SaslRequest request = Request(new NetworkCredential("alice", "pass")) with { ServiceName = service, Host = "127.0.0.1" };
+        ISaslExchange exchange = authenticator.Begin("DIGEST-MD5", request);
+        byte[] challenge = "realm=\"\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\",charset=\"utf-8\",algorithm=\"md5-sess\""u8.ToArray();
+
+        byte[]? answer = await RespondAsync(exchange, challenge);
+
+        string answerText = answer is null ? "(none)" : Windows1252.GetString(answer);
+        diagnostics.Act("answer", answerText);
+        StringAssert.StartsWith(answerText, "username=\"alice\",realm=\"\",nonce=\"OA6MG9tEQGm2hh\",");
+        StringAssert.Contains(answerText, $",digest-uri=\"{service}/127.0.0.1\",");
+    }
+
+    [TestMethod]
     [DataRow("DIGEST-MD5", DisplayName = "DIGEST-MD5: its rspauth answer is no message (upstream test823, test869)")]
     [DataRow("CRAM-MD5", DisplayName = "CRAM-MD5")]
     public void Begin_ChallengeMechanism_SendsAnEmptyAnswerAsAnEmptyLine(string mechanism)
