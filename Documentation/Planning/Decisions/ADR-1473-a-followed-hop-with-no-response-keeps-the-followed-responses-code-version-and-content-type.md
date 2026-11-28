@@ -29,6 +29,5 @@ A successful hop with no HTTP response is left as it is: it was not measured.
 
 ## Consequences
 
-`%header{...}` and `%{header_json}` stay empty, as curl's are. `%{num_headers}` still prints `0`
-where curl prints the followed response's count: `TransferReport` has no property that counts
-headers without naming their source, so that is a task of its own.
+`%header{...}` and `%{header_json}` stay empty, as curl's are. `%{num_headers}`, which this
+decision left at `0`, prints the followed response's count since ADR-1476 (BL-6096).

@@ -7,8 +7,8 @@ namespace Curl.Core;
 /// <summary>
 /// Pins what <see cref="RedirectFollower" /> reports for the response when a followed hop fails
 /// before any response arrives: curl 8.21.0 keeps the followed response's <c>%{http_code}</c>,
-/// <c>%{http_version}</c> and <c>%{content_type}</c>, both when <c>-m</c> ends the hop and when
-/// its connection is refused (measured 2026-11-28, BL-6095 Notes).
+/// <c>%{http_version}</c>, <c>%{content_type}</c> and <c>%{num_headers}</c>, both when <c>-m</c> ends
+/// the hop and when its connection is refused (measured 2026-11-28, BL-6095 and BL-6096 Notes).
 /// </summary>
 [TestClass]
 public sealed class RedirectFollowerTimedOutHopResponseCodeTests
@@ -22,6 +22,23 @@ public sealed class RedirectFollowerTimedOutHopResponseCodeTests
 
         AssertResponse(report, 302, System.Net.HttpVersion.Version11, "text/x-first");
         Assert.AreEqual(0, report.ResponseHeaders.Count);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_FollowedHopFailsWithNoResponse_CountsTheFollowedResponsesHeaders()
+    {
+        TransferReport report = await ReportAsync(Redirect(302), TimedOut(new TransferReport()));
+
+        Assert.AreEqual(1, report.HeaderCount);
+        Assert.AreEqual(0, report.ResponseHeaders.Count);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_FailedHopCountsHeaderLinesOfItsOwn_CountsThose()
+    {
+        TransferReport report = await ReportAsync(Redirect(302), TimedOut(new TransferReport { ConnectReplyHeaderCount = 3 }));
+
+        Assert.AreEqual(3, report.HeaderCount);
     }
 
     [TestMethod]
