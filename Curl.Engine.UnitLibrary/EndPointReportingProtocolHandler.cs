@@ -76,7 +76,7 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     // Only the HTTP handler counts its connections on its report; every other scheme's are counted by the recorder.
     private static bool CountsItsConnections(ITransferContext context) => context.Url.Scheme is "http" or "https";
 
-    // Gives a report with no timings the transfer's connect and total times and, when it sent none itself, the bytes the upload stream gave (BL-5410). A failure with no report stays without one (BL-5421), and one that never connected sent nothing.
+    // Gives a report with no timings the transfer's connect and total times and, when it sent none itself, the bytes the upload stream gave (BL-5410). A failure with no report stays without one (BL-5421), and one that never connected sent nothing. A report with timings keeps them, but for the start of a timed-out one.
     private TransferResult StampTimingsAndUploadSize(TransferResult result, ITransferContext context, long started, long uploaded, bool cancelled = false)
     {
         if (result.Report is null && !result.IsSuccess && !cancelled)
@@ -85,9 +85,9 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         }
 
         TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
-        if (report.Timings is not null)
+        if (report.Timings is { } own)
         {
-            return result;
+            return StartedFrom(result, own, TimedFrom(result, context, own.Started));
         }
 
         return result with { Report = TimedReport(report, result.IsSuccess, context, TimedFrom(result, context, started), UploadSizeOf(report, result.IsSuccess, uploaded)) };
@@ -96,6 +96,10 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     // -m counts from its watchdog's start, before the handler's, so a timed-out first hop's total counts from there and is not under -m's value, as curl's is not (STD-231). A later hop's counts from its own start, as the redirect follower measures the whole from the first hop's.
     private static long TimedFrom(TransferResult result, ITransferContext context, long started) =>
         result.ExitCode == CurlExitCode.OperationTimedOut && context.Http?.RedirectsFollowed is not > 0 ? context.OperationStarted ?? started : started;
+
+    // The result with its handler's own timings, as HTTP's, counted from started: the result itself when they already are.
+    private static TransferResult StartedFrom(TransferResult result, TransferTimings own, long started) =>
+        started == own.Started ? result : result with { Report = result.Report! with { Timings = own with { Started = started } } };
 
     // The report with its timings and upload size, and a UDP channel's local end when the scheme reports one (BL-5493).
     private TransferReport TimedReport(TransferReport report, bool succeeded, ITransferContext context, long started, long uploadSize)
