@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-6019]
-touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Networking.UnitLibrary/TcpConnector.ConnectTimeout.cs, Curl.Networking.UnitLibrary/TcpConnector.DirectConnect.cs, Curl.Networking.UnitLibrary/TcpConnector.TlsHandshake.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerTimingsTests.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerTests.cs, Curl.Engine.UnitTests/TransferPerformerTests.cs, Curl.Networking.UnitTests/TcpConnectorTests.FailureTimings.cs]
+touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Networking.UnitLibrary/TcpConnector.ConnectTimeout.cs, Curl.Networking.UnitLibrary/TcpConnector.DirectConnect.cs, Curl.Networking.UnitLibrary/TcpConnector.TlsHandshake.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerTimingsTests.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerTests.cs, Curl.Engine.UnitTests/TransferPerformerTests.cs, Curl.Networking.UnitTests/TcpConnectorTests.FailureTimings.cs, Curl.Networking.UnitLibrary/NumberedConnectFailure.cs, Curl.Networking.UnitTests/TcpConnectorStd231Tests.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultStd231Tests.cs, Curl.Engine.UnitTests/Ext097Tests.cs]
 requirement: none
 created: 2026-11-26
 completed:
@@ -72,9 +72,39 @@ Causes and plan:
    `Connected` for `RequestReady`, and stamp `FirstByteReceived` at the first write to the
    transfer's output (`TransferPerformer.WithFirstByte` only fills a null one, with the end).
 
+Second run, 2026-11-28 (code written, left uncommitted for the stash):
+- Measured again (Windows Debug build, a TcpListener that accepts and never answers, `-m 2`): `t` and
+  `nc` are already right on this branch (BL-6081 and BL-6082 landed): amqps, rediss and grpcs gave
+  `[28 t=2.02 ip=:-1 nc=1]`. Real curl 8.18.0 (the WinGet build) for https gave `[28 t=2.006 ip=:-1 nc=1]`,
+  so curl's own schemes keep `ip` empty.
+- Done but not committed: `ConnectResult.LocalEndPointBeforeFailure`, `RemoteEndPointBeforeFailure`,
+  `WithEndPointsBeforeFailure` and `CarriedBy`. `TcpConnector.TlsHandshake.cs` puts a failed result holding
+  the dialled end points under `TcpConnectedOnCancellationKey`, and `ConnectTimeout.cs` and
+  `NumberedConnectFailure.cs` copy them. `EndPointRecordingConnector` hands them to
+  `ConnectionEndPointRecorder.RecordFailedAfterOpening`. The recorder puts them on a failed transfer that
+  recorded no connection, but only when `ReportsEndPointsOfFailedConnects` is set.
+  `EndPointReportingProtocolHandler` sets it for a scheme that is not in `ManagedCurlVersion.Protocols`
+  (ADR-1475). Afterwards amqps, mqtt5s and grpcs gave `[28 t=2.02 ip=127.0.0.1:28950 nc=1]`, and so did
+  `--connect-timeout 1`. https still gives `ip=:-1`. Tests: `Ext097Tests` (new), `TcpConnectorStd231Tests`
+  and `ConnectResultStd231Tests`. The Abstractions, Networking and Engine fast tests pass (1648, 5029 and
+  3276 tests). `touches` widened to NumberedConnectFailure.cs (no task in Doing names it) and to the three test files.
+- Not done: Measure-CodeQuality.ps1 for the three libraries did not finish in time (other lanes were
+  building, and this run's 58-minute command timeout stopped it). The full fast suite was not run either, so
+  the code is left for the stash.
+- Left: run the quality gate and the fast tests, then commit. The NATS receive still needs fixing. It was
+  reproduced with a PowerShell NATS stand-in (INFO, PONG, then `MSG` after 2.5 s): `[28 pt=5.012 st=5.012 t=5.012]`.
+  Cause: for a scheme whose handler does not time itself, `EndPointReportingProtocolHandler.TimedReport` sets
+  RequestReady to the end, and `TransferPerformer.WithFirstByte` sets FirstByteReceived to the end. Fix this
+  for extended schemes only, because curl's own schemes stamp both at the end (measured, BL-515).
+  RequestReady should come from the first connection's TlsHandshakeCompleted, falling back to Connected.
+  FirstByteReceived should come from the first write to the transfer's output, which needs a first-write stamp
+  on the output stream (`Curl.Core.UnitLibrary/MaxTimeWatchdog.cs`'s wrapped output, or
+  `Curl.Engine.UnitLibrary/TransferContextFactory.cs`). Widen `touches` for that file.
+
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: be1c9677 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019 in Doing; plan and measurements are under Notes
 - 2026-11-28: Backlog -> Doing. Criteria at claim: be1c9677 69116afe 3d836d5e.
+- 2026-11-28: Doing -> Backlog. Left: quality gate and fast suite for the uncommitted remote_ip fix (ADR-1475), then the NATS receive's pretransfer and starttransfer; see Notes
