@@ -1,0 +1,38 @@
+{
+    "schema":  1,
+    "shift":  "20261128-074057",
+    "branch":  "work/dark-factory",
+    "state":  "running",
+    "publishedAt":  "2026-11-28T15:11:48Z",
+    "autoLanes":  {
+                      "lanes":  2,
+                      "target":  2,
+                      "binding":  "capacity",
+                      "reason":  "lanes auto: starting at 2 (last shift saved 2, raised to 13 by -MinStartLanes, capped at 2)",
+                      "changedAt":  "2026-11-28T14:42:44Z"
+                  },
+    "lanes":  [
+                  {
+                      "lane":  1,
+                      "task":  "BL-6094",
+                      "title":  "Stamp pretransfer at setup and starttransfer at first byte for an extended protocol receive ended by -m (EXT-097, part 2)",
+                      "model":  "sonnet",
+                      "modelWhy":  "feature pipeline, first run",
+                      "phase":  "run",
+                      "step":  "quality",
+                      "taskStartedAt":  "2026-11-28T14:43:37Z",
+                      "heartbeatAt":  "2026-11-28T15:11:39Z"
+                  },
+                  {
+                      "lane":  2,
+                      "task":  "BL-6098",
+                      "title":  "ftp through an unresolved HTTP proxy reports %{scheme} ftp; curl reports http",
+                      "model":  "sonnet",
+                      "modelWhy":  "feature pipeline, first run",
+                      "phase":  "run",
+                      "step":  "quality",
+                      "taskStartedAt":  "2026-11-28T14:44:34Z",
+                      "heartbeatAt":  "2026-11-28T15:11:32Z"
+                  }
+              ]
+}
