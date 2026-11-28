@@ -744,7 +744,7 @@ internal sealed class FtpSession(
     /// <c>Established connection</c> line again, as curl 8.21.0 writes it a second time
     /// between <c>234</c> and <c>USER</c> (measured, BL-1084). The control connection is named
     /// as its own session source, so the provider runs it on a TLS client whose session the data
-    /// connections can resume (ADR-1466).
+    /// connections can resume (ADR-1468).
     /// </summary>
     private async ValueTask<TransferResult?> UpgradeControlAsync()
     {

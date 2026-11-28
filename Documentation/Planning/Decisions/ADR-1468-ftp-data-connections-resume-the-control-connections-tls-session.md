@@ -1,4 +1,4 @@
-# ADR-1466: FTP data connections resume the control connection's TLS session
+# ADR-1468: FTP data connections resume the control connection's TLS session
 
 - Status: Accepted
 - Date: 2026-11-26

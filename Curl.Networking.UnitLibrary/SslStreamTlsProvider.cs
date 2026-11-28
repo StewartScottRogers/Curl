@@ -167,7 +167,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// Performs a handshake that resumes, or leaves a session for a later handshake to resume,
     /// across connections, as FTP's control and data connections do. The Schannel build runs
     /// the overload with events, Windows resuming the session itself; the OpenSSL build runs it
-    /// on a <see cref="HandBuiltTlsProvider" /> of this provider's options (ADR-1466).
+    /// on a <see cref="HandBuiltTlsProvider" /> of this provider's options (ADR-1468).
     /// </summary>
     /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
     /// <param name="sessionSource">The connection whose session to resume, <paramref name="plaintext" /> itself for the first one.</param>

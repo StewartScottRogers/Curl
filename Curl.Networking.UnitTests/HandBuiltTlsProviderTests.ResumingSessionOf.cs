@@ -10,7 +10,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// A handshake that resumes the session of an earlier one on another connection, as an FTP data
-/// connection resumes the control connection's (STD-220, ADR-1466).
+/// connection resumes the control connection's (STD-220, ADR-1468).
 /// </summary>
 public sealed partial class HandBuiltTlsProviderTests
 {

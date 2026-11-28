@@ -7,7 +7,7 @@ namespace Curl.Original.Protocol.Ftp;
 
 /// <summary>
 /// Both FTP TLS handshakes name the control connection as their session source, so the data
-/// connection resumes its session, as vsftpd's <c>require_ssl_reuse</c> demands (STD-220, ADR-1466).
+/// connection resumes its session, as vsftpd's <c>require_ssl_reuse</c> demands (STD-220, ADR-1468).
 /// The TLS double refuses a data handshake that does not resume, as vsftpd does.
 /// </summary>
 [TestClass]
