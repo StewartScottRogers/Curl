@@ -4,7 +4,7 @@ namespace Curl.Protocol.Abstractions;
 
 /// <summary>
 /// Pins <see cref="TransferReport.HeaderCount" />, what <c>%{num_headers}</c> prints: the trailers alone,
-/// else the report's own header lines, else the count a followed response left (ADR-1476).
+/// else the report's own header lines, else the count a followed response left (ADR-1477).
 /// </summary>
 [TestClass]
 public sealed class TransferReportHeaderCountTests

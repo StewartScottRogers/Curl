@@ -30,4 +30,4 @@ A successful hop with no HTTP response is left as it is: it was not measured.
 ## Consequences
 
 `%header{...}` and `%{header_json}` stay empty, as curl's are. `%{num_headers}`, which this
-decision left at `0`, prints the followed response's count since ADR-1476 (BL-6096).
+decision left at `0`, prints the followed response's count since ADR-1477 (BL-6096).

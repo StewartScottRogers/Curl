@@ -1,4 +1,4 @@
-# ADR-1476: A followed hop with no response keeps the followed response's header count
+# ADR-1477: A followed hop with no response keeps the followed response's header count
 
 - Status: Accepted
 - Date: 2026-11-28

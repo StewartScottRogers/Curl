@@ -1069,7 +1069,7 @@ public sealed class RedirectFollower(
             };
         }
 
-        // curl overwrites %{http_code}, %{http_version}, %{content_type} and %{num_headers} only when a response arrives, so a followed hop that fails without one leaves those of the response it followed (measured 2026-11-28, BL-6095 and BL-6096, ADR-1473, ADR-1476). A report with no HTTP version had no HTTP response; a status code it already carries stays, and header lines it counts itself replace the followed count.
+        // curl overwrites %{http_code}, %{http_version}, %{content_type} and %{num_headers} only when a response arrives, so a followed hop that fails without one leaves those of the response it followed (measured 2026-11-28, BL-6095 and BL-6096, ADR-1473, ADR-1477). A report with no HTTP version had no HTTP response; a status code it already carries stays, and header lines it counts itself replace the followed count.
         private TransferReport WithFollowedResponse(TransferReport report, bool succeeded)
         {
             if (succeeded || report.HttpVersion is not null || followedReport is not { } followed)

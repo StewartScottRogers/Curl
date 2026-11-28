@@ -86,7 +86,7 @@ public sealed record TransferReport
     /// Gets the <see cref="HeaderCount" /> of the response a <c>-L</c> chain followed, set when the followed
     /// hop fails with no response; zero otherwise. Those headers are not in <see cref="ResponseHeaders" />, so
     /// <c>%{header_json}</c> and <c>%header{}</c> show none, but <c>%{num_headers}</c> still counts them, as
-    /// curl does, unless this report counts headers of its own (ADR-1476).
+    /// curl does, unless this report counts headers of its own (ADR-1477).
     /// </summary>
     public int FollowedHeaderCount { get; init; }
 

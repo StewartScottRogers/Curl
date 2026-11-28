@@ -29,7 +29,7 @@ Measured in BL-6095 (2026-11-28) with `Record-CurlExchange.ps1` and `C:\Program 
 ## Notes
 
 - Done directly rather than through the /feature agent stages: a one-property change, and the run's cost cap is small.
-- Plan: `TransferReport.FollowedHeaderCount` and a computed `HeaderCount`; `RedirectFollower` sets the former, `TransferWriteOutVariables` prints the latter. A failed hop that counts header lines of its own prints those (ADR-1476).
+- Plan: `TransferReport.FollowedHeaderCount` and a computed `HeaderCount`; `RedirectFollower` sets the former, `TransferWriteOutVariables` prints the latter. A failed hop that counts header lines of its own prints those (ADR-1477).
 - Widened `touches` by the Abstractions unit test, `Curl.Core.UnitLibrary/CLAUDE.md` and ADR-1473 (its Consequences said `%{num_headers}` still printed 0); BL-6093, the other task in Doing, names none of them.
 - Both repros (302 with four headers; silent listener under `-L -m 2`, and a closed port) print `4|{}|302` from real curl and from Curl (exit 28 and 7).
 - Quality: the full `-Library` run could not finish before the deadline (93 of 171 test projects after 60 minutes), so it was stopped, Curl.Output.UnitTests and Curl.Protocol.Abstractions.UnitTests were run with coverage into the same results directory, and the script scored it with `-SkipTestRun`: Core, Output and Abstractions 100% line and branch, 0 failing members.

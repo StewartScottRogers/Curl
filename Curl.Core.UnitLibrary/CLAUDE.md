@@ -49,7 +49,7 @@ effective URL, summed header/request/connection counts, timings from the first h
 `RedirectDuration` - counted from `-m`'s start when a followed hop ends with exit 28, ADR-1472;
 a followed hop that fails with no HTTP response keeps the followed response's code, HTTP version
 and content type, ADR-1473, and its header count unless the hop counts header lines of its own,
-ADR-1476). Without `-L` it returns the dispatcher's result unchanged. Given a
+ADR-1477). Without `-L` it returns the dispatcher's result unchanged. Given a
 `HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
 8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy. Given a
 `HopAltSvcSelector`, it looks each hop's `--alt-svc` route and HTTP version up again from the
