@@ -36,3 +36,4 @@ Split from BL-6028. `HttpTransferDeadline.cs` and the two test files are named h
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 9539172d 09658ea9 8a7549dc 3d836d5e.
