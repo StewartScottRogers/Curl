@@ -31,3 +31,4 @@ Measured in BL-6095 (2026-11-28) with `Record-CurlExchange.ps1` and `C:\Program 
 ## Log
 
 - 2026-11-28: Created.
+- 2026-11-28: Backlog -> Doing. Criteria at claim: 1d52f2be 9563dfe4 3d836d5e.
