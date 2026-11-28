@@ -43,7 +43,7 @@ Split from BL-6028. `HttpTransferDeadline.cs` and the two test files are named h
 Measured with `Curl.Console` against a loopback listener that is never accepted from, `-m 2`: `https` five runs
 `t=2.023` to `2.095`, `nc=1`; `wss` `t=2.059` and `2.153`, `nc=1`; `http` `t=2.116`. `-m 10 --connect-timeout 1`
 keeps its shorter total (`t=1.19`). curl's `t=2.0x` was measured under BL-6028. Build clean, fast tests green,
-both libraries 100% line and branch with no failing member. Left, filed as BL-6091: a followed redirect hop.
+both libraries 100% line and branch with no failing member. Left, filed as BL-6092: a followed redirect hop.
 
 ## Log
 

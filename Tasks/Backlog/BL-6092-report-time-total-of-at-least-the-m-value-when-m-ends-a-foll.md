@@ -1,5 +1,5 @@
 ---
-id: BL-6091
+id: BL-6092
 title: Report %{time_total} of at least the -m value when -m ends a followed redirect hop
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-28
 completed:
 ---
-# BL-6091 — Report %{time_total} of at least the -m value when -m ends a followed redirect hop
+# BL-6092 — Report %{time_total} of at least the -m value when -m ends a followed redirect hop
 
 ## Goal
 
