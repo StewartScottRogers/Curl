@@ -38,6 +38,38 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    [DataRow("403 Forbidden", true, "The requested URL returned error: 403", DisplayName = "-f, 403")]
+    [DataRow("407 Proxy Authentication Required", true, "The requested URL returned error: 407", DisplayName = "-f, 407 with no challenge")]
+    [DataRow("302 Found", true, "CONNECT tunnel failed, response 302", DisplayName = "-f, 302")]
+    [DataRow("403 Forbidden", false, "CONNECT tunnel failed, response 403", DisplayName = "no -f, 403")]
+    public async Task ConnectAsync_RefusedConnect_ReportsCurlsLineAfterTheReplyHead(string status, bool failsOnHttpErrorStatus, string expected)
+    {
+        var events = new RecordingTransferEvents();
+        var (connector, _) = CreateAuthenticatingConnector(
+            HttpAuthSchemes.Basic,
+            new ScriptedConnection(Encoding.Latin1.GetBytes($"HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")));
+
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events, FailsOnHttpErrorStatus = failsOnHttpErrorStatus });
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("* " + expected, events.Transcript[^1]);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_FailsOnHttpErrorStatusAndAuthenticationProblem_ReportsNoLineAfterTheReplyHead()
+    {
+        var events = new RecordingTransferEvents();
+        var (connector, _) = CreateAuthenticatingConnector(HttpAuthSchemes.Basic, new ScriptedConnection(Encoding.Latin1.GetBytes(BasicChallengeClosing)));
+
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events, FailsOnHttpErrorStatus = true });
+
+        Assert.AreEqual("CONNECT tunnel failed, response 407", result.ErrorMessage);
+        CollectionAssert.Contains(events.Info, "Basic authentication problem, ignoring.");
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("CONNECT tunnel failed", StringComparison.Ordinal) || line.StartsWith("The requested URL", StringComparison.Ordinal)));
+        Assert.IsFalse(events.Transcript[^1].StartsWith('*'));
+    }
+
+    [TestMethod]
     [DataRow(407, "Basic realm=\"p\"", "Basic YTpi", true, DisplayName = "Basic sent, Basic offered")]
     [DataRow(407, "Digest realm=\"p\", nonce=\"n\"", "Digest username=\"a\"", true, DisplayName = "Digest sent, Digest offered")]
     [DataRow(407, "Digest realm=\"p\", nonce=\"n\", stale=true", "Digest username=\"a\"", false, DisplayName = "Digest sent, nonce stale")]

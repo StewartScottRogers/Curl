@@ -25,6 +25,20 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(HttpFailMode.Fail, true, DisplayName = "-f")]
+    [DataRow(HttpFailMode.FailWithBody, false, DisplayName = "--fail-with-body")]
+    [DataRow(HttpFailMode.None, false, DisplayName = "neither")]
+    public async Task ExecuteAsync_FailMode_TellsTheConnectorWhetherAnErrorStatusFails(HttpFailMode mode, bool expected)
+    {
+        QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, "CONNECT tunnel failed, response 403", null, 0, 403));
+        TransferContext context = ProgressContext("https://example.com/", new RecordingTransferProgress(), new HttpRequestOptions { Fail = mode });
+
+        await Handler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual(expected, connector.Targets.Single().FailsOnHttpErrorStatus);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_FailAndProxyRefuses407WithoutAuthenticationProblem_NamesTheStatus()
     {
         QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, "CONNECT tunnel failed, response 407", null, 0, 407));

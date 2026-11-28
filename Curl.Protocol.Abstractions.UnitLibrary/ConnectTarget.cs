@@ -201,6 +201,20 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// </remarks>
     public bool TrustsSystemStoreOnly { get; init; }
 
+    /// <summary>
+    /// Gets whether the transfer fails on an HTTP status of 400 or above (<c>-f</c>, libcurl's
+    /// <c>CURLOPT_FAILONERROR</c>; not <c>--fail-with-body</c>); <see langword="false" />, the
+    /// default, otherwise.
+    /// </summary>
+    /// <remarks>
+    /// A connector whose proxy refuses the CONNECT with such a status writes
+    /// <c>The requested URL returned error: N</c> as its <c>-v</c> line in place of
+    /// <c>CONNECT tunnel failed, response N</c>, or neither when the <c>407</c> drew curl's
+    /// authentication problem, as curl 8.22.0 does (measured, BL-6049, ADR-1466). The failed
+    /// result is the same either way; the caller decides the transfer's exit code.
+    /// </remarks>
+    public bool FailsOnHttpErrorStatus { get; init; }
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));

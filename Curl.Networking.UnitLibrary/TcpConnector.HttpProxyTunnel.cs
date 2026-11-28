@@ -125,7 +125,7 @@ public sealed partial class TcpConnector
 
             if (!onThisConnection)
             {
-                return await CloseUnopenedTunnelAsync(connection, reply, proxyAuthorization, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure, tunnel.Target.Events, tunnel.ReplyHeadBytes.Value, tunnel.LastStatusReply.Value).ConfigureAwait(false);
+                return await CloseUnopenedTunnelAsync(connection, reply, proxyAuthorization, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure, tunnel.Target, tunnel.ReplyHeadBytes.Value, tunnel.LastStatusReply.Value).ConfigureAwait(false);
             }
 
             proxyAuthorization = answer;
@@ -147,13 +147,13 @@ public sealed partial class TcpConnector
         ExceptionDispatchInfo? exception,
         string? redialAuthorization,
         string? firstSspiFailure,
-        ITransferEvents events,
+        ConnectTarget target,
         long headBytes,
         (int StatusCode, int HeaderCount) lastStatusReply)
     {
         await connection.DisposeAsync().ConfigureAwait(false);
         exception?.Throw();
-        return redialAuthorization is null ? (TunnelFailure(reply, proxyAuthorization, firstSspiFailure, events, headBytes, lastStatusReply), null) : (null, redialAuthorization);
+        return redialAuthorization is null ? (TunnelFailure(reply, proxyAuthorization, firstSspiFailure, target, headBytes, lastStatusReply), null) : (null, redialAuthorization);
     }
 
     /// <summary>
