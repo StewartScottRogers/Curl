@@ -14,6 +14,13 @@ Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
 
+Proxy (BL-6087): curl's own connection is tunnelled through `ITransferContext.Proxy`
+when it is set, and WinLDAP's own second connection goes straight to the host. A connect
+of curl's own that fails writes `closing connection #N`; under `-f` (not
+`--fail-with-body`) a proxy that refuses the CONNECT with 400 or above makes it exit 22
+(`The requested URL returned error: N`, or `HTTP response code said error` after a `407`
+authentication problem).
+
 Diagnostic log (`--log-level`, ADR-0222, BL-929): `LdapTransferLog` writes under the
 `ldap` component - the bind by DN, the search's base, scope and filter and how many entries
 it returned (`info`), each message sent and search reply received by operation and

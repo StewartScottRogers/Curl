@@ -19,7 +19,10 @@ namespace Curl.Original.Protocol.Ldap;
 /// LDAPv3 bind with <see cref="ITransferContext.Credentials" />' user name as the DN and its
 /// password, or the anonymous bind (empty DN and password) without <c>-u</c>, which the
 /// OpenLDAP dialect leaves out after a successful StartTLS; how it fails is
-/// <see cref="LdapBind" />'s. A connect failure is returned as the connector reported it.
+/// <see cref="LdapBind" />'s. Curl's own connection is tunnelled through
+/// <see cref="ITransferContext.Proxy" /> when it is set. A connect failure writes
+/// <c>closing connection #N</c> and is returned as the connector reported it, except that under
+/// <c>-f</c> a proxy that refused the CONNECT with 400 or above makes it exit 22.
 /// </para>
 /// <para>
 /// The URL is read as the build reads it (<see cref="WinLdapUrlReader" />,
@@ -64,6 +67,9 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     private const int DefaultTlsPort = 636;
 
     private const string TlsScheme = "ldaps";
+
+    /// <summary>curl's generic exit 22 text, used when a proxy's <c>407</c> drew its authentication problem (BL-6087).</summary>
+    private const string HttpResponseCodeSaidError = "HTTP response code said error";
 
     /// <summary>The schemes this handler serves, as curl 8.21.0's <c>--version</c> protocol list names them.</summary>
     private static readonly string[] Schemes = ["ldap", TlsScheme];
@@ -184,9 +190,40 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     {
         bool winLdapChecksCertificate = dialect == LdapDialect.WinLdap && target.UseTls && context.Credentials is not null;
         ConnectResult connect = await connector.ConnectAsync(winLdapChecksCertificate ? target with { TrustsSystemStoreOnly = true } : target, context.CancellationToken).ConfigureAwait(false);
-        TransferResult? failure = connect.Connection is not null ? null : ConnectFailure(connect);
-        return (connect, failure);
+        if (connect.Connection is not null)
+        {
+            return (connect, null);
+        }
+
+        // curl 8.22.0 closes every connection of its own it could not open (measured, BL-6087).
+        context.Events.ReportInfo(LdapVerboseLines.Closing(connect.ConnectionNumber));
+        return (connect, CurlConnectFailure(context, connect));
     }
+
+    /// <summary>
+    /// The failure of curl's own connect: under <c>-f</c>, exit 22 when a proxy refused the CONNECT
+    /// with 400 or above, naming the status, or curl's generic text when the <c>407</c> drew its
+    /// authentication problem; otherwise as the connector reported it (measured, BL-6087).
+    /// </summary>
+    private static TransferResult CurlConnectFailure(ITransferContext context, ConnectResult connect)
+    {
+        int status = connect.ProxyConnectResponseCode;
+        if (!FailsOnProxyStatus(context) || status < 400)
+        {
+            return ConnectFailure(connect);
+        }
+
+        return TransferResult.Failure(
+            CurlExitCode.HttpReturnedError,
+            connect.IsProxyAuthenticationProblem ? HttpResponseCodeSaidError : $"The requested URL returned error: {status}");
+    }
+
+    /// <summary>
+    /// Whether <c>-f</c> fails the transfer when a proxy refuses the CONNECT, as
+    /// <see cref="ConnectTarget.FailsOnHttpErrorStatus" /> tells the connector;
+    /// <c>--fail-with-body</c> does not.
+    /// </summary>
+    private static bool FailsOnProxyStatus(ITransferContext context) => context.Http?.Fail == HttpFailMode.Fail;
 
     /// <summary>
     /// Binds and searches on <paramref name="connection" />, curl's own connection, or, for the WinLDAP
@@ -231,11 +268,13 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// <summary>
     /// The target of WinLDAP's own connection: for <c>ldaps</c> the handshake sends the machine name
     /// as its server name and trusts only the Windows certificate store, whatever <c>--cacert</c>
-    /// says, unless <c>-k</c> turns verification off (CGR-289, ADR-0979, ADR-0992); a plaintext
-    /// target is unchanged.
+    /// says, unless <c>-k</c> turns verification off (CGR-289, ADR-0979, ADR-0992). WinLDAP knows
+    /// nothing of curl's proxy, so this connection goes straight to the host (measured, BL-6087).
     /// </summary>
     private static ConnectTarget WinLdapTargetOf(ConnectTarget target) =>
-        (target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target) with { Events = NoTransferEvents.Instance };
+        (target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target)
+            with
+        { Events = NoTransferEvents.Instance, Proxy = null, FailsOnHttpErrorStatus = false };
     /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
     /// <remarks>The WinLDAP dialect first names the library and the URL, and once the URL is read, the kind of connection.</remarks>
     private async ValueTask<TransferResult> SearchOnAsync(IConnection connection, ITransferContext context)
@@ -284,14 +323,21 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
 
     /// <summary>
     /// The host and port the transfer's URL names, with TLS from the first byte for
-    /// <c>ldaps</c>, reporting the connect to the transfer's events.
+    /// <c>ldaps</c>, tunnelled through <see cref="ITransferContext.Proxy" /> when it is set,
+    /// reporting the connect to the transfer's events.
     /// </summary>
     private static ConnectTarget TargetOf(ITransferContext context)
     {
         CurlUrl url = context.Url;
         bool useTls = url.Scheme == TlsScheme;
         int defaultPort = useTls ? DefaultTlsPort : DefaultPort;
-        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls) { Events = context.Events, DiagnosticLog = context.DiagnosticLog };
+        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls)
+        {
+            Proxy = context.Proxy,
+            FailsOnHttpErrorStatus = FailsOnProxyStatus(context),
+            Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
+        };
     }
 
     /// <summary>
