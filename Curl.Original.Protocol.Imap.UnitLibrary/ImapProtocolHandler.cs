@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Imap;
@@ -14,10 +15,11 @@ namespace Curl.Original.Protocol.Imap;
 /// The connection goes to the URL's host and port (143 for <c>imap</c>, 993 for <c>imaps</c>
 /// unless the URL names one), through <see cref="ITransferContext.Proxy" /> when one is set;
 /// an <c>imaps</c> connection is TLS from its first byte (ADR-0121 §4). A failed connect is
-/// returned as the connector reported it. Commands are tagged <c>A001</c>, <c>A002</c>, ...
-/// as <see cref="ImapControlChannel" /> describes, the letter <c>B</c> on the run's second
-/// connection and so on, and the conversation and the exit code of each failure are described
-/// on <see cref="ImapSession" />. A successful transfer leaves its connection, logged in, to the
+/// returned as the connector reported it, but under <c>-f</c> a proxy that refuses the CONNECT
+/// with 400 or above makes it exit 22 (BL-6085). Commands are tagged <c>A001</c>, <c>A002</c>,
+/// ... as <see cref="ImapControlChannel" /> describes, the letter <c>B</c> on the run's second
+/// connection and so on, and the conversation and the exit code of each other failure are
+/// described on <see cref="ImapSession" />. A successful transfer leaves its connection, logged in, to the
 /// run's connection cache, and the next URL for the same host, port and login carries on with
 /// its next tag; <c>LOGOUT</c> is sent when the cache closes it (<see cref="ImapKeptConnection" />, BL-1987).
 /// </para>
@@ -144,12 +146,12 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             Proxy = context.Proxy,
             Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
+            FailsOnHttpErrorStatus = FailsOnProxyStatus(context),
         };
         ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
-            return new ImapConnectOutcome(
-                new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused }, null);
+            return new ImapConnectOutcome(EndFailedConnect(context, connected), null);
         }
 
         context.Progress.ReportTransferStarted();
@@ -216,16 +218,14 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
             PoolScheme = url.Scheme,
+            FailsOnHttpErrorStatus = FailsOnProxyStatus(context),
         };
         string loginKey = ImapKeptConnection.LoginKeyOf(context);
         long started = context.TimeProvider.GetTimestamp();
         ConnectResult connected = await ConnectAsync(target, loginKey, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
-            return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage)
-            {
-                IsConnectionRefused = connected.IsConnectionRefused,
-            };
+            return EndFailedConnect(context, connected);
         }
 
         long connectEnded = context.TimeProvider.GetTimestamp();
@@ -246,6 +246,35 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             ReportConnectionEnd(context.Events, result, session.Phase, target, connected.ConnectionNumber);
             return StampTimings(result, context, started, connected, connectEnded);
         }
+    }
+
+    /// <summary>
+    /// Whether <c>-f</c> fails the transfer when a proxy refuses the connection's CONNECT, as
+    /// <see cref="ConnectTarget.FailsOnHttpErrorStatus" /> tells the connector;
+    /// <c>--fail-with-body</c> does not.
+    /// </summary>
+    private static bool FailsOnProxyStatus(ITransferContext context) => context.Http?.Fail == HttpFailMode.Fail;
+
+    /// <summary>
+    /// Writes the <c>closing connection #N</c> line curl 8.22.0's <c>-v</c> ends every failed
+    /// connect with, and gives the transfer's result: under <c>-f</c>, exit 22 when a proxy
+    /// refused the CONNECT with 400 or above, naming the status, or curl's generic text when the
+    /// <c>407</c> drew its authentication problem; otherwise the connector's exit code and
+    /// message (measured, BL-6085).
+    /// </summary>
+    private static TransferResult EndFailedConnect(ITransferContext context, ConnectResult connected)
+    {
+        context.Events.ReportInfo(ImapInfoLines.Closing(connected.ConnectionNumber));
+        int status = connected.ProxyConnectResponseCode;
+        if (FailsOnProxyStatus(context) && status >= 400)
+        {
+            string message = connected.IsProxyAuthenticationProblem
+                ? "HTTP response code said error"
+                : string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {status}");
+            return TransferResult.Failure(CurlExitCode.HttpReturnedError, message);
+        }
+
+        return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
     }
 
     /// <summary>
