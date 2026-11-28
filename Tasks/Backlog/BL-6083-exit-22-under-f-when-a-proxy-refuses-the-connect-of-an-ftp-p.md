@@ -1,5 +1,5 @@
 ---
-id: BL-6081
+id: BL-6083
 title: Exit 22 under -f when a proxy refuses the CONNECT of an ftp -p tunnel
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-27
 completed:
 ---
-# BL-6081 — Exit 22 under -f when a proxy refuses the CONNECT of an ftp -p tunnel
+# BL-6083 — Exit 22 under -f when a proxy refuses the CONNECT of an ftp -p tunnel
 
 ## Goal
 

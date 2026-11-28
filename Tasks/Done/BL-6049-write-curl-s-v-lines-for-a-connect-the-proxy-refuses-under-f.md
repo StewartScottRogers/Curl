@@ -43,7 +43,7 @@ code, not run). The connector is not told the fail mode, so the likely seam is a
   body), 407 with no challenge (user, `Connection: close`), 407 Basic with no user: `* The requested URL returned error: N`.
   407 Basic to `-U a:b`, and `--proxy-anyauth` refused a second time: neither line. 302 under `-f`, 403 without `-f` and 403
   under `--fail-with-body`: `* CONNECT tunnel failed, response N`.
-- The `ftp://` `-p -f` case differs from curl (exit 7, not 22): filed as BL-6081.
+- The `ftp://` `-p -f` case differs from curl (exit 7, not 22): filed as BL-6083.
 - Build clean, fast tests green. `Measure-CodeQuality.ps1` over the three libraries would run all 151 test projects
   (66 done after 60 minutes), past the deadline, so it was stopped and the three libraries' own test projects were measured
   and scored with `-SkipTestRun`: every changed member passes line, branch, complexity and CRAP; the 12 members listed
