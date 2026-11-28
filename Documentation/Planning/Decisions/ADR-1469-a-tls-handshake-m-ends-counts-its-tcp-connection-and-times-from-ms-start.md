@@ -1,4 +1,4 @@
-# ADR-1467 — A TLS handshake `-m` ends counts its TCP connection, and times a timed-out transfer from `-m`'s start
+# ADR-1469 — A TLS handshake `-m` ends counts its TCP connection, and times a timed-out transfer from `-m`'s start
 
 - Status: Accepted
 - Date: 2026-11-27

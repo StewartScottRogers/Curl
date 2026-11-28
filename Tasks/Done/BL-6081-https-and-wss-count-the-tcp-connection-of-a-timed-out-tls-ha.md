@@ -40,7 +40,7 @@ Finished from the stash (second run). Measured with this build against a never-a
 `wss` `[28 t=2.014..2.067 nc=1]` over 10 runs; `https` `nc=1`; refused `127.0.0.1:1` `nc=0` for `https` and `wss`.
 The stashed change alone left `wss` at `t=1.76..1.99` on some runs, because its total was timed from the handler's
 start, after `-m`'s. `EndPointReportingProtocolHandler` (added to `touches`; no other task in Doing names it) now
-times an exit 28 whose handler reported no timings from `ITransferContext.OperationStarted` (ADR-1467). `https`
+times an exit 28 whose handler reported no timings from `ITransferContext.OperationStarted` (ADR-1469). `https`
 times itself and is left to BL-6082.
 Quality: scored from the coverage of the three libraries' own `.UnitTests` (`-SkipTestRun`), a lower bound: no
 failing member is one this change added or altered. `dotnet build` clean, fast tests green.
@@ -49,4 +49,4 @@ failing member is one this change added or altered. `dotnet build` clean, fast t
 
 - 2026-11-27: Created.
 - 2026-11-27: Backlog -> Doing. Criteria at claim: f95c1f0d 0fe6442f 682d32cc 171fc27d 3d836d5e.
-- 2026-11-27: Doing -> Done. https and wss count the TCP connection of a timed-out TLS handshake in num_connects (1), and wss times it from -m's start (ADR-1467).
+- 2026-11-27: Doing -> Done. https and wss count the TCP connection of a timed-out TLS handshake in num_connects (1), and wss times it from -m's start (ADR-1469).

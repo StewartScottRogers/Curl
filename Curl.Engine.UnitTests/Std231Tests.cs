@@ -6,7 +6,7 @@ namespace Curl.Engine;
 /// Pins STD-231: a connect that failed, or that <c>-m</c> cancelled, during its TLS handshake had its TCP connection
 /// open, which curl 8.22.0 counts in the failed transfer's <c>%{num_connects}</c>, as 1 for both <c>https</c> and
 /// <c>wss</c> (measured, BL-6028 Notes); <see cref="EndPointRecordingConnector" /> counts it, and
-/// <see cref="EndPointReportingProtocolHandler" /> times a timed-out transfer from <c>-m</c>'s start (ADR-1467).
+/// <see cref="EndPointReportingProtocolHandler" /> times a timed-out transfer from <c>-m</c>'s start (ADR-1469).
 /// </summary>
 [TestClass]
 public sealed class Std231Tests
