@@ -46,7 +46,7 @@ rewriting POST to GET and dropping credentials to another host, port or scheme a
 8.21.0 does - except that each hop sends its own URL's user information unless `-u`
 credentials go to it (ADR-0240, BL-814) - and returns the last hop's result with one merged report (redirect count,
 effective URL, summed header/request/connection counts, timings from the first hop with
-`RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. Given a
+`RedirectDuration` - counted from `-m`'s start when a followed hop ends with exit 28, ADR-1472). Without `-L` it returns the dispatcher's result unchanged. Given a
 `HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
 8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy. Given a
 `HopAltSvcSelector`, it looks each hop's `--alt-svc` route and HTTP version up again from the

@@ -189,7 +189,9 @@ public sealed class RedirectFollower(
     /// header, request and connection counts summed over every hop, and
     /// <see cref="TransferReport.Timings" /> merged by <see cref="RedirectHopTimings" />: measured from
     /// the first hop's start, each phase the sum of its time on every hop, and
-    /// <see cref="TransferTimings.RedirectDuration" /> the time until the last hop began.
+    /// <see cref="TransferTimings.RedirectDuration" /> the time until the last hop began. When a followed
+    /// hop ends with exit 28 and <paramref name="context" /> has an
+    /// <see cref="ITransferContext.OperationStarted" />, those times are counted from it instead.
     /// </returns>
     /// <remarks>
     /// It tells the handler that the chain ended itself, when the chain returns. The engine does not call it: it calls
@@ -244,7 +246,7 @@ public sealed class RedirectFollower(
         HttpRequestOptions http,
         RedirectPolicy policy)
     {
-        RedirectChain chain = new(context.TimeProvider);
+        RedirectChain chain = new(context.TimeProvider, context.OperationStarted);
         RedirectDiagnosticLog log = new(context.DiagnosticLog);
         long operationStarted = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
         long? uploadStart = SeekableStart(context.Upload);
@@ -968,8 +970,10 @@ public sealed class RedirectFollower(
 
     /// <summary>
     /// What the hops of one chain add up to, merged into the last hop's report.
+    /// <paramref name="maxTimeStarted" /> is the first context's
+    /// <see cref="ITransferContext.OperationStarted" />, the instant <c>-m</c> counts from.
     /// </summary>
-    private sealed class RedirectChain(TimeProvider timeProvider)
+    private sealed class RedirectChain(TimeProvider timeProvider, long? maxTimeStarted)
     {
         private readonly RedirectHopTimings timings = new(timeProvider);
         private TransferReport? lastReport;
@@ -1054,9 +1058,20 @@ public sealed class RedirectFollower(
                     RequestSize = requestSize,
                     ConnectionCount = connectionCount,
                     EarlierResponseHeaders = [.. earlierResponseHeaders],
-                    Timings = timings.Merge(report.Timings),
+                    Timings = CountedFromMaxTimeStart(timings.Merge(report.Timings), outcome.ExitCode),
                 },
             };
+        }
+
+        // -m counts from its watchdog's start, before the first handler's, so a chain it ends on a followed hop counts from there and its total is not under -m's value, as curl's is not (STD-231, ADR-1470). Only a followed hop has a redirect duration: the engine already counts a first hop's timeout from there.
+        private TransferTimings? CountedFromMaxTimeStart(TransferTimings? merged, CurlExitCode exitCode)
+        {
+            if (exitCode != CurlExitCode.OperationTimedOut || maxTimeStarted is not long started || merged is null || merged.RedirectDuration == TimeSpan.Zero)
+            {
+                return merged;
+            }
+
+            return merged with { Started = started, RedirectDuration = merged.RedirectDuration + timeProvider.GetElapsedTime(started, merged.Started) };
         }
     }
 }
