@@ -39,7 +39,7 @@ internal sealed class MultiCallbackQueue
         {
             lock (gate)
             {
-                return arrived.Task;
+                return queued.Count > 0 ? Task.CompletedTask : arrived.Task;
             }
         }
     }
@@ -111,12 +111,19 @@ internal sealed class MultiCallbackQueue
 
     private void Enqueue(QueuedCallback callback)
     {
+        TaskCompletionSource waiting;
         lock (gate)
         {
             queued.Enqueue(callback);
-            arrived.TrySetResult();
             queuedEvent.Set();
+            waiting = arrived;
+            arrived = NewArrivedSignal();
         }
+
+        // Completed through the pool's shared queue, never here: the calling thread blocks next, and a waiter put
+        // on its own work queue resumes only once an idle thread takes it from there, which none does while the
+        // shared queue has work, so a multi wait ran to its whole timeout on a loaded machine (BL-6090).
+        ThreadPool.UnsafeQueueUserWorkItem(static signal => signal.SetResult(), waiting, preferLocal: false);
     }
 
     private QueuedCallback? TryDequeue()
@@ -124,9 +131,8 @@ internal sealed class MultiCallbackQueue
         lock (gate)
         {
             QueuedCallback? next = queued.TryDequeue(out QueuedCallback? callback) ? callback : null;
-            if (queued.Count == 0 && arrived.Task.IsCompleted)
+            if (queued.Count == 0)
             {
-                arrived = NewArrivedSignal();
                 queuedEvent.Reset();
             }
 
