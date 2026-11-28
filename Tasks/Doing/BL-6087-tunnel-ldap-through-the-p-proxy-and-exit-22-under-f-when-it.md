@@ -30,3 +30,4 @@ Measured while doing BL-6083 with `Record-CurlExchange.ps1` (`-sS -v -p -f -x ht
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 3390b2f5 6ff2b1f3.
