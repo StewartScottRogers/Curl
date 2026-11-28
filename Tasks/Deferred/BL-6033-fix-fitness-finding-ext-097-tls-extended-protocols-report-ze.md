@@ -108,3 +108,4 @@ Second run, 2026-11-28 (code written, left uncommitted for the stash):
 - 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019 in Doing; plan and measurements are under Notes
 - 2026-11-28: Backlog -> Doing. Criteria at claim: be1c9677 69116afe 3d836d5e.
 - 2026-11-28: Doing -> Backlog. Left: quality gate and fast suite for the uncommitted remote_ip fix (ADR-1475), then the NATS receive's pretransfer and starttransfer; see Notes
+- 2026-11-28: Backlog -> Deferred. Split into BL-6093 (remote_ip when -m ends the TLS handshake, continues the stash) and BL-6094 (receive pretransfer and starttransfer); nothing is left to do here.
