@@ -1,4 +1,4 @@
-# ADR-1466: The connect target tells the connector that -f fails on a refused CONNECT's status
+# ADR-1467: The connect target tells the connector that -f fails on a refused CONNECT's status
 
 - Status: Accepted
 - Date: 2026-11-27

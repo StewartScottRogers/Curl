@@ -22,7 +22,7 @@ public sealed partial class TcpConnector
 
     // curl 8.22.0's -v line after a refused CONNECT's reply head: the refusal, unless -f fails the
     // transfer on the status first, which names the status, or says nothing after an authentication
-    // problem (measured, BL-6049 Notes, ADR-1466).
+    // problem (measured, BL-6049 Notes, ADR-1467).
     private static void ReportRefusal(ConnectTarget target, int statusCode, string refused, bool authenticationProblem)
     {
         if (!target.FailsOnHttpErrorStatus || statusCode < 400)

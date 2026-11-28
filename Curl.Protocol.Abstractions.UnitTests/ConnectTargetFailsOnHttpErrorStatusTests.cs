@@ -2,7 +2,7 @@ namespace Curl.Protocol.Abstractions;
 
 /// <summary>
 /// <see cref="ConnectTarget.FailsOnHttpErrorStatus" /> is off unless a handler sets it for
-/// <c>-f</c> (BL-6049, ADR-1466).
+/// <c>-f</c> (BL-6049, ADR-1467).
 /// </summary>
 [TestClass]
 public sealed class ConnectTargetFailsOnHttpErrorStatusTests

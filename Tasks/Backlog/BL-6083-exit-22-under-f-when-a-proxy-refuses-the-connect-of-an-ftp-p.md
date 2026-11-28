@@ -23,7 +23,7 @@ ftp://example.test/x`, reply `403`, `Content-Length: 0`): reference curl 8.22.0 
 `* The requested URL returned error: 403`, `* closing connection #0`,
 `curl: (22) The requested URL returned error: 403`; Curl writes `* CONNECT tunnel failed, response 403` and
 `curl: (7) CONNECT tunnel failed, response 403`. The FTP handler does not set
-`ConnectTarget.FailsOnHttpErrorStatus` (ADR-1466) and does not turn the failed connect into exit 22; see
+`ConnectTarget.FailsOnHttpErrorStatus` (ADR-1467) and does not turn the failed connect into exit 22; see
 `HttpProtocolHandler.FailedConnectResult` (STD-125, STD-227, ADR-1465) for HTTP's rule, the `407` text included.
 Other protocols that tunnel through a proxy were not measured: measure them and file what differs.
 

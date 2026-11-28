@@ -36,7 +36,7 @@ code, not run). The connector is not told the fail mode, so the likely seam is a
 `touches` includes the `ConnectTarget` contract file; widen it with that contract's test file if a test is added there.
 
 - 2026-11-27 (lane 3): `ConnectTarget.FailsOnHttpErrorStatus`, set by the HTTP handler for `-f` only, picks the line in
-  `TcpConnector.TunnelFailure` (ADR-1466). `touches` widened to `HttpProtocolHandler.ConnectTargets.cs` (where the target is
+  `TcpConnector.TunnelFailure` (ADR-1467). `touches` widened to `HttpProtocolHandler.ConnectTargets.cs` (where the target is
   built) and the contract's new test file; the only other task in Doing (BL-6028) names neither.
 - Measured with `Record-CurlExchange.ps1` as a proxy, reference curl 8.22.0 and Curl, `-sS -v -x http://127.0.0.1:P
   https://example.test/x`; the `*` and `curl:` lines are identical in all ten cases. Under `-f`: 403 (with and without a
