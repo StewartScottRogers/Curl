@@ -192,6 +192,10 @@ public sealed class RedirectFollower(
     /// <see cref="TransferTimings.RedirectDuration" /> the time until the last hop began. When a followed
     /// hop ends with exit 28 and <paramref name="context" /> has an
     /// <see cref="ITransferContext.OperationStarted" />, those times are counted from it instead.
+    /// When a followed hop fails with no HTTP response, the report keeps the
+    /// <see cref="TransferReport.HttpVersion" /> of the response it followed, and that response's
+    /// <see cref="TransferReport.ResponseCode" /> and <see cref="TransferReport.ContentType" />
+    /// where the hop reported none.
     /// </returns>
     /// <remarks>
     /// It tells the handler that the chain ended itself, when the chain returns. The engine does not call it: it calls
@@ -977,6 +981,7 @@ public sealed class RedirectFollower(
     {
         private readonly RedirectHopTimings timings = new(timeProvider);
         private TransferReport? lastReport;
+        private TransferReport? followedReport;
         private string? lastReferer;
         private string? effectiveUrl;
         private long headerSize;
@@ -991,6 +996,7 @@ public sealed class RedirectFollower(
         public void Add(TransferReport? report, string? referer)
         {
             earlierResponseHeaders.AddRange(lastReport?.ResponseHeaders ?? []);
+            followedReport = lastReport;
             lastReport = report;
             lastReferer = referer;
             if (report is null)
@@ -1045,7 +1051,7 @@ public sealed class RedirectFollower(
 
         public TransferResult Merge(TransferResult outcome)
         {
-            TransferReport report = lastReport ?? new TransferReport();
+            TransferReport report = WithFollowedResponse(lastReport ?? new TransferReport(), outcome.IsSuccess);
             return outcome with
             {
                 Report = report with
@@ -1060,6 +1066,22 @@ public sealed class RedirectFollower(
                     EarlierResponseHeaders = [.. earlierResponseHeaders],
                     Timings = CountedFromMaxTimeStart(timings.Merge(report.Timings), outcome.ExitCode),
                 },
+            };
+        }
+
+        // curl overwrites %{http_code}, %{http_version} and %{content_type} only when a response arrives, so a followed hop that fails without one leaves those of the response it followed (measured 2026-11-28, BL-6095, ADR-1473). A report with no HTTP version had no HTTP response; a status code it already carries stays.
+        private TransferReport WithFollowedResponse(TransferReport report, bool succeeded)
+        {
+            if (succeeded || report.HttpVersion is not null || followedReport is not { } followed)
+            {
+                return report;
+            }
+
+            return report with
+            {
+                ResponseCode = report.ResponseCode == 0 ? followed.ResponseCode : report.ResponseCode,
+                HttpVersion = followed.HttpVersion,
+                ContentType = report.ContentType ?? followed.ContentType,
             };
         }
 
