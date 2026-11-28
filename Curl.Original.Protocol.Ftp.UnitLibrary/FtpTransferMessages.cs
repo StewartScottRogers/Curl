@@ -503,5 +503,19 @@ internal static class FtpTransferMessages
     /// <returns>The line, such as <c>closing connection #0</c>.</returns>
     internal static string ClosingConnection(long connectionNumber) => Format($"closing connection #{connectionNumber}");
 
+    /// <summary>
+    /// curl 8.22.0's exit 22 text under <c>-f</c> when a proxy's <c>407</c> to a CONNECT drew its
+    /// authentication problem (measured, BL-6083).
+    /// </summary>
+    internal const string HttpResponseCodeSaidError = "HTTP response code said error";
+
+    /// <summary>
+    /// curl 8.22.0's exit 22 text under <c>-f</c> when a proxy refuses a CONNECT (measured,
+    /// BL-6083).
+    /// </summary>
+    /// <param name="statusCode">The status the proxy answered the CONNECT with.</param>
+    /// <returns>The message, such as <c>The requested URL returned error: 403</c>.</returns>
+    internal static string RequestedUrlReturnedError(int statusCode) => Format($"The requested URL returned error: {statusCode}");
+
     private static string Format(FormattableString message) => message.ToString(CultureInfo.InvariantCulture);
 }

@@ -30,7 +30,10 @@ public sealed partial class TcpConnector
         catch (OperationCanceledException canceled)
         {
             // The TCP connection was open when the handshake was cancelled, which curl counts in %{num_connects} (STD-231).
-            canceled.Data[ConnectResult.TcpConnectedOnCancellationKey] = true;
+            // It carries the connection's end points, which an extended protocol reports (EXT-097).
+            canceled.Data[ConnectResult.TcpConnectedOnCancellationKey] = ConnectResult.Failed(CurlExitCode.OperationTimedOut, canceled.Message)
+                .WithTcpConnectedBeforeFailure(true)
+                .WithEndPointsBeforeFailure(dialed.LocalEndPoint, dialed.RemoteEndPoint);
             throw;
         }
 

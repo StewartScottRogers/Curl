@@ -32,13 +32,14 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         catch (OperationCanceledException canceled) when (canceled.Data.Contains(ConnectResult.TcpConnectedOnCancellationKey))
         {
             // -m ended a TLS handshake over an open TCP connection, which curl counts in %{num_connects} (STD-231).
-            recorder.RecordFailedAfterOpening();
+            ConnectResult? carried = ConnectResult.CarriedBy(canceled);
+            recorder.RecordFailedAfterOpening(carried?.LocalEndPointBeforeFailure, carried?.RemoteEndPointBeforeFailure);
             throw;
         }
 
         if (connect.IsTcpConnectedBeforeFailure)
         {
-            recorder.RecordFailedAfterOpening();
+            recorder.RecordFailedAfterOpening(connect.LocalEndPointBeforeFailure, connect.RemoteEndPointBeforeFailure);
         }
 
         recorder.RecordProxyConnect(connect);

@@ -28,6 +28,7 @@ public sealed class TcpConnectorStd231Tests
 
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.IsTrue(result.IsTcpConnectedBeforeFailure);
+        Assert.AreEqual(new IPEndPoint(Loopback, 29990), result.RemoteEndPointBeforeFailure);
     }
 
     [TestMethod]
@@ -55,5 +56,6 @@ public sealed class TcpConnectorStd231Tests
             async () => await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 29990, UseTls: true), caller.Token));
 
         Assert.IsTrue(exception.Data.Contains(ConnectResult.TcpConnectedOnCancellationKey));
+        Assert.AreEqual(new IPEndPoint(Loopback, 29990), ConnectResult.CarriedBy(exception)?.RemoteEndPointBeforeFailure);
     }
 }

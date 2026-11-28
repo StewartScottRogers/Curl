@@ -8,7 +8,7 @@ depends-on: [BL-6019, BL-6081]
 touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpTransferDeadline.cs, Curl.Engine.UnitTests/Std231TimeTotalTests.cs, Curl.Original.Protocol.Http.UnitTests/HttpTransferDeadlineStd231Tests.cs]
 requirement: none
 created: 2026-11-27
-completed:
+completed: 2026-11-28
 ---
 # BL-6082 — https: report %{time_total} of at least the -m value when -m ends a TLS handshake
 
@@ -24,15 +24,29 @@ Cause found: the HTTP handler's own timings start after the `-m` watchdog's cloc
 
 ## Acceptance criteria
 
-- [ ] The `https` repro command with `-m 2` prints `nc=1` and `t` of at least 2.
-- [ ] The same command with `wss://` still prints `nc=1` and `t` of at least 2.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected time (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The `https` repro command with `-m 2` prints `nc=1` and `t` of at least 2.
+- [x] The same command with `wss://` still prints `nc=1` and `t` of at least 2.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected time (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 Split from BL-6028. `HttpTransferDeadline.cs` and the two test files are named here from BL-6028's notes on where the remaining fix lies.
 
+2026-11-28 (lane 1): two causes, both fixed (ADR-1470).
+
+- The engine kept the HTTP handler's own start: `EndPointReportingProtocolHandler` now moves a timed-out first
+  hop's timings to `ITransferContext.OperationStarted`.
+- `HttpTransferDeadline`'s `-m` timer could fire before the limit had passed on the clock: it is now set again
+  for what is left.
+
+Measured with `Curl.Console` against a loopback listener that is never accepted from, `-m 2`: `https` five runs
+`t=2.023` to `2.095`, `nc=1`; `wss` `t=2.059` and `2.153`, `nc=1`; `http` `t=2.116`. `-m 10 --connect-timeout 1`
+keeps its shorter total (`t=1.19`). curl's `t=2.0x` was measured under BL-6028. Build clean, fast tests green,
+both libraries 100% line and branch with no failing member. Left, filed as BL-6092: a followed redirect hop.
+
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 9539172d 09658ea9 8a7549dc 3d836d5e.
+- 2026-11-28: Doing -> Done. https, wss and http report time_total of at least -m (ADR-1470)

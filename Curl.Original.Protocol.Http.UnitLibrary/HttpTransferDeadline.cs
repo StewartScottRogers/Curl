@@ -9,7 +9,8 @@ namespace Curl.Original.Protocol.Http;
 /// transfer, and <c>--connect-timeout</c> (300 seconds when not given, or given as 0) for each
 /// connect within it. <c>-m 0</c>, like no <c>-m</c>, sets no limit. <c>-m</c> is measured
 /// from <see cref="ITransferContext.OperationStarted" />, so a redirect chain shares one
-/// limit, or from the moment the deadline is created when that is not set; the connect
+/// limit, or from the moment the deadline is created when that is not set, and passes only
+/// once the whole of it has passed on that clock; the connect
 /// timeout always from the moment the deadline is created. A limit that passes cancels
 /// <see cref="Token" /> (or the connect's token), which the handler turns into exit 28 with
 /// the message curl 8.21.0 prints (measured, BL-174 Notes).
@@ -21,6 +22,11 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// <c>DEFAULT_CONNECT_TIMEOUT</c> of 300 seconds.
     /// </summary>
     internal static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(300);
+
+    // The longest wait a .NET timer takes, about 49.7 days; a longer -m is waited for in several.
+    private static readonly TimeSpan LongestTimerWait = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
+    private readonly Lock maxTimeTimerGate = new();
 
     private readonly TimeProvider timeProvider;
 
@@ -34,9 +40,12 @@ internal sealed class HttpTransferDeadline : IDisposable
 
     private readonly TimeSpan? maxTime;
 
+    // Never disposed: it holds no timer or handle, and the -m timer's callback may cancel it while Dispose runs.
     private readonly CancellationTokenSource? maxTimeElapsed;
 
     private readonly CancellationTokenSource transfer;
+
+    private ITimer? maxTimeTimer;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HttpTransferDeadline" /> class, starting
@@ -51,10 +60,21 @@ internal sealed class HttpTransferDeadline : IDisposable
         transferCancellation = context.CancellationToken;
         connectTimeout = PositiveOrNull(context.ConnectTimeout) ?? DefaultConnectTimeout;
         maxTime = PositiveOrNull(context.MaxTime);
-        maxTimeElapsed = MaxTimeElapsed(maxTime);
-        transfer = maxTimeElapsed is null
-            ? CancellationTokenSource.CreateLinkedTokenSource(transferCancellation)
-            : CancellationTokenSource.CreateLinkedTokenSource(transferCancellation, maxTimeElapsed.Token);
+        maxTimeElapsed = maxTime is null ? null : new CancellationTokenSource();
+        transfer = LinkTransferAndMaxTime();
+        StartMaxTime();
+    }
+
+    private CancellationTokenSource LinkTransferAndMaxTime() => maxTimeElapsed is null
+        ? CancellationTokenSource.CreateLinkedTokenSource(transferCancellation)
+        : CancellationTokenSource.CreateLinkedTokenSource(transferCancellation, maxTimeElapsed.Token);
+
+    private void StartMaxTime()
+    {
+        if (maxTime is { } limit)
+        {
+            CancelMaxTimeOrWait(limit - timeProvider.GetElapsedTime(operationStartedAt, startedAt));
+        }
     }
 
     /// <summary>
@@ -236,21 +256,35 @@ internal sealed class HttpTransferDeadline : IDisposable
         }
     }
 
-    private CancellationTokenSource? MaxTimeElapsed(TimeSpan? positiveMaxTime)
+    // Ends -m when none of it is left, else sets the timer for what is. A timer may fire a few milliseconds early,
+    // which would end the transfer with a %{time_total} under -m, so one that does is set again, as the engine's
+    // -m watchdog's is (STD-231, ADR-1470). The wait is whole milliseconds, rounded up, as a .NET timer drops a part.
+    private void CancelMaxTimeOrWait(TimeSpan left)
     {
-        if (positiveMaxTime is not { } limit)
+        if (left <= TimeSpan.Zero)
         {
-            return null;
+            maxTimeElapsed!.Cancel();
+            return;
         }
 
-        TimeSpan left = limit - timeProvider.GetElapsedTime(operationStartedAt, startedAt);
-        return new CancellationTokenSource(left > TimeSpan.Zero ? left : TimeSpan.Zero, timeProvider);
+        TimeSpan wait = TimeSpan.FromMilliseconds(Math.Min(Math.Ceiling(left.TotalMilliseconds), LongestTimerWait.TotalMilliseconds));
+        lock (maxTimeTimerGate)
+        {
+            if (maxTimeTimer is { } timer)
+            {
+                timer.Change(wait, Timeout.InfiniteTimeSpan);
+            }
+            else
+            {
+                maxTimeTimer = timeProvider.CreateTimer(_ => CancelMaxTimeOrWait(maxTime!.Value - timeProvider.GetElapsedTime(operationStartedAt)), null, wait, Timeout.InfiniteTimeSpan);
+            }
+        }
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
         transfer.Dispose();
-        maxTimeElapsed?.Dispose();
+        maxTimeTimer?.Dispose();
     }
 }

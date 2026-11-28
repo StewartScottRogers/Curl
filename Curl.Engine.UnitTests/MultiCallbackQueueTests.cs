@@ -231,6 +231,49 @@ public sealed class MultiCallbackQueueTests
         Assert.IsFalse(queue.Arrived.IsCompleted);
     }
 
+    // The thread asking for a callback blocks until a perform runs it, so a waiter woken through that thread's
+    // own work queue resumes only when an idle pool thread takes it from there, which none does while the
+    // shared queue has work: a multi wait then ran to its whole timeout on a loaded machine (BL-6090).
+    [TestMethod]
+    [DoNotParallelize]
+    public async Task Arrived_CallbackAskedForOnAThreadPoolThreadWhileThePoolIsBusy_ResumesItsWaiter()
+    {
+        MultiCallbackQueue queue = new();
+        using CancellationTokenSource busy = new(TimeSpan.FromSeconds(10));
+        Task<bool> resumedWhileBusy = ResumesWhileBusyAsync(queue.Arrived, busy.Token);
+        for (int item = 0; item < Environment.ProcessorCount * 4; item++)
+        {
+            KeepThePoolBusy(busy.Token);
+        }
+
+        Task<int> caller = Task.Run(() => queue.Run(() => 1, CancellationToken.None));
+        bool resumed = await resumedWhileBusy;
+        await busy.CancelAsync();
+        queue.RunQueued();
+
+        Assert.AreEqual(1, await caller.WaitAsync(Limit));
+        Assert.IsTrue(resumed, "the waiter resumed only once the thread pool had no other work");
+    }
+
+    private static async Task<bool> ResumesWhileBusyAsync(Task arrived, CancellationToken busy)
+    {
+        await arrived.ConfigureAwait(false);
+        return !busy.IsCancellationRequested;
+    }
+
+    // One work item that queues itself again on the pool's shared queue until the load is cancelled.
+    private static void KeepThePoolBusy(CancellationToken busy) => ThreadPool.UnsafeQueueUserWorkItem(
+        static token =>
+        {
+            Thread.SpinWait(2000);
+            if (!token.IsCancellationRequested)
+            {
+                KeepThePoolBusy(token);
+            }
+        },
+        busy,
+        preferLocal: false);
+
     private static async Task WaitUntilQueuedAsync(MultiCallbackQueue queue)
     {
         DateTime deadline = DateTime.UtcNow + Limit;

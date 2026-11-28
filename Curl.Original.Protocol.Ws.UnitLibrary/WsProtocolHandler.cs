@@ -160,11 +160,14 @@ public sealed class WsProtocolHandler(
             Proxy = context.Proxy,
             Events = context.Events,
             DiagnosticLog = context.DiagnosticLog,
+            FailsOnHttpErrorStatus = FailsOnProxyStatus(context),
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return WithoutConnection(new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused });
+            // curl 8.22.0 closes every connection it could not open (measured, BL-6086).
+            context.Events.ReportInfo(WsInfoLines.Closing(connect.ConnectionNumber));
+            return WithoutConnection(FailedConnectResult(context, connect));
         }
 
         context.Progress.ReportTransferStarted();
@@ -189,6 +192,26 @@ public sealed class WsProtocolHandler(
         }
 
         return outcome with { Result = WithFirstAuthFailure(outcome.Result, authLines.Lines) };
+    }
+
+    // Whether -f fails the transfer when a proxy refuses the CONNECT; --fail-with-body does not.
+    private static bool FailsOnProxyStatus(ITransferContext context) => context.Http?.Fail == HttpFailMode.Fail;
+
+    // The result of a connect that failed: under -f, exit 22 when a proxy refused the CONNECT with
+    // 400 or above, naming the status, or curl's generic text when the 407 drew its authentication
+    // problem; otherwise the connector's own failure (measured against curl 8.22.0, BL-6086).
+    private static TransferResult FailedConnectResult(ITransferContext context, ConnectResult connect)
+    {
+        int status = connect.ProxyConnectResponseCode;
+        if (FailsOnProxyStatus(context) && status >= 400)
+        {
+            string message = connect.IsProxyAuthenticationProblem
+                ? "HTTP response code said error"
+                : string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {status}");
+            return TransferResult.Failure(CurlExitCode.HttpReturnedError, message);
+        }
+
+        return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
     }
 
     /// <summary>An outcome that hands no connection back.</summary>

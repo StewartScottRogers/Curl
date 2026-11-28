@@ -64,7 +64,8 @@ public sealed partial class TcpConnector
             var message = $"Connection timed out after {TimedOutMilliseconds(started, connectLimit)} milliseconds";
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message, (canceled as CanceledAfterResolveException)?.Timings)
-                .WithTcpConnectedBeforeFailure(canceled.Data.Contains(ConnectResult.TcpConnectedOnCancellationKey));
+                .WithTcpConnectedBeforeFailure(canceled.Data.Contains(ConnectResult.TcpConnectedOnCancellationKey))
+                .WithEndPointsBeforeFailure(ConnectResult.CarriedBy(canceled)?.LocalEndPointBeforeFailure, ConnectResult.CarriedBy(canceled)?.RemoteEndPointBeforeFailure);
         }
     }
 

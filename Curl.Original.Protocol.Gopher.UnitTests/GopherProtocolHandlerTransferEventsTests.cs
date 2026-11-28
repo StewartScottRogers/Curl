@@ -324,7 +324,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ConnectFails_ReportsNothing()
+    public async Task ExecuteAsync_ConnectFails_ReportsOnlyTheClosingConnectionLine()
     {
         TranscriptTransferEvents events = new();
         Diagnostics.Arrange("connect result", "Failed CouldntConnect \"refused\"");
@@ -333,8 +333,8 @@ public sealed class GopherProtocolHandlerTransferEventsTests
             .ExecuteAsync(Context("gopher://h/1/", events));
         Report(result, events);
 
-        Diagnostics.Assert("transcript line count", 0, events.Transcript.Count);
-        Assert.IsEmpty(events.Transcript);
+        Diagnostics.Assert("transcript line count", 1, events.Transcript.Count);
+        Assert.AreEqual("* closing connection #0", events.Transcript.Single());
     }
 
     private static FakeConnector Connector(IConnection connection, long connectionNumber) =>

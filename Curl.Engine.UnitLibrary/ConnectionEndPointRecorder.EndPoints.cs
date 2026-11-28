@@ -27,7 +27,30 @@ internal sealed partial class ConnectionEndPointRecorder
     /// Records a connect that failed after its TCP connection opened, which a failed transfer counts in
     /// <c>%{num_connects}</c> though no end point is reported, as curl 8.22.0 does (measured, STD-231).
     /// </summary>
-    internal void RecordFailedAfterOpening() => connectionsFailedAfterOpening++;
+    /// <param name="local">The local end point of the connection that was open, <see langword="null" /> when not known.</param>
+    /// <param name="remote">The peer of the connection that was open, <see langword="null" /> when not known.</param>
+    internal void RecordFailedAfterOpening(IPEndPoint? local = null, IPEndPoint? remote = null)
+    {
+        connectionsFailedAfterOpening++;
+        if (failedRemoteEndPoint is null)
+        {
+            failedLocalEndPoint = local;
+            failedRemoteEndPoint = remote;
+        }
+    }
+
+    /// <summary>The local end point of the first connect that failed with its TCP connection open (EXT-097).</summary>
+    private IPEndPoint? failedLocalEndPoint;
+
+    /// <summary>The peer of the first connect that failed with its TCP connection open (EXT-097).</summary>
+    private IPEndPoint? failedRemoteEndPoint;
+
+    /// <summary>
+    /// Gets or sets whether a failed transfer that recorded no connection reports the end points of a connect
+    /// that failed with its TCP connection open, as an extended protocol's does and curl's own schemes' do not:
+    /// curl prints <c>%{remote_ip}</c> empty for an https TLS handshake <c>-m</c> ends (measured, EXT-097).
+    /// </summary>
+    internal bool ReportsEndPointsOfFailedConnects { get; set; }
 
     /// <summary>Gets the connect timings of the transfer's first connection, or <see langword="null" /> when none was given.</summary>
     internal ConnectTimings? FirstConnectTimings { get; private set; }
@@ -144,6 +167,8 @@ internal sealed partial class ConnectionEndPointRecorder
     {
         connectionsOpened = 0;
         connectionsFailedAfterOpening = 0;
+        failedLocalEndPoint = null;
+        failedRemoteEndPoint = null;
         connectionRecorded = false;
         FirstConnectTimings = null;
         localEndPoint = null;
@@ -151,12 +176,29 @@ internal sealed partial class ConnectionEndPointRecorder
         unixSocketRemoteIp = null;
     }
 
+    /// <summary>
+    /// Puts the end points of the first connect that failed with its TCP connection open on a failed
+    /// transfer's report when <see cref="ReportsEndPointsOfFailedConnects" /> is set and the report has none (EXT-097).
+    /// </summary>
+    private TransferResult WithEndPointsOfFailedConnect(TransferResult result)
+    {
+        if (!ReportsEndPointsOfFailedConnects || result.IsSuccess || failedRemoteEndPoint is null)
+        {
+            return result;
+        }
+
+        TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
+        return report.RemoteEndPoint is not null
+            ? result
+            : result with { Report = report with { LocalEndPoint = failedLocalEndPoint, RemoteEndPoint = failedRemoteEndPoint } };
+    }
+
     /// <summary>The end points half of <see cref="ReportOn" />.</summary>
     private TransferResult WithEndPoints(TransferResult result)
     {
         if (!connectionRecorded)
         {
-            return result;
+            return WithEndPointsOfFailedConnect(result);
         }
 
         TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };

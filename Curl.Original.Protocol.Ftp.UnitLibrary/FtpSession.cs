@@ -218,10 +218,12 @@ internal sealed class FtpSession(
     private readonly EndPoint? controlLocalEndPoint = control.Connection.LocalEndPoint;
 
     /// <summary>
-    /// The control connection's peer address, which <c>-v</c> names as where a passive data
-    /// connection is dialled; the URL's host when it is unknown.
+    /// The host <c>-v</c> names as where a passive data connection on the control connection's
+    /// host is dialled: the control connection's peer address, or the URL's host when that is
+    /// unknown or the connection goes through a proxy, whose address the peer's then is
+    /// (measured, BL-6088).
     /// </summary>
-    private readonly string controlPeerAddress = PeerAddressOr(control.Connection.RemoteEndPoint, context.Url.IdnHost);
+    private readonly string controlPeerAddress = ShownControlHost(context.Proxy, control.Connection.RemoteEndPoint, context.Url.IdnHost);
 
     /// <summary>
     /// Whether the control connection's peer is an IPv6 address (not an IPv4-mapped one),
@@ -1858,8 +1860,8 @@ internal sealed class FtpSession(
 
     // The field initializers' branches live in these four, so the primary constructor
     // stays under complexity 10 in the coverage report (BL-2024).
-    private static string PeerAddressOr(EndPoint? endPoint, string host) =>
-        Unmapped((endPoint as IPEndPoint)?.Address)?.ToString() ?? host;
+    private static string ShownControlHost(ProxyEndpoint? proxy, EndPoint? peer, string urlHost) =>
+        proxy is null ? Unmapped((peer as IPEndPoint)?.Address)?.ToString() ?? urlHost : urlHost;
 
     private static long? MaxFileSizeOf(ITransferContext context) =>
         context.MaxFileSize > 0 ? context.MaxFileSize : null;
@@ -2207,10 +2209,19 @@ internal sealed class FtpSession(
     /// <paramref name="shownHost" /> and the port. A dial that fails names the control
     /// connection and then <paramref name="shownHost" /> after <c>via</c>, as curl 8.21.0's does (BL-904).
     /// After an accepted <c>PROT P</c> the TLS handshake waits for the transfer command
-    /// (<see cref="ReadyDataConnectionAsync" />, CGR-005).
+    /// (<see cref="ReadyDataConnectionAsync" />, CGR-005). This is the last dial a transfer has,
+    /// so a failure is followed by curl 8.22.0's <c>shutting down connection #N</c> (BL-6088).
     /// </summary>
-    private async ValueTask<TransferResult?> ConnectDataAsync(string host, string shownHost, int port) =>
-        await DialDataAsync(host, shownHost, port).ConfigureAwait(false);
+    private async ValueTask<TransferResult?> ConnectDataAsync(string host, string shownHost, int port)
+    {
+        TransferResult? failed = await DialDataAsync(host, shownHost, port).ConfigureAwait(false);
+        if (failed is not null)
+        {
+            context.Events.ReportInfo(FtpTransferMessages.ShuttingDownConnection(controlName.Number));
+        }
+
+        return failed;
+    }
 
     /// <summary>
     /// Dials the passive data connection without its TLS handshake: <see langword="null" />
@@ -2233,15 +2244,16 @@ internal sealed class FtpSession(
         var target = new ConnectTarget(host, port, false)
         {
             Proxy = context.Proxy,
-            Events = new FtpDataConnectEvents(context.Events, failure, controlName.Host, trace),
+            Events = new FtpDataConnectEvents(context.Events, failure, context.Proxy is null ? controlName.Host : null, trace),
             DiagnosticLog = context.DiagnosticLog,
             TcpIoTrace = protectData ? null : FtpTcpIoTraces.Data,
+            FailsOnHttpErrorStatus = FtpProtocolHandler.FailsOnProxyStatus(context),
         };
         ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         dataConnection = connected.Connection;
         if (dataConnection is null)
         {
-            return new TransferResult(connected.ExitCode, 0, failure.Rewrite(connected.ErrorMessage!)) { IsConnectionRefused = connected.IsConnectionRefused };
+            return FtpProtocolHandler.FailedConnectResult(context, connected, failure.Rewrite(connected.ErrorMessage!));
         }
 
         log.PassiveDataConnected(host, port);

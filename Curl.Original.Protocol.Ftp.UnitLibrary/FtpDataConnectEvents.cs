@@ -9,15 +9,17 @@ namespace Curl.Original.Protocol.Ftp;
 /// and the connection opened marked the transfer's second one, named by
 /// <paramref name="urlHost" />, so <c>-v</c> says <c>Established 2nd connection to &lt;URL host&gt;</c>
 /// as curl 8.21.0's does whichever address the data connection dialled (measured, BL-944).
+/// Through a proxy the connector's name, the proxy's host, stands, as curl 8.22.0's does
+/// (measured, BL-6088).
 /// </summary>
 /// <param name="transferEvents">The transfer's own events.</param>
 /// <param name="failure">The rewrite for the data connection's failure line.</param>
-/// <param name="urlHost">The URL's host, as given.</param>
+/// <param name="urlHost">The URL's host, as given, or <see langword="null" /> through a proxy.</param>
 /// <param name="trace">
 /// Writes the DO_MORE phase's <c>--trace-config ftp</c> poll line just before the connection
 /// opened, between the <c>Trying</c> and <c>Established</c> lines, as curl 8.21.0 writes it (BL-1162).
 /// </param>
-internal sealed class FtpDataConnectEvents(ITransferEvents transferEvents, FtpDataConnectFailure failure, string urlHost, FtpStateTrace trace) : ITransferEvents
+internal sealed class FtpDataConnectEvents(ITransferEvents transferEvents, FtpDataConnectFailure failure, string? urlHost, FtpStateTrace trace) : ITransferEvents
 {
     /// <inheritdoc />
     public void ReportInfo(string text) => transferEvents.ReportInfo(failure.Rewrite(text));
@@ -26,7 +28,7 @@ internal sealed class FtpDataConnectEvents(ITransferEvents transferEvents, FtpDa
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
     {
         trace.DataConnectionPending();
-        transferEvents.ReportConnectionOpened(opened with { HostName = urlHost, IsSecondConnection = true });
+        transferEvents.ReportConnectionOpened(opened with { HostName = urlHost ?? opened.HostName, IsSecondConnection = true });
     }
 
     /// <inheritdoc />

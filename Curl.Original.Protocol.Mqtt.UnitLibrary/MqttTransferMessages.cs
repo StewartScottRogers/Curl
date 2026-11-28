@@ -133,13 +133,22 @@ internal static class MqttTransferMessages
     /// </summary>
     internal const string ReadMustWait = "EEEE AAAAGAIN";
 
-    /// <summary>The <c>-v</c> line that ends the connection after anything but exit 23.</summary>
+    /// <summary>The <c>-v</c> line that ends an opened connection after anything but exit 23.</summary>
     /// <param name="connectionNumber">The connection's number.</param>
     /// <returns>The line, such as <c>shutting down connection #0</c>.</returns>
     internal static string ShuttingDownConnection(long connectionNumber) =>
         string.Create(CultureInfo.InvariantCulture, $"shutting down connection #{connectionNumber}");
 
-    /// <summary>The <c>-v</c> line that ends the connection after an output write failure.</summary>
+    /// <summary>The exit 22 message when a <c>407</c> refuses the CONNECT with an authentication problem under <c>-f</c>.</summary>
+    internal const string HttpResponseCodeSaidError = "HTTP response code said error";
+
+    /// <summary>The exit 22 message when a proxy refuses the CONNECT with 400 or above under <c>-f</c>.</summary>
+    /// <param name="statusCode">The status of the CONNECT's reply.</param>
+    /// <returns>The message, such as <c>The requested URL returned error: 403</c>.</returns>
+    internal static string RequestedUrlReturnedError(int statusCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {statusCode}");
+
+    /// <summary>The <c>-v</c> line that ends the connection after an output write failure or a failed connect.</summary>
     /// <param name="connectionNumber">The connection's number.</param>
     /// <returns>The line, such as <c>closing connection #0</c>.</returns>
     internal static string ClosingConnection(long connectionNumber) =>

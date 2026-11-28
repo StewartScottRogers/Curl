@@ -45,8 +45,9 @@ public sealed class FtpProtocolHandlerDataConnectFailureTests
 
         diagnostics.Assert("result", new TransferResult(CurlExitCode.CouldntConnect, 0, expected) { IsConnectionRefused = true }, result with { Report = null });
         Assert.AreEqual(new TransferResult(CurlExitCode.CouldntConnect, 0, expected) { IsConnectionRefused = true }, result with { Report = null });
-        diagnostics.Assert("last -v line", expected, events.Info[^1]);
-        Assert.AreEqual(expected, events.Info[^1]);
+        diagnostics.Assert("-v line before the shut down", expected, events.Info[^2]);
+        Assert.AreEqual(expected, events.Info[^2]);
+        Assert.AreEqual("shutting down connection #0", events.Info[^1]);
     }
 
     [TestMethod]
@@ -196,7 +197,7 @@ public sealed class FtpProtocolHandlerDataConnectFailureTests
             events,
             ReportEveryEvent);
 
-        diagnostics.Assert("event calls reported", 11, events.Calls.SkipWhile(call => call != "ReportInfo: Trying 127.0.0.2:1...").Count());
+        diagnostics.Assert("event calls reported", 12, events.Calls.SkipWhile(call => call != "ReportInfo: Trying 127.0.0.2:1...").Count());
         CollectionAssert.AreEqual(
             new[]
             {
@@ -211,6 +212,7 @@ public sealed class FtpProtocolHandlerDataConnectFailureTests
                 "ReportResponseHeader",
                 "ReportDataSent",
                 "ReportDataReceived",
+                "ReportInfo: shutting down connection #0",
             },
             events.Calls.SkipWhile(call => call != "ReportInfo: Trying 127.0.0.2:1...").ToArray());
     }

@@ -189,7 +189,13 @@ public sealed class RedirectFollower(
     /// header, request and connection counts summed over every hop, and
     /// <see cref="TransferReport.Timings" /> merged by <see cref="RedirectHopTimings" />: measured from
     /// the first hop's start, each phase the sum of its time on every hop, and
-    /// <see cref="TransferTimings.RedirectDuration" /> the time until the last hop began.
+    /// <see cref="TransferTimings.RedirectDuration" /> the time until the last hop began. When a followed
+    /// hop ends with exit 28 and <paramref name="context" /> has an
+    /// <see cref="ITransferContext.OperationStarted" />, those times are counted from it instead.
+    /// When a followed hop fails with no HTTP response, the report keeps the
+    /// <see cref="TransferReport.HttpVersion" /> of the response it followed, and that response's
+    /// <see cref="TransferReport.ResponseCode" /> and <see cref="TransferReport.ContentType" />
+    /// where the hop reported none.
     /// </returns>
     /// <remarks>
     /// It tells the handler that the chain ended itself, when the chain returns. The engine does not call it: it calls
@@ -244,7 +250,7 @@ public sealed class RedirectFollower(
         HttpRequestOptions http,
         RedirectPolicy policy)
     {
-        RedirectChain chain = new(context.TimeProvider);
+        RedirectChain chain = new(context.TimeProvider, context.OperationStarted);
         RedirectDiagnosticLog log = new(context.DiagnosticLog);
         long operationStarted = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
         long? uploadStart = SeekableStart(context.Upload);
@@ -968,11 +974,14 @@ public sealed class RedirectFollower(
 
     /// <summary>
     /// What the hops of one chain add up to, merged into the last hop's report.
+    /// <paramref name="maxTimeStarted" /> is the first context's
+    /// <see cref="ITransferContext.OperationStarted" />, the instant <c>-m</c> counts from.
     /// </summary>
-    private sealed class RedirectChain(TimeProvider timeProvider)
+    private sealed class RedirectChain(TimeProvider timeProvider, long? maxTimeStarted)
     {
         private readonly RedirectHopTimings timings = new(timeProvider);
         private TransferReport? lastReport;
+        private TransferReport? followedReport;
         private string? lastReferer;
         private string? effectiveUrl;
         private long headerSize;
@@ -987,6 +996,7 @@ public sealed class RedirectFollower(
         public void Add(TransferReport? report, string? referer)
         {
             earlierResponseHeaders.AddRange(lastReport?.ResponseHeaders ?? []);
+            followedReport = lastReport;
             lastReport = report;
             lastReferer = referer;
             if (report is null)
@@ -1041,7 +1051,7 @@ public sealed class RedirectFollower(
 
         public TransferResult Merge(TransferResult outcome)
         {
-            TransferReport report = lastReport ?? new TransferReport();
+            TransferReport report = WithFollowedResponse(lastReport ?? new TransferReport(), outcome.IsSuccess);
             return outcome with
             {
                 Report = report with
@@ -1054,9 +1064,37 @@ public sealed class RedirectFollower(
                     RequestSize = requestSize,
                     ConnectionCount = connectionCount,
                     EarlierResponseHeaders = [.. earlierResponseHeaders],
-                    Timings = timings.Merge(report.Timings),
+                    Timings = CountedFromMaxTimeStart(timings.Merge(report.Timings), outcome.ExitCode),
                 },
             };
+        }
+
+        // curl overwrites %{http_code}, %{http_version}, %{content_type} and %{num_headers} only when a response arrives, so a followed hop that fails without one leaves those of the response it followed (measured 2026-11-28, BL-6095 and BL-6096, ADR-1473, ADR-1477). A report with no HTTP version had no HTTP response; a status code it already carries stays, and header lines it counts itself replace the followed count.
+        private TransferReport WithFollowedResponse(TransferReport report, bool succeeded)
+        {
+            if (succeeded || report.HttpVersion is not null || followedReport is not { } followed)
+            {
+                return report;
+            }
+
+            return report with
+            {
+                ResponseCode = report.ResponseCode == 0 ? followed.ResponseCode : report.ResponseCode,
+                HttpVersion = followed.HttpVersion,
+                ContentType = report.ContentType ?? followed.ContentType,
+                FollowedHeaderCount = followed.HeaderCount,
+            };
+        }
+
+        // -m counts from its watchdog's start, before the first handler's, so a chain it ends on a followed hop counts from there and its total is not under -m's value, as curl's is not (STD-231, ADR-1470). Only a followed hop has a redirect duration: the engine already counts a first hop's timeout from there.
+        private TransferTimings? CountedFromMaxTimeStart(TransferTimings? merged, CurlExitCode exitCode)
+        {
+            if (exitCode != CurlExitCode.OperationTimedOut || maxTimeStarted is not long started || merged is null || merged.RedirectDuration == TimeSpan.Zero)
+            {
+                return merged;
+            }
+
+            return merged with { Started = started, RedirectDuration = merged.RedirectDuration + timeProvider.GetElapsedTime(started, merged.Started) };
         }
     }
 }

@@ -35,6 +35,11 @@ handler holds no proxy code.
   whole request to `ITransferContext.Events` as one block of data sent, each read as
   data received, the server's close as a zero-byte block, and then
   `shutting down connection #N`, which a refused path reports too.
+- A failed connect reports `closing connection #N`. Under `-f` (not
+  `--fail-with-body`) the connect target sets `ConnectTarget.FailsOnHttpErrorStatus`,
+  and a proxy that refuses the CONNECT with 400 or above makes it exit 22
+  (`The requested URL returned error: N`, or `HTTP response code said error` after a
+  `407` authentication problem), as curl 8.22.0 does (BL-6089).
 - `DictIoFailures` turns a failed send, receive or output write into curl's exit
   55, 56 or 23 and its message (BL-1125), wording any socket error with the
   shared `CurlSocketErrorText` table (BL-1337); the handler returns it rather than

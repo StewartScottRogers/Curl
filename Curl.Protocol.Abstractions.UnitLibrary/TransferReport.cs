@@ -83,6 +83,23 @@ public sealed record TransferReport
     public int InformationalHeaderCount { get; init; }
 
     /// <summary>
+    /// Gets the <see cref="HeaderCount" /> of the response a <c>-L</c> chain followed, set when the followed
+    /// hop fails with no response; zero otherwise. Those headers are not in <see cref="ResponseHeaders" />, so
+    /// <c>%{header_json}</c> and <c>%header{}</c> show none, but <c>%{num_headers}</c> still counts them, as
+    /// curl does, unless this report counts headers of its own (ADR-1477).
+    /// </summary>
+    public int FollowedHeaderCount { get; init; }
+
+    /// <summary>
+    /// Gets how many headers <c>%{num_headers}</c> prints: <see cref="TrailerCount" /> when above zero;
+    /// otherwise the <see cref="ResponseHeaders" />, <see cref="PseudoHeaders" />,
+    /// <see cref="ConnectReplyHeaderCount" /> and <see cref="InformationalHeaderCount" /> together, or
+    /// <see cref="FollowedHeaderCount" /> when those come to zero.
+    /// </summary>
+    public int HeaderCount => TrailerCount > 0 ? TrailerCount : OwnOrFollowedHeaderCount(
+        ResponseHeaders.Count + PseudoHeaders.Count + ConnectReplyHeaderCount + InformationalHeaderCount);
+
+    /// <summary>
     /// Gets every header of every response before the last one in a <c>-L</c> chain, hop by
     /// hop and in the order received, duplicates kept; empty when no redirect was followed.
     /// <c>%header{name:all:separator}</c> writes these values before the last response's.
@@ -341,4 +358,6 @@ public sealed record TransferReport
     /// <param name="size">The body bytes received.</param>
     /// <returns>The copy.</returns>
     public TransferReport WithDownloadSize(long size) => this with { DownloadSize = size };
+
+    private int OwnOrFollowedHeaderCount(int own) => own > 0 ? own : FollowedHeaderCount;
 }

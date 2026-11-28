@@ -8,7 +8,7 @@ depends-on: [BL-6081, BL-6082]
 touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitTests/EndPointReportingProtocolHandlerConnectFailureTimingTests.cs]
 requirement: none
 created: 2026-11-26
-completed:
+completed: 2026-11-28
 ---
 # BL-6041 — wss and ftp: a failed or timed-out TCP connect reports %{time_total} 0; curl reports the elapsed time
 
@@ -31,12 +31,14 @@ leaves such a result unstamped (BL-5421 says why for the cases it measured; keep
 
 ## Acceptance criteria
 
-- [ ] `wss` and `ftp` connects that fail (exit 6, 28) report a non-zero `%{time_total}`, with `%{num_connects}` 0, matching real curl measured with the same command lines.
-- [ ] A focused unit test in `Curl.Engine.UnitTests` pins the behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `wss` and `ftp` connects that fail (exit 6, 28) report a non-zero `%{time_total}`, with `%{num_connects}` 0, matching real curl measured with the same command lines.
+- [x] A focused unit test in `Curl.Engine.UnitTests` pins the behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 ## Log
 
 - 2026-11-26: Created.
+- 2026-11-28: Backlog -> Doing. Criteria at claim: 41fd4ecd 31332653 3d836d5e.
+- 2026-11-28: Doing -> Done. done
