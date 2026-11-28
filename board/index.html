@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<!--
+  Curl task board: a live kanban of Tasks/ drawn in the viewer's browser from the
+  GitHub REST API. One self-contained file: no build step, no framework, no external
+  script, stylesheet or font. The contract it follows is ADR-0129.
+
+  Query overrides (all optional):
+    ?repo=owner/name   repository to read (default StewartScottRogers/Curl); also
+                       changes the card links
+    ?branch=name       task branch to read (default work/dark-factory); also changes
+                       the card links
+    ?refresh=seconds   refresh interval; a value under the minimum (60 s per API call
+                       made per refresh) is clamped up to it
+    ?tree=url          fetch this URL instead of the recursive tree call, e.g.
+                       ?tree=../fixtures/tree.json against .github/gource/serve.cs
+    ?status=url        fetch this URL instead of the board branch's status.json, e.g.
+                       ?status=../fixtures/status.json
+    ?now=ISO-8601      pin the clock the page reads (the refresh stamp, run times,
+                       heartbeat ages and staleness)
+    ?auditBranch=name  branch the Audit tab reads findings from (default audit)
+    ?audit=url         fetch this URL instead of the audit branch's recursive tree call,
+                       e.g. ?audit=../fixtures/audit-tree.json
+    ?findings=url      read each finding's text from this folder (url + file name)
+                       instead of raw.githubusercontent.com, e.g.
+                       ?findings=../fixtures/findings/
+    ?contents=url      send finding moves to this contents API base (url + path) instead
+                       of https://api.github.com/repos/<repo>/contents/; honoured only
+                       when the page itself is served from localhost and the url is on
+                       the page's own origin, so a crafted link cannot send the token
+                       anywhere else
+
+  Tabs: #tasks (also no hash) shows the task kanban and lanes; #audit shows the audit
+  office's findings as a kanban (BL-1184), with an accepted finding whose every task is
+  in Tasks/Done (or an archive under it) shown as "Fixed, awaiting re-audit" rather than
+  "Approved": it closes only on its auditor's re-audit (ADR-0422); #gaps shows the gap
+  dashboard (../gaps/) without its own site links. Findings are listed from the task branch's
+  tree and the audit branch's tree, the audit branch's copy winning, and their texts are
+  read from raw.githubusercontent.com, which costs no API calls; each text is re-read
+  only when its blob SHA changes.
+
+  Moving findings (BL-1185): with a GitHub token saved on the Audit tab (a fine-grained
+  personal access token, this repository only, Contents: read and write), each card
+  offers the moves its status allows - proposed: Approve, Defer, Block; deferred: Back
+  to waiting, Reject; blocked: Back to waiting. A move reads the finding from the audit
+  branch through the contents API, changes its status: and reason: lines, appends one
+  line to its ## Log, and writes it back to the audit branch as one commit,
+  "chore(audit): <old> -> <new> <AF-id>". A 409 (the file changed since it was read)
+  reloads the finding and overwrites nothing. The token lives in this browser's
+  localStorage, goes only into the Authorization header of contents API requests, and
+  "Forget token" removes it. Without one the tab is read-only.
+
+  Token expiry and renewal (BL-1211): the tab shows "Token expires <date> (in N days)".
+  GitHub's CORS answer does not expose GitHub-Authentication-Token-Expiration to scripts,
+  so the date is the day the token was saved plus 30 days, labelled as an estimate; the
+  header is used instead if GitHub ever exposes it. From 7 days before, the line is a
+  warning and the renewal steps open under it. A 401, or a 403 whose message names the
+  token, on any request made with it shows "Your token has expired or was refused" and the
+  steps, and hides the move buttons until a new token is saved. "How do I make a token?"
+  shows the steps at any time. Saving a token, and each page load with one saved, costs
+  one GET of the repository (the URL above ?contents= in a local preview) to learn this.
+
+  Releasing findings (BL-1249): with a token that also has Actions: read and write, the tab
+  shows "Release approved findings (N)", N being the approved findings whose task: is none,
+  and each such Approved card a "Release" button. Either sends one POST to
+  /repos/<repo>/actions/workflows/release-approved-findings.yml/dispatches (ref master,
+  input findings: the card's ID, or empty for all), which runs
+  Audit/Tools/New-TasksFromAcceptedFindings.ps1 in GitHub Actions. The page then says
+  "Releasing… (run)", and "Released as BL-####" once a refresh reads the finding's task:
+  line naming its task. A 404 means the workflow is not on master yet; a 401 or 403 means
+  the token lacks Actions: read and write, and the steps to add it are shown.
+
+  Adding a data source: append one { name, url, fetch, render } object to `sources`
+  below. `fetch(source)` returns the parsed data (use fetchJson, which records the
+  rate-limit headers and throws on 403 and 429); `render(data)` draws it. The refresh
+  interval is 60 s times sources.length, so the budget follows the array by itself.
+
+  Local preview: dotnet run --file .github/gource/serve.cs -- .github/board 8000
+  then open http://localhost:8000/site/index.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curl task board</title>
+<style>
+  :root { color-scheme: light dark; --line: #8884; --card: #8881; --warn: #c60; --bad: #c33; }
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 12px 16px; }
+  header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+  h1 { font-size: 18px; margin: 0; }
+  .site-links { margin-left: auto; }
+  .muted { opacity: .7; }
+  #messages p { margin: 6px 0; padding: 6px 10px; border-radius: 4px; }
+  #messages p.warning { border: 1px solid var(--warn); }
+  #messages p.error { border: 1px solid var(--bad); }
+  #lanes:empty { display: none; }
+  #lanes { margin-top: 12px; }
+  #lanes > p { margin: 6px 0; }
+  #lanes .banner { padding: 6px 10px; border-radius: 4px; border: 1px solid var(--warn); }
+  .lane-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .lane { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--card); }
+  .lane.stale { border-color: var(--bad); }
+  .lane h2 { font-size: 15px; margin: 0 0 4px; display: flex; justify-content: space-between; }
+  .lane .stale-mark { color: var(--bad); font-weight: 600; }
+  .lane .task { margin-bottom: 4px; }
+  .lane .task a, .lane .task .id { font-weight: 600; margin-right: 6px; color: inherit; }
+  .lane dl { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }
+  .lane dd { margin: 0; overflow-wrap: anywhere; }
+  #board { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; }
+  .column { border: 1px solid var(--line); border-radius: 6px; padding: 8px; min-width: 0; }
+  .column h2 { font-size: 15px; margin: 0 0 8px; display: flex; justify-content: space-between; }
+  .card { display: block; padding: 6px 8px; margin-bottom: 6px; border-radius: 4px; background: var(--card); color: inherit; text-decoration: none; }
+  .card:hover { outline: 1px solid var(--line); }
+  .card .id { font-weight: 600; margin-right: 6px; }
+  details { border-top: 1px solid var(--line); padding: 4px 0; }
+  summary { cursor: pointer; }
+  details .card { margin-top: 6px; }
+  footer { margin-top: 16px; font-size: 12px; }
+  nav.tabs { display: flex; gap: 4px; margin-top: 10px; border-bottom: 1px solid var(--line); }
+  nav.tabs a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: inherit; text-decoration: none; margin-bottom: -1px; }
+  nav.tabs a[aria-selected="true"] { border-color: var(--line); background: Canvas; font-weight: 600; }
+  [hidden] { display: none !important; }
+  #audit-board { display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
+  #audit-folded { margin-top: 12px; }
+  #audit-folded > details { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; margin-bottom: 8px; }
+  details.finding { border-top: none; padding: 0; margin-bottom: 6px; border-radius: 4px; background: var(--card); }
+  details.finding > summary { padding: 6px 8px; list-style: none; }
+  details.finding > summary::-webkit-details-marker { display: none; }
+  details.finding .id { font-weight: 600; margin-right: 6px; }
+  details.finding .facts { display: block; font-size: 12px; }
+  details.finding .body { padding: 0 8px 8px; }
+  details.finding h3 { font-size: 13px; margin: 8px 0 2px; }
+  details.finding pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.4 ui-monospace, monospace; margin: 0; }
+  details.finding .body a { color: inherit; }
+  #audit-token { margin-top: 10px; }
+  #audit-token form, #audit-token p { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+  details.finding .moves { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+  details.finding .moves input { flex: 1 1 160px; min-width: 0; }
+  details.finding .move-message { margin: 6px 0 0; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--line); }
+  details.finding .move-message.error { border-color: var(--bad); }
+  #audit-token .token-alert { display: block; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--warn); }
+  #audit-token .token-alert.error { border-color: var(--bad); }
+  #token-help { border-top: none; padding: 0; margin: 4px 0; }
+  #token-help ol { margin: 4px 0; padding-left: 24px; }
+  #token-help li { margin: 2px 0; overflow-wrap: anywhere; }
+  #token-help a { color: inherit; }
+  #audit-release { margin-top: 10px; }
+  #audit-release:empty { display: none; }
+  .release-message a { color: inherit; }
+  .release-message ol { margin: 4px 0; padding-left: 24px; }
+  .release-message li { overflow-wrap: anywhere; }
+  @media (max-width: 700px) {
+    #board, #audit-board { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Curl task board</h1>
+  <span id="source" class="muted"></span>
+  <span id="refreshed" class="muted">Loading…</span>
+  <span class="site-links"><a href="../">Gource</a> · <a href="../coverage/">Coverage</a> · <a href="../gaps/">Gaps</a></span>
+</header>
+<nav class="tabs" role="tablist">
+  <a id="tab-tasks" href="#tasks" role="tab" aria-controls="panel-tasks">Tasks</a>
+  <a id="tab-audit" href="#audit" role="tab" aria-controls="panel-audit">Audit</a>
+  <a id="tab-gaps" href="#gaps" role="tab" aria-controls="panel-gaps">Gaps</a>
+</nav>
+<div id="messages"></div>
+<div id="panel-tasks" role="tabpanel" aria-labelledby="tab-tasks">
+<section id="lanes"></section>
+<main id="board"></main>
+</div>
+<div id="panel-gaps" role="tabpanel" aria-labelledby="tab-gaps" hidden>
+<p class="muted">The gap analysis dashboard: Curl measured against upstream curl (ADR-0433). <a href="../gaps/">Open it full page</a>.</p>
+<iframe id="gaps-frame" title="Gap analysis dashboard" data-src="../gaps/" style="width:100%;height:80vh;border:0"></iframe>
+</div>
+<div id="panel-audit" role="tabpanel" aria-labelledby="tab-audit" hidden>
+<p id="audit-source" class="muted"></p>
+<section id="audit-token">
+  <form id="token-form" hidden>
+    <label for="token-input">GitHub token</label>
+    <input id="token-input" type="password" autocomplete="off" spellcheck="false" size="40">
+    <button type="submit">Save token</button>
+  </form>
+  <p id="token-note" class="muted" hidden></p>
+  <p id="token-saved" hidden>
+    <span id="token-saved-text"></span>
+    <button id="token-forget" type="button">Forget token</button>
+  </p>
+  <p id="token-refused" class="token-alert error" hidden>Your token has expired or was refused. Make a new one with the steps below; moves stay off until it is saved.</p>
+  <p id="token-expiry" hidden></p>
+  <details id="token-help">
+    <summary>How do I make a token?</summary>
+    <ol id="token-steps"></ol>
+  </details>
+</section>
+<section id="audit-release"></section>
+<main id="audit-board"></main>
+<section id="audit-folded"></section>
+</div>
+<footer class="muted"><span id="cadence"></span></footer>
+<script>
+'use strict';
+
+const params = new URLSearchParams(location.search);
+const repo = params.get('repo') || 'StewartScottRogers/Curl';
+const branch = params.get('branch') || 'work/dark-factory';
+const pinnedNow = params.get('now') ? new Date(params.get('now')) : null;
+const states = ['Backlog', 'Doing', 'Blocked', 'Deferred', 'Done'];
+const archiveFolder = /^\d{4}-\d{2}-\d{2}_\d{4}$/;
+const taskFile = /^(BL-\d+)(?:-(.*))?\.md$/;
+const secondsPerCall = 60;
+const staleMs = 10 * 60 * 1000;
+const auditBranch = params.get('auditBranch') || 'audit';
+const findingsOverride = params.get('findings') ? new URL(params.get('findings'), location.href).href : null;
+const findingFile = /^Audit\/Findings\/(AF-\d+)(?:-(.*))?\.md$/;
+// 'reaudit' is not a status: it is an accepted finding whose tasks are all Done.
+const findingColumns = [['proposed', 'Waiting for you'], ['accepted', 'Approved'], ['reaudit', 'Fixed, awaiting re-audit'], ['deferred', 'Deferred'], ['blocked', 'Blocked']];
+const findingFolds = [['rejected', 'Rejected'], ['closed', 'Closed']];
+// The moves each status allows (BL-1183): [button label, new status, reason required].
+const findingMoves = {
+  proposed: [['Approve', 'accepted', false], ['Defer', 'deferred', true], ['Block', 'blocked', true]],
+  deferred: [['Back to waiting', 'proposed', false], ['Reject', 'rejected', true]],
+  blocked: [['Back to waiting', 'proposed', false]],
+};
+const tokenKey = 'curl-board-github-token';
+const tokenSavedAtKey = 'curl-board-github-token-saved-at';
+const contentsBase = previewContentsBase() || `https://api.github.com/repos/${repo}/contents/`;
+// The repository's own API URL (or the preview folder above ?contents=), read once when a
+// token is saved and once per page load with one saved, to learn whether it still works.
+const tokenCheckUrl = new URL('..', contentsBase).href;
+const tokenLifetimeDays = 30;
+const tokenWarningDays = 7;
+const dayMs = 24 * 60 * 60 * 1000;
+// The renewal steps (BL-1211), word for word as Claude's memory has them; [text, link] pairs.
+const tokenSteps = [
+  [['Open ', ''], ['https://github.com/settings/personal-access-tokens/new', 'https://github.com/settings/personal-access-tokens/new']],
+  [['Name: Curl board audit tab', '']],
+  [['Expiration: 30 days', '']],
+  [['Resource owner: StewartScottRogers', '']],
+  [['Repository access: Only select repositories, then Curl', '']],
+  [['Permissions, Repository permissions, Actions: Read and write, and Contents: Read and write (Metadata read-only is added by itself; everything else No access)', '']],
+  [['Generate token and copy it', '']],
+  [['Here: press Forget token, paste the new token, save', '']],
+  [['Optional: delete the expired token at ', ''], ['https://github.com/settings/personal-access-tokens', 'https://github.com/settings/personal-access-tokens']],
+];
+// Releasing approved findings (BL-1249): one workflow dispatch per press. The URL sits
+// beside the token check's, so a local preview's ?contents= override covers it too.
+const releaseWorkflow = 'release-approved-findings.yml';
+const dispatchUrl = new URL(`actions/workflows/${releaseWorkflow}/dispatches`, tokenCheckUrl).href;
+const releaseRunsUrl = `https://github.com/${repo}/actions/workflows/${releaseWorkflow}`;
+// How to give the saved token the Actions permission; editing keeps the token's value.
+const tokenEditSteps = [
+  'Open https://github.com/settings/personal-access-tokens',
+  'Choose Curl board audit tab, then Edit',
+  'Repository permissions: Actions: Read and write, and Contents: Read and write',
+  'Update; the token itself does not change, so there is nothing to save here again',
+];
+// What the last request made with the token said about it: refused (401, or a 403 naming
+// the token) and the expiry GitHub sent, when the browser lets the page read it.
+let tokenRefused = false;
+let tokenExpiresAt = null;
+let tokenHelpForcedFor = '';
+
+// ?contents= is a local-preview override only: the page must be on localhost and the
+// override on the page's own origin, so a crafted link cannot send the token elsewhere.
+function previewContentsBase() {
+  const value = params.get('contents');
+  if (!value || !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return null;
+  const url = new URL(value, location.href);
+  return url.origin === location.origin ? url.href : null;
+}
+
+// The tree most recently read, so lane cards can link their task to its file.
+let latestTree = null;
+// The findings most recently read, redrawn in place after a move.
+let latestAudit = null;
+
+function now() { return pinnedNow || new Date(); }
+
+function resolveOverride(name, fallback) {
+  const value = params.get(name);
+  return value ? new URL(value, location.href).href : fallback;
+}
+
+const sources = [
+  {
+    name: 'task tree',
+    url: resolveOverride('tree',
+      `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`),
+    fetch: source => fetchJson(source.url),
+    render: tree => { latestTree = tree; renderBoard(tree); },
+  },
+  {
+    name: 'dark factory status',
+    url: resolveOverride('status',
+      `https://api.github.com/repos/${repo}/contents/status.json?ref=board`),
+    fetch: source => fetchJson(source.url, { Accept: 'application/vnd.github.raw+json' }, [404]),
+    render: status => renderLanes(status),
+  },
+  {
+    // The audit branch's tree is the one extra API call; finding texts come from
+    // raw.githubusercontent.com, which has no API rate limit (BL-1184).
+    name: 'audit findings',
+    url: resolveOverride('audit',
+      `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(auditBranch)}?recursive=1`),
+    fetch: async source => readFindings(await fetchJson(source.url, {}, [404])),
+    render: audit => {
+      latestAudit = audit;
+      renderAudit();
+      if (audit.truncated) {
+        showMessage('warning', `GitHub truncated the ${auditBranch} branch's tree, so the Audit tab may be missing findings.`);
+      }
+    },
+  },
+];
+
+const minimumSeconds = secondsPerCall * sources.length;
+const requestedSeconds = parseInt(params.get('refresh'), 10);
+const refreshSeconds = Number.isFinite(requestedSeconds) ? Math.max(minimumSeconds, requestedSeconds) : minimumSeconds;
+
+// Rate-limit state from the most recent API answer.
+let rateLimit = { remaining: null, resetAt: null, exhausted: false };
+
+class RateLimitError extends Error {}
+
+// Returns null instead of throwing for a status listed in nullStatuses.
+async function fetchJson(url, headers = {}, nullStatuses = []) {
+  const response = await fetch(url, { cache: 'no-store', headers });
+  const remaining = response.headers.get('X-RateLimit-Remaining');
+  const reset = response.headers.get('X-RateLimit-Reset');
+  if (remaining !== null) rateLimit.remaining = parseInt(remaining, 10);
+  if (reset !== null) rateLimit.resetAt = new Date(parseInt(reset, 10) * 1000);
+  if (response.status === 403 || response.status === 429) {
+    rateLimit.exhausted = true;
+    throw new RateLimitError(`${url} answered ${response.status}`);
+  }
+  if (nullStatuses.includes(response.status)) return null;
+  if (!response.ok) throw new Error(`${url} answered ${response.status} ${response.statusText}`);
+  return response.json();
+}
+
+function titleFromSlug(slug) {
+  if (!slug) return '';
+  const words = slug.replace(/-/g, ' ');
+  const title = words.charAt(0).toUpperCase() + words.slice(1);
+  return slug.length >= 59 ? title + '…' : title;
+}
+
+// Splits the tree into live cards per state and archived cards per Done folder.
+function readBoard(tree) {
+  const columns = Object.fromEntries(states.map(state => [state, []]));
+  const archives = new Map();
+  for (const entry of tree.tree || []) {
+    if (entry.type !== 'blob') continue;
+    const parts = entry.path.split('/');
+    if (parts[0] !== 'Tasks' || !states.includes(parts[1])) continue;
+    let target;
+    if (parts.length === 3) {
+      target = columns[parts[1]];
+    } else if (parts.length === 4 && parts[1] === 'Done' && archiveFolder.test(parts[2])) {
+      if (!archives.has(parts[2])) archives.set(parts[2], []);
+      target = archives.get(parts[2]);
+    } else {
+      continue;
+    }
+    const match = taskFile.exec(parts[parts.length - 1]);
+    if (!match) continue;
+    target.push({ id: match[1], title: titleFromSlug(match[2]), path: entry.path });
+  }
+  const byId = (a, b) => parseInt(a.id.slice(3), 10) - parseInt(b.id.slice(3), 10) || a.path.localeCompare(b.path);
+  for (const cards of Object.values(columns)) cards.sort(byId);
+  for (const cards of archives.values()) cards.sort(byId);
+  const archiveList = [...archives.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  return { columns, archives: archiveList };
+}
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function cardElement(card) {
+  const link = element('a', 'card');
+  link.href = `https://github.com/${repo}/blob/${branch}/${card.path.split('/').map(encodeURIComponent).join('/')}`;
+  link.title = card.path;
+  link.append(element('span', 'id', card.id), element('span', 'title', card.title));
+  return link;
+}
+
+function renderBoard(tree) {
+  const { columns, archives } = readBoard(tree);
+  const board = document.getElementById('board');
+  board.replaceChildren();
+  for (const state of states) {
+    const column = element('section', 'column');
+    column.dataset.state = state;
+    const heading = element('h2');
+    heading.append(element('span', 'name', state), element('span', 'count muted', String(columns[state].length)));
+    column.append(heading);
+    for (const card of columns[state]) column.append(cardElement(card));
+    if (state === 'Done') {
+      for (const [folder, cards] of archives) {
+        const details = element('details', 'archive');
+        details.append(element('summary', null, `${folder} · ${cards.length} ${cards.length === 1 ? 'task' : 'tasks'}`));
+        for (const card of cards) details.append(cardElement(card));
+        column.append(details);
+      }
+    }
+    board.append(column);
+  }
+  if (tree.truncated) {
+    showMessage('warning', 'GitHub truncated the tree: it was too large to return whole, so this board is missing tasks.');
+  }
+}
+
+function showMessage(kind, text) {
+  document.getElementById('messages').append(element('p', kind, text));
+}
+
+function utcTime(date) {
+  return date.toISOString().slice(11, 16) + ' UTC';
+}
+
+function duration(ms) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+}
+
+function taskPath(id) {
+  const entry = ((latestTree && latestTree.tree) || []).find(entry =>
+    entry.type === 'blob' && entry.path.startsWith('Tasks/') && entry.path.split('/').pop().startsWith(`${id}-`));
+  return entry ? entry.path : null;
+}
+
+function laneTaskElement(lane) {
+  const line = element('div', 'task');
+  if (!lane.task) {
+    line.append(element('span', 'muted', 'Holds no task'));
+    return line;
+  }
+  const path = taskPath(lane.task);
+  let id;
+  if (path) {
+    id = element('a', null, lane.task);
+    id.href = `https://github.com/${repo}/blob/${branch}/${path.split('/').map(encodeURIComponent).join('/')}`;
+    id.title = path;
+  } else {
+    id = element('span', 'id', lane.task);
+  }
+  line.append(id, element('span', 'title', lane.title || ''));
+  return line;
+}
+
+// One card per lane: task, phase, step, run time and heartbeat age (ADR-0129 items 8 and 9).
+// `stale` is decided by renderLanes, which knows whether the shift is still running.
+function laneCardElement(lane, stale) {
+  const heartbeat = new Date(lane.heartbeatAt);
+  const card = element('article', stale ? 'lane stale' : 'lane');
+  card.dataset.lane = String(lane.lane);
+  const heading = element('h2');
+  heading.append(element('span', 'name', lane.lane === 0 ? 'Runner' : `Lane ${lane.lane}`));
+  if (stale) heading.append(element('span', 'stale-mark', 'stale'));
+  card.append(heading, laneTaskElement(lane));
+  const facts = element('dl');
+  const fact = (term, value) => facts.append(element('dt', 'muted', term), element('dd', null, value));
+  fact('Phase', lane.phase || '');
+  fact('Step', lane.step || '');
+  if (lane.task && lane.taskStartedAt) fact('Running', duration(now() - new Date(lane.taskStartedAt)));
+  fact('Heartbeat', `${duration(now() - heartbeat)} ago`);
+  card.append(facts);
+  return card;
+}
+
+function renderLanes(status) {
+  const section = document.getElementById('lanes');
+  section.replaceChildren();
+  if (status === null) {
+    section.append(element('p', 'muted', 'No dark factory status published yet'));
+    return;
+  }
+  if (status.schema !== 1) {
+    section.append(element('p', 'banner',
+      `The dark factory status uses schema ${status.schema}, which this page cannot read; reload it to get the current page.`));
+    return;
+  }
+  const publishedAt = new Date(status.publishedAt);
+  let notLive = false;
+  if (status.state === 'ended') {
+    section.append(element('p', 'banner', `The shift ended at ${utcTime(publishedAt)}.`));
+  } else if (now() - publishedAt > staleMs) {
+    notLive = true;
+    section.append(element('p', 'banner',
+      `The status has not been updated since ${utcTime(publishedAt)}; the shift may have stopped.`));
+  }
+  // The -Lanes Auto count and its last change's reason (BL-770); null on a fixed-lane shift.
+  const auto = status.autoLanes;
+  if (auto) {
+    section.append(element('p', 'auto-lanes',
+      `Auto lanes: ${auto.lanes} - ${auto.reason}, ${utcTime(new Date(auto.changedAt))}`));
+  }
+  const cards = element('div', 'lane-cards');
+  const lanes = [...(status.lanes || [])].sort((a, b) => a.lane - b.lane);
+  for (const lane of lanes) {
+    const heartbeatOld = now() - new Date(lane.heartbeatAt) > staleMs;
+    cards.append(laneCardElement(lane, status.state !== 'ended' && (notLive || heartbeatOld)));
+  }
+  section.append(cards);
+}
+
+// Finding texts already read, by blob SHA, so a refresh re-reads only changed findings.
+const findingTexts = new Map();
+// Findings and folded lists the viewer has opened, kept open across refreshes.
+const openFindings = new Set();
+
+function encodePath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
+function findingTextUrl(ref, path) {
+  if (findingsOverride) return new URL(encodeURIComponent(path.split('/').pop()), findingsOverride).href;
+  return `https://raw.githubusercontent.com/${repo}/refs/heads/${encodePath(ref)}/${encodePath(path)}`;
+}
+
+async function findingText(finding) {
+  if (findingTexts.has(finding.sha)) return findingTexts.get(finding.sha);
+  const response = await fetch(findingTextUrl(finding.ref, finding.path), { cache: 'no-store' });
+  if (!response.ok) throw new Error(`${finding.path} answered ${response.status} ${response.statusText}`);
+  const text = await response.text();
+  findingTexts.set(finding.sha, text);
+  return text;
+}
+
+// Front matter as a map of lower-case keys, the body after it, and the body's `## Log` section.
+function parseFinding(text) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const fields = {};
+  let bodyStart = 0;
+  if (lines[0] === '---') {
+    const end = lines.indexOf('---', 1);
+    if (end > 0) {
+      for (const line of lines.slice(1, end)) {
+        const match = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line);
+        if (match) fields[match[1].toLowerCase()] = match[2].trim();
+      }
+      bodyStart = end + 1;
+    }
+  }
+  const body = lines.slice(bodyStart);
+  const heading = body.find(line => /^# /.test(line));
+  const logStart = body.findIndex(line => /^## Log\s*$/.test(line));
+  let log = '';
+  if (logStart >= 0) {
+    const next = body.findIndex((line, index) => index > logStart && /^## /.test(line));
+    log = body.slice(logStart + 1, next < 0 ? undefined : next).join('\n').trim();
+  }
+  return { fields, heading: heading ? heading.slice(2).trim() : '', log };
+}
+
+// Findings listed in the task branch's tree (master's copies, merged in) and the audit
+// branch's tree; the audit branch's copy wins when both have one.
+async function readFindings(auditTree) {
+  const byId = new Map();
+  const collect = (tree, ref) => {
+    for (const entry of (tree && tree.tree) || []) {
+      const match = entry.type === 'blob' && findingFile.exec(entry.path);
+      if (match) byId.set(match[1], { id: match[1], slug: match[2], path: entry.path, sha: entry.sha, ref });
+    }
+  };
+  collect(latestTree, branch);
+  collect(auditTree, auditBranch);
+  const findings = [...byId.values()].sort((a, b) => parseInt(a.id.slice(3), 10) - parseInt(b.id.slice(3), 10));
+  await Promise.all(findings.map(async finding => {
+    try {
+      finding.text = await findingText(finding);
+      const { fields, heading, log } = parseFinding(finding.text);
+      finding.status = (fields.status || '').toLowerCase();
+      finding.title = fields.title || heading.replace(/^AF-\d+\s*[—-]\s*/, '') || titleFromSlug(finding.slug);
+      finding.auditor = fields.auditor || '';
+      finding.severity = fields.severity || '';
+      finding.reason = fields.reason || '';
+      finding.task = fields.task || '';
+      finding.tasks = (`${fields.tasks || ''} ${fields.task || ''}`.match(/BL-\d+/gi) || []).map(id => id.toUpperCase());
+      finding.log = log;
+    } catch (error) {
+      finding.error = error.message;
+      finding.title = titleFromSlug(finding.slug);
+    }
+  }));
+  return { findings, auditBranchFound: auditTree !== null, truncated: Boolean(auditTree && auditTree.truncated) };
+}
+
+function textSection(parent, title, text, tag) {
+  parent.append(element('h3', null, title), element(tag, null, text));
+}
+
+function findingElement(finding) {
+  const details = element('details', 'finding');
+  details.dataset.id = finding.id;
+  details.open = openFindings.has(finding.id);
+  details.addEventListener('toggle', () => {
+    if (details.open) openFindings.add(finding.id); else openFindings.delete(finding.id);
+  });
+  const summary = element('summary');
+  summary.append(element('span', 'id', finding.id), element('span', 'title', finding.title));
+  const facts = [finding.auditor, finding.severity].filter(Boolean).join(' · ');
+  summary.append(element('span', 'facts muted', facts || 'auditor and severity not read'));
+  details.append(summary);
+  const body = element('div', 'body');
+  const link = element('a', null, `${finding.path} on ${finding.ref}`);
+  link.href = `https://github.com/${repo}/blob/${encodePath(finding.ref)}/${encodePath(finding.path)}`;
+  body.append(link);
+  if (!finding.error && findingMoves[finding.status] && savedToken() && !tokenRefused) body.append(movesElement(finding));
+  if (!finding.error && finding.status === 'accepted') body.append(...releaseElements(finding));
+  const message = moveMessages.get(finding.id);
+  if (message) body.append(element('p', `move-message ${message.kind}`, message.text));
+  if (finding.error) {
+    textSection(body, 'Could not read the finding', finding.error, 'p');
+  } else {
+    textSection(body, 'Reason', finding.reason || 'None given.', 'p');
+    textSection(body, 'Log', finding.log || 'No Log section.', 'pre');
+    textSection(body, 'Full text', finding.text, 'pre');
+  }
+  details.append(body);
+  return details;
+}
+
+function foldedList(key, label, findings) {
+  const details = element('details', 'fold');
+  details.open = openFindings.has(key);
+  details.addEventListener('toggle', () => {
+    if (details.open) openFindings.add(key); else openFindings.delete(key);
+  });
+  details.append(element('summary', null, `${label} · ${findings.length}`));
+  for (const finding of findings) details.append(findingElement(finding));
+  return details;
+}
+
+// The IDs of tasks in Tasks/Done or any folder under it, from the task branch's tree.
+function doneTaskIds() {
+  const ids = new Set();
+  for (const entry of (latestTree && latestTree.tree) || []) {
+    const match = entry.type === 'blob' && /^Tasks\/Done\/(?:[^/]+\/)?(BL-\d+)[-.]/.exec(entry.path);
+    if (match) ids.add(match[1]);
+  }
+  return ids;
+}
+
+function renderAudit() {
+  renderTokenControls();
+  if (!latestAudit) return;
+  const { findings, auditBranchFound } = latestAudit;
+  // A redraw replaces the reason fields; the one being typed in keeps focus and caret.
+  const active = document.activeElement;
+  const typing = active && active.dataset && active.dataset.reasonFor
+    ? { id: active.dataset.reasonFor, start: active.selectionStart, end: active.selectionEnd } : null;
+  const known = [...findingColumns, ...findingFolds].map(([status]) => status);
+  const done = doneTaskIds();
+  const fixed = finding => finding.status === 'accepted' && (finding.tasks || []).length > 0 && finding.tasks.every(id => done.has(id));
+  const withStatus = status => findings.filter(finding => !finding.error && (
+    status === 'reaudit' ? fixed(finding) : finding.status === status && !(status === 'accepted' && fixed(finding))));
+  const proposed = withStatus('proposed').length;
+  document.getElementById('tab-audit').textContent = `Audit (${proposed})`;
+  document.getElementById('audit-source').textContent = auditBranchFound
+    ? `Findings from ${auditBranch}, and ${branch} for any the ${auditBranch} branch lacks.`
+    : `No ${auditBranch} branch; findings from ${branch}.`;
+  const board = document.getElementById('audit-board');
+  board.replaceChildren();
+  for (const [status, label] of findingColumns) {
+    const cards = withStatus(status);
+    const column = element('section', 'column');
+    column.dataset.status = status;
+    const heading = element('h2');
+    heading.append(element('span', 'name', label), element('span', 'count muted', String(cards.length)));
+    column.append(heading);
+    for (const finding of cards) column.append(findingElement(finding));
+    board.append(column);
+  }
+  const folded = document.getElementById('audit-folded');
+  folded.replaceChildren();
+  for (const [status, label] of findingFolds) folded.append(foldedList(`fold:${status}`, label, withStatus(status)));
+  const others = findings.filter(finding => finding.error || !known.includes(finding.status));
+  if (others.length > 0) folded.append(foldedList('fold:other', 'Unreadable or unknown status', others));
+  renderReleaseAll();
+  const field = typing && [...document.querySelectorAll('input[data-reason-for]')]
+    .find(input => input.dataset.reasonFor === typing.id);
+  if (field) {
+    field.focus();
+    field.setSelectionRange(typing.start, typing.end);
+  }
+}
+
+function savedToken() {
+  try { return localStorage.getItem(tokenKey) || ''; } catch { return ''; }
+}
+
+// The token is never written back into the page: the field is emptied once it is saved.
+function renderTokenControls() {
+  const saved = savedToken() !== '';
+  document.getElementById('token-form').hidden = saved;
+  document.getElementById('token-note').hidden = saved;
+  document.getElementById('token-saved').hidden = !saved;
+  document.getElementById('token-note').textContent =
+    `Read-only. To approve, defer, block or reject findings here, paste a fine-grained GitHub personal ` +
+    `access token for ${repo} only, with Contents: read and write, and Actions: read and write to release ` +
+    `approved findings as tasks. It is kept in this browser's local storage and sent only to the GitHub API.`;
+  document.getElementById('token-saved-text').textContent = tokenRefused
+    ? 'The saved token was refused; moves are off.'
+    : `Moves commit to the ${auditBranch} branch with the token saved in this browser.`;
+  document.getElementById('token-refused').hidden = !(saved && tokenRefused);
+  const expiry = saved && !tokenRefused ? tokenExpiry() : null;
+  const line = document.getElementById('token-expiry');
+  line.hidden = !expiry;
+  if (expiry) {
+    line.className = expiry.warn ? 'token-alert' : 'muted';
+    line.textContent = expiry.text;
+  }
+  // The steps open by themselves once per warning or refusal; the viewer may close them.
+  const help = document.getElementById('token-help');
+  const forcedFor = saved && tokenRefused ? 'refused' : expiry && expiry.warn ? 'warning' : '';
+  if (forcedFor && forcedFor !== tokenHelpForcedFor) help.open = true;
+  tokenHelpForcedFor = forcedFor;
+}
+
+function renderTokenSteps() {
+  const list = document.getElementById('token-steps');
+  for (const parts of tokenSteps) {
+    const item = element('li');
+    for (const [text, href] of parts) {
+      if (!href) { item.append(text); continue; }
+      const link = element('a', null, text);
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      item.append(link);
+    }
+    list.append(item);
+  }
+}
+
+function savedAt() {
+  try {
+    const value = new Date(localStorage.getItem(tokenSavedAtKey) || '');
+    return Number.isNaN(value.getTime()) ? null : value;
+  } catch { return null; }
+}
+
+// "Token expires <date> (in N days)" from GitHub's header, else the saved date plus 30
+// days, labelled as an estimate: GitHub's CORS answer does not expose
+// GitHub-Authentication-Token-Expiration to scripts (checked 2026-10-02, BL-1211).
+function tokenExpiry() {
+  let expiresAt = tokenExpiresAt;
+  const estimated = !expiresAt;
+  if (estimated) {
+    const saved = savedAt();
+    if (!saved) return null;
+    expiresAt = new Date(saved.getTime() + tokenLifetimeDays * dayMs);
+  }
+  const days = Math.ceil((expiresAt - now()) / dayMs);
+  const when = days > 1 ? `in ${days} days` : days === 1 ? 'in 1 day' : days === 0 ? 'today' : `${-days} day${days === -1 ? '' : 's'} ago`;
+  const verb = days < 0 ? 'expired' : 'expires';
+  const label = estimated
+    ? `; an estimate, saved ${isoDate(savedAt())} plus ${tokenLifetimeDays} days, as GitHub does not let this page read the real date`
+    : '';
+  const advice = days <= tokenWarningDays ? ' Make a new one with the steps below.' : '';
+  return { warn: days <= tokenWarningDays, text: `Token ${verb} ${isoDate(expiresAt)} (${when}${label}).${advice}` };
+}
+
+// GitHub sends "2026-11-01 12:00:00 -0700"; null when absent or unreadable.
+function parseTokenExpiration(value) {
+  const match = value && /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{2})(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const date = new Date(`${match[1]}T${match[2]}${match[3]}:${match[4]}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+// Learns from any answer to a request made with the token whether GitHub refused it
+// (401, or 403 with a message naming the token) and, when readable, when it expires.
+function noteTokenAnswer(response, message) {
+  const expiresAt = parseTokenExpiration(response.headers.get('GitHub-Authentication-Token-Expiration'));
+  if (expiresAt) tokenExpiresAt = expiresAt;
+  const refused = response.status === 401 || (response.status === 403 && /token/i.test(message || ''));
+  if (refused && !tokenRefused) {
+    tokenRefused = true;
+    renderAudit();
+  }
+  return refused;
+}
+
+// The one request a saved token costs per page load, and the one saving a token costs.
+async function checkToken() {
+  const token = savedToken();
+  if (!token) return;
+  try {
+    const response = await fetch(tokenCheckUrl, {
+      cache: 'no-store', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}` },
+    });
+    const answer = await response.json().catch(() => ({}));
+    if (token !== savedToken()) return;
+    noteTokenAnswer(response, answer.message);
+  } catch {
+    // A network failure says nothing about the token; the next move or page load asks again.
+  }
+  renderAudit();
+}
+
+document.getElementById('token-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const input = document.getElementById('token-input');
+  const token = input.value.trim();
+  input.value = '';
+  if (token) {
+    localStorage.setItem(tokenKey, token);
+    localStorage.setItem(tokenSavedAtKey, now().toISOString());
+    tokenRefused = false;
+    tokenExpiresAt = null;
+    checkToken();
+  }
+  renderAudit();
+});
+
+document.getElementById('token-forget').addEventListener('click', () => {
+  localStorage.removeItem(tokenKey);
+  localStorage.removeItem(tokenSavedAtKey);
+  tokenRefused = false;
+  tokenExpiresAt = null;
+  renderAudit();
+});
+
+// Per finding ID: the reason being typed, the last move's message, and moves in flight.
+// Kept outside the cards so a refresh's redraw loses none of them.
+const draftReasons = new Map();
+const moveMessages = new Map();
+const movesInFlight = new Set();
+
+function movesElement(finding) {
+  const box = element('div', 'moves');
+  const reason = element('input');
+  reason.type = 'text';
+  reason.placeholder = 'One-line reason';
+  reason.setAttribute('aria-label', `Reason for moving ${finding.id}`);
+  reason.dataset.reasonFor = finding.id;
+  reason.value = draftReasons.get(finding.id) || '';
+  reason.addEventListener('input', () => draftReasons.set(finding.id, reason.value));
+  box.append(reason);
+  for (const [label, to, reasonRequired] of findingMoves[finding.status]) {
+    const button = element('button', null, label);
+    button.type = 'button';
+    button.dataset.to = to;
+    button.disabled = movesInFlight.has(finding.id);
+    button.addEventListener('click', () => moveFinding(finding.id, label, to, reasonRequired));
+    box.append(button);
+  }
+  return box;
+}
+
+function setMoveMessage(id, kind, text) {
+  moveMessages.set(id, { kind, text });
+  renderAudit();
+}
+
+class ConflictError extends Error {}
+
+function contentsUrl(path) {
+  return new URL(encodePath(path), contentsBase).href;
+}
+
+async function contentsRequest(method, path, token, body) {
+  const url = method === 'GET' ? `${contentsUrl(path)}?ref=${encodeURIComponent(auditBranch)}` : contentsUrl(path);
+  const headers = { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}` };
+  if (body) headers['Content-Type'] = 'application/json';
+  const response = await fetch(url, { method, cache: 'no-store', headers, body: body ? JSON.stringify(body) : undefined });
+  const answer = await response.json().catch(() => ({}));
+  const refused = noteTokenAnswer(response, answer.message);
+  if (response.ok) return answer;
+  const said = answer.message ? `: ${answer.message}` : '';
+  if (response.status === 409) throw new ConflictError(`GitHub answered 409${said}`);
+  if (refused) throw new Error(`GitHub refused the token (${response.status}${said}); make a new one with the steps above`);
+  if (method === 'GET' && response.status === 404) throw new Error(`${path} is not on the ${auditBranch} branch, or the token cannot read it (404)`);
+  throw new Error(`GitHub answered ${response.status} ${response.statusText}${said}`);
+}
+
+// The contents API sends base64 of the file's bytes; a BOM, if any, is kept.
+function fromBase64(text) {
+  const bytes = Uint8Array.from(atob(text.replace(/\s/g, '')), character => character.charCodeAt(0));
+  return new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
+}
+
+function toBase64(text) {
+  let binary = '';
+  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function isoDate(date) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// The finding's text with only its status: and reason: lines changed and one line
+// appended to its ## Log section; line endings are kept.
+function movedFindingText(text, from, to, reason, date) {
+  const newline = text.includes('\r\n') ? '\r\n' : '\n';
+  const lines = text.split(newline);
+  if (lines[0].replace(/^﻿/, '') !== '---') throw new Error('the finding has no front matter');
+  const end = lines.indexOf('---', 1);
+  if (end < 0) throw new Error('the finding\'s front matter is not closed');
+  const statusIndex = lines.findIndex((line, index) => index > 0 && index < end && /^status:/i.test(line));
+  if (statusIndex < 0) throw new Error('the finding has no status: line');
+  lines[statusIndex] = `status: ${to}`;
+  const reasonLine = `reason: ${reason}`;
+  const reasonIndex = lines.findIndex((line, index) => index > 0 && index < end && /^reason:/i.test(line));
+  if (reasonIndex >= 0) lines[reasonIndex] = reasonLine; else lines.splice(statusIndex + 1, 0, reasonLine);
+  const entry = `- ${isoDate(date)}: ${from} -> ${to}.${reason ? ` ${reason}` : ''}`;
+  const logIndex = lines.findIndex((line, index) => index > end && /^## Log\s*$/.test(line));
+  if (logIndex < 0) {
+    let last = lines.length - 1;
+    while (last > end && lines[last].trim() === '') last--;
+    lines.splice(last + 1, 0, '', '## Log', '', entry);
+    return lines.join(newline);
+  }
+  const next = lines.findIndex((line, index) => index > logIndex && /^## /.test(line));
+  let last = (next < 0 ? lines.length : next) - 1;
+  while (last > logIndex && lines[last].trim() === '') last--;
+  lines.splice(last + 1, 0, ...(last === logIndex ? ['', entry] : [entry]));
+  return lines.join(newline);
+}
+
+function currentFinding(id) {
+  return ((latestAudit && latestAudit.findings) || []).find(finding => finding.id === id);
+}
+
+// Points the finding at its text on the audit branch, so the card redraws in its new
+// column and the next refresh finds the new blob's text already read.
+function adoptFindingText(id, path, sha, text) {
+  findingTexts.set(sha, text);
+  const finding = currentFinding(id);
+  if (!finding) return;
+  const { fields, log } = parseFinding(text);
+  Object.assign(finding, {
+    path, sha, text, log, ref: auditBranch, error: undefined,
+    status: (fields.status || '').toLowerCase(), reason: fields.reason || '', task: fields.task || '',
+  });
+}
+
+async function moveFinding(id, label, to, reasonRequired) {
+  const token = savedToken();
+  const finding = currentFinding(id);
+  if (!token || !finding || movesInFlight.has(id)) return;
+  const reason = (draftReasons.get(id) || '').replace(/\s+/g, ' ').trim();
+  if (reasonRequired && !reason) {
+    setMoveMessage(id, 'error', `${label} needs a one-line reason.`);
+    return;
+  }
+  const from = finding.status;
+  const path = finding.path;
+  movesInFlight.add(id);
+  setMoveMessage(id, 'info', `${label}: committing to ${auditBranch}…`);
+  try {
+    const read = await contentsRequest('GET', path, token);
+    const text = fromBase64(read.content);
+    const readStatus = (parseFinding(text).fields.status || '').toLowerCase();
+    if (readStatus !== from) {
+      adoptFindingText(id, path, read.sha, text);
+      throw new Error(`the finding is ${readStatus || 'without a status'} on ${auditBranch}, not ${from}; reloaded it, nothing was changed`);
+    }
+    const moved = movedFindingText(text, from, to, reason, now());
+    const written = await contentsRequest('PUT', path, token, {
+      message: `chore(audit): ${from} -> ${to} ${id}`,
+      content: toBase64(moved),
+      sha: read.sha,
+      branch: auditBranch,
+    });
+    adoptFindingText(id, path, written.content.sha, moved);
+    draftReasons.delete(id);
+    const commit = written.commit && written.commit.sha ? ` in ${written.commit.sha.slice(0, 7)}` : '';
+    movesInFlight.delete(id);
+    setMoveMessage(id, 'info', to === 'accepted'
+      ? `Approved${commit}. Release it as a Curl task with its Release button.`
+      : `Moved ${from} -> ${to}${commit}.`);
+  } catch (error) {
+    let text = `${label} failed: ${error.message}.`;
+    if (error instanceof ConflictError) {
+      text = `${label} failed: the finding changed on ${auditBranch} since it was read (409). ` +
+        'Reloaded it; nothing was overwritten.';
+      try {
+        const reread = await contentsRequest('GET', path, token);
+        adoptFindingText(id, path, reread.sha, fromBase64(reread.content));
+      } catch (reloadError) {
+        text += ` The reload failed too: ${reloadError.message}.`;
+      }
+    }
+    movesInFlight.delete(id);
+    setMoveMessage(id, 'error', text);
+  }
+}
+
+// The BL ID a finding's task: line names, or null while it is none.
+function releasedTask(finding) {
+  const match = /^BL-\d+$/i.exec((finding.task || '').trim());
+  return match ? match[0].toUpperCase() : null;
+}
+
+function awaitingRelease(finding) {
+  return !finding.error && finding.status === 'accepted' && (finding.task || 'none').trim().toLowerCase() === 'none';
+}
+
+// Per finding ID, or '*' for the release-all button: the last dispatch's message and the
+// findings it covered. Kept outside the cards so a refresh's redraw loses none of them.
+const releaseMessages = new Map();
+// Findings a dispatch has started a run for, waiting for their task: line to change.
+const releasing = new Set();
+let releaseInFlight = false;
+
+// "Released as BL-####" once every finding the message covered names its task.
+function releaseMessageElement(message) {
+  const findings = message.ids.map(currentFinding).filter(Boolean);
+  const tasks = findings.map(releasedTask);
+  if (findings.length > 0 && tasks.every(Boolean)) {
+    return element('p', 'move-message release-message', `Released as ${tasks.join(', ')}`);
+  }
+  const box = element('p', `move-message release-message ${message.kind}`, message.text);
+  if (message.run) {
+    const link = element('a', null, 'run');
+    link.href = message.run;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    box.append(' (', link, ')');
+  }
+  if (message.steps) {
+    const list = element('ol');
+    for (const step of message.steps) list.append(element('li', null, step));
+    box.append(list);
+  }
+  return box;
+}
+
+function releaseButton(label, ids, all) {
+  const button = element('button', null, label);
+  button.type = 'button';
+  button.disabled = releaseInFlight || ids.every(id => releasing.has(id));
+  button.addEventListener('click', () => releaseFindings(ids, all));
+  return button;
+}
+
+// An approved card's Release button (while its task: is none) and its release message.
+function releaseElements(finding) {
+  const task = releasedTask(finding);
+  const message = releaseMessages.get(finding.id);
+  if (task) return [element('p', 'move-message release-message', `Released as ${task}`)];
+  const parts = [];
+  if (awaitingRelease(finding) && savedToken() && !tokenRefused) {
+    const box = element('div', 'moves');
+    box.append(releaseButton('Release', [finding.id], false));
+    parts.push(box);
+  }
+  if (message) parts.push(releaseMessageElement(message));
+  return parts;
+}
+
+function renderReleaseAll() {
+  const section = document.getElementById('audit-release');
+  section.replaceChildren();
+  const waiting = ((latestAudit && latestAudit.findings) || []).filter(awaitingRelease).map(finding => finding.id);
+  if (waiting.length > 0 && savedToken() && !tokenRefused) {
+    section.append(releaseButton(`Release approved findings (${waiting.length})`, waiting, true));
+  }
+  const message = releaseMessages.get('*');
+  if (message) section.append(releaseMessageElement(message));
+}
+
+function setReleaseMessage(ids, all, message) {
+  const entry = { ...message, ids };
+  if (all) releaseMessages.set('*', entry);
+  for (const id of ids) releaseMessages.set(id, entry);
+  renderAudit();
+}
+
+// One workflow dispatch: the card's finding, or empty for every approved finding without
+// a task. The token goes only into the Authorization header.
+async function releaseFindings(ids, all) {
+  const token = savedToken();
+  if (!token || releaseInFlight || ids.length === 0) return;
+  releaseInFlight = true;
+  setReleaseMessage(ids, all, { kind: 'info', text: 'Sending the release…' });
+  let message;
+  try {
+    const response = await fetch(dispatchUrl, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: 'master', inputs: { findings: all ? '' : ids.join(',') }, return_run_details: true }),
+    });
+    const answer = await response.json().catch(() => ({}));
+    if (response.ok) {
+      for (const id of ids) releasing.add(id);
+      message = { kind: 'info', text: 'Releasing…', run: answer.html_url || releaseRunsUrl };
+    } else if (response.status === 404) {
+      message = { kind: 'error', text: 'Available after the next merge to master.' };
+    } else if (response.status === 401 || response.status === 403) {
+      // A 401 is the token itself refused; a 403 here is a token without the Actions
+      // permission, which still moves findings, so only a 401 turns the moves off.
+      if (response.status === 401) noteTokenAnswer(response, answer.message);
+      message = {
+        kind: 'error',
+        text: `GitHub refused the release (${response.status}). The token needs Actions: Read and write as well as ` +
+          'Contents: Read and write. To edit it:',
+        steps: tokenEditSteps,
+      };
+    } else {
+      message = { kind: 'error', text: `Release failed: GitHub answered ${response.status}${answer.message ? `: ${answer.message}` : ''}.` };
+    }
+  } catch (error) {
+    message = { kind: 'error', text: `Release failed: ${error.message}.` };
+  }
+  releaseInFlight = false;
+  setReleaseMessage(ids, all, message);
+}
+
+function showTab() {
+  const shown = ['#audit', '#gaps'].includes(location.hash) ? location.hash.slice(1) : 'tasks';
+  for (const name of ['tasks', 'audit', 'gaps']) {
+    document.getElementById(`panel-${name}`).hidden = name !== shown;
+    document.getElementById(`tab-${name}`).setAttribute('aria-selected', String(name === shown));
+  }
+  // The gap dashboard loads only when its tab is first opened.
+  const frame = document.getElementById('gaps-frame');
+  if (shown === 'gaps' && !frame.src) {
+    // The dashboard's own site links would be a second row of tabs here; the board's are enough.
+    frame.addEventListener('load', () => {
+      const siteLinks = frame.contentDocument?.querySelector('nav.tabs');
+      if (siteLinks) {
+        siteLinks.style.display = 'none';
+      }
+    });
+    frame.src = frame.dataset.src;
+  }
+}
+
+function clockTime(date, withSeconds) {
+  const pad = n => String(n).padStart(2, '0');
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return withSeconds ? `${time}:${pad(date.getSeconds())}` : time;
+}
+
+async function refresh() {
+  document.getElementById('messages').replaceChildren();
+  rateLimit = { remaining: null, resetAt: null, exhausted: false };
+  let allSucceeded = true;
+  for (const source of sources) {
+    try {
+      source.render(await source.fetch(source));
+      source.rendered = true;
+    } catch (error) {
+      allSucceeded = false;
+      if (!(error instanceof RateLimitError)) {
+        const kept = source.rendered ? 'showing the last one read' : 'nothing read yet';
+        showMessage('error', `Could not refresh the ${source.name} (${error.message}); ${kept}.`);
+      }
+    }
+  }
+  if (allSucceeded) {
+    document.getElementById('refreshed').textContent = `Last refreshed ${clockTime(now(), true)}`;
+  }
+  let delayMs = refreshSeconds * 1000;
+  const limitReached = rateLimit.exhausted || (rateLimit.remaining !== null && rateLimit.remaining < sources.length);
+  if (limitReached) {
+    const resetAt = rateLimit.resetAt;
+    if (resetAt) {
+      showMessage('error', `GitHub's hourly API limit is used up; next refresh at ${clockTime(resetAt, false)}`);
+      delayMs = Math.max(delayMs, resetAt.getTime() - Date.now() + 1000);
+    } else {
+      showMessage('error', `GitHub's hourly API limit is used up; next refresh in ${refreshSeconds} s`);
+    }
+  }
+  setTimeout(refresh, delayMs);
+}
+
+window.addEventListener('hashchange', showTab);
+showTab();
+renderTokenSteps();
+// A token saved before the page recorded save dates counts from the first load that sees it.
+if (savedToken() && !savedAt()) {
+  try { localStorage.setItem(tokenSavedAtKey, now().toISOString()); } catch { /* storage unavailable */ }
+}
+renderTokenControls();
+checkToken();
+document.getElementById('source').textContent = `${repo} · ${branch}`;
+document.getElementById('cadence').textContent =
+  `Refreshes every ${refreshSeconds} s (minimum ${minimumSeconds} s: ${secondsPerCall} s per API call, ` +
+  `${sources.length} call${sources.length === 1 ? '' : 's'} per refresh; set ?refresh= to slow it down).`;
+refresh();
+</script>
+</body>
+</html>
