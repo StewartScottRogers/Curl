@@ -100,3 +100,4 @@ or `Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs` (already in tou
 - 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019 in Doing; waits on BL-6019 (plan and measurements under Notes)
 - 2026-11-27: Backlog -> Doing. Criteria at claim: 45a3dc74 69116afe 3d836d5e.
 - 2026-11-27: Doing -> Backlog. Code for nc=1 written and unit tested (uncommitted, unmeasured): left are the quality run and https t under 2 by 10-30 ms from the HTTP handler's timings (see Notes)
+- 2026-11-27: Backlog -> Deferred. Split for size into BL-6081 (num_connects count, continues the stash) and BL-6082 (https time_total at least -m); do not reopen
