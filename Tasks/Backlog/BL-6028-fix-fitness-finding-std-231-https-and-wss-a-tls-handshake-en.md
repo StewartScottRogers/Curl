@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-6019]
-touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Networking.UnitLibrary/TcpConnector.ConnectTimeout.cs, Curl.Networking.UnitLibrary/TcpConnector.DirectConnect.cs, Curl.Networking.UnitLibrary/TcpConnector.TlsHandshake.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Engine.UnitTests/Std231Tests.cs, Curl.Networking.UnitTests/TcpConnectorStd231Tests.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultStd231Tests.cs]
+touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Networking.UnitLibrary/TcpConnector.ConnectTimeout.cs, Curl.Networking.UnitLibrary/TcpConnector.DirectConnect.cs, Curl.Networking.UnitLibrary/TcpConnector.TlsHandshake.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Networking.UnitLibrary/NumberedConnectFailure.cs, Curl.Engine.UnitTests/Std231Tests.cs, Curl.Networking.UnitTests/TcpConnectorStd231Tests.cs, Curl.Protocol.Abstractions.UnitTests/ConnectResultStd231Tests.cs]
 requirement: none
 created: 2026-11-26
 completed:
@@ -73,9 +73,30 @@ Plan:
    even when `handlerCountsConnections` (`http`/`https` report 0 after a timed-out connect, built by
    `HttpTransferDeadline`).
 
+2026-11-27 (lane 2): plan steps 1-3 are written and left uncommitted for the stash: no quality run had
+finished when the deadline came (the stopped run was still building after 80 minutes). Done:
+`ConnectResult.TcpConnectedOnCancellationKey`, `IsTcpConnectedBeforeFailure` and `WithTcpConnectedBeforeFailure`;
+`TcpConnector.SecureWhenAskedAsync` marks a cancelled handshake's exception and the connect-limit catch copies the
+mark onto its failure; `NumberedConnectFailure.Of` keeps the flag (it rebuilt the failure and dropped it; touches
+widened for that file, which no Doing task held); `EndPointRecordingConnector` counts a marked failure or cancellation
+through `ConnectionEndPointRecorder.RecordFailedAfterOpening`; `WithConnectionCount` adds those to a failed
+transfer's count even when the handler counts, giving a reportless result a report. Focused tests: `Std231Tests`,
+`TcpConnectorStd231Tests`, `ConnectResultStd231Tests`. Build clean; Abstractions (1643), Networking (5019) and
+Engine (3259) fast tests green.
+Measured with the change (listener on 127.0.0.1:29990 that never accepts): `-m 2` https `[28 t=1.97..1.99 nc=1]`,
+wss `[28 t=2.02 nc=1]`; `--connect-timeout 1` both `nc=1`; refused `127.0.0.1:1` keeps `nc=0`.
+Left: (1) run `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Networking.UnitLibrary,Curl.Protocol.Abstractions.UnitLibrary`
+and commit; (2) https `t` is 10 to 30 ms under 2: the HTTP handler's own timings (the report already has `Timings`, so
+`EndPointReportingProtocolHandler.StampTimingsAndUploadSize` keeps them) start after the `-m` watchdog's clock, and
+plain `http://10.255.255.1/ -m 2` shows the same (`t=1.97`). curl's total counts from the transfer start, where `-m`
+starts. Likely fix: in the `-m` cancellation path, a total under `MaxTime` moves `Started` back to `completed - MaxTime`,
+or the HTTP deadline report starts at the watchdog's start; that needs `Curl.Original.Protocol.Http.UnitLibrary/HttpTransferDeadline.cs`
+or `Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs` (already in touches).
+
 ## Log
 
 - 2026-11-26: Created from fitness review 2026-11-26T0704.
 - 2026-11-26: Backlog -> Doing. Criteria at claim: 45a3dc74 69116afe 3d836d5e.
 - 2026-11-26: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/TcpConnector.cs, held by BL-6019 in Doing; waits on BL-6019 (plan and measurements under Notes)
 - 2026-11-27: Backlog -> Doing. Criteria at claim: 45a3dc74 69116afe 3d836d5e.
+- 2026-11-27: Doing -> Backlog. Code for nc=1 written and unit tested (uncommitted, unmeasured): left are the quality run and https t under 2 by 10-30 ms from the HTTP handler's timings (see Notes)
