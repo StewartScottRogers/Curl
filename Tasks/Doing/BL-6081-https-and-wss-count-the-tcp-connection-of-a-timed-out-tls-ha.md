@@ -39,3 +39,4 @@ The stash holds the whole change and its three test files, built clean with the 
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: f95c1f0d 0fe6442f 682d32cc 171fc27d 3d836d5e.
