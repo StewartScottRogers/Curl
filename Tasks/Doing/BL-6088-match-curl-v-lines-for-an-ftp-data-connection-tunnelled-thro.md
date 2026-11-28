@@ -30,3 +30,4 @@ Measured while doing BL-6083 with a PowerShell loopback proxy that answers the c
 ## Log
 
 - 2026-11-27: Created.
+- 2026-11-27: Backlog -> Doing. Criteria at claim: 1961e71e 89b25f9e.
